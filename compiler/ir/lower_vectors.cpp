@@ -235,7 +235,8 @@ void Vectors::vector_loop(ForIn *p_loop) {
 // for each (x in list) and for (i in list) over one of Godot's collections. Its Array and its packed arrays
 // by index, first to last: the size is asked again each time round, as a vector's length is read, and
 // `for in` gives the indices. Its Dictionary by the keys it has as the loop begins, in Godot's order: a key
-// erased on the way is passed over and one added is not reached, as with an Object here.
+// erased on the way is passed over and one added is not reached, as with an Object here. No collection
+// (null) is nothing to go through, as in AS3.
 void Vectors::engine_loop(ForIn *p_loop) {
 	const uint32_t position = p_loop->offset;
 	const Type *whole = p_loop->collection->type;
@@ -259,6 +260,10 @@ void Vectors::engine_loop(ForIn *p_loop) {
 	}
 	const uint32_t collection = l_.engine_reg(Kind::Val, whole);
 	l_.emit(Op::Move, position, collection, l_.expression(p_loop->collection, Kind::Val));
+	// Nothing to go through if there is no collection, as with a Vector.
+	const uint32_t present = l_.reg(Kind::Bool);
+	l_.emit(Op::HostPresent, position, present, collection);
+	const uint32_t to_end = l_.emit(Op::JumpIfNot, position, present, 0);
 	const std::string_view counted = keyed ? std::string_view("GodotArray") : whole->symbol->name;
 	const uint32_t list = keyed ? Engine(l_).method_of("GodotDictionary", "keys", Kind::Val, "Array", { collection }, position).value_or(NONE) : collection;
 	if (list == NONE) {
@@ -298,6 +303,7 @@ void Vectors::engine_loop(ForIn *p_loop) {
 	l_.emit(Op::AddI64, position, at, at, one);
 	l_.emit(Op::Jump, position, top);
 	l_.patch(out, l_.here());
+	l_.patch(to_end, l_.here());
 	Statements(l_).finish_loop(next_at);
 }
 

@@ -445,7 +445,11 @@ output = compare("loops.gd", [
     "for in gives a Dictionary's keys", "for in into a variable declared above", "for each gives a Dictionary's values", "break and continue",
     "an element added on the way is reached", "a key erased on the way is passed over, one added is not reached", "a loop inside a loop",
     "for in over a packed array", "in on a Dictionary", "delete on a Dictionary", "delete by a name", "an element of another type",
+    "for each into the script's own class", "a node without the script is not of its class", "for each into one of Godot's values",
+    "no collection is nothing to go through",
 ])
+check("loops.gd: a node without the script, where the loop's variable is the script's class, is AS3's coercion error",
+      "to Loops." in output and "at Loops/scripted()" in output, output[-1500:])
 check("loops.gd: an element that is not what the loop's variable is declared is AS3's coercion error",
       "Error #1034: Type Coercion failed: cannot convert 5 to Node." in output and "at Loops/wrongElement()" in output, output[-1500:])
 

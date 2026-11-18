@@ -114,6 +114,35 @@ package {
 			delete table["b"];
 			return int(table.size());
 		}
+		// Into a variable of the script's own class: a node that carries the script is one, as for `as`.
+		public function scripted(list:GodotArray):String {
+			var out:String = "";
+			for each (var own:Loops in list) {
+				out += own.name + ";";
+			}
+			return out;
+		}
+		public function points(list:GodotArray):Number {
+			var total:Number = 0;
+			for each (var point:Vector2 in list) {
+				total += point.x * point.y;
+			}
+			return total;
+		}
+		// No collection: nothing to go through, as with a Vector that is null.
+		public function missing():String {
+			var list:GodotArray = null;
+			var table:GodotDictionary = null;
+			var count:int = 0;
+			for each (var a:* in list) { count++; }
+			for (var i:int in list) { count++; }
+			for each (var b:* in table) { count++; }
+			for (var k:* in table) { count++; }
+			var said:String = "" + count;
+			try { said += " " + ("k" in table); } catch (e:Error) { said += " in:" + e.errorID; }
+			try { said += " " + (delete table["k"]); } catch (f:Error) { said += " delete:" + f.errorID; }
+			return said;
+		}
 		public function wrongElement(list:GodotArray):String {
 			var out:String = "";
 			for each (var child:Node in list) {

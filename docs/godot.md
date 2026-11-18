@@ -205,6 +205,8 @@ package game {
 - **`for each` gives the elements of a `GodotArray` or a packed array, and the values of a
   `GodotDictionary`.** `for in` gives the indices, or the keys.
 - **An element is checked as it's stored in the loop's variable.** One that doesn't fit is TypeError #1034.
+  A node that carries your script fits a variable of the script's class.
+- **A loop over `null` runs no times,** as in AS3.
 - **A loop over a `GodotArray` reaches an element added on the way.** A loop over a `GodotDictionary` visits
   the keys it had when the loop began, in Godot's order, and skips a key erased on the way.
 - **`key in table` and `delete table[key]` work on a `GodotDictionary`.** `delete` gives `true` whether or

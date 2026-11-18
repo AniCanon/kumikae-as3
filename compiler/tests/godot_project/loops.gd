@@ -79,4 +79,15 @@ func _physics_process(_delta: float) -> bool:
 	show("delete on a Dictionary", [ask("remove", [smaller, 2]), ask("remove", [smaller, "z"]), smaller], [true, true, {"a": 1, "c": Vector2(3, 4)}])
 	show("delete by a name", ask("removeNamed", [{"a": 1, "b": 2, "c": 3}]), 2)
 	show("an element of another type", ask("wrongElement", [[node, 5]]), null)
+	show("for each into the script's own class", ask("scripted", [[node, node]]), "%s;%s;" % [node.name, node.name])
+	var plain := Node2D.new()
+	show("a node without the script is not of its class", ask("scripted", [[node, plain]]), null)
+	plain.free()
+	var points := [Vector2(1, 2), Vector2(3, 4)]
+	var area := 0.0
+	for point in points:
+		area += point.x * point.y
+	show("for each into one of Godot's values", ask("points", [points]), area)
+	# GDScript refuses a loop over null: AS3 goes through nothing.
+	show("no collection is nothing to go through", ask("missing"), "0 in:1009 delete:1009")
 	return false

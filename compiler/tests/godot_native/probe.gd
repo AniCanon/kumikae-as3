@@ -76,7 +76,8 @@ func _loops() -> void:
 			" ", loops.call("untilNegative", [3, 0, 4, -1, 5]), " ", loops.call("grown", growing), growing, " ", loops.call("erasedOnTheWay", {"a": 1, "b": 2, "c": 3}),
 			" ", loops.call("pairs", [1, 2, 3]), " ", loops.call("packedIndices", PackedInt32Array([5, 6])))
 	print("PROBE keyed=", loops.call("has", table, 2), loops.call("has", table, "2"), " ", loops.call("remove", table, 2), table, " ", loops.call("removeNamed", {"b": 1}),
-			" ", loops.call("wrongElement", [loops, 5]))
+			" ", loops.call("wrongElement", [loops, 5]), " ", loops.call("scripted", [loops, loops]), " ", loops.call("points", [Vector2(1, 2), Vector2(3, 4)]),
+			" ", loops.call("missing"))
 
 
 # What signals carry between AS3 and Godot (the test project's Emits.as, by the rows emits.gd holds to what
