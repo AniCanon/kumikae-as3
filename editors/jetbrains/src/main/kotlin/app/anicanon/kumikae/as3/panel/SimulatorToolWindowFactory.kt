@@ -17,7 +17,7 @@ class SimulatorToolWindowFactory :
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val ios = if (SystemInfo.isMac) project.service<SimulatorHost>().repository else null
-        val emulators = AndroidEmulators(project.service<app.anicanon.kumikae.as3.run.AndroidDevices>())
+        val emulators = androidEmulators(project)
         val catalog = GameDeviceCatalog(ios, emulators, { device ->
             val content = toolWindow.contentManager.findContent("iOS") ?: addIos(project, toolWindow)
             toolWindow.contentManager.setSelectedContent(content)
@@ -48,6 +48,10 @@ class SimulatorToolWindowFactory :
     }
 
     companion object {
+        private fun androidEmulators(project: Project) = AndroidEmulators(
+            project.service<app.anicanon.kumikae.as3.run.AndroidDevices>(),
+            PropertiesComponent.getInstance(),
+        )
         private val IOS = com.intellij.openapi.util.Key.create<SimulatorToolWindow>("kumikae.ios.window")
         internal fun showIos(project: Project) {
             val window =
@@ -62,7 +66,7 @@ class SimulatorToolWindowFactory :
         private fun androidContent(project: Project, window: ToolWindow): com.intellij.ui.content.Content {
             window.contentManager.findContent("Android")?.let { return it }
             val viewer =
-                AndroidDeviceWindow(AndroidEmulators(project.service<app.anicanon.kumikae.as3.run.AndroidDevices>()))
+                AndroidDeviceWindow(androidEmulators(project))
             return ContentFactory.getInstance().createContent(viewer.component, "Android", false).also {
                 it.putUserData(ANDROID, viewer)
                 it.setDisposer(viewer)

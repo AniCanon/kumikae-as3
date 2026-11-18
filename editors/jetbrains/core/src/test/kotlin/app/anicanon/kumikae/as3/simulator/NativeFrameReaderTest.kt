@@ -8,6 +8,29 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class NativeFrameReaderTest {
+    @Test fun returnsAnUnusedImageWhenDimensionsChangeDuringAllocation() {
+        val file = Files.createTempFile("native-resize", ".slot")
+        try {
+            RandomAccessFile(file.toFile(), "rw").use { writer ->
+                writer.setLength(NativeFrameLayout.fileBytes)
+                val header = NativeFrameHeader(1, 1, 1, 4, 1, 2, 1, 1, 1000)
+                writer.write(header.encode())
+                val expected = java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB)
+                var discarded: java.awt.image.BufferedImage? = null
+                NativeFrameReader(file, discard = { discarded = it }) { _, _ ->
+                    writer.seek(0)
+                    writer.write(header.copy(sequence = 2, width = 2, stride = 8).encode())
+                    expected
+                }.use { reader ->
+                    assertNull(reader.poll())
+                    kotlin.test.assertSame(expected, discarded)
+                }
+            }
+        } finally {
+            Files.delete(file)
+        }
+    }
+
     @Test fun allocationAllowsPublicationAndThenReadsTheNewestHeader() {
         val file = Files.createTempFile("native-allocation", ".slot")
         try {

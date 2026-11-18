@@ -9,7 +9,26 @@ import java.nio.file.Path
 
 internal data class AndroidAvd(val name: String, val serial: String? = null)
 
-internal class AndroidEmulators(private val devices: AndroidDevices) {
+internal enum class AndroidGraphics(val label: String, val arguments: List<String>) {
+    DEVICE("Device default", emptyList()),
+    HOST("Host GPU", listOf("-gpu", "host")),
+    SOFTWARE("Software", listOf("-gpu", "software")),
+}
+
+internal class AndroidEmulators(
+    private val devices: AndroidDevices,
+    private val settings: com.intellij.ide.util.PropertiesComponent,
+) {
+    var graphics: AndroidGraphics
+        get() = AndroidGraphics.entries.firstOrNull { it.name == settings.getValue(GRAPHICS) } ?: AndroidGraphics.DEVICE
+        set(mode) {
+            settings.setValue(GRAPHICS, mode.name, AndroidGraphics.DEVICE.name)
+        }
+
+    private companion object {
+        const val GRAPHICS = "kumikae.as3.android.emulatorGraphics"
+    }
+
     private val sdk: Path get() = requireNotNull(devices.sdk) {
         "Install Android SDK Platform Tools and Android Emulator."
     }
@@ -42,6 +61,7 @@ internal class AndroidEmulators(private val devices: AndroidDevices) {
         ) {
             arguments += "-no-window"
         }
+        arguments += graphics.arguments
         ProcessBuilder(arguments).redirectErrorStream(true)
             .redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
     }

@@ -33,9 +33,12 @@ internal class SimulatorWindowController(
         private set
     var frame: SimulatorFrame? = null
         private set(value) {
+            if (field === value) return
+            val previous = field
             field = value
             hasFrame = value != null
             onFrame(value)
+            previous?.retire()
         }
     var capture by mutableStateOf("")
         private set
@@ -63,6 +66,12 @@ internal class SimulatorWindowController(
         frame = it
         capture = if (it == null) "" else "Native · ${it.image.width}×${it.image.height}"
     }, { status = it })
+
+    var onFramesReady: () -> Unit
+        get() = live.onFramesReady
+        set(value) {
+            live.onFramesReady = value
+        }
 
     fun frameTick() {
         live.tick(
@@ -243,6 +252,7 @@ internal class SimulatorWindowController(
         if (disposed) return
         disposed = true
         live.dispose()
+        frame = null
         touchController.dispose()
         actions.dispose()
         polling.dispose()

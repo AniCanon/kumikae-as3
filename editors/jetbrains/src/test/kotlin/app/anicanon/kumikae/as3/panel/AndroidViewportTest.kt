@@ -6,10 +6,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class AndroidViewportTest {
+    @Test fun graphicsOverrideOnlyChangesTheNextEmulatorLaunch() {
+        assertEquals(emptyList<String>(), AndroidGraphics.DEVICE.arguments)
+        assertEquals(listOf("-gpu", "host"), AndroidGraphics.HOST.arguments)
+        assertEquals(listOf("-gpu", "software"), AndroidGraphics.SOFTWARE.arguments)
+    }
+
     @Test fun `a busy event thread receives one notification for the newest frame`() {
         val queue = mutableListOf<() -> Unit>()
         var received = 0
-        val frames = AndroidFrameDispatch({ queue.add(it) }) { received++ }
+        val frames = FrameDispatch({ queue.add(it) }) { received++ }
         repeat(10) { frames.request() }
         assertEquals(1, queue.size)
         queue.removeAt(0)()

@@ -11,6 +11,7 @@ data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage
 
 class NativeFrameReader(
     path: Path,
+    private val discard: (BufferedImage) -> Unit = {},
     private val allocate: (Int, Int) -> BufferedImage = { width, height ->
         BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
     },
@@ -30,6 +31,17 @@ class NativeFrameReader(
         val initial = initialLock.use { readHeader() } ?: return null
         // Allocation can collect the JVM heap. Never make the native writer wait for that pause.
         val image = allocate(initial.width, initial.height)
+        var delivered = false
+        try {
+            val picture = copyNewest(image)
+            delivered = picture != null
+            return picture
+        } finally {
+            if (!delivered) discard(image)
+        }
+    }
+
+    private fun copyNewest(image: BufferedImage): NativePicture? {
         val pixels = (image.raster.dataBuffer as DataBufferInt).data
         val lock = channel.tryLock(0, Long.MAX_VALUE, true) ?: return null
         lock.use {

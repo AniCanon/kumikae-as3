@@ -163,14 +163,32 @@ internal object UiProbeAndroidRun {
                     return highlighted
                 }
                 await("highlighted Start button on the home screen", 20) { isHighlighted(.14, .67) }
-                app.invokeAndWait { screen.presented = { paints += it } }
-                val sampleStart = System.nanoTime()
+                val sequences = mutableListOf<Long>()
+                val observed = mutableListOf<Long>()
+                val delays = mutableListOf<Double>()
+                val reader = UiProbeReaderAllocation("Kumikae Android display")
+                var sampleStart = 0L
+                app.invokeAndWait {
+                    sampleStart = System.nanoTime()
+                    screen.presented = { now ->
+                        val frame = checkNotNull(screen.picture)
+                        paints += now
+                        sequences += frame.sequence
+                        observed += frame.observedAt
+                        delays += (now - frame.decodedAt) / 1e6
+                    }
+                }
                 tap(.22, .68)
                 await("selected character and Continue button on the roster", 12) {
                     isHighlighted(.12, .40) && isHighlighted(.86, .89)
                 }
                 Thread.sleep(5000)
-                val sampleEnd = System.nanoTime()
+                var sampleEnd = 0L
+                app.invokeAndWait {
+                    screen.presented = {}
+                    sampleEnd = System.nanoTime()
+                }
+                val allocated = reader.bytes()
                 app.invokeAndWait {
                     val image = BufferedImage(screen.width, screen.height, BufferedImage.TYPE_INT_RGB)
                     val g = image.createGraphics()
@@ -183,9 +201,14 @@ internal object UiProbeAndroidRun {
                 }
                 check(paints.size >= 2)
                 val fps = paints.size * 1e9 / (sampleEnd - sampleStart)
+                val sourceFps = (sequences.last() - sequences.first()) * 1e9 / (observed.last() - observed.first())
+                val sorted = delays.sorted()
                 Files.writeString(
                     output.resolve("android-display.txt"),
-                    "Game launched from Rider. ${paints.size} frames presented, ${"%.1f".format(fps)} fps.\n",
+                    "Game launched from Rider. ${paints.size} frames presented, ${"%.1f".format(fps)} fps.\n" +
+                        "Reader allocated $allocated bytes. Capture sequence rate: $sourceFps/s. " +
+                        "Decoded-to-paint p50/p95 ms: " +
+                        "${sorted[sorted.size / 2]} / ${sorted[(sorted.lastIndex * .95).toInt()]}\n",
                 )
                 check(source == Files.readString(folder.resolve("export_presets.cfg")))
             } finally {

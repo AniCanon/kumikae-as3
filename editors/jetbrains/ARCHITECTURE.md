@@ -145,7 +145,10 @@ With the input switch on, `LocalSession` starts the Swift helper in `native/Simu
 - `NativeBridgeConnection` checks that the helper is ready and sends small control messages.
 - The helper writes each frame into a memory-mapped slot. `NativeFrameReader` copies a new frame out under
   a shared file lock, and `NativeFrameFeed` does that work off the UI thread and keeps only the newest
-  frame.
+  frame. The reader acquires an unused image before locking to copy. An unread, superseded frame
+  or an image detached on the UI thread can return to the pool. Clipboard snapshots own their pixels.
+- Both platform readers signal the UI thread on publication. Each view coalesces notices and takes
+  the newest available frame. Stream startup and retries use the status timer.
 - A failure to start reaches the panel, which retries with a bounded backoff. There's no other backend to
   fall back to.
 

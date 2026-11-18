@@ -74,9 +74,13 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
         }
     }
     private val refresh = Timer(2000) { refresh() }
-    private val frames = AndroidFrameDispatch({ java.awt.EventQueue.invokeLater(it) }) {
+    private val frames = FrameDispatch({ java.awt.EventQueue.invokeLater(it) }) {
         val live = feed
-        live?.poll()?.let { screen.picture = it }
+        live?.poll()?.let { next ->
+            val previous = screen.picture
+            screen.picture = next
+            if (previous != null) live.retire(previous)
+        }
         live?.failure?.let {
             closeView()
             status = it

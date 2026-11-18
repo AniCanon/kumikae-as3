@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kumikae-logo-dark.svg">
-    <img src="docs/assets/kumikae-logo.svg" alt="Kumikae logo" width="96" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="editors/jetbrains/src/main/resources/META-INF/pluginIcon_dark.svg">
+    <img src="editors/jetbrains/src/main/resources/META-INF/pluginIcon.svg" alt="Kumikae AS3" width="96" height="96">
   </picture>
 </p>
 

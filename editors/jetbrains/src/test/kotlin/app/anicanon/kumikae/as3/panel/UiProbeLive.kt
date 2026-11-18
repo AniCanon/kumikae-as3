@@ -124,6 +124,7 @@ internal object UiProbeLive {
             val threads = ManagementFactory.getThreadMXBean()
             val edt = onEdtValue { Thread.currentThread().threadId() }
             val cpuStart = threads.getThreadCpuTime(edt)
+            val reader = UiProbeReaderAllocation("kumikae-native-frames")
             repeat(16) { index ->
                 val frame = onEdtValue { checkNotNull(controller.frame) }
                 val size = frame.geometry
@@ -147,6 +148,7 @@ internal object UiProbeLive {
                 Thread.sleep(100)
             }
             val seconds = (System.nanoTime() - start) / 1e9
+            val allocated = reader.bytes()
             val edtCpuSeconds = (threads.getThreadCpuTime(edt) - cpuStart) / 1e9
             val resolution = onEdtValue { checkNotNull(controller.frame).geometry }
             val fps = paints.size / seconds
@@ -175,6 +177,7 @@ internal object UiProbeLive {
                 "painted_fps=$fps\nobserved_to_paint_p50_ms=${percentile(delays, .5)}\n" +
                     "observed_to_paint_p95_ms=${percentile(delays, .95)}\n" +
                     "mouse_press_to_up_ack_ms=${taps.joinToString()}\n" +
+                    "reader_allocated_bytes=$allocated\n" +
                     "resolution=$resolution\nedt_cpu_seconds=$edtCpuSeconds\nmeasurement_seconds=$seconds\n" +
                     "drag_frames_before_release=$dragPaints\n" +
                     "launch_request_to_next_paint_ms=$launchDelay\n" +

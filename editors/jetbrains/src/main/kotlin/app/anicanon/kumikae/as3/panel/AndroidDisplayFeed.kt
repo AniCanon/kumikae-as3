@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.simulator.FrameImagePool
 import app.anicanon.kumikae.as3.simulator.NativeFrameReader
 import java.awt.image.BufferedImage
 import java.nio.file.Files
@@ -7,7 +8,14 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
-internal data class AndroidPicture(val image: BufferedImage, val guestWidth: Int, val guestHeight: Int)
+internal data class AndroidPicture(
+    val image: BufferedImage,
+    val guestWidth: Int,
+    val guestHeight: Int,
+    val sequence: Long,
+    val observedAt: Long,
+    val decodedAt: Long,
+)
 
 internal class AndroidDisplayFeed(
     helper: Path,
@@ -26,6 +34,8 @@ internal class AndroidDisplayFeed(
         Files.deleteIfExists(directory)
         throw error
     }
+    private val images = FrameImagePool(BufferedImage.TYPE_INT_RGB)
+    fun retire(previous: AndroidPicture) = images.release(previous.image)
     private val latest = AtomicReference<AndroidPicture?>()
     private val inputProcess = try {
         ProcessBuilder(adb.toString(), "-s", serial, "shell").redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
@@ -66,10 +76,18 @@ internal class AndroidDisplayFeed(
             try {
                 val ready = process.inputStream.bufferedReader().readLine()
                 check(ready == "ready") { ready ?: "The emulator display did not start." }
-                NativeFrameReader(slot) { w, h -> BufferedImage(w, h, BufferedImage.TYPE_INT_RGB) }.use { reader ->
+                NativeFrameReader(slot, discard = images::release, allocate = images::acquire).use { reader ->
                     while (!closed.get() && process.isAlive) {
                         reader.poll()?.let {
-                            latest.set(AndroidPicture(it.image, it.header.nativeWidth, it.header.nativeHeight))
+                            val picture = AndroidPicture(
+                                it.image,
+                                it.header.nativeWidth,
+                                it.header.nativeHeight,
+                                it.header.sequence,
+                                it.header.observedNanos,
+                                System.nanoTime(),
+                            )
+                            latest.getAndSet(picture)?.let(::retire)
                             onUpdate()
                         }
                         Thread.sleep(4)

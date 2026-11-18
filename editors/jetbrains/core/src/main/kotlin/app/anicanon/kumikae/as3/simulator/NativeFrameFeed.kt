@@ -9,6 +9,11 @@ internal class NativeFrameFeed(
     private val stopped: () -> Unit,
     private val release: () -> Unit,
 ) : FrameFeed {
+    @Volatile private var listener: (() -> Unit)? = null
+    override fun setFrameListener(listener: (() -> Unit)?) {
+        this.listener = listener
+    }
+
     private val latest = LatestValue<LiveFrame>()
     private val closed = AtomicBoolean()
     override val ended: Boolean get() = closed.get()
@@ -17,7 +22,8 @@ internal class NativeFrameFeed(
         private set
 
     // Startup runs on the service worker; mapping failure must reach the stream controller immediately.
-    private val mapped = NativeFrameReader(bridge.slot)
+    private val images = FrameImagePool(java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE)
+    private val mapped = NativeFrameReader(bridge.slot, discard = images::release, allocate = images::acquire)
     private val worker = Thread({
         try {
             mapped.use { reader ->
@@ -38,8 +44,10 @@ internal class NativeFrameFeed(
                                     picture.image,
                                     header.observedNanos + bridge.clockOffsetNanos,
                                     System.nanoTime(),
+                                    images::release,
                                 ),
-                            )
+                            )?.retire()
+                            listener?.invoke()
                         }
                     }
                     Thread.sleep(4)
@@ -69,6 +77,7 @@ internal class NativeFrameFeed(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        listener = null
         latest.close()
         if (Thread.currentThread() !== worker) worker.interrupt()
     }

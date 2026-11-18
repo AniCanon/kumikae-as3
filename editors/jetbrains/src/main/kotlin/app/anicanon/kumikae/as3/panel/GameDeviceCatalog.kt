@@ -28,6 +28,7 @@ internal class GameDeviceCatalog(
     private var simulators by mutableStateOf(emptyList<SimulatorDevice>())
     private var emulators by mutableStateOf(emptyList<AndroidAvd>())
     private var iosStatus by mutableStateOf("Loading simulators…")
+    private var graphics by mutableStateOf(android.graphics)
     private var androidStatus by mutableStateOf("Loading emulators…")
 
     val component = composePanel(this) {
@@ -48,6 +49,19 @@ internal class GameDeviceCatalog(
                             if (device.serial == null) "Stopped" else "Running",
                             { openAndroid(device) },
                         )
+                    }
+                    if (emulators.any { it.serial == null }) {
+                        Label("Graphics for next emulator start")
+                        org.jetbrains.compose.swing.components.ComboBox(
+                            AndroidGraphics.entries,
+                            graphics,
+                            onSelectionChange = { value ->
+                                if (value != null) {
+                                    graphics = value
+                                    android.graphics = value
+                                }
+                            },
+                        ) { Label(it.label) }
                     }
                     if (androidStatus.isNotBlank()) StatusLine(androidStatus)
                     Button("Refresh devices", ::refresh)

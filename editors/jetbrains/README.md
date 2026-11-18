@@ -104,7 +104,11 @@ templates and an ARM64 destination. The macOS distribution bundles the AS3 runti
 ## The iOS Simulator panel
 
 Open **View → Tool Windows → Game Devices** and select an iOS simulator. The iOS tab displays its
-screen, input controls and console. Android devices open in the Android tab.
+screen, input controls and console. Android devices open in the Android tab. For stopped Android
+devices, **Graphics for next emulator start** offers **Device default**, **Host GPU** and **Software**.
+This applies when Rider next starts an emulator and leaves the AVD configuration intact.
+See [embedded device performance](../../docs/embedded-device-performance.md) for frame rates, latency
+and how to repeat the measurements.
 
 ### Live picture and input
 

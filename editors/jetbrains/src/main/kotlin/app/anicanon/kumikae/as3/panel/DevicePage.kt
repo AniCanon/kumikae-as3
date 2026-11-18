@@ -135,7 +135,7 @@ private fun DeviceBar(
         IconButton(
             AllIcons.Actions.Dump,
             "Copy screenshot",
-            { controller.frame?.let { prompts.copy(it.image) } },
+            { controller.frame?.let { prompts.copy(it.snapshot()) } },
             enabled = controller.hasFrame,
         )
         IconButton(AllIcons.Actions.Edit, "Type text", {

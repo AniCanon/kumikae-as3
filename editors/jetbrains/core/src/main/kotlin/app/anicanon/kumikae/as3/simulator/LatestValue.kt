@@ -10,11 +10,13 @@ class LatestValue<T : Any> : AutoCloseable {
     private var value: T? = null
     private var closed = false
 
-    fun put(next: T) = lock.withLock {
-        if (!closed) {
-            value = next
-            changed.signalAll()
-        }
+    /** Returns the item that no consumer acquired, including the incoming item after close. */
+    fun put(next: T): T? = lock.withLock {
+        if (closed) return next
+        val previous = value
+        value = next
+        changed.signalAll()
+        previous
     }
 
     fun poll(): T? = lock.withLock { value.also { value = null } }
