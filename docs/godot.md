@@ -65,6 +65,8 @@ package game {
 - **A script class can extend another script class.**
 - **A class that extends no Godot class is a plain AS3 object.** It has no node behind it, and you can't
   hand it to Godot.
+- **A script on a reference-counted Godot class,** such as `RefCounted` or `Resource`, lives while AS3 or
+  Godot holds it. You can create one with `new`.
 - **`toString()` is what `print(node)` shows in GDScript,** if your class defines it.
 - **Scripts run on the main thread.** A call from another thread is refused with a message.
 
@@ -97,6 +99,10 @@ Other things to know:
 - **Static methods and constants are on the class:** `Vector2.fromAngle(a)`, `Color.html("#ff8000")`,
   `Vector2.ZERO`, `Color.RED`.
 - **An argument you leave out takes Godot's default.**
+- **A global function that can return any type,** such as `lerp` or `max`, is used where the code says
+  what it expects: `var x:Number = lerp(a, b, 0.5);`.
+- **`Input.singleton` is the singleton object itself,** for where you need to pass it.
+- **A method is a function wherever Godot takes a callable:** `children.filter(isEnemy)`.
 - **Enums are `int`.**
 - **Methods that take raw pointers aren't available.** There are 60 of them.
 

@@ -59,6 +59,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
 | Collections | `Array`, `Vector.<T>`, `flash.utils.Dictionary`, and object literals |
+| Untyped values | Properties, methods and library calls by name on a `*` or `Object` value. A name that isn't there is Flash's ReferenceError #1069 |
 | Standard library | `String`, `Number`, `Math`, `Date`, `RegExp`, `JSON`, `Error` and its subclasses, and the top-level functions such as `parseInt`, `isNaN` and `encodeURIComponent` |
 | Packages | Several files, packages, imports, and package-level functions and variables |
 
