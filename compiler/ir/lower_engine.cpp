@@ -116,13 +116,17 @@ bool Engine::is_singleton(const Symbol *p_class) {
 }
 
 // An element of one of Godot's collections that is itself stored somewhere (`points[0]`, `grid[1][2]`):
-// changing a part of it is writing it back there.
+// changing a part of it is writing it back there. So is one of Godot's values that a Vector holds
+// (`kept[0].x = 1` with a Vector.<Vector2>): read from its place, changed, and written back into it.
 bool Engine::stored_element(const Expr *p_expression) {
 	if (!p_expression || p_expression->kind != NodeKind::Index) {
 		return false;
 	}
 	const Expr *object = static_cast<const Index *>(p_expression)->object;
 	Kind kind = Kind::Void;
+	if (l_.is_vector(object->type)) {
+		return l_.kind_of(p_expression->type, &kind) && kind == Kind::Val;
+	}
 	return l_.kind_of(object->type, &kind) && kind == Kind::Val &&
 			(object->kind == NodeKind::Name || object->kind == NodeKind::Member || stored_element(object));
 }
@@ -284,6 +288,57 @@ uint32_t Engine::engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands
 	}
 	uint32_t out = l_.engine_reg(p_result, p_type);
 	l_.emit(Op::HostOperate, p_position, out, *op, l_.arguments(std::move(p_operands)));
+	return out;
+}
+
+bool Engine::is_dictionary(const Type *p_type) const {
+	return p_type && p_type->kind == Type::Instance && Lowerer::is_godot(p_type->symbol) && p_type->symbol->name == "GodotDictionary";
+}
+
+bool Engine::is_indexed(const Type *p_type) {
+	uint32_t name = 0;
+	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+	const bool array = symbol && Lowerer::is_godot(symbol) && (symbol->name == "GodotArray" || symbol->name.substr(0, 6) == "Packed");
+	return array && l_.engine_name(symbol, "size", &name);
+}
+
+std::optional<uint32_t> Engine::method_of(std::string_view p_class, std::string_view p_method, Kind p_result, std::string_view p_godot_result, std::vector<uint32_t> p_arguments, uint32_t p_position) {
+	const std::optional<uint32_t> name = l_.engine_entry(std::string(p_class) + "." + std::string(p_method));
+	if (!name) {
+		return std::nullopt;
+	}
+	const uint32_t out = p_godot_result.empty() ? l_.reg(p_result) : l_.engine_reg(p_result, p_godot_result);
+	l_.emit(Op::HostCall, p_position, out, *name, l_.arguments(std::move(p_arguments)));
+	return out;
+}
+
+uint32_t Engine::dictionary_has(Binary *p_in) {
+	const uint32_t position = p_in->offset;
+	// The key is worked out first, as it is written first.
+	const uint32_t key = l_.settled(l_.expression(p_in->left, Kind::Void), p_in->right, position);
+	if (l_.kind_at(key) == Kind::Obj) {
+		l_.refuse(p_in->left->offset, "a script object as the key of a Godot value");
+	}
+	const uint32_t table = l_.expression(p_in->right, Kind::Val);
+	if (const std::optional<uint32_t> out = method_of("GodotDictionary", "has", Kind::Bool, std::string_view(), { table, key }, position)) {
+		return *out;
+	}
+	l_.refuse(p_in->right->offset, "'in' on a value of type 'GodotDictionary'");
+	return l_.default_value(Kind::Bool, position);
+}
+
+// True whether or not the key was there, as `delete` on an Object is in AS3.
+uint32_t Engine::dictionary_erase(Index *p_target, uint32_t p_position) {
+	const uint32_t table = l_.settled(l_.expression(p_target->object, Kind::Val), p_target->index, p_position);
+	const uint32_t key = l_.expression(p_target->index, Kind::Void);
+	if (l_.kind_at(key) == Kind::Obj) {
+		l_.refuse(p_target->index->offset, "a script object as the key of a Godot value");
+	}
+	if (!method_of("GodotDictionary", "erase", Kind::Bool, std::string_view(), { table, key }, p_position)) {
+		l_.refuse(p_target->offset, "'delete' of this");
+	}
+	const uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(Op::ConstBool, p_position, out, 1);
 	return out;
 }
 

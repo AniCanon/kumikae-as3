@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_functions.h"
 #include "lower_statements.h"
 
@@ -262,6 +263,9 @@ uint32_t Dynamic::remove(Unary *p_delete) {
 		l_.emit(Op::ConstBool, position, out, 0);
 		return out;
 	}
+	if (target->kind == NodeKind::Index && Engine(l_).is_dictionary(holder_written->type)) {
+		return Engine(l_).dictionary_erase(static_cast<Index *>(target), position);
+	}
 	if (!holder_written || !by_name(holder_written) || declared) {
 		l_.refuse(target->offset, "'delete' of this");
 		return out;
@@ -283,6 +287,9 @@ uint32_t Dynamic::remove(Unary *p_delete) {
 // key in holder: the key worked out first.
 uint32_t Dynamic::in(Binary *p_in) {
 	const uint32_t position = p_in->offset;
+	if (Engine(l_).is_dictionary(p_in->right->type)) {
+		return Engine(l_).dictionary_has(p_in);
+	}
 	const uint32_t out = l_.reg(Kind::Bool);
 	Kind kind = Kind::Void;
 	if (!l_.kind_of(p_in->right->type, &kind) || (kind != Kind::Any && kind != Kind::Obj)) {

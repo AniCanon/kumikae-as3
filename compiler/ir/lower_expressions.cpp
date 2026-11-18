@@ -15,6 +15,18 @@ bool Lowerer::is_null(const Expr *p_expression) {
 	return p_expression->kind == NodeKind::NullLit;
 }
 
+bool Lowerer::gives_nothing(const Expr *p_expression) {
+	return p_expression->kind == NodeKind::Call && p_expression->type && p_expression->type->kind == Type::Void;
+}
+
+void Lowerer::effect(Expr *p_expression) {
+	if (p_expression && gives_nothing(p_expression)) {
+		Expressions(*this).evaluate(p_expression, Kind::Void);
+	} else {
+		expression(p_expression, Kind::Void);
+	}
+}
+
 uint32_t Lowerer::expression(Expr *p_expression, Kind p_want) {
 	if (!p_expression) {
 		return default_value(p_want, 0);
@@ -30,6 +42,11 @@ uint32_t Lowerer::expression(Expr *p_expression, Kind p_want) {
 		return p_want == Kind::F64 ? convert(out, Kind::F64, p_expression->offset) : out;
 	}
 	uint32_t value = Expressions(*this).evaluate(p_expression, p_want);
+	if (gives_nothing(p_expression)) {
+		// A call that gives nothing, used as a value: undefined, as in AS3.
+		value = reg(Kind::Any);
+		emit(Op::AnyConst, p_expression->offset, value, 0);
+	}
 	return convert(value, p_want, p_expression->offset);
 }
 
@@ -429,6 +446,9 @@ uint32_t Expressions::unary(Unary *p_unary, Kind p_want) {
 			return l_.any_typeof(p_unary->operand, position);
 		case TokenKind::KwDelete:
 			return Dynamic(l_).remove(p_unary);
+		case TokenKind::KwVoid: // `void x` works x out and is undefined.
+			l_.effect(p_unary->operand);
+			return l_.empty_untyped(l_.compilation_.any_type(), position);
 		case TokenKind::Bang: {
 			uint32_t out = l_.reg(Kind::Bool);
 			l_.emit(Op::Not, position, out, l_.expression(p_unary->operand, Kind::Bool));

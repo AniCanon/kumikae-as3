@@ -120,6 +120,9 @@ const Type *Typer::call(Call *p_call) {
 	}
 	switch (type->kind) {
 		case Type::ClassObject:
+			if (type->element && type->element->kind == Type::Instance && type->element->symbol == compilation_.builtin("Date")) {
+				return string_; // Date(x) is the time now as text, as in Flash: no Date.
+			}
 			return type->element; // `int(x)`, `Player(x)`: a conversion.
 		case Type::Any:
 			return any_;

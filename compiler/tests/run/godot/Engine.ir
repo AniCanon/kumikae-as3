@@ -146,7 +146,7 @@ function Engine/members(r0:Object):Boolean
   @45 ConstBool r30 0
   @46 Return r30
 function Engine/collections(r0:Object, r1:Object):int
-  godot r2:Line2D r4:Vector2 r5:Vector2 r6:Vector2 r7:Line2D r8:PackedVector2Array r10:PackedVector2Array r11:PackedVector2Array r15:Vector2 r27:Vector2 r40:Vector2 r46:Vector2
+  godot r2:Line2D r4:Vector2 r5:Vector2 r6:Vector2 r7:Line2D r8:PackedVector2Array r10:PackedVector2Array r11:PackedVector2Array r16:Vector2 r28:Vector2 r41:Vector2 r47:Vector2
   @0 HostNew r4 [Vector2] ()
   @1 HostNew r5 [Vector2] ()
   @3 HostNew r7 [Line2D] ()
@@ -157,63 +157,65 @@ function Engine/collections(r0:Object, r1:Object):int
   @10 Move r3 r9
   @11 HostGet r11 r2 [Line2D.points]
   @12 Move r10 r11
-  @13 ConstI64 r12 0
-  @15 HostCall r13 [PackedVector2Array.size] (r10)
-  @16 LtI64 r14 r12 r13
-  @17 JumpIfNot r14 @29
-  @18 HostIndexGet r15 r10 r12
-  @19 Move r4 r15
-  @21 I32ToF64 r16 r3
-  @22 ConstF64 r17 1
-  @23 AddF64 r18 r16 r17
-  @24 F64ToI32 r19 r18
-  @25 Move r3 r19
-  @26 ConstI64 r20 1
-  @27 AddI64 r12 r12 r20
-  @28 Jump @14
-  @30 HostCall _ [GodotObject.free] (r2)
-  @31 Move r21 r1
-  @32 ObjToBool r22 r21
-  @33 JumpIfNot r22 @51
-  @34 ConstF64 r23 0
-  @36 VecLength r24 r21
-  @37 U32ToF64 r26 r24
-  @38 LtF64 r25 r23 r26
-  @39 JumpIfNot r25 @51
-  @40 VecGet r27 r21 r23
-  @41 Move r5 r27
-  @43 I32ToF64 r28 r3
-  @44 ConstF64 r29 1
-  @45 AddF64 r30 r28 r29
-  @46 F64ToI32 r31 r30
-  @47 Move r3 r31
-  @48 ConstF64 r32 1
-  @49 AddF64 r23 r23 r32
-  @50 Jump @35
-  @52 MakeFunction r33 Engine/collections/function _
-  @53 ToAny r34 r33
-  @54 NullCheck r1
-  @55 VecLength r35 r1
-  @56 FromAny r36 r34 -1
-  @57 JumpIfNot r36 @71
-  @58 U32ToF64 r37 r35
-  @59 ConstF64 r38 0
-  @60 LtF64 r39 r38 r37
-  @61 JumpIfNot r39 @71
-  @62 VecGet r40 r1 r38
-  @63 F64ToI32 r41 r38
-  @64 ToAny r42 r41
-  @65 ToAny r43 r40
-  @66 ToAny r44 r1
-  @67 CallFunction _ r34 (r43, r42, r44)
-  @68 ConstF64 r45 1
-  @69 AddF64 r38 r38 r45
-  @70 Jump @60
-  @72 VecCall r46 2 (r1)
-  @73 Move r6 r46
-  @75 Return r3
-  @76 ConstI32 r47 0
-  @77 Return r47
+  @13 HostPresent r12 r10
+  @14 JumpIfNot r12 @31
+  @15 ConstI64 r13 0
+  @17 HostCall r14 [PackedVector2Array.size] (r10)
+  @18 LtI64 r15 r13 r14
+  @19 JumpIfNot r15 @31
+  @20 HostIndexGet r16 r10 r13
+  @21 Move r4 r16
+  @23 I32ToF64 r17 r3
+  @24 ConstF64 r18 1
+  @25 AddF64 r19 r17 r18
+  @26 F64ToI32 r20 r19
+  @27 Move r3 r20
+  @28 ConstI64 r21 1
+  @29 AddI64 r13 r13 r21
+  @30 Jump @16
+  @32 HostCall _ [GodotObject.free] (r2)
+  @33 Move r22 r1
+  @34 ObjToBool r23 r22
+  @35 JumpIfNot r23 @53
+  @36 ConstF64 r24 0
+  @38 VecLength r25 r22
+  @39 U32ToF64 r27 r25
+  @40 LtF64 r26 r24 r27
+  @41 JumpIfNot r26 @53
+  @42 VecGet r28 r22 r24
+  @43 Move r5 r28
+  @45 I32ToF64 r29 r3
+  @46 ConstF64 r30 1
+  @47 AddF64 r31 r29 r30
+  @48 F64ToI32 r32 r31
+  @49 Move r3 r32
+  @50 ConstF64 r33 1
+  @51 AddF64 r24 r24 r33
+  @52 Jump @37
+  @54 MakeFunction r34 Engine/collections/function _
+  @55 ToAny r35 r34
+  @56 NullCheck r1
+  @57 VecLength r36 r1
+  @58 FromAny r37 r35 -1
+  @59 JumpIfNot r37 @73
+  @60 U32ToF64 r38 r36
+  @61 ConstF64 r39 0
+  @62 LtF64 r40 r39 r38
+  @63 JumpIfNot r40 @73
+  @64 VecGet r41 r1 r39
+  @65 F64ToI32 r42 r39
+  @66 ToAny r43 r42
+  @67 ToAny r44 r41
+  @68 ToAny r45 r1
+  @69 CallFunction _ r35 (r44, r43, r45)
+  @70 ConstF64 r46 1
+  @71 AddF64 r39 r39 r46
+  @72 Jump @62
+  @74 VecCall r47 2 (r1)
+  @75 Move r6 r47
+  @77 Return r3
+  @78 ConstI32 r48 0
+  @79 Return r48
 function Engine/defaults(r0:Object, r1:GodotValue):GodotValue
   godot r1:Color r2:Color r3:Color r5:Color r6:Color
   @1 HostDefault r2 [@default.Color.clamp.0]

@@ -411,7 +411,8 @@ output = compare("untyped.gd", [
     "untyped Godot values multiplied, subtracted, divided and negated", "untyped Godot values in order",
     "an untyped Godot value multiplied and subtracted in place", "a typed Godot value times an untyped one",
     "untyped numbers stay AS3's", "where Godot has no such operator the answer is AS3's",
-    "JSON refuses Godot's values",
+    "JSON refuses Godot's values", "is with Godot's value types", "as with Godot's value types", "a cast to one of Godot's value types",
+    "is, as and a cast on typed values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and
@@ -423,6 +424,8 @@ check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyp
 check("untyped.gd: a thrown Godot value nothing catches is reported as its text", "(3.0, 4.0)\n\tat Untyped/throwValue()" in output,
       output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
+check("untyped.gd: a cast to one of Godot's value types of a value that is not one is AS3's coercion error",
+      "Error #1034: Type Coercion failed: cannot convert text to Vector2." in output and output.count("\tat Untyped/castValue()") == 2, output[-2500:])
 
 # AS3's Objects and Dictionaries to Godot as its Dictionaries (keys as text), and a Dictionary of Godot's
 # copied where an AS3 Dictionary is wanted.
@@ -435,6 +438,20 @@ check("objects.gd: what Godot can't hold is an AS3 error that says why",
       "holds itself, or nests too deep" in output and "at Objects/holdsItself()" in output and
       "an Array with properties other than its indices" in output and "at Objects/plainInside()" in output and
       "'for in' and 'for each' over one of Godot's values held untyped" in output, output[-2000:])
+
+# Loops over Godot's own collections, and `in` and `delete` on its Dictionary, as GDScript goes through them.
+output = compare("loops.gd", [
+    "for each over what a method gives", "for each into a Number", "for each into an untyped variable", "for in gives an Array's indices",
+    "for in gives a Dictionary's keys", "for in into a variable declared above", "for each gives a Dictionary's values", "break and continue",
+    "an element added on the way is reached", "a key erased on the way is passed over, one added is not reached", "a loop inside a loop",
+    "for in over a packed array", "in on a Dictionary", "delete on a Dictionary", "delete by a name", "an element of another type",
+    "for each into the script's own class", "a node without the script is not of its class", "for each into one of Godot's values",
+    "no collection is nothing to go through",
+])
+check("loops.gd: a node without the script, where the loop's variable is the script's class, is AS3's coercion error",
+      "to Loops." in output and "at Loops/scripted()" in output, output[-1500:])
+check("loops.gd: an element that is not what the loop's variable is declared is AS3's coercion error",
+      "Error #1034: Type Coercion failed: cannot convert 5 to Node." in output and "at Loops/wrongElement()" in output, output[-1500:])
 
 # What GDScript reaches of a script by name: public fields to read and write, public methods, and the lists.
 compare("members.gd", [
@@ -566,7 +583,7 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
 # A vector of Vector2s or of Vector2is holds each value in its place: never null, a copy read out and a copy
 # stored, the places themselves handed to Godot as a packed array's elements.
 compare("places.gd", [
-    "grown", "no value is refused", "methods", "ends", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
+    "grown", "no value is refused", "methods", "ends", "a part of an element", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
     "given: none", "given: whole numbers", "a larger value type", "a larger value type: to Godot", "taken",
 ])
 

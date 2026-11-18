@@ -64,6 +64,9 @@ void Statements::declare_locals(Node *p_body) {
 	const std::unordered_set<const Symbol *> valued = valued_locals(p_body);
 	// A function's own locals: not those of a function written inside it, which are that one's.
 	walk(p_body, [&](Node *p_node) -> bool {
+		if (p_node->kind == NodeKind::FunctionStmt) {
+			Functions(l_).declare_function(static_cast<FunctionStmt *>(p_node)->function);
+		}
 		if (p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt) {
 			return false;
 		}
@@ -165,7 +168,7 @@ void Statements::for_loop(Stmt *p_statement) {
 	statement(loop->body);
 	uint32_t update_at = l_.here();
 	if (loop->update) {
-		l_.expression(loop->update, Kind::Void);
+		l_.effect(loop->update);
 	}
 	l_.emit(Op::Jump, position, top);
 	if (out != NONE) {
@@ -283,7 +286,7 @@ void Statements::return_statement(Stmt *p_statement) {
 	Return *result = static_cast<Return *>(p_statement);
 	if (l_.constructor_ || l_.fn().result == Kind::Void) {
 		if (result->value) {
-			l_.expression(result->value, Kind::Void);
+			l_.effect(result->value);
 		}
 		leave_return(position, NONE);
 	} else {
@@ -331,7 +334,7 @@ void Statements::by_kind(Stmt *p_statement) {
 		case NodeKind::ImportStmt:
 			break;
 		case NodeKind::ExprStmt:
-			l_.expression(static_cast<ExprStmt *>(p_statement)->expr, Kind::Void);
+			l_.effect(static_cast<ExprStmt *>(p_statement)->expr);
 			break;
 		case NodeKind::VarStmt:
 			variables(static_cast<VarStmt *>(p_statement)->decl);
@@ -371,8 +374,7 @@ void Statements::by_kind(Stmt *p_statement) {
 			labeled(static_cast<Labeled *>(p_statement));
 			break;
 		case NodeKind::FunctionStmt:
-			l_.refuse(position, "a function inside a function");
-			break;
+			break; // Made as the function starts (Functions::nested_functions).
 		default:
 			l_.refuse(position, "this statement");
 			break;
@@ -383,7 +385,7 @@ void Statements::by_kind(Stmt *p_statement) {
 void Statements::for_in_loop(ForIn *p_loop) {
 	if (l_.is_vector(p_loop->collection->type) && !(l_.array_ && p_loop->collection->type->symbol == l_.array_)) {
 		Vectors(l_).vector_loop(p_loop);
-	} else if (p_loop->element) {
+	} else if (p_loop->element || Engine(l_).is_dictionary(p_loop->collection->type) || Engine(l_).is_indexed(p_loop->collection->type)) {
 		Vectors(l_).engine_loop(p_loop);
 	} else {
 		Dynamic(l_).loop(p_loop); // An Array's properties too.

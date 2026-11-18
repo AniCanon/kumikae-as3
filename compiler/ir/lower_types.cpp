@@ -490,8 +490,8 @@ bool Lowerer::value_kind(const Expr *p_expression, Kind *r_kind) const {
 	if (!kind_of(p_expression->type, r_kind)) {
 		return false;
 	}
-	if (null_as(p_expression)) {
-		*r_kind = Kind::Any;
+	if (null_as(p_expression) || gives_nothing(p_expression)) {
+		*r_kind = Kind::Any; // What a call that gives nothing is worth: undefined.
 	}
 	return true;
 }
@@ -501,7 +501,7 @@ Kind Lowerer::natural(Expr *p_expression) {
 	if (p_expression->type && p_expression->type->kind == Type::Null) {
 		return Kind::Obj;
 	}
-	if (null_as(p_expression)) {
+	if (null_as(p_expression) || gives_nothing(p_expression)) {
 		return Kind::Any;
 	}
 	if (!kind_of(p_expression->type, &kind)) {

@@ -54,11 +54,11 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 |---|---|
 | Classes | Fields, constructors, methods, static members, getters and setters, inheritance with `override` and `super`, `final`, and the four access levels |
 | Interfaces | Methods, getters and setters. A class can implement several, and an interface can extend several |
-| Functions | Default parameters, `...rest`, `arguments`, function expressions that capture their variables, methods as values, `call` and `apply` |
+| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, `call` and `apply` |
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
-| Casts and conversions | `Enemy(value)` casts to a class or an interface: it gives the value when it is one, `null` for `null`, and TypeError #1034 for anything else. `int(x)`, `uint(x)`, `Number(x)`, `String(x)` and `Boolean(x)` convert. `Array(x)`, `Object(x)` and `Vector.<T>(x)` do what they do in Flash |
+| Casts and conversions | `Enemy(value)` casts to a class or an interface: it gives the value when it is one, `null` for `null`, and TypeError #1034 for anything else. `Dictionary(x)` is a cast too. `int(x)`, `uint(x)`, `Number(x)`, `String(x)` and `Boolean(x)` convert. The other library classes do what they do in Flash: `Array(x)`, `Object(x)` and `Vector.<T>(x)`; `Error(x)` and its subclasses create an error; `RegExp(x)` gives `x` itself when it's a `RegExp`, and a new one otherwise; `Date(x)` gives the current time as text |
 | Collections | `Array`, `Vector.<T>`, `flash.utils.Dictionary`, and object literals |
 | Untyped values | Properties, methods and library calls by name on a `*` or `Object` value. A name that isn't there is Flash's ReferenceError #1069 |
 | Standard library | `String`, `Number`, `Math`, `Date`, `RegExp`, `JSON`, `Error` and its subclasses, and the top-level functions such as `parseInt`, `isNaN` and `encodeURIComponent` |
@@ -76,22 +76,21 @@ The compiler reports each of these as an error with its own message.
 - E4X (XML literals and operators), namespaces, the `with` statement, and `include`.
 - `dynamic` classes. The built-in dynamic classes, such as `Object` and `Array`, still take new properties.
 - `prototype`. Classes are sealed, and a class has only its own static members.
-- `this` or `super` inside a function expression. In AS3, `this` there is the global object, not the
-  object of the surrounding method. Read the object into a variable first, or use a method.
+- `this` or `super` inside a function expression or a function declared inside a function. In AS3, `this`
+  there is the global object, not the object of the surrounding method. Read the object into a variable
+  first, or use a method.
 
 **Not built yet:**
 
 - **Weak keys:** `new Dictionary(true)`.
-- **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.**
+- **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.** Reading a name that one of
+  these doesn't have gives `undefined`, as in Flash.
 - **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
   value works: `list.push`, `text.charAt`.
-- **`Date`, `RegExp`, `Error` or `Dictionary` called as a function:** `Date(value)`. In Flash none of
-  these is a cast: `Date(value)` gives the time as text, and `Error(value)` creates an error. Use
-  `value as Date`.
-- **`is`, `as` and a cast with one of Godot's value types:** `value as Vector2`, `Vector2(value)`. Store
-  the value in a variable of that type instead: a `*` value is checked as it is stored.
+- **`is` and `as` with `Int64`.** Store the value in an `Int64` variable instead: it's converted, and
+  checked, as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
-  class that extends `RegExp`.
+  class that extends `RegExp` or `Dictionary`.
 
 `kas3c check` accepts some of these. `kas3c run` and Godot then refuse the program, or stop it where it
 reaches the construct, with an error that says `is not supported by the interpreter yet`.
@@ -144,8 +143,7 @@ A value of type A fits where B is expected when one of these holds:
 
 When B is a subclass of A, the error asks for a cast:
 `a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`. Where calling the type isn't a cast, as
-with `Array` or `Date`, the error says `use 'as'` alone, and for one of Godot's value types it gives no
-advice.
+with `Array` or `Date`, the error says `use 'as'` alone.
 
 ### How expressions are typed
 

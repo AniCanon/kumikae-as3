@@ -169,6 +169,43 @@ package {
 			return said.join(";");
 		}
 
+		// One part of an element changed where it is: the element is read, changed, and written back into the
+		// vector, its index worked out once. A vector that holds the values themselves, and one of a larger
+		// type that holds a reference to each.
+		public function parts():String {
+			var kept:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
+			kept[0].x = 9;
+			kept[0].y += 1;
+			kept[1].x++;
+			--kept[1].y;
+			var at:int = 0;
+			kept[at++].x *= 2;
+			kept[1][0] = 7;
+			var cells:Vector.<Vector2i> = new Vector.<Vector2i>(1);
+			cells[0].x = 5;
+			cells[0].y -= 2;
+			var deep:Vector.<Vector3> = new <Vector3>[new Vector3(1, 2, 3)];
+			deep[0].z = 8;
+			deep[0].x += 0.5;
+			var tints:Vector.<Color> = new <Color>[new Color(0, 0, 0)];
+			tints[0].r = 1;
+			tints[0].a -= 0.5;
+			var boxes:Vector.<Rect2> = new <Rect2>[new Rect2(0, 0, 1, 1)];
+			boxes[0].size.x = 6;
+			boxes[0].position += new Vector2(1, 1);
+			var said:Array = [kept, at, cells, deep, tints, boxes];
+			var copy:Vector2 = kept[0];
+			copy.x = -1;
+			said.push(kept[0].x);
+			try { kept[5].x = 1; } catch (e:RangeError) { said.push(e.errorID); }
+			var none:Vector.<Vector3> = new Vector.<Vector3>(1);
+			none[0].x = 1;
+			said.push(none[0]);
+			var holds:Vector.<Vector3> = new <Vector3>[null];
+			try { holds[0].x = 1; } catch (missing:Error) { said.push("no value"); }
+			return said.join(";");
+		}
+
 		// What arrives from Godot, typed and untyped, stored into a place; and what is of another type refused.
 		public function taken(line:Line2D, list:Array):String {
 			var v:Vector.<Vector2> = new Vector.<Vector2>(2);

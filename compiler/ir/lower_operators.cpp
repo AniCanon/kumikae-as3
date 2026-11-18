@@ -142,7 +142,7 @@ uint32_t Operators::godot_object_of(uint32_t p_object, Expr *p_written, uint32_t
 }
 
 // An untyped value and one of Godot's classes: whether it holds such an object decides.
-uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class) {
+uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class, Kind p_kind) {
 	const uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	const bool test = p_binary->op == TokenKind::KwIs;
@@ -152,7 +152,7 @@ uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class)
 	if (test) {
 		return fits;
 	}
-	uint32_t out = l_.engine_reg(Kind::Ref, p_binary->type);
+	uint32_t out = l_.engine_reg(p_kind, p_binary->type);
 	l_.emit(Op::ConstNull, position, out);
 	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
 	l_.emit(Op::FromAny, position, out, value, p_godot_class);
@@ -235,6 +235,11 @@ uint32_t Operators::type_test(Binary *p_binary) {
 	}
 	if (godot_target && l_.untyped(left) && l_.engine_name(symbol, std::string_view(), &godot_class)) {
 		return untyped_godot_test(p_binary, godot_class);
+	}
+	if (symbol && Lowerer::is_godot(symbol) && !godot_target && l_.engine_name(symbol, std::string_view(), &godot_class)) {
+		// One of Godot's value types (Vector2, Color, its Array): whatever is on the left, what the value
+		// is as the line runs decides, by Godot's name for its type.
+		return untyped_godot_test(p_binary, godot_class, Kind::Val);
 	}
 	if (godot_target && l_.engine_name(symbol, std::string_view(), &godot_class)) {
 		return godot_test(p_binary, godot_class);

@@ -150,6 +150,10 @@ Godot's API description.
 - **A variable of a value type starts at zero,** not `null`, as in GDScript: `var start:Vector2;` is
   `(0, 0)`. You can still assign `null` to it.
 - **`trace(v)` and `"at " + v` give Godot's text for the value.**
+- **`is`, `as` and a cast work with Godot's value types.** `value is Color` asks what the value is now.
+  `value as Vector2` gives the value or `null`. `Vector2(value)` gives the value, `null` for `null`, and
+  TypeError #1034 for anything else. A cast doesn't convert: `Vector2(cell)` with a `Vector2i` is an error,
+  and `new Vector2(cell)` converts.
 
 ### Vectors of values
 
@@ -159,6 +163,8 @@ of structs does.
 - `new Vector.<Vector2>(3)` holds three zero vectors.
 - An element is never `null`. Writing `null` into one is a compile error.
 - What you read is a copy, and what you store is copied in.
+- `points[0].x += 1` changes one part of an element where it is. The compiler reads the element, changes
+  it and writes it back, for a vector of any of Godot's value types.
 - Handed to Godot where it takes a `PackedVector2Array`, the vector is copied in one step.
 
 A `Vector.<int>` or `Vector.<uint>` stores four bytes for each element and goes to Godot as a
@@ -177,8 +183,8 @@ AS3 collections convert when you hand them to Godot:
 | `PackedVector2Array`, `PackedVector3Array`, `PackedVector4Array`, `PackedColorArray` | An `Array`, or a `Vector` of that type |
 | `GodotDictionary` | An `Object`, or a `flash.utils.Dictionary` |
 
-Godot receives a copy. On the way back, a Godot collection stays a `GodotArray` or `GodotDictionary`
-until you ask for the AS3 kind:
+Godot receives a copy. On the way back, a Godot collection stays a `GodotArray` or `GodotDictionary`, and
+you can loop over it as it is:
 
 ```actionscript
 package game {
@@ -187,8 +193,7 @@ package game {
     public class Roster extends Node {
         public function names():Array {
             var result:Array = [];
-            var children:Array = getChildren() as Array;
-            for each (var child:Node in children) {
+            for each (var child:Node in getChildren()) {
                 result.push(child.name);
             }
             return result;
@@ -197,8 +202,19 @@ package game {
 }
 ```
 
-A Godot dictionary converts to a `flash.utils.Dictionary` the same way. Its keys become what a
-`Dictionary` keeps, so the Godot keys `1` and `"1"` become one key.
+- **`for each` gives the elements of a `GodotArray` or a packed array, and the values of a
+  `GodotDictionary`.** `for in` gives the indices, or the keys.
+- **An element is checked as it's stored in the loop's variable.** One that doesn't fit is TypeError #1034.
+  A node that carries your script fits a variable of the script's class.
+- **A loop over `null` runs no times,** as in AS3.
+- **A loop over a `GodotArray` reaches an element added on the way.** A loop over a `GodotDictionary` visits
+  the keys it had when the loop began, in Godot's order, and skips a key erased on the way.
+- **`key in table` and `delete table[key]` work on a `GodotDictionary`.** `delete` gives `true` whether or
+  not the key was there, as it does on an `Object`.
+
+To get the AS3 kind, ask for it: `getChildren() as Array`. A Godot dictionary converts to a
+`flash.utils.Dictionary` the same way. Its keys become what a `Dictionary` keeps, so the Godot keys `1` and
+`"1"` become one key.
 
 ### Integers
 
@@ -350,6 +366,12 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
+- A method of Godot's isn't a value: `timer.timeout.add(queueFree)` is refused. Pass a method of your own
+  that calls it.
+- A Godot class isn't a class value: `var kind:Class = Node2D` is refused. `is`, `as` and `new` take the
+  class by name.
+- A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
+  a variable of its type first.
 - A script class in the default package with the same name as a Godot class is ambiguous. Put it in a
   package.
 - `super._process(delta)` on a Godot virtual does nothing, as Godot's own empty versions do. It can't

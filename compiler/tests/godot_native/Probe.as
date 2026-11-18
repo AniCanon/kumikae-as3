@@ -639,6 +639,18 @@ package {
 			return "never";
 		}
 
+		// `is`, `as` and a cast with one of Godot's value types, on values held every way.
+		public function kinds(value:*):String {
+			var held:Object = value;
+			var out:String = (value is Vector2) + " " + (held is Color) + " " + (kept is Vector2) + " " + (kept is Color) + " " + (value as Vector2) + " " + (held as Color);
+			try {
+				out += " " + Vector2(value);
+			} catch (e:TypeError) {
+				out += " " + e.errorID;
+			}
+			return out;
+		}
+
 		// An error nothing catches: Godot is told, with the trace, and carries on.
 		public function fail(depth:int):int {
 			if (depth == 0) {

@@ -113,6 +113,24 @@ package {
 			}
 			return "never";
 		}
+		// `is`, `as` and a cast with one of Godot's value types: what the value is now decides.
+		public function isValue(value:*):Array {
+			return [value is Vector2, value is Color, value is Vector2i, value is GodotArray, value is PackedInt32Array];
+		}
+		public function asValue(value:*):String {
+			var point:Vector2 = value as Vector2;
+			var held:Object = value;
+			return point + "/" + (held as Color) + "/" + (value as GodotDictionary);
+		}
+		public function castValue(value:*):Vector2 {
+			return Vector2(value);
+		}
+		public function typedValue(point:Vector2, tint:Color):String {
+			var none:Vector2 = null;
+			var plain:Thing = new Thing();
+			return (point is Vector2) + "/" + (point is Color) + "/" + (tint as Color) + "/" + (tint as Vector2) + "/" + (none is Vector2) + "/" + (none as Vector2) +
+					"/" + (5 is Vector2) + "/" + (plain is Vector2) + "/" + Vector2(point) + "/" + Vector2(none) + "/" + (this is Vector2);
+		}
 		// A Godot object freed while an untyped value holds it is null, as a typed one is.
 		public function freed():String {
 			var n:Node = new Node();

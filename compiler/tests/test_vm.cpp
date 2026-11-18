@@ -1688,6 +1688,8 @@ static void test_engine_calls() {
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
+		// A class of Godot's constants is no type a value can be cast to.
+		"function f(x:*):void { var k:* = Key(x); }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
 		// `super` written in a function expression is not the method's.
 		"function f():void { var g:Function = function():void { super.queueFree(); }; }",

@@ -157,20 +157,27 @@ uint32_t Functions::closure_value(FunctionExpr *p_expression) {
 		l_.refuse(position, "this function expression");
 		return l_.default_value(Kind::Obj, position);
 	}
+	return closure_of(p_expression->function, true, position);
+}
+
+uint32_t Functions::closure_of(FunctionDecl *p_decl, bool p_expression, uint32_t p_position) {
 	Function made;
-	made.name = l_.fn().name + "/function";
+	made.name = l_.fn().name + "/" + (p_decl->name.empty() ? std::string("function") : std::string(p_decl->name));
 	made.file = l_.fn().file;
-	made.position = position;
+	made.position = p_position;
 	made.owner = NONE;
 	made.written_in = l_.fn().owner != NONE ? l_.fn().owner : l_.fn().written_in;
 	made.is_static = false; // Its first register is the environment.
 	l_.module_.functions.push_back(std::move(made));
 	const uint32_t index = static_cast<uint32_t>(l_.module_.functions.size()) - 1;
+	const uint32_t environment = l_.own_env_reg_ != NONE ? l_.own_env_reg_ : l_.received_env_ ? 0 : NONE;
 	PendingFunction pending;
-	pending.decl = p_expression->function;
+	pending.decl = p_decl;
 	pending.index = index;
 	pending.unit = l_.unit_;
 	pending.klass = l_.class_;
+	pending.expression = p_expression;
+	pending.given_environment = environment != NONE;
 	if (l_.own_env_reg_ != NONE) {
 		pending.chain.push_back(l_.own_layout_);
 	}
@@ -178,10 +185,38 @@ uint32_t Functions::closure_value(FunctionExpr *p_expression) {
 		pending.chain.insert(pending.chain.end(), l_.chain_.begin(), l_.chain_.end());
 	}
 	l_.pending_functions_.push_back(std::move(pending));
-	const uint32_t environment = l_.own_env_reg_ != NONE ? l_.own_env_reg_ : l_.received_env_ ? 0 : NONE;
 	uint32_t out = l_.reg(Kind::Obj);
-	l_.emit(Op::MakeFunction, position, out, index, environment);
+	l_.emit(Op::MakeFunction, p_position, out, index, environment);
 	return out;
+}
+
+// `function helper():void {}` written in a function: a variable of that function, which holds the function
+// from the start, so that a line above it can call it, as in AS3.
+void Functions::declare_function(FunctionDecl *p_decl) {
+	if (!p_decl || !p_decl->symbol || l_.locals_.count(p_decl->symbol)) {
+		return;
+	}
+	const uint32_t local = l_.reg(Kind::Obj);
+	l_.locals_[p_decl->symbol] = local;
+	l_.fn().locals.push_back({ std::string(p_decl->name), local });
+}
+
+// After the environment is made, which the functions are given: each declared function's value, in the
+// order they are written.
+void Functions::nested_functions(Node *p_body) {
+	uint32_t klass = NONE;
+	walk(p_body, [&](Node *p_node) -> bool {
+		if (p_node->kind == NodeKind::FunctionStmt) {
+			FunctionDecl *decl = static_cast<FunctionStmt *>(p_node)->function;
+			if (!decl || !decl->symbol || !l_.class_index(l_.function_, &klass)) {
+				l_.refuse(p_node->offset, "this function");
+				return false;
+			}
+			const uint32_t position = p_node->offset;
+			l_.store(l_.place_of_symbol(decl->symbol, 0, position), closure_of(decl, false, position), position);
+		}
+		return !nested_function(p_node);
+	});
 }
 
 // The function expressions met while lowering a function, each as a function of its own; and those met in
@@ -200,7 +235,14 @@ void Functions::lower_pending_functions() {
 		l_.fn().result = decl->return_type ? l_.written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {
 			Statements(l_).declare_locals(decl->body);
+			// A function expression's own name is a variable of its own that holds it: `function f() { f(); }`.
+			const bool named = pending.expression && decl->symbol && decl->symbol->kind == SymbolKind::LocalFunction;
+			if (named) {
+				declare_function(decl);
+				l_.emit(Op::MakeFunction, decl->offset, l_.locals_[decl->symbol], pending.index, pending.given_environment ? 0 : NONE);
+			}
 			make_environment(decl);
+			nested_functions(decl->body);
 			Statements(l_).statement(decl->body);
 		}
 		Bodies(l_).end(decl->end ? decl->end - 1 : decl->offset);
