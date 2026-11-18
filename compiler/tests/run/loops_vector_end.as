@@ -50,6 +50,9 @@ package {
             attempt("byThree", byThree);
             attempt("byThreeStore", byThreeStore);
             attempt("byFar", byFar);
+            attempt("strided", strided);
+            attempt("stridedStore", stridedStore);
+            attempt("stridedFixed", stridedFixed);
             attempt("inner", inner);
             attempt("innerShorter", innerShorter);
             attempt("ratiosPast", ratiosPast);
@@ -66,8 +69,8 @@ package {
         private function attempt(name:String, run:Function):void {
             try {
                 trace(name, run());
-            } catch (error:RangeError) {
-                trace(name, "RangeError", error.errorID, error.message);
+            } catch (error:Error) {
+                trace(name, error is RangeError ? "RangeError" : "another error", error.errorID, error.message);
             }
         }
 
@@ -418,6 +421,47 @@ package {
             var sum:Number = 0;
             for (var i:int = 0; i < 2000000000; i += 4999) { sum += v[i]; }
             return sum;
+        }
+
+        // A counter that starts at twice a variable and goes up by it, past a vector shorter than its bound.
+        private function strided():Number {
+            var v:Vector.<int> = ints(50);
+            var sum:Number = 0;
+            for (var i:int = 2; i < 9; i++) {
+                var j:int = i + i;
+                while (j < 60) {
+                    sum += v[j];
+                    j += i;
+                }
+            }
+            return sum;
+        }
+
+        // The same, storing: the store at the vector's end makes it one longer, and the next is past it.
+        private function stridedStore():String {
+            var v:Vector.<int> = ints(50);
+            for (var i:int = 2; i < 9; i++) {
+                var j:int = i + i;
+                while (j < 60) {
+                    v[j] = 0;
+                    j += i;
+                }
+            }
+            return v.length + ": " + v;
+        }
+
+        private function stridedFixed():Number {
+            var v:Vector.<int> = ints(50, true);
+            var count:int = 0;
+            for (var i:int = 5; i < 9; i++) {
+                var j:int = i + i;
+                while (j < 60) {
+                    v[j] = 0;
+                    count++;
+                    j += i;
+                }
+            }
+            return count;
         }
 
         // The inner loop's vector is shorter than the outer's.

@@ -37,6 +37,9 @@ downBelow RangeError 1125 Error #1125: The index -1 is out of range 10.
 byThree RangeError 1125 Error #1125: The index 12 is out of range 10.
 byThreeStore RangeError 1125 Error #1125: The index 13 is out of range 11.
 byFar RangeError 1125 Error #1125: The index 9998 is out of range 5000.
+strided RangeError 1125 Error #1125: The index 50 is out of range 50.
+stridedStore RangeError 1125 Error #1125: The index 52 is out of range 51.
+stridedFixed RangeError 1125 Error #1125: The index 50 is out of range 50.
 inner RangeError 1125 Error #1125: The index 4 is out of range 4.
 innerShorter RangeError 1125 Error #1125: The index 6 is out of range 6.
 ratiosPast RangeError 1125 Error #1125: The index 8 is out of range 8.
