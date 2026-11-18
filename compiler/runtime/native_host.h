@@ -14,6 +14,7 @@
 #include "no_engine.h"
 #include "operations.h"
 #include "program.h"
+#include "time_limit.h"
 
 #include <memory>
 #include <string>
@@ -45,6 +46,8 @@ struct Embedder {
 	vm::EngineSource &source;
 	vm::Clock &clock;
 	const ir::Module *module = nullptr;
+	// How long a call from outside may run before Error #1502 stops it, in milliseconds: 0 for no limit.
+	uint32_t time_limit = 0;
 };
 
 // The module the interpreter is given, made from the program's table: its classes, globals and strings by
@@ -125,6 +128,8 @@ struct Host final : vm::NativeCode {
 	std::vector<KeptTrace> kept;
 	Slot *updated = nullptr; // Where the thunk in progress hands back a register it moved on.
 	bool stopped = false; // The library could not go on (no memory even for an error): it has said why.
+	// How long a call from outside may run (Error #1502): none until the embedder sets one.
+	TimeLimit limit;
 	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
@@ -162,6 +167,7 @@ struct Host final : vm::NativeCode {
 	[[nodiscard]] bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
 			uint32_t p_extras, Slot *r_result) override;
 	[[nodiscard]] bool hand_over(vm::NativeError *r_error) override;
+	void call_began() override { limit.began(); }
 	void clear_globals() override;
 	Slot *global(uint32_t p_index) override { return &globals[p_index]; }
 	bool statics_given(uint32_t p_class) const override { return p_class < class_used.size() && class_used[p_class]; }

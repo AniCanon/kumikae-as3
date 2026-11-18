@@ -12,8 +12,13 @@ namespace rt {
 
 // Errors. One that is raised sets c->failing; the function it is raised in then leaves by its error path.
 
-// A call one deeper than MAX_DEPTH was asked for: AS3's Error #1023.
-//     void stack_overflow(Context *c);
+// A call one deeper than MAX_DEPTH was asked for, or one with the stack nearly used up: AS3's Error #1023,
+// and true. The host's watch on how long a call runs asks the same way, by the stack's floor: then the call
+// goes on (false) unless its time is up, which is Flash's Error #1502 (true), or the stack is used up indeed.
+//     bool stack_overflow(Context *c);
+// The alarm is set (alarmed()): the clock is looked at. True if the call from outside has run longer than
+// it may: Flash's Error #1502 is on its way out, which no catch takes.
+//     bool overdue(Context *c);
 // A member of nothing was asked for: AS3's TypeError #1009.
 //     void raise_null(Context *c);
 // Memory ran out where the runtime itself asked for some: AS3's Error #1000.

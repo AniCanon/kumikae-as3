@@ -36,7 +36,8 @@
 	X(method_make, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	X(function_length, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	/* Errors (operations.h says what each is for). */ \
-	X(stack_overflow, void, (Context *c), (c)) \
+	X(stack_overflow, bool, (Context *c), (c)) \
+	X(overdue, bool, (Context *c), (c)) \
 	X(raise_null, void, (Context *c), (c)) \
 	X(call_failed, bool, (Context *c), (c)) \
 	X(out_of_memory, void, (Context *c), (c)) \

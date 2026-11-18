@@ -1,0 +1,3 @@
+Error: Error #1502: A script has executed for longer than the timeout period of 0.1 seconds.
+	at counted_down/run()[counted_down.as:12]
+	at counted_down()[counted_down.as:6]

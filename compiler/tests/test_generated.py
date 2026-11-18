@@ -18,7 +18,11 @@ timings rest on, so that a change that undoes one fails here and not only in a b
   - push() of one value onto a vector with room for it is written where it is: no call of the library, and
     for a Vector2 into a vector that holds each in its place, no handle;
   - a Vector2 that is a field of the script, read only to be multiplied, is read out of the field's own
-    handle: no handle is made for the read and given back after it.
+    handle: no handle is made for the read and given back after it;
+  - a loop can be stopped when a call has run too long (Error #1502), and a loop counted by a whole number
+    against a bound that stays as it is pays nothing for that each round: its test is one comparison, of
+    the counter and the end of a stretch, and the host's alarm is looked at where a stretch ends. A counter
+    that goes up to a vector's own length is an index of the vector with nothing more asked.
 """
 import os
 import re
@@ -45,12 +49,15 @@ def functions(folder, file):
     return found
 
 
-def loops(body):
-    """The text of each loop: from a label to the last jump back to it."""
+def loops(body, copies="LV"):
+    """The text of each loop: from its label to the last jump back to it, or, for a loop counted by its
+    stretches, to the label its rounds begin at (N for L, W for V). With copies="V", only the copies in
+    which the vectors' lengths and elements are locals."""
     found = []
-    for label in re.findall(r"^([LV]\d+):;$", body, re.M):
+    for label in re.findall(r"^(?:\[\[maybe_unused\]\] )?([%s]\d+):;$" % copies, body, re.M):
         start = body.index(label + ":;")
-        back = body.rfind("goto %s;" % label)
+        rounds = {"L": "N", "V": "W"}[label[0]] + label[1:]
+        back = max(body.rfind("goto %s;" % label), body.rfind("goto %s;" % rounds))
         if back > start:
             found.append(body[start:back])
     return found
@@ -74,8 +81,10 @@ with tempfile.TemporaryDirectory() as where:
             body = made.get(leaf, "")
             check("%s is found" % leaf, bool(body))
             check("%s keeps no count of the depth" % leaf, "c->depth" not in body and "stack_overflow" not in body, body)
-        vec = made.get("CmpAs_vec", "")
-        check("vec, which calls nothing, keeps no count of the depth", vec and "c->depth" not in vec, vec)
+        # A loop can be stopped (Error #1502), so the function it is in can fail: work's is counted by `i`
+        # against a bound that stays, and looks at the alarm where a stretch ends, not each round.
+        check("work's loop is held to a stretch, and counts no rounds", "= stretch_" in inside and "--rounds" not in work and
+              "overdue(c)" in inside, inside)
 
 with tempfile.TemporaryDirectory() as where:
     sources = os.path.join(tests, "bench", "languages")
@@ -100,6 +109,9 @@ with tempfile.TemporaryDirectory() as where:
         check("Saxpy's loops are found", bool(inside), process)
         check("a static field no code in the function can write is read once, not in its loops", "c->globals[" not in inside and
               "c->globals[" in process, process)
+        fast = loops(process, "V")
+        check("Saxpy's loops over its vectors are held to stretches as indexes, and count no rounds", len(fast) >= 2 and
+              all("= stretch_index" in loop for loop in fast) and "--rounds" not in process, process)
 
 with tempfile.TemporaryDirectory() as where:
     sources = os.path.join(tests, "bench", "languages")
@@ -142,11 +154,12 @@ with tempfile.TemporaryDirectory() as where:
     check("vectors.as is written as C++", written.returncode == 0, written.stderr)
     if written.returncode == 0:
         made = functions(where, "vectors.cpp").get("vectors", "")
-        fast = [loop for loop in loops(made) if "goto S" in loop]
+        fast = loops(made, "V")
         check("vectors' loops have a copy with locals", len(fast) >= 1, made)
         for loop in fast:
             check("the copy with locals does not look at the vector", "->length" not in loop and "element" not in loop and "thunk(" not in loop,
                   loop)
+            check("a counter that goes up to the vector's own length is its index with nothing more asked", "goto S" not in loop, loop)
 
 for failure in failures:
     print("FAIL " + failure[:2500])

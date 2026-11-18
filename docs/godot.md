@@ -293,7 +293,7 @@ as its source and the AS3 stack trace. The game carries on.
 - **An error in a listener comes out of the `emit()` that ran it,** so a `catch` around the `emit()` catches
   it.
 - **A call from the engine that runs longer than 15 seconds is stopped** with Error #1502, and the game
-  carries on. This limit applies on the interpreter, not yet in native code.
+  carries on. The limit is the same on the interpreter and in native code.
 
 ## Tests in a project
 

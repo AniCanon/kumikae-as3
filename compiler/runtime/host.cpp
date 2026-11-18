@@ -17,7 +17,7 @@ static_assert(NONE == ir::NONE, "the program table and the IR write `none` alike
 
 Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		program(p_program), module(p_embedder.module ? native_module(*p_embedder.module, p_program) : stub_module(p_program)),
-		output(p_embedder.output), handles(p_embedder.handles) {
+		output(p_embedder.output), handles(p_embedder.handles), limit(context, p_embedder.clock) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
 	asked = runner_for(&context);
@@ -65,6 +65,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.program = &program;
 	context.api = runtime_api();
 	context.host = this;
+	limit.set(p_embedder.time_limit);
 }
 
 void Host::clear_globals() {
@@ -106,6 +107,7 @@ void Host::say_counts() const {
 }
 
 Host::~Host() {
+	limit.set(0); // Its thread reads the context.
 	if (!thunk_counts.empty()) {
 		say_counts();
 	}
@@ -185,8 +187,8 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	Host &host = *c->host;
 	// The interpreter refuses an entry with the stack nearly used up, and one that is refused has no frame
 	// to catch its error in: Error #1023 is raised here, where generated code can catch it.
-	if (vm::stack_below(c->stack_floor ? c->stack_floor : vm::stack_floor())) {
-		stack_overflow(c);
+	const uintptr_t floor = c->stack_floor.load(std::memory_order_relaxed);
+	if (vm::stack_below(floor ? floor : vm::stack_floor()) && stack_overflow(c)) {
 		return empty();
 	}
 	const uint32_t function = host.thunk_function(p_thunk);
@@ -306,9 +308,13 @@ void Host::use_class(uint32_t p_class, bool p_from_code) {
 }
 
 bool Host::run() {
+	// Each is a call from outside, counted with the interpreter's own: what the library calls back
+	// meanwhile is inside it, and its time is the call's (Error #1502).
 	for (uint32_t i = 0; i < program.initializer_count; i++) {
 		Slot none = empty();
+		interpreter->entered();
 		program.functions[program.initializers[i]].entry(&context, nullptr, 0, &none);
+		interpreter->left();
 		if (context.failing) {
 			report();
 			return false;
@@ -332,7 +338,9 @@ bool Host::run() {
 		std::vector<Slot> arguments(constructor.parameters, empty());
 		arguments[0] = made;
 		Slot none = empty();
+		interpreter->entered();
 		constructor.entry(&context, arguments.data(), 1, &none);
+		interpreter->left();
 	}
 	const bool ran = !context.failing;
 	if (!ran) {

@@ -182,7 +182,7 @@ conversion, #1125 for a vector index out of range, #1023 for a stack overflow.
 | Situation | What happens |
 |---|---|
 | Recursion without end | Error #1023 at the 10,001st nested call. The program doesn't crash |
-| A script that runs too long | Error #1502 after 15 seconds, which no `catch` stops. Native code doesn't have this limit yet |
+| A script that runs too long | Error #1502 after 15 seconds, which no `catch` stops and no `finally` runs after |
 | A regular expression that backtracks without end | An `Error` after ten million steps, plus a thousand for each character of the text |
 | An `Array` or `Vector` that contains itself, converted to text | Error #1023 |
 | A pattern that can't be parsed | A `SyntaxError` where the `RegExp` is created |

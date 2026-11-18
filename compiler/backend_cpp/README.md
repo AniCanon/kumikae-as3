@@ -36,6 +36,7 @@ each class suits development, where only what an edit changed is rebuilt.
 | `function_calls.cpp` | Direct calls, virtual calls and interface calls |
 | `function_fast.cpp`, `function_library.cpp` | Library operations with an inline fast path, and direct calls into the library |
 | `function_loops.cpp`, `function_whole.cpp` | Loops over vectors, and 32-bit integer arithmetic |
+| `function_rounds.cpp` | Where a loop goes round: the look at the host's alarm that stops a loop without end, and loops counted by a whole number |
 | `function_borrowed.cpp` | Reads that don't need a reference count |
 | `function_engine.cpp`, `function_values.cpp`, `function_signals.cpp` | Calls into Godot, Godot's value types, and `emit()` |
 | `thunks` | Operations left to the interpreter's library |
@@ -56,6 +57,9 @@ each class suits development, where only what an edit changed is rebuilt.
 - **An error is `c->failing`,** tested after each operation that can raise one. The function then goes to
   its handlers, or leaves and adds its line to the stack trace. Nothing about lines is kept while a
   program runs without errors.
+- **A loop can be stopped.** Where a loop goes round, the function looks at the host's alarm once in
+  `ROUNDS` rounds, so that a call that runs too long ends with Error #1502 as under the interpreter. A
+  function with a loop can therefore fail. See [the runtime](../runtime/README.md#the-time-limit).
 - **A null check is explicit,** and left out on `this`.
 - **`#line` markers point at the `.as` source.**
 
@@ -70,6 +74,8 @@ to give a wrong answer if the proof were wrong.
 | No error check after a call that can't fail | A function in which nothing can fail keeps no call depth and sets no error. | `tests/run/deep_leaf.as` |
 | Fields in locals | A number or Boolean field of `this` that a loop uses stays in a local. Memory is updated only around code that could see the field another way. | `tests/run/field_in_loop.as` |
 | Static fields in locals | A static number or Boolean that a function reads and never writes is read once. A constant of the function's own class is read once whatever the function runs. | `tests/run/static_still.as`, `tests/run/static_const_still.as` |
+| Counted loops | A loop counted by a whole number against a bound that stays the same (`for (i = 0; i < n; i++)`) is held to stretches of `ROUNDS` steps, worked out where a stretch begins. Each round costs one comparison, as before, and the alarm is looked at where a stretch ends. | `tests/run/loops_counted.as`, `tests/run/stopped/` |
+| Indexes held to a stretch | In a loop's copy with locals, a stretch ends no further on than the vectors the counter indexes. An element read or stored under the counter then needs no test of its own. | `tests/run/loops_counted.as` |
 | Fields through the class's struct | Tells the C++ compiler which field of which class a read or write touches. | `tests/run/field_classes.as` |
 | Loops over vectors | A loop that reads and writes vectors of numbers is written twice. The first copy keeps each vector's length and elements in locals. An index out of range jumps to the second copy, which is the loop as written. | `tests/run/vector_loops.as` |
 | Narrow vector elements | An element of a `Vector.<int>` is read and written as four bytes. | `tests/run/vector_narrow.as` |

@@ -1,0 +1,3 @@
+Error: Error #1502: A script has executed for longer than the timeout period of 0.1 seconds.
+	at do_while/count()[do_while.as:12]
+	at do_while()[do_while.as:6]

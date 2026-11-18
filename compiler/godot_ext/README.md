@@ -118,11 +118,13 @@ With a program library loaded, everything else in this folder works as before. T
 interpreter over the same module, in which each function's body is native code. A call from Godot runs the
 generated function itself. See [runtime/README.md](../runtime/README.md).
 
-Two things don't work under native code yet:
+One thing doesn't work under native code yet:
 
 - **Hot reload of native code.** An edit moves the running game onto the interpreter, with its state.
   Objects created before the move aren't updated in place.
-- **The time limit on a script** (Error #1502).
+
+The time limit on a call from the engine (Error #1502) is the project's setting either way: the extension
+hands it to the interpreter and to the host of a program library alike.
 
 ### Building on Play
 

@@ -53,6 +53,9 @@ struct NativeCode {
 	// true, and the error is the interpreter's. False if the native side keeps it, having begun what led
 	// to the call: the interpreter then raises a placeholder that only leaves its own frames.
 	[[nodiscard]] virtual bool hand_over(NativeError *r_error) = 0;
+	// A call from outside begins that no other is running inside, whoever made it (the host for the
+	// engine, or the interpreter for whoever holds it): the one whose time native code keeps.
+	virtual void call_began() {}
 	// The static fields and package variables native code keeps are emptied: Interpreter::clear_globals().
 	virtual void clear_globals() = 0;
 	// Where native code keeps a static field or package variable (by its number in the module): what the

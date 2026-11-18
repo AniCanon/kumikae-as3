@@ -27,6 +27,7 @@ python3 compiler/tests/run_programs.py compiler/build/kas3c compiler/tests
 | `golden/names`, `golden/types` | Name resolution and types: a `.as` file, and the exact output of `kas3c check` with `--dump-names` or `--dump-types` | `golden` |
 | `run/` | Whole programs on the interpreter: a `.as` file with its expected output (`.out`), its expected errors (`.err`), and its IR (`.ir`) where the IR is pinned | `programs` |
 | `run/refused/` | One program for each construct the interpreter doesn't run yet, with the error it must give | `programs` |
+| `run/stopped/` | Programs that never end. Each runs with a time limit of a tenth of a second and must be stopped by Error #1502, on the interpreter and as native code | `programs`, `native` |
 | `run_native.py` | The programs of `run/` as native code: written by `kas3c cpp`, built with the system's C++ compiler, and held to the same `.out` and `.err` | `native` |
 | `corpus/` | Realistic programs that must parse and check with no errors. `runs.txt` lists the ones that must also lower for Godot | `golden`, `corpus` |
 | `godot_project/`, `godot_native/` | AS3 inside Godot. See [Tests inside Godot](#tests-inside-godot) | `godot_extension` |

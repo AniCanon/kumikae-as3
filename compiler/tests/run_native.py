@@ -23,6 +23,10 @@ says how many times generated code left an operation to the library (a thunk). b
 the number for each, which is small and does not grow with the loop: a change that loses a fast path makes
 it millions, and fails here and not only in a timing.
 
+The programs of run/stopped/ never end by themselves: each is built the same way and run with a tenth of a
+second for a call (KAS3_TIME_LIMIT_MS=100). It must be stopped by Error #1502 as the interpreter stops it:
+status 1, X.out on standard output, and standard error that begins with X.err.
+
 deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
 (KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash. So is callbacks_nest, whose
 calls pass through the library's own.
@@ -97,8 +101,9 @@ kas3c = os.path.abspath(sys.argv[1])
 tests = os.path.abspath(sys.argv[2])
 work = os.path.abspath(sys.argv[3])
 given, update = options(sys.argv[4:])
-# As run_programs.py fixes them: Date's now and the zone, and leaks reported.
-environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", TZ="PST8PDT,M3.2.0,M11.1.0")
+# As run_programs.py fixes them: Date's now and the zone, leaks reported, and no program held to Flash's
+# fifteen seconds, which a machine too busy to run one in that time would end it with.
+environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", TZ="PST8PDT,M3.2.0,M11.1.0", KAS3_TIME_LIMIT_MS="0")
 folder = os.path.join(tests, "run")
 
 
@@ -171,15 +176,39 @@ def one(name):
     return ("failed", "\n".join(problems)) if problems else ("passed", "")
 
 
+def stopped(name):
+    """A program of run/stopped/ (named "stopped/X"): ("passed", "") if the time limit stops it as it must, or ("failed", why)."""
+    sources_in = os.path.join(folder, "stopped")
+    base = os.path.join(sources_in, name[len("stopped/"):])
+    out = os.path.join(work, name.replace("/", "_"))
+    what, said = build([os.path.basename(base) + ".as"], sources_in, out)
+    if what:
+        return "failed", "%s: %s" % (what, said)
+    try:
+        ran = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, cwd=sources_in, timeout=60,
+                             env=dict(environment, KAS3_TIME_LIMIT_MS="100"))
+    except subprocess.TimeoutExpired:
+        return "failed", "it was not stopped: it ran for more than 60 seconds"
+    problems = []
+    if ran.stdout != expected(base + ".out"):
+        problems.append("--- output expected\n%s--- output\n%s" % (expected(base + ".out"), ran.stdout))
+    if not ran.stderr.startswith(expected(base + ".err", "no .err")):
+        problems.append("--- errors expected to begin with\n%s--- errors\n%s" % (expected(base + ".err"), ran.stderr[:600]))
+    if ran.returncode != 1:
+        problems.append("exit %d" % ran.returncode)
+    return ("failed", "\n".join(problems)) if problems else ("passed", "")
+
+
 names = sorted({os.path.splitext(os.path.basename(path))[0]
                 for path in glob.glob(os.path.join(folder, "*.as")) + glob.glob(os.path.join(folder, "*.args"))})
+names += sorted("stopped/" + os.path.splitext(os.path.basename(path))[0] for path in glob.glob(os.path.join(folder, "stopped", "*.as")))
 if given["--only"]:
     names = [name for name in names if name in given["--only"]]
 includes = [flag for folder_ in given["--include"] for flag in ("-I", folder_)]
 headers = precompiled()
 jobs = int(given["--jobs"][0]) if given["--jobs"] else min(MOST_JOBS, os.cpu_count() or MOST_JOBS)
 with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-    outcomes = dict(zip(names, pool.map(one, names)))
+    outcomes = dict(zip(names, pool.map(lambda name: stopped(name) if name.startswith("stopped/") else one(name), names)))
 
 failures = ["%s\n%s" % (name, why) for name, (what, why) in outcomes.items() if what == "failed"]
 skipped = {name: why for name, (what, why) in outcomes.items() if what == "skipped"}

@@ -1,0 +1,3 @@
+Error: Error #1502: A script has executed for longer than the timeout period of 0.1 seconds.
+	at counted_wrap/run()[counted_wrap.as:12]
+	at counted_wrap()[counted_wrap.as:6]

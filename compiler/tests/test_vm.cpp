@@ -125,6 +125,44 @@ static void test_time_limit() {
 		CHECK_EQ(host.errors, std::string());
 		interpreter.release_object(object);
 	}
+	// Whoever keeps native code's time is told of each call from outside that no other is running inside,
+	// however it is made: the start, an object made, a method called. Not of one made inside another.
+	{
+		struct Told final : vm::NativeCode {
+			vm::Interpreter *program = nullptr;
+			uint32_t began = 0;
+			uint32_t inside = 0; // How many of those began with a call already in progress.
+			void call_began() override {
+				began++;
+				inside += program->in_call() ? 1 : 0;
+			}
+			[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+			void clear_globals() override {}
+			vm::Slot *global(uint32_t) override { return nullptr; }
+			bool statics_given(uint32_t) const override { return false; }
+			[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+		} told;
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		told.program = &interpreter;
+		interpreter.set_native(&told);
+		CHECK(interpreter.start());
+		const uint32_t started = told.began;
+		vm::Object *object = interpreter.construct(spin);
+		CHECK_EQ(told.began, started + 1);
+		vm::Slot sum;
+		sum.bits = 0;
+		CHECK(interpreter.call_method(object, "quick", nullptr, 0, &sum));
+		CHECK_EQ(told.began, started + 2);
+		// A call a host counts itself (native code run for the engine), and one made inside it.
+		interpreter.entered();
+		CHECK_EQ(told.began, started + 3);
+		CHECK(interpreter.call_method(object, "quick", nullptr, 0, &sum));
+		interpreter.left();
+		CHECK_EQ(told.began, started + 3);
+		CHECK_EQ(told.inside, (uint32_t)0);
+		interpreter.release_object(object);
+	}
 	// Flash's own words for its own limit, 15 seconds.
 	{
 		Recorder host;

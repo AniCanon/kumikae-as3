@@ -41,11 +41,6 @@ bool is_number(Kind p_kind) {
 	return is_whole(p_kind) || p_kind == Kind::F64 || p_kind == Kind::Bool;
 }
 
-// Where an instruction jumps to, or NONE.
-uint32_t target_of(const Instruction &p_in) {
-	return p_in.op == Op::Jump ? p_in.a : p_in.op == Op::JumpIf || p_in.op == Op::JumpIfNot ? p_in.b : NONE;
-}
-
 } // namespace
 
 // Whether an element read into the register is a plain copy of what the vector's place holds: a number, a
@@ -172,8 +167,11 @@ bool FunctionWriter::fast_vector(const Instruction &p_in) {
 	const auto local = [&](uint32_t p_register) { return std::find(fast_->vectors.begin(), fast_->vectors.end(), p_register) != fast_->vectors.end(); };
 	const auto element = [&](uint32_t p_vector, uint32_t p_index) {
 		const std::string index = "static_cast<uint32_t>(" + reg(p_index) + ")";
-		line("if (KAS3_UNLIKELY(" + index + " >= n" + std::to_string(p_vector) + ")) goto S" + std::to_string(pc_) + ";");
-		retried_[pc_] = true;
+		// An index held to a stretch that ends where the vector does is one of the vector's (function_rounds.cpp).
+		if (!index_held(p_vector, p_index)) {
+			line("if (KAS3_UNLIKELY(" + index + " >= n" + std::to_string(p_vector) + ")) goto S" + std::to_string(pc_) + ";");
+			retried_[pc_] = true;
+		}
 		return "d" + std::to_string(p_vector) + "[" + index + "]";
 	};
 	switch (p_in.op) {
@@ -207,7 +205,7 @@ bool FunctionWriter::fast_vector(const Instruction &p_in) {
 std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<bool> &p_landed) {
 	std::vector<bool> inside(function_.code.size() + 1, false); // What a jump of the loop itself goes to.
 	for (uint32_t pc = p_loop.from; pc <= p_loop.to; pc++) {
-		const uint32_t target = target_of(function_.code[pc]);
+		const uint32_t target = jump_target(function_.code[pc]);
 		if (target != NONE && target >= p_loop.from && target <= p_loop.to) {
 			inside[target] = true;
 		}
@@ -245,7 +243,10 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 			text_.assign(function_.registers.size(), NONE);
 		}
 		instruction(function_.code[pc_]);
-		out += (inside[pc_] ? "V" + std::to_string(pc_) + ":;\n" : std::string()) + body_;
+		out += (inside[pc_] ? (rounds_counted(pc_) ? "RV" + std::to_string(pc_) + ":;\n" : std::string()) + (counts(pc_) ? "[[maybe_unused]] " : "") + "V" +
+								std::to_string(pc_) + ":;\n"
+							: std::string()) +
+				body_;
 	}
 	fast_ = nullptr;
 	pc_ = resume;

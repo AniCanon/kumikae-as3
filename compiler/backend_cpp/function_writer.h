@@ -29,6 +29,10 @@ struct Signature {
 Signature signature_of(const ir::Function &p_function);
 // Whether callers say how many arguments they give: the function has parameters with defaults.
 bool takes_count(const ir::Function &p_function);
+// Where an instruction jumps to, or NONE.
+inline uint32_t jump_target(const ir::Instruction &p_in) {
+	return p_in.op == ir::Op::Jump ? p_in.a : p_in.op == ir::Op::JumpIf || p_in.op == ir::Op::JumpIfNot ? p_in.b : ir::NONE;
+}
 
 class FunctionWriter {
 	const ir::Module &module_;
@@ -179,6 +183,53 @@ class FunctionWriter {
 	// Stores a value someone else holds: a reference is taken first.
 	void share(uint32_t p_register, const std::string &p_borrowed);
 	std::string fail(); // "line = 12; goto failed;": where an error at this instruction goes.
+	// function_rounds.cpp: where a loop goes round, the host's alarm is looked at once in many rounds.
+	std::string jump(uint32_t p_target); // A jump, with what counts the round if it goes back.
+	std::vector<bool> rounds_; // Per instruction: a jump goes back to it.
+	bool rounds_counted(uint32_t p_pc) const; // Whether such a jump is counted in the function's local.
+	// A loop counted by one whole-number register against a bound that stays as it is.
+	struct Counted {
+		uint32_t from = 0; // The instruction its one jump back goes to, and that jump.
+		uint32_t to = 0;
+		uint32_t test = 0; // The comparison of the counter and the bound; the jump out follows it.
+		uint32_t counter = 0;
+		bool up = true; // The counter goes up to the bound, or down to it.
+		bool inclusive = false; // `<=`.
+		uint32_t bound = 0; // The Number register the counter is held against.
+		uint32_t step = 0; // The Number register added to the counter, or taken from it.
+		uint32_t stepped = 0; // The instruction that adds or takes it.
+		uint32_t moved = 0; // The instruction that writes the counter.
+	};
+	std::vector<Counted> counted_;
+	// How such a loop is written in the copy being written.
+	struct Counts {
+		const Counted *loop = nullptr;
+		bool index = false; // The stretch's end is held as an index of the loop's vectors.
+		std::string start; // The label where a stretch begins.
+		std::string label; // Where the jump back goes: past the stretch's start.
+		std::string end; // The local that holds the stretch's end.
+		std::string within; // The test that the counter is short of its stretch's end.
+		std::string left; // How far the counter is from the loop's end: none or less, and the loop ends.
+		std::string begin; // The statement that begins a stretch at the counter.
+		std::string none; // What the stretch's end is where there is no stretch; empty where there always is one.
+		// For an index: the test that there is no stretch from where the counter is.
+		std::string leaves;
+	};
+	void find_counted();
+	bool counted_shape(Counted *r_loop) const;
+	bool counted_step(Counted *r_loop) const;
+	std::vector<uint32_t> writes_in(uint32_t p_register, uint32_t p_from, uint32_t p_to) const;
+	uint32_t written_once(const Counted &p_loop, uint32_t p_register, uint32_t p_low, uint32_t p_high) const;
+	std::optional<std::string> still_whole(const Counted &p_loop, uint32_t p_register, uint32_t p_low, uint32_t p_before, uint32_t p_parts) const;
+	uint32_t parts_begin(const Counted &p_loop, uint32_t p_register, uint32_t p_low, uint32_t p_before, uint32_t p_parts) const;
+	std::optional<Counts> counts(uint32_t p_from) const;
+	std::vector<uint32_t> indexed(const Counted &p_loop) const;
+	bool int_bound(const Counted &p_loop) const;
+	// Whether the element the instruction being written reads or stores is known to be one of the vector's,
+	// by the stretch its index is held to: nothing more is asked of the index there.
+	bool index_held(uint32_t p_vector, uint32_t p_index) const;
+	std::string counted_declared() const;
+	bool counted(const ir::Instruction &p_in);
 	void check(); // If an error is on its way out, go where fail() says.
 	void mark(); // Before what may run other code: the line this function is on, where frames are kept.
 	void null_check(uint32_t p_register);

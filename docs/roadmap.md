@@ -62,8 +62,8 @@ state of the project changes.
 
 - **Native code when you press Play.** The extension can build the program library by itself when a
   project runs on macOS, cache it, and fall back to the interpreter when there's no C++ toolchain. Turn it
-  on with the project setting `actionscript/native/play`. It's off by default until two things are done:
-  hot reload that updates objects created under native code, and the 15-second limit on a runaway script.
+  on with the project setting `actionscript/native/play`. It's off by default until hot reload updates
+  objects created under native code.
 
 ## Next
 

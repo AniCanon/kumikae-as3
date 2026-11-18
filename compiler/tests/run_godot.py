@@ -506,21 +506,35 @@ compare("cycles.gd", [
     "on an Object, what an AS3 static holds stays whole when Godot frees the Object",
 ])
 
-# A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
-with tempfile.TemporaryDirectory() as limited:
-    copy = os.path.join(limited, "project")
-    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
-    with open(os.path.join(copy, "project.godot"), "a") as settings:
-        settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
-    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300)
-    output = run.stdout + run.stderr
-    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 6, output[-1500:])
-    for name, got, want in values:
-        check("timeout.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
-    check("timeout.gd: Flash's error, where the loop is", output.count(
-        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
-        "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
+def timeout_test(label, native=False):
+    """A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give. With
+    `native`, the scripts run as native code, by the library Play built in a run before: they are stopped
+    the same way, and the same is said."""
+    with tempfile.TemporaryDirectory() as limited:
+        copy = os.path.join(limited, "project")
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
+        with open(os.path.join(copy, "project.godot"), "a") as settings:
+            settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
+        environment = dict(os.environ, **{play_godot.SWITCH: "1" if native else "0"})
+        if native:
+            first = subprocess.run([godot, "--headless", "--path", copy, "--quit-after", "5"], capture_output=True, text=True, timeout=300, env=environment)
+            check("%s: a run before builds the library" % label, play_godot.BUILDS in first.stdout + first.stderr and play_godot.settled(copy) and
+                  len(play_godot.libraries(copy)) == 1, (first.stdout + first.stderr)[-900:])
+        run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300, env=environment)
+        output = run.stdout + run.stderr
+        values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 6, output[-1500:])
+        check("%s: the scripts run %s" % (label, "as native code" if native else "on the interpreter"), (play_godot.USED in output) == native, output[:900])
+        for name, got, want in values:
+            check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
+        check("%s: Flash's error, where the loop is" % label, output.count(
+            "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
+            "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
+        play_godot.settled(copy)
+
+
+timeout_test("timeout.gd")
+timeout_test("timeout.gd, as native code", native=True)
 
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [

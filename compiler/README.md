@@ -125,7 +125,7 @@ An error that nothing catches goes to standard error with an AS3 stack trace, an
 
 | Variable | Effect on `kas3c run` |
 |---|---|
-| `KAS3_TIME_LIMIT_MS` | The time after which a run is stopped with Error #1502. The default is 15 seconds, as in Flash. `0` means no limit. |
+| `KAS3_TIME_LIMIT_MS` | The time after which a run is stopped with Error #1502. The default is 15 seconds, as in Flash. `0` means no limit. A program built as a plain executable reads it too. |
 | `KAS3_NOW` | Fixes the time `Date` reads, in milliseconds since 1970, so that a test prints the same text every run. `TZ` sets the time zone. |
 | `KAS3_REPORT_LEAKS` | Reports objects and strings still alive when the program ends, and exits with status 3. The test suite sets it. |
 | `KAS3_REMEMBER_CONSTRUCTIONS` | Turns on the record hot reload keeps of constructor arguments, to measure its cost. |

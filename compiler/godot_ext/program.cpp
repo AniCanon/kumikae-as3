@@ -82,13 +82,18 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 }
 
 // Flash stops a script that runs too long, after 15 seconds; so does this, after the project's setting
-// `actionscript/limits/script_timeout_seconds` (0 for no limit).
+// `actionscript/limits/script_timeout_seconds` (0 for no limit), whichever way the scripts run. In
+// milliseconds.
+static uint32_t time_limit() {
+	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
+			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
+	return seconds > 0 ? (uint32_t)std::min(seconds * 1000.0, 4.0e9) : 0;
+}
+
 static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
 	p_host.new_program(); // What is worked out from here on is this program's.
 	auto made = std::make_unique<vm::Interpreter>(p_module, p_host);
-	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
-			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
-	made->set_time_limit(seconds > 0 ? (uint32_t)std::min(seconds * 1000.0, 4.0e9) : 0);
+	made->set_time_limit(time_limit());
 	// Where the scripts can be reloaded (a debug build: the watch, the debugger, reload_scripts()), what
 	// objects are constructed with is remembered, so that a reload can update them in place. An exported
 	// game pays nothing for it.
@@ -127,7 +132,7 @@ Project &Project::get() {
 	}
 	if (!library.empty()) {
 		std::string why;
-		program->native_ = NativeProgram::load(library, *program->module_, program->host_, &why);
+		program->native_ = NativeProgram::load(library, *program->module_, program->host_, time_limit(), &why);
 		if (program->native_) {
 			UtilityFunctions::print("ActionScript: the scripts run as native code.");
 		} else {

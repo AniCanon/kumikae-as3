@@ -26,8 +26,12 @@ void run_here(void *p_run) {
 		const char *fixed = std::getenv("KAS3_NOW");
 		vm::StandaloneOutput output;
 		vm::SystemClock clock(fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
-		Host host(*r_run->program, Embedder{ output, vm::NoEngine::instance(), vm::NoEngine::instance(), clock });
-		host.context.stack_floor = vm::stack_floor();
+		// As `kas3c run`: Flash's fifteen seconds for a call, or what KAS3_TIME_LIMIT_MS says (0: no limit).
+		const char *limit = std::getenv("KAS3_TIME_LIMIT_MS");
+		Embedder embedder{ output, vm::NoEngine::instance(), vm::NoEngine::instance(), clock };
+		embedder.time_limit = limit ? static_cast<uint32_t>(std::strtoul(limit, nullptr, 10)) : vm::Interpreter::FLASH_TIME_LIMIT;
+		Host host(*r_run->program, embedder);
+		host.context.stack_floor.store(vm::stack_floor(), std::memory_order_relaxed);
 		ran = host.run();
 	}
 	std::fflush(stdout);
