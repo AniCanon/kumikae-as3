@@ -163,6 +163,8 @@ of structs does.
 - `new Vector.<Vector2>(3)` holds three zero vectors.
 - An element is never `null`. Writing `null` into one is a compile error.
 - What you read is a copy, and what you store is copied in.
+- `points[0].x += 1` changes one part of an element where it is. The compiler reads the element, changes
+  it and writes it back, for a vector of any of Godot's value types.
 - Handed to Godot where it takes a `PackedVector2Array`, the vector is copied in one step.
 
 A `Vector.<int>` or `Vector.<uint>` stores four bytes for each element and goes to Godot as a

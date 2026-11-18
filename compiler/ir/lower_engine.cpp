@@ -116,13 +116,17 @@ bool Engine::is_singleton(const Symbol *p_class) {
 }
 
 // An element of one of Godot's collections that is itself stored somewhere (`points[0]`, `grid[1][2]`):
-// changing a part of it is writing it back there.
+// changing a part of it is writing it back there. So is one of Godot's values that a Vector holds
+// (`kept[0].x = 1` with a Vector.<Vector2>): read from its place, changed, and written back into it.
 bool Engine::stored_element(const Expr *p_expression) {
 	if (!p_expression || p_expression->kind != NodeKind::Index) {
 		return false;
 	}
 	const Expr *object = static_cast<const Index *>(p_expression)->object;
 	Kind kind = Kind::Void;
+	if (l_.is_vector(object->type)) {
+		return l_.kind_of(p_expression->type, &kind) && kind == Kind::Val;
+	}
 	return l_.kind_of(object->type, &kind) && kind == Kind::Val &&
 			(object->kind == NodeKind::Name || object->kind == NodeKind::Member || stored_element(object));
 }
