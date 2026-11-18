@@ -66,7 +66,7 @@ def check(name, condition, detail=""):
 
 # Godot learns of a project's extensions when the editor first scans it. Told to quit at once (--import),
 # Godot crashes as it exits after that first scan: its documentation thread for the new classes outlives
-# the documentation (see the compiler's README). first_scan.gd ends when the scan has and that thread has
+# the documentation (see tests/README.md). first_scan.gd ends when the scan has and that thread has
 # been waited for, however long either takes: the first scan is then clean, and is checked so in a copy
 # that has never been scanned.
 FIRST_SCAN = ["--headless", "--editor", "-s", "first_scan.gd"]

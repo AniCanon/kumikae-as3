@@ -2,7 +2,7 @@
 // they are now are written as C++ (backend_cpp), built by the system's C++ compiler into a library under
 // the project's `.godot/kas3`, and loaded. The compiler runs beside the game, never in its way: a run that
 // finds no library for its scripts starts on the interpreter and says so, and the next run is native
-// (godot_ext/play_cache.h says what is kept where; the compiler's README, when this is done and when not).
+// (godot_ext/play_cache.h says what is kept where; godot_ext/README.md, when this is done and when not).
 #pragma once
 
 #include "ir.h"

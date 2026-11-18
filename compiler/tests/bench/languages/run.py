@@ -131,7 +131,7 @@ def export(godot, extension, where):
         config.write('<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n'
                      '    <add key="cache" value="%s" />\n  </packageSources>\n</configuration>\n' % nuget_cache())
     # The editor's first scan learns of the extension and the C# project; quitting in the same frame crashes
-    # Godot (see the compiler's README), so it is given time.
+    # Godot (see tests/README.md), so it is given time.
     step("the editor's first scan", [godot, "--headless", "--editor", "--quit-after", "300", "--path", project], project)
     step("dotnet build", ["dotnet", "build", "CmpCs.csproj", "-v", "q"], project)
     os.makedirs(os.path.join(project, "out"))  # Godot exports only into a folder that is there.

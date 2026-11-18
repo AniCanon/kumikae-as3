@@ -1,63 +1,160 @@
-# `godot_ext/`: the GDExtension
+# `godot_ext/`: the Godot extension
 
-What makes AS3 a scripting language inside Godot 4: scripts that extend Godot classes, attached to nodes,
-called by the engine.
+The extension is a GDExtension that registers ActionScript 3 as a scripting language in stock Godot 4.7.
+A `.as` file is then a script: it extends a Godot class, attaches to a node, and is called by the engine.
+For how that looks to someone writing scripts, read [Using AS3 in Godot](../../docs/godot.md).
+
+**Depends on:** `runtime/`, `vm/`, `backend_cpp/`, `ir/` and `src/`, and
+[godot-cpp](https://github.com/godotengine/godot-cpp) for Godot 4.7. This is the only folder that includes
+godot-cpp. Nothing here is included by another folder.
+
+## Build and test
+
+```sh
+cmake -S compiler -B compiler/build-godot -DKAS3_GODOT_CPP=<path to godot-cpp>
+cmake --build compiler/build-godot --target kas3_godot
+python3 compiler/tests/run_godot.py compiler/tests compiler/build/kas3c
+```
+
+The library is written to `tests/godot_project/bin`. The tests need `godot` 4.7 on the `PATH`, or its path
+in `KAS3_GODOT`. For iOS, run `tests/build_ios.sh`.
+
+godot-cpp is built as `template_release`, and Godot's editor loads that library too. godot-cpp compiles
+nothing differently for the editor, so one library serves both.
+
+## Files
 
 | Files | Job |
 |---|---|
-| `register.cpp`, `language.h` | Entry point; the script language Godot sees |
-| `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
-| `native_program` | The project's program library (the C++ backend's output, built for the project): found, loaded, checked against the scripts as they are, and given what it needs of Godot (method binds, singletons, names, the entry points: among them a method bind called so that what it gives is made where a new handle keeps it, and an element of a Dictionary given as the value with parts it is asked for as). The runtime's host then keeps the interpreter everything else here asks (`Project::interpreter()`), with every function's body native |
-| `play_build`, `play_cache.h`, `toolchain.h` | Play builds the project's program library by itself ([the compiler's README](../README.md#play-builds-the-program-library)): which build the scripts need and whether `.godot/kas3` has it, the scripts written as C++ on a thread (the backend, linked in, and the runtime's headers, carried), the compiler started beside the game and its end said. The two headers include nothing of Godot's (`tests/test_play_cache.cpp`): a build's key and the names of its files, which builds are taken away, the command the shell is given, the switch; and which C++ compiler is found without running one |
-| `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
-| `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back. A parameter of a script's class takes the Godot object that carries such a script, as the script's object (`object_arrives`, `members.h`). Where Godot passes every argument and each is exactly of the type its parameter holds (worked out once for a function), they are taken as they come: a value with parts is lent as a copy on the stack, and nothing is checked twice or allocated |
-| `counted` | What arrives where a script's class is declared and Godot gives an object (`arriving_script`): the script object of the Godot object, if its script's class is that one or extends it, and nothing else; the one place every such arrival asks (a call's arguments, a field set from Godot, the program's own `is`, `as` and stores of an untyped value through `EngineHandles::script_of`), which holds the Godot object of a counted one for as long as the program holds what arrived (`taken_script`). A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it. A script taken off its object ends the pair: AS3's hold on the Godot object is given back (a last one frees it at the end of the frame), and a script object AS3 still holds lives on alone, its handle on the Godot object keeping nothing |
-| `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
-| `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
-| `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`). A handle on an object that is not reference-counted is shared by whoever copies it (`shares`): it counts no reference of Godot's, is never written in place and is no node of the collector's, so one handle serves every holder, and goes when the last lets go |
-| `handles.h` | Where every handle (a `godot::Variant` the interpreter holds) is made and freed, each with its head before it (`rt::HandleHead`, which generated code reads too); a freed one's memory is kept for the next on the main thread |
-| `godot_signals.cpp` | The AS3 way of listening to a signal (`@add`, `@addOnce`, `@remove`, `@has`, `@removeAll`, `@numListeners`), made from Godot's own calls |
-| `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods; and the time (`Clock`: Godot's clock, the C library's zone) |
-| `godot_calls.h` | What the host files share: the arguments of a call, a failed call in AS3's words, a freed object |
-| `godot_utility.cpp` | Godot's global functions |
-| `godot_prepared.cpp`, `worked.h` | Each engine instruction worked out once when a program loads (`prepare`), by the facts its entry in the name table carries, and run with what Godot gave (`run`): an operator's evaluator for its operands' types, a value type's methods and parts on the bare value, a class's method or property accessor by its method bind, a constant's value, a global function; the StringName for text a method takes made once. One that meets values of other types goes by name |
-| `godot_emit.cpp` | A signal's `emit()` worked out once: Godot has it as a method of the signal reached by its name, so it is made as `Object`'s `emit_signal` by its method bind, on the signal's object with the signal's name first; the name and the object's id are asked of the signal once for each place, and again when the place is handed another signal. The interpreter's instruction and generated code's own emit (`native_program`) both end there; a signal that is not there, or whose object is gone, is left to the request by name |
-| `godot_untyped.cpp` | An untyped value as a Variant and back: an integer stays an integer, a whole float a float |
-| `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array, each number and Boolean made where the Array holds it; a vector of ints, whose places are what a `PackedInt32Array` holds, in one copy; a vector of `Vector2`s, whose places hold the values, as a `PackedVector2Array` in one copy, and such a value as a handle and back (`boxed`, `unboxed`); an Object or a Dictionary as a Dictionary, its keys as text |
-| `program` (collector) | Once a frame, a step of the cycle collector with a budget of work (`COLLECTOR_WORK`); a whole collection when Godot shuts down (`Project::before_shutdown`, after its main loop, of any kind, has finished) and when the program is unloaded. `GodotHost::node` and `node_edges` say what a reference-counted object holds: its listeners, and its AS3 script's object, joined to it (`counted`: the two are one to the collector) |
-| `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`); a container's class the new build no longer names (`Vector.<T>`) is added to it. Then the objects alive whose constructors would give them other values now are updated in place (`Reload::update_in_place`): in a debug build the interpreter remembers what each object of a class with no Godot base was constructed with (`remember_constructions`; an exported game does not). A reload starts no scene again. Also asked for at once: the language's `reload_scripts()`, and Godot's debugger. A game that runs as native code is moved the same way, off the program library's own interpreter onto one that runs the new code, and says so: native code is not reloaded yet, and remembers nothing of what objects are made with |
-| `restart.cpp` | What a reload says of the objects alive, in one line (`say_moved`): the classes updated in place, those left as they were and why (a Godot base, a constructor that reads a static variable or makes an object…), and that a restart shows the rest; and what it says of static variables' first values. The running scene started again from its file, when a person asks (the language's `restart_scene()`, which says what that does not make again: nodes outside the scene, objects static fields hold) or when the scene's own file was edited; never for a reload of the scripts alone. A save while the scene is being started again starts it once more when it is in |
-| `sources` (`KAS3_SOURCE_DIR`) | Where the scripts are read from, and the watch's look at them (a folder is listed again only when it changed). When a file or a folder is read again is `watch.h`'s rule, which includes nothing of Godot's and asks no clock (`tests/test_watch.cpp`): a second save within one second is seen however late the watch looks. In a debug build, a folder outside the project to read and watch the scripts in: a game on a simulator runs from a pack, and is told where on the computer its scripts are edited. Its scenes and text resources (`.tscn`, `.tres`) are watched there too, and an edited one takes the place of the pack's copy (`take_over_path`); the running scene starts again if its file changed |
-| `callable`, `bound_method.h` | A method as a Godot function (`BoundMethod`), and what becomes of one when the scripts are reloaded or unloaded |
-| `listeners.cpp` | Listeners as the cycle collector sees them (`vm/collector.h`): taken out of their signals to see whether anything else holds them, and put back in their places if so |
+| `register.cpp`, `language.h` | The entry point, and the script language Godot sees |
+| `program` | The project's scripts: found, read, checked and lowered. Also the reload, and the collector's step each frame |
+| `sources`, `watch.h`, `test_folders.h` | Where scripts are read from, when a file is read again, and which folders hold tests |
+| `script`, `instance` | A script resource, and one object's script instance |
+| `script_call.cpp` | Godot calling a function of a script object: arguments counted, checked and converted |
+| `members` | What Godot reaches of a script by name: public fields, getters, setters and methods |
+| `counted` | Script objects whose Godot object is reference counted, and a Godot object arriving where a script's class is declared |
+| `godot_host`, `godot_handles.cpp`, `handles.h` | The interpreter's four host interfaces, implemented with Godot's calls. Handles on Godot's values |
+| `godot_prepared.cpp`, `worked.h` | Each engine instruction resolved once when a program loads |
+| `godot_source.cpp`, `godot_utility.cpp` | Constructors, constants, singletons, static methods, the clock, and Godot's global functions |
+| `godot_signals.cpp`, `godot_emit.cpp`, `listeners.cpp` | Listening to a signal, emitting one, and listeners as the cycle collector sees them |
+| `godot_untyped.cpp`, `godot_collections.cpp` | Untyped values to and from `Variant`, and AS3 collections handed to Godot |
+| `callable`, `bound_method.h` | A method as a Godot callable |
+| `restart.cpp` | What a reload reports, and restarting the running scene |
+| `native_program`, `shared_library` | [The program library](#the-program-library): found, loaded, checked, and given what it needs from Godot |
+| `play_build`, `play_cache.h`, `toolchain.h` | [Building the program library on Play](#building-on-play) |
+
+## How it works
+
+- **One program for each project.** Every `.as` file under the project is compiled together when the first
+  script loads. If any fails to compile, the errors are reported once and no script loads.
+- **The interpreter doesn't know Godot.** `vm/host.h` is the whole boundary. The extension implements its
+  four interfaces with Godot's calls.
+- **Godot's names come from Godot.** The generated name table says that `moveAndSlide` is `move_and_slide`.
+  Nothing is worked out backward from the AS3 name.
+- **Engine instructions are resolved once.** When a program loads, `prepare` finds what each engine
+  instruction needs: an operator's evaluator for its operand types, a method bind, a property's accessors,
+  a constant's value. Nothing is looked up by name while the program runs. An instruction that meets
+  values of other types than expected falls back to a request by name.
+- **In the interpreter, a Godot value is boxed** in a handle (a `godot::Variant` the interpreter holds).
+  A handle on an object that isn't reference counted, such as a node, is shared by everyone who copies it.
+- **Calls can nest.** The engine calls a script, which calls the engine, which can call a script again,
+  for as long as the thread's stack lasts. With the stack nearly used up, one more call is Error #1023.
+- **The cycle collector runs in steps.** Once a frame it does a bounded amount of work. It runs to
+  completion when Godot shuts down and when the program is unloaded. A reference-counted Godot object and
+  its AS3 script object are one node to the collector.
+- **Scripts are watched in a debug build.** When a file changes, the program is compiled again and the
+  running game moves onto it. [Hot reload](../../docs/hot-reload.md) describes what a reload does.
+  `vm/reload` does the move.
 
 ## Rules
 
-- **The only folder that includes godot-cpp.** Nothing here is included by `src/`, `ir/` or `vm/`.
-- **A value from Godot is checked against the register's type before it is taken** (`arrives`, `take`).
-  What does not fit is an AS3 error that names what gave it.
-- **A name Godot needs is made once and kept** (`GodotHost::name`). No `StringName` is built per call.
-- **An object found behind a handle for generated code is watched** (`native_program.cpp`, `object_behind`):
-  the host keeps a binding of its own on it, under its own token, whose only job is to count the object's
-  end (`gone`), which is what lets generated code read the object from the handle's head with no look by
-  its id. Godot takes an object out of those found by their ids before it tells of its end, with no
-  script run between. The extension must not be made one Godot reloads while a game runs: the bindings
-  last as long as the library does.
-- **Files are read through Godot** (`FileAccess`, `DirAccess`, `res://`), never the operating system's
-  paths: an exported game keeps them in a pack. The one exception is `play_build`'s cache, which a C++
-  compiler is given by the system's paths, and which a game in a pack does not have.
-- **Nothing waits for the C++ compiler.** `play_build` starts it and looks once a frame whether it has
-  ended; the scripts are written as C++ on a thread that asks nothing of Godot and is joined as Godot
-  shuts down.
-- **AS3 runs on the main thread.** A call from another thread (a method, a field, `toString`) is refused with
-  a message, and so is a script attached there; a script instance Godot frees there is freed on the main
-  thread, at the end of the frame.
-- **Every behaviour is compared with GDScript's** in `tests/godot_project/`: the driver prints what the AS3
-  script gave beside what GDScript gives, and `tests/run_godot.py` checks they agree.
-- An Array or a Dictionary handed to Godot may be written by it: never hand the same one to two calls.
-- Godot reaches a script's members by name only through `members.h` (`find_member`), so that get, set,
-  calls and the lists agree. Every place that runs AS3 on a script object for Godot calls
-  `hold_if_referenced` after it (`instance.h`): that is how a reference-counted object learns AS3 holds it.
+- **A value from Godot is checked against the register's type before it's taken.** What doesn't fit is an
+  AS3 error that names what gave it.
+- **A name Godot needs is made once and kept** (`GodotHost::name`). No `StringName` is built for a call.
+- **Files are read through Godot** (`FileAccess`, `DirAccess`, `res://`), never through the operating
+  system's paths, because an exported game keeps its files in a pack. The one exception is the Play build's
+  cache, which a C++ compiler reads.
+- **AS3 runs on the main thread.** A call from another thread is refused with a message. A script instance
+  that Godot frees on another thread is freed on the main thread, at the end of the frame.
+- **Godot reaches a script's members by name only through `members.h`** (`find_member`), so that get, set,
+  call and the member lists agree.
+- **Every place that runs AS3 on a script object for Godot calls `hold_if_referenced` afterward**
+  (`instance.h`). That's how a reference-counted object learns that AS3 holds it.
+- **Never hand the same `Array` or `Dictionary` to two calls.** Godot may write to one it's given.
+- **Every behavior is compared with GDScript's.** In `tests/godot_project/`, a driver prints what the AS3
+  script gave beside what GDScript gives, and `tests/run_godot.py` checks that they agree.
+- **Godot must not reload the extension while a game runs.** The host keeps a binding on each Godot object
+  that generated code reads directly, to learn when the object is freed. The bindings last as long as the
+  library does.
 
-Build and test: `cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests`
-(needs `godot` 4.7 on the `PATH`). iOS: `tests/build_ios.sh`.
+## The program library
+
+A project's scripts, written as C++ by `kas3c cpp --godot` and built into one shared library, are the
+project's program library. When the extension loads the scripts, it looks for one:
+
+1. The file that `KAS3_PROGRAM_LIBRARY` names.
+2. `bin/libkas3_program.dylib` in the project (`.so` on Linux).
+3. A library the extension built itself, under `.godot/kas3`.
+
+The library must have been built from the scripts as they are now, which the extension checks with a
+fingerprint of the compiled module, and for this runtime's layout. If it was, the scripts run as native
+code and Godot's output says so. If not, a warning says why and the interpreter runs the scripts.
+
+To build one by hand, run this from the project's folder:
+
+```sh
+kas3c cpp --godot --unit $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
+    -I <repository>/compiler/runtime -I <repository>/compiler/vm -I <repository>/compiler/ir \
+    -I <repository>/compiler/src -shared native/*.cpp -o bin/libkas3_program.dylib
+```
+
+Give the files in sorted order, as shown. The extension reads them in that order, and both must compile
+the same module. The flags for Linux and Windows are in `play_cache.h` and `shared_library.cpp`, and
+haven't been run on either system.
+
+With a program library loaded, everything else in this folder works as before. The runtime's host keeps an
+interpreter over the same module, in which each function's body is native code. A call from Godot runs the
+generated function itself. See [runtime/README.md](../runtime/README.md).
+
+Two things don't work under native code yet:
+
+- **Hot reload of native code.** An edit moves the running game onto the interpreter, with its state.
+  Objects created before the move aren't updated in place.
+- **The time limit on a script** (Error #1502).
+
+### Building on Play
+
+With the project setting `actionscript/native/play` on, the extension builds the program library itself
+when a game runs from its project folder.
+
+- **The key.** A build is identified by the scripts as compiled, the runtime's layout, the backend and the
+  runtime headers this extension carries, the C++ compiler, and the flags. If `.godot/kas3` has
+  `libkas3_program_<key>`, the extension loads it. No compiler runs.
+- **A build.** Without that library, the game starts on the interpreter and says so. The scripts are
+  written as C++ on a thread, and the compiler runs beside the game at a lower priority. When it ends, the
+  game says the next run is native. If the game closes first, the compiler keeps running, so the next run
+  finds the library.
+- **No path to this repository.** The extension carries the backend and the runtime's headers
+  (`tools/embed_runtime.py`). The library is always built for the runtime that loads it, wherever the
+  extension is installed.
+- **The cache.** `.godot/kas3` holds, for each build, a folder `<key>/` with the C++ and `build.log`, the
+  library, a `<key>.building` marker while it's built, and a `<key>.failed` marker if it couldn't be. A
+  library is never overwritten. When a build begins, old builds are removed, except those in use and the
+  three newest others.
+- **No compiler.** One warning names what to install, and the interpreter runs the scripts. On macOS the
+  extension looks for Xcode's command line tools itself and never runs `/usr/bin/c++` without them,
+  because that would open an install window. `KAS3_CXX` names another compiler.
+- **A failed build** is reported once, with the path of the compiler's output, and isn't tried again.
+  Delete `.godot/kas3` to try again.
+- **Nothing waits for the compiler.** `play_build` starts it and checks once a frame whether it has ended.
+- **Where nothing is built:** in the editor, in a game run from a pack (an export, the iOS Simulator), on
+  a system other than macOS and Linux, and in a project with a library given by hand. The Linux path is
+  written and hasn't been built or run.
+
+`play_cache.h` and `toolchain.h` include nothing from Godot, so `tests/test_play_cache.cpp` tests the rules
+with folders of its own. `tests/play_godot.py` plays a project in Godot: twice, edited between runs, with
+no compiler, and with a compiler that fails.
+
+`KAS3_NATIVE_PLAY` overrides the project setting: `1` for on, `0` for off. The tests set it to `0` for
+every run except those that test the build.

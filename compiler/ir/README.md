@@ -1,60 +1,72 @@
 # `ir/`: the typed IR and the lowerer
 
-`ir.h` is the instruction set the interpreter runs and, later, what a native backend will read. The lowerer
-turns the checked tree from `src/` into it.
+The typed intermediate representation (IR) is the single definition of what a program means. The
+interpreter runs it, and the C++ backend writes it as C++. The lowerer produces it from the checked syntax
+tree that `src/` gives.
+
+**Depends on:** `src/` only. It includes no Godot header and nothing from `vm/`.
+
+## The IR
+
+- **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,
+  so values carry no tags.
+- **Plain data.** A module holds no pointers into the syntax tree. It can be compared, printed and
+  fingerprinted without the compiler.
+- **AS3's arithmetic, exactly.** `int + int` is computed as a `Number` and wraps to 32 bits when it's
+  stored in an `int`, which is what the checker's types say.
+- **Ready for a debugger.** Every instruction has a source position, every function lists its named
+  locals, and each statement begins with a marker where a hook can stop the program.
+- **Godot by name table.** An instruction that asks something of Godot names it by an index into
+  `Module::engine_names`, never by text. Each entry is a copy of one line of the generated name table, so a
+  back end finds Godot's method, property or operator once.
+
+## Files
 
 | Files | Job |
 |---|---|
-| `ir.h` | The IR as a whole, for every includer: the three headers below, and printing and comparing a module |
-| `ir_ops.h` | Kinds of register, the table of operations (`KAS3_IR_OPS`: a name and three shape letters each), an instruction |
-| `ir_codes.h` | What the codes in some operations' operands mean: which of Math's, a vector's, String's, RegExp's, Date's or JSON's functions; the fields of the library's objects |
+| `ir.h` | The IR as a whole, for every includer |
+| `ir_ops.h` | Kinds of register, and the table of operations (`KAS3_IR_OPS`): a name and three shape letters each |
+| `ir_codes.h` | What the codes in some operations' operands mean, such as which `Math` or `String` function |
 | `ir_module.h` | A module: classes, fields, functions, handlers, globals |
-| `ir_print.cpp` | The text form the golden files hold |
-| `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
-| `ir_reach.h` | What an instruction calls, and the code reached from a function, said once for the two files around it |
-| `ir_chain.cpp` | A class's constructor chain (`constructor_chain`): whether it depends only on its arguments and constants, so that a reload can run it again for an object that is alive, why not, and which constants it reads |
-| `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
-| `lowerer.h` | The one class: its state, the methods every part of the lowering uses (registers, constants, kinds and conversions, places, `expression()`), and the helper classes it befriends. Each helper holds `Lowerer &l_`, is made where it is needed (`Statements(*this).statement(s)`), and keeps nothing from one use to the next: what lasts is the lowerer's |
-| `lower_env.h` | Places (where a value is stored), and what is kept of the variables function expressions capture |
-| `lower_flow.h` | What is kept of the loops and `try` statements around the code being lowered (`Loop`, `TryBlock`, `TryExit`) |
-| `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
-| `lower_expressions.h`, `lower_expressions` | Expressions: the lowerer's `expression()`, which converts a value to the kind wanted, and each kind of expression (the `Expressions` class, a friend of the lowerer) |
-| `lower_calls.h`, `lower_calls` | Calls (the `Calls` class, a friend of the lowerer): what a call is, a method or function of the program, a conversion, `trace`, `super(...)`, and a call's arguments as the function's parameters expect them |
-| `lower_operators.h`, `lower_operators` | Operators on two values (the `Operators` class, a friend of the lowerer): arithmetic, bitwise, string, logical, comparisons, equality, `is` and `as` |
-| `lower_comparisons` | For `Operators`: comparisons and equality, an Int64 against another kind exactly |
-| `lower_statements.h`, `lower_statements` | Statements (the `Statements` class, a friend of the lowerer): locals, `if`, the loops, `switch`, `break`, `continue`, `return`, `throw` |
-| `lower_classes.h`, `lower_classes` | Each class's place in the module, before any body is lowered (the `Classes` class, a friend of the lowerer): what it inherits, its fields, its methods and their table slots, Godot's virtuals it answers |
-| `lower_bodies.h`, `lower_bodies` | The body of each function (the `Bodies` class, a friend of the lowerer): its start and end, its parameters, a method, a constructor (with the fields' first values), a class's static initializer, package variables |
-| `lower_literals` | Number and string literals (a string's escapes), and the built-in library's constants: `NaN`, `Infinity`, the limits of the number types, Array's sort options |
-| `lower_engine.h`, `lower_engine` | Godot's members (the `Engine` class, a friend of the lowerer): properties, constants, singletons, parts of a value, the zero of a value with parts, 32-bit integers, operators Godot carries out |
-| `lower_engine_calls.h`, `lower_engine_calls` | Calls of Godot's methods and global functions (the `EngineCalls` class, a friend of the lowerer): the arguments the engine is given, with Godot's own defaults; a method bound where Godot takes a function; a signal reached by its name (`timer[name].add(f)`) |
-| `lower_try` | For `Statements`: `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
-| `lower_any` | The untyped value: coercion where a type is declared, `typeof`; for `Operators`, `==`, `<`, `+`, `is`/`as` |
-| `lower_dynamic` | Properties by name (`class Dynamic`, a friend of the lowerer): Object literals, `new Object()` and `flash.utils.Dictionary`, `o.a` and `o[k]` as places, `delete`, `in`, a property called by its name, `for in` and `for each` over anything that is not a vector |
-| `lower_functions.h`, `lower_closures`, `lower_functions` | Function expressions and what they capture (an environment, one object per function that is shared), and function values: a method or a function as a value, a call through one, `call` and `apply` (the `Functions` class, a friend of the lowerer) |
-| `lower_vectors.h`, `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type; then, in the `Vectors` class, a friend of the lowerer: places, methods, loops, handing one to Godot); `Math` |
-| `lower_vector_methods` | For `Vectors`: a vector's methods, what each takes and gives, and the call |
-| `lower_members` | Getters and setters (a property is a place; each half a function with a table slot of its own, `get x`), and interfaces (a class with no objects; each class's table from an interface method's name to its function, `CallInterface`). A helper class, `Members`, that the lowerer befriends |
-| `lower_regexp`, `lower_date` | RegExp and Date for the `Library` class: their classes (made on first use), a regular expression literal, `new`, their properties as places, their methods and String's that take a pattern |
-| `library_methods.h` | The methods of a String, an Array, a Vector and a Function by name: what each takes and gives, and the typed operation that does it. Read by the lowerer for a typed vector's call, and by the interpreter for a call by name on an untyped value |
-| `library_names.h` | RegExp's and Date's members by name and their codes in RegExpCall and DateCall: read by the lowerer, and by the interpreter for a member reached by name on an untyped value |
-| `lower_json` | JSON for the `Library` class: `JSON.parse`, `JSON.stringify` and a Dictionary's `toJSON()`, one `JsonCall` each, with the classes it makes and raises put into the module |
-| `lower_library.h`, `lower_library` | The standard library (the `Library` class, a friend of the lowerer): `String`'s methods, the numbers' `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, and `toString()` of any object |
+| `ir_print.cpp` | The text form that `kas3c ir` prints and the golden files hold |
+| `ir_compare.cpp` | What changed between two builds that a reload alone wouldn't show |
+| `ir_chain.cpp` | Whether a class's constructor chain depends only on its arguments and on constants, so that a reload can run it again for a live object |
+| `ir_reach.h` | What an instruction calls, and the code reached from a function |
+| `library_methods.h`, `library_names.h`, `library_entries.h` | The built-in library's methods by name: what each takes and gives, and the operation that carries it out. Read by the lowerer, the interpreter and the C++ backend |
+| `lower.h`, `lower.cpp` | The entry point |
+| `lowerer.h` | The `Lowerer` class: its state, and the helpers every part of the lowering uses |
+| `lower_env.h`, `lower_flow.h` | Places a value is stored in, captured variables, and the loops and `try` statements around the code being lowered |
+| `lower_emit`, `lower_types`, `lower_places`, `lower_literals` | Registers and constants, kinds and conversions, places, and literals |
+| `lower_expressions`, `lower_operators`, `lower_comparisons`, `lower_calls` | Expressions, operators and calls |
+| `lower_statements`, `lower_try` | Statements, and `try`/`catch`/`finally` with labels |
+| `lower_classes`, `lower_bodies`, `lower_members` | A class's place in the module, function bodies, and getters, setters and interfaces |
+| `lower_functions`, `lower_closures` | Function expressions, what they capture, and function values |
+| `lower_any`, `lower_dynamic` | The untyped value, and properties by name |
+| `lower_vectors`, `lower_vector_methods`, `lower_math` | `Vector.<T>` and `Math` |
+| `lower_library`, `lower_regexp`, `lower_date`, `lower_json` | The rest of the standard library |
+| `lower_engine`, `lower_engine_calls` | Godot's members: properties, constants, singletons, operators, methods and global functions |
+
+The lowerer is one class split across files. `Lowerer` keeps the state. Each group of what it lowers is a
+helper class that it befriends, such as `Statements`, `Operators` or `Calls`. A helper holds the lowerer
+by reference, is created where it's needed, and keeps nothing from one use to the next.
 
 ## Rules
 
-- **Includes `src/` only.** No Godot header, nothing from `vm/`. Godot's own names come from the name table
-  through `godot_name(...)`.
-- **An engine instruction names what it asks for by its entry in the name table,** never by text: an `E`
-  operand is an index into `Module::engine_names`, each a copy of one entry (`engine_entry()`,
-  `engine_name()`, `engine_operator()`), so that a backend finds Godot's method, property or operator
-  once, by that entry.
-- **A new operation** is one entry in `KAS3_IR_OPS`, with its shape letters, plus its case in
-  `vm/interpreter_run.cpp`. `tests/test_ir.cpp` checks the letters; nothing else lists operations.
-- **What is not supported yet is refused by name** with `refuse(position, "...")`, never lowered to
+- **Evaluation order is AS3's:** left to right, the receiver before the arguments. A `null` receiver is
+  reported after the arguments are evaluated.
+- **What isn't supported is refused by name,** with `refuse(position, "...")`. It's never lowered to
   something that runs wrongly. Each refusal has a line in the list in `tests/test_vm.cpp`.
-- **Evaluation order is AS3's:** left to right, receiver before arguments, a null receiver reported after
-  the arguments are worked out.
-- **A clean-up leaves the golden IR byte for byte** (`tests/run/*.ir`).
+- **A clean-up leaves the golden IR unchanged,** byte for byte (`tests/run/*.ir`).
+- **Static fields are set on a class's first use,** a base class before its subclasses, as in Flash.
 
-Tests: `test_ir`, `test_constructors`, `test_vm`, and the `programs` group (`tests/run/`).
+## Where a new thing goes
+
+A new operation is one entry in `KAS3_IR_OPS`, with its shape letters, and its case in
+`vm/interpreter_run.cpp`. `tests/test_ir.cpp` checks the letters. Nothing else lists the operations.
+
+Its lowering goes in the `lower_*.cpp` that owns that kind of code.
+
+## Tests
+
+`test_ir`, `test_constructors`, `test_vm`, and the `programs` group, which runs every program in
+`tests/run/`.
