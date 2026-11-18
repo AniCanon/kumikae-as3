@@ -191,7 +191,7 @@ std::string write_header(const ir::Module &p_module) {
 	return out + "\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n";
 }
 
-std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, bool p_keeps_stack) {
+std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, bool p_keeps_stack, bool p_remembers) {
 	std::string tables = "namespace {\n\n";
 	std::vector<std::string> classes, functions, globals, strings, files, interface_methods, thunks;
 	for (uint32_t i = 0; i < p_module.classes.size(); i++) {
@@ -232,7 +232,10 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	counted("const uint32_t", "USES", numbers(p_thunks.uses()));
 	counted("const uint32_t", "NAMES", numbers(p_thunks.names()));
 	program += std::to_string(ir::fingerprint(p_module)) + "ull, ";
-	program += known_classes(p_module) + ", " + number(p_module.library_function) + ", " + boolean(p_keeps_stack) + " };\n";
+	program += known_classes(p_module) + ", " + number(p_module.library_function) + ", " + boolean(p_keeps_stack);
+	// Written only where it is so: a program that does not tell is the same text as it was, and what the
+	// table does not say is false.
+	program += std::string(p_remembers ? ", true" : "") + " };\n";
 	tables += program + "\n} // namespace\n\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n\n";
 	tables += "extern \"C\" KAS3_EXPORT const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";
 	return tables;

@@ -27,6 +27,7 @@ python3 compiler/tests/run_programs.py compiler/build/kas3c compiler/tests
 | `golden/names`, `golden/types` | Name resolution and types: a `.as` file, and the exact output of `kas3c check` with `--dump-names` or `--dump-types` | `golden` |
 | `run/` | Whole programs on the interpreter: a `.as` file with its expected output (`.out`), its expected errors (`.err`), and its IR (`.ir`) where the IR is pinned | `programs` |
 | `run/refused/` | One program for each construct the interpreter doesn't run yet, with the error it must give | `programs` |
+| `run/stopped/` | Programs that never end. Each runs with a time limit of a tenth of a second and must be stopped by Error #1502, on the interpreter and as native code | `programs`, `native` |
 | `run_native.py` | The programs of `run/` as native code: written by `kas3c cpp`, built with the system's C++ compiler, and held to the same `.out` and `.err` | `native` |
 | `corpus/` | Realistic programs that must parse and check with no errors. `runs.txt` lists the ones that must also lower for Godot | `golden`, `corpus` |
 | `godot_project/`, `godot_native/` | AS3 inside Godot. See [Tests inside Godot](#tests-inside-godot) | `godot_extension` |
@@ -41,7 +42,8 @@ Three properties hold across the suites:
 - **Both back ends agree.** A program in `run/` runs on the interpreter and as native code, and must print
   the same output both ways.
 - **Nothing leaks.** Every program must leave no object or string alive when it ends. Each program also
-  runs a second time with hot reload's record of constructor arguments turned on, and must do the same.
+  runs a second time with hot reload's record of constructor arguments turned on, and must do the same. A
+  set of programs is built as native code with `--remember` and run that way too.
 - **Nothing crashes.** The parser test parses every byte-prefix of each corpus file. The query test runs
   each corpus file with one byte missing through every editor query.
 
@@ -99,6 +101,7 @@ every run shares the test project.
   print the same.
 - **`play_godot.py`** tests the extension building a program library on Play: a project played twice,
   edited between runs, with the setting off, with no compiler, and with a compiler that fails.
+- **`timeout.gd`** runs on the interpreter and from a native start: a script stuck in a loop is stopped.
 - **Reload and restart** run from an interpreted start and from a native start.
 
 Every other run turns the Play build off with `KAS3_NATIVE_PLAY=0`.

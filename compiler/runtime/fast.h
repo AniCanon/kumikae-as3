@@ -7,6 +7,7 @@
 #include "values.h"
 
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace kas3 {
@@ -73,10 +74,43 @@ inline Object *made_object(Context *c, uint32_t p_class) {
 	found->klass = p_class;
 	found->gc_next = nullptr;
 	const uint32_t numbers = c->class_numbers[p_class];
-	for (uint32_t i = 0; i + 1 < size; i++) {
+	const uint32_t fields = c->class_fields[p_class];
+	for (uint32_t i = 0; i < fields; i++) {
 		field<Slot>(found, i) = (numbers >> i) & 1 ? slot(std::numeric_limits<double>::quiet_NaN()) : empty();
 	}
+	// What the block's last object was constructed with is not this one's: the record after the fields
+	// says nothing is remembered, and the rest of it is read only once a constructor has filled it.
+	if (fields + 1 < size) {
+		field<Slot>(found, fields) = empty();
+	}
 	return found;
+}
+
+// What an object is constructed with, remembered where it is made: for a class the host keeps only the
+// arguments of (Context::class_tells), an object of the class itself that has no record yet. The record is
+// the host's, after the object's fields: what there is of it and how many arguments, then each argument
+// after the object. An object of another class is one whose constructor called this one by `super(...)`:
+// its own tells of it, and there is nothing to keep here. False where the host is to be told (constructing).
+inline bool remembered_here(Context *c, Object *p_object, uint32_t p_class, const Slot *p_arguments, uint32_t p_count) {
+	if (!c->class_tells[p_class]) {
+		return false;
+	}
+	if (p_object->klass != p_class) {
+		return true;
+	}
+	Slot *const record = &field<Slot>(p_object, c->class_fields[p_class]);
+	uint32_t head[2];
+	std::memcpy(head, record, sizeof head);
+	if (head[0] != RECORD_NOTHING) {
+		return false;
+	}
+	head[0] = RECORD_ARGUMENTS;
+	head[1] = p_count - 1;
+	std::memcpy(record, head, sizeof head);
+	for (uint32_t i = 1; i < p_count; i++) {
+		record[i] = p_arguments[i];
+	}
+	return true;
 }
 
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
@@ -185,12 +219,13 @@ inline Str *text_of(Context *c, bool p_value) {
 	return text_of_flag(c, p_value);
 }
 
-// A typed value as an untyped one, with a reference of its own.
-inline Slot to_any(Context *c, int32_t p_value) {
-	return any_integer(c, p_value);
+// A typed value as an untyped one, with a reference of its own. A whole number and a Boolean are their
+// own bits (vm/any.h), written here.
+inline Slot to_any(Context *, int32_t p_value) {
+	return vm::any::integer(p_value);
 }
-inline Slot to_any(Context *c, bool p_value) {
-	return any_boolean(c, p_value);
+inline Slot to_any(Context *, bool p_value) {
+	return vm::any::boolean(p_value);
 }
 inline Slot to_any(Context *c, Str *p_value) {
 	retain(c, p_value);
@@ -201,7 +236,7 @@ inline Slot to_any(Context *c, Object *p_value) {
 	return any_object(c, p_value);
 }
 inline Slot to_any(Context *c, uint32_t p_value) {
-	return p_value <= static_cast<uint32_t>(INT32_MAX) ? any_integer(c, static_cast<int32_t>(p_value)) : any_number(c, p_value);
+	return p_value <= static_cast<uint32_t>(INT32_MAX) ? vm::any::integer(static_cast<int32_t>(p_value)) : any_number(c, p_value);
 }
 // A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
 // number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.

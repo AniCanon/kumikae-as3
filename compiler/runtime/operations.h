@@ -12,8 +12,13 @@ namespace rt {
 
 // Errors. One that is raised sets c->failing; the function it is raised in then leaves by its error path.
 
-// A call one deeper than MAX_DEPTH was asked for: AS3's Error #1023.
-//     void stack_overflow(Context *c);
+// A call one deeper than MAX_DEPTH was asked for, or one with the stack nearly used up: AS3's Error #1023,
+// and true. The host's watch on how long a call runs asks the same way, by the stack's floor: then the call
+// goes on (false) unless its time is up, which is Flash's Error #1502 (true), or the stack is used up indeed.
+//     bool stack_overflow(Context *c);
+// The alarm is set (alarmed()): the clock is looked at. True if the call from outside has run longer than
+// it may: Flash's Error #1502 is on its way out, which no catch takes.
+//     bool overdue(Context *c);
 // A member of nothing was asked for: AS3's TypeError #1009.
 //     void raise_null(Context *c);
 // Memory ran out where the runtime itself asked for some: AS3's Error #1000.
@@ -40,6 +45,10 @@ namespace rt {
 // values.
 //     void use_class(Context *c, uint32_t p_class);
 //     bool is_class(const Context *c, const Object *p_object, uint32_t p_class);
+// A constructor begins (the function by its number), called with these arguments, the object first: asked
+// only where the host remembers what objects are constructed with (Context::remembers), by a program
+// library built to tell (Program::remembers), so that a reload can update the object in place.
+//     void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count);
 
 // An operation carried out by the library the interpreter has (runtime/thunks.cpp): p_given are the values
 // its ThunkInfo says are handed in, each a whole slot; they stay the caller's. What it hands back is the

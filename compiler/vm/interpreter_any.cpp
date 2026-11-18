@@ -123,7 +123,11 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
 		case Op::AnyIsGodot:
-			result(Kind::Bool, of_bool(any::tag(b) == AnyTag::Godot && host_.handles.is_class(any::pointer(b), module_.engine_names[p_in.c].name)));
+			if (void *const held = engine_object_in(module_, b)) {
+				result(Kind::Bool, of_bool(host_.handles.is_class(held, module_.engine_names[p_in.c].name)));
+			} else {
+				result(Kind::Bool, of_bool(false));
+			}
 			break;
 		default:
 			break;

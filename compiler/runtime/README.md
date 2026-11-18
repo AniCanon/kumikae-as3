@@ -22,6 +22,7 @@ copy of them to build a project's program library.
 | `layout.h` | The layout number a program library and its host must share (`RUNTIME_LAYOUT`) |
 | `engine.h`, `godot_values.h` | Godot without a Godot header: handles on its objects and values, its value types as plain structs with inline math, and the engine's entry points (`EngineApi`) |
 | `native_host.h`, `host.cpp` | The host: the context's state, its interpreter, and the engine it was given |
+| `time_limit.h`, `time_limit.cpp` | [The time limit](#the-time-limit) on a call from outside (Error #1502) |
 | `errors.cpp` | Raising, catching, stack traces, and the report of an uncaught error |
 | `direct.h`, `direct.cpp` | Library functions called with no thunk |
 | `calls.cpp`, `properties.cpp` | Fast paths that aren't inline |
@@ -98,7 +99,49 @@ how the library, and Godot, call a function without knowing its body is native: 
 - **An instruction that asks the engine through a thunk** goes by Godot's names and boxed values.
 - **A stack overflow found by the interpreter inside a thunk** leaves the generated functions in between
   without running their `finally` blocks.
-- **Native code has no time limit.** Error #1502 is raised by the interpreter's loop.
+
+### What objects are constructed with
+
+Hot reload updates a live object in place by running its constructor again with the arguments the object
+was built with ([vm/constructions.h](../vm/constructions.h)). Under native code the interpreter sees no
+constructor called, so a program library written with `kas3c cpp --remember` tells the host:
+
+- **The constructor of a class whose chain can be run again calls `constructing`** as it begins, when
+  `c->remembers` is set. No other constructor does, and a library written without the option has no such
+  call: its C++ is the same to the byte.
+- **The record is the interpreter's own,** in the same room after the object's fields. A reload onto the
+  interpreter reads it as it reads the records it made itself.
+- **Recycled objects keep their room.** A class whose constructor takes only numbers and Booleans is still
+  recycled. A class that takes text is freed by the heap, which gives the text up. When a block is made
+  into a new object, `made_object()` empties the fields and the record's first slot, which says nothing is
+  remembered yet. The rest of the record is read only after a constructor has filled it.
+- **A record of numbers and Booleans is written where the object is made.** The host hears of the first
+  object of a class whose constructor takes nothing else and sets `Context::class_tells`. From then on
+  `remembered_here()` copies the arguments into the record inline, and `constructing` is called only where
+  that can't be done.
+
+A host remembers only when its embedder asks (`Embedder::remember`). The extension asks in a debug build.
+
+### The time limit
+
+A call from outside that runs too long is stopped with Flash's Error #1502, as under the interpreter: the
+same limit, the same message, and no `catch` or `finally` takes it. Generated code counts no statements, so
+the host does it another way (`time_limit.h`):
+
+- **A thread of the host's wakes sixteen times in the limit's length.** When the call that was running at
+  its last look is still running, it sets `c->alarm` and puts `c->stack_floor` above every frame.
+- **Generated code looks at the alarm where a loop goes round,** once in `ROUNDS` rounds, and at the floor
+  where a function that can fail is entered, as it always did. Every loop of jumps and calls passes one of
+  the two.
+- **The program's own thread reads the clock** (`overdue()`, `stack_overflow()`). The call goes on unless
+  its time is up.
+- **The thread ends with the host.** It reads and writes the context's alarm and floor and nothing else of
+  the program. The host stops it and waits for it before anything of its own is destroyed, so a reload
+  that drops the program, and the extension as it unloads, leave no thread behind. A limit changed while a
+  call runs starts another thread, and the call's time so far counts against the new limit
+  (`tests/test_time_limit.cpp`).
+
+A call that isn't stopped pays one byte read every `ROUNDS` rounds of a loop.
 
 ## Inside Godot
 

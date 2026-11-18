@@ -163,6 +163,10 @@ struct Program {
 	// The function behind a method of the library read by name (ir::Module::library_function), or NONE.
 	uint32_t library_function;
 	bool keeps_stack; // Its functions keep a StackFrame each: it reads an Error's getStackTrace().
+	// Its constructors tell the host what each object is constructed with (constructing), where the host
+	// remembers that: built so for a game that is being edited, and not for a release. A table that does
+	// not say is one that does not: the text of a program built without it is what it always was.
+	bool remembers = false;
 };
 
 } // namespace rt

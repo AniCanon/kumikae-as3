@@ -28,6 +28,11 @@ struct Options {
 	// one inside another (a constructor inside what makes the object): what a release is built from. The
 	// other way, a file for each class, is what an editor rebuilds least of after an edit.
 	bool one_unit = false;
+	// Each constructor whose class's chain can be run again (ir::constructor_refusal) tells the host what
+	// its object is constructed with, where the host remembers that: for a game that is being edited, so
+	// that a reload can update the objects native code made in place. Without it nothing is written for
+	// it: the program is the same C++ as it was, to the byte.
+	bool remembers = false;
 };
 
 // One .cpp for each class with code of its own, `program.h` (every declaration) and `program.cpp` (the

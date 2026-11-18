@@ -103,14 +103,15 @@ code and Godot's output says so. If not, a warning says why and the interpreter 
 To build one by hand, run this from the project's folder:
 
 ```sh
-kas3c cpp --godot --unit $(find . -name '*.as' -not -path '*/.*' -not -path './tests/*' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+kas3c cpp --godot --unit --remember $(find . -name '*.as' -not -path '*/.*' -not -path './tests/*' | sed 's|^\./||' | LC_ALL=C sort) -o native/
 c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
     -I <repository>/compiler/runtime -I <repository>/compiler/vm -I <repository>/compiler/ir \
     -I <repository>/compiler/src -shared native/*.cpp -o bin/libkas3_program.dylib
 ```
 
 Give the same files the extension reads, in sorted order: every `.as` file except those in folders whose
-name starts with a dot and in the project's test folders. Both must compile the same module.
+name starts with a dot and in the project's test folders. Both must compile the same module. Leave
+`--remember` out for a library you ship.
 
 The flags for Linux are in `play_cache.h`. Neither Linux nor Windows has been built or run.
 
@@ -118,16 +119,23 @@ With a program library loaded, everything else in this folder works as before. T
 interpreter over the same module, in which each function's body is native code. A call from Godot runs the
 generated function itself. See [runtime/README.md](../runtime/README.md).
 
-Two things don't work under native code yet:
+One thing doesn't work under native code yet:
 
 - **Hot reload of native code.** An edit moves the running game onto the interpreter, with its state.
-  Objects created before the move aren't updated in place.
-- **The time limit on a script** (Error #1502).
+
+Objects created as native code are updated in place by the reloads that follow, as the interpreter's own
+are, when the library was written with `kas3c cpp --remember`. The library Play builds always is. In a debug
+build the host then remembers each object's constructor arguments
+([runtime/README.md](../runtime/README.md#what-objects-are-constructed-with)).
+
+The time limit on a call from the engine (Error #1502) is the project's setting either way: the extension
+hands it to the interpreter and to the host of a program library alike.
 
 ### Building on Play
 
 With the project setting `actionscript/native/play` on, the extension builds the program library itself
-when a game runs from its project folder.
+when a game runs from its project folder. The setting is on by default on macOS, where the build has been
+run, and off elsewhere.
 
 - **The key.** A build is identified by the scripts as compiled, the runtime's layout, the backend and the
   runtime headers this extension carries, the C++ compiler, and the flags. If `.godot/kas3` has

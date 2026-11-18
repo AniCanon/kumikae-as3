@@ -191,6 +191,40 @@ package {
 			var found:Emits = other as Emits;
 			return (other is Emits) + " " + (found ? String(found.name) : "none") + " " + (found != null && found === mate);
 		}
+		// The same said by a cast: the object when it is one, null for null, and AS3's TypeError #1034 for
+		// any other, to the script's class and to one of Godot's.
+		public function castMate(other:Node):String {
+			try {
+				var found:Emits = Emits(other);
+				return (found ? String(found.name) : "none") + " " + (found != null && found === mate);
+			} catch (error:TypeError) {
+				return "refused " + error.errorID;
+			}
+			return "";
+		}
+		public function castUntyped(other:*):Array {
+			var out:Array = [];
+			try {
+				var script:Emits = Emits(other);
+				out.push(script ? String(script.name) : "none");
+			} catch (error:TypeError) {
+				out.push("refused " + error.errorID);
+			}
+			try {
+				var plain:Node = Node(other);
+				out.push(plain ? String(plain.name) : "none");
+			} catch (error:TypeError) {
+				out.push("refused " + error.errorID);
+			}
+			try {
+				var sprite:Sprite2D = Sprite2D(other);
+				out.push(sprite ? String(sprite.name) : "none");
+			} catch (error:TypeError) {
+				out.push("refused " + error.errorID);
+			}
+			return out;
+		}
+		public function castSelf():Array { return [String(Node(this).name) == String(name), Emits(Node(this)) === this, Emits(this) === this]; }
 		public function untypedMate(other:*):Array { return [other is Emits, (other as Emits) != null, other is EmitsChild, (other as EmitsChild) == null]; }
 		public function keepUntyped(other:*):String {
 			try {

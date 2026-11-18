@@ -375,7 +375,7 @@ uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
 		l_.emit(Op::ConstI64, position, out, l_.wide(*exact)); // The least Int64 has no positive to negate.
 		return out;
 	}
-	if (l_.kind_of(p_unary->operand->type, &result) && result == Kind::I64) {
+	if (l_.value_kind(p_unary->operand, &result) && result == Kind::I64) {
 		uint32_t value = l_.expression(p_unary->operand, Kind::I64);
 		if (p_unary->op == TokenKind::Plus) {
 			return value;
@@ -465,8 +465,8 @@ uint32_t Lowerer::wide_operand(Expr *p_expression, Kind p_beside) {
 
 Kind Lowerer::operand_kind(Expr *p_expression, Expr *p_other) {
 	Kind kind = Kind::Void, other = Kind::Void;
-	kind_of(p_expression->type, &kind);
-	if (kind_of(p_other->type, &other) && other == Kind::I64 && wide_literal(p_expression)) {
+	value_kind(p_expression, &kind);
+	if (value_kind(p_other, &other) && other == Kind::I64 && wide_literal(p_expression)) {
 		return Kind::I64;
 	}
 	return kind;
@@ -506,7 +506,7 @@ uint32_t Expressions::assign(Assign *p_assign) {
 	} else {
 		uint32_t old = l_.settled(l_.load(place, position), p_assign->value, position);
 		Kind right_kind = Kind::Void;
-		l_.kind_of(p_assign->value->type, &right_kind);
+		l_.value_kind(p_assign->value, &right_kind);
 		bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || l_.is_string_type(p_assign->value->type));
 		bool engine = !strings && (is_engine(l_.kind_at(old)) || is_engine(right_kind));
 		uint32_t right = engine ? Engine(l_).operand(p_assign->value, p_assign->target->type) : l_.wide_operand(p_assign->value, strings || p_assign->op == TokenKind::SlashAssign ? Kind::Void : place.kind);

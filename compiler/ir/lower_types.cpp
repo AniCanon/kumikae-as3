@@ -460,10 +460,49 @@ uint32_t Lowerer::convert_primitive(uint32_t p_reg, Kind p_to, uint32_t p_positi
 	}
 }
 
+bool Lowerer::null_as(const Expr *p_expression) const {
+	Kind kind = Kind::Void;
+	if (!p_expression || !kind_of(p_expression->type, &kind) || !(is_numeric(kind) || kind == Kind::Bool) || kind == Kind::I64) {
+		return false;
+	}
+	if (p_expression->kind == NodeKind::Conditional) {
+		const Conditional *choice = static_cast<const Conditional *>(p_expression);
+		return null_as(choice->then_value) || null_as(choice->else_value);
+	}
+	if (p_expression->kind != NodeKind::Binary) {
+		return false;
+	}
+	const Binary *binary = static_cast<const Binary *>(p_expression);
+	switch (binary->op) {
+		case TokenKind::KwAs:
+			return true;
+		case TokenKind::AmpAmp:
+		case TokenKind::PipePipe:
+			return null_as(binary->left) || null_as(binary->right);
+		case TokenKind::Comma:
+			return null_as(binary->right);
+		default:
+			return false;
+	}
+}
+
+bool Lowerer::value_kind(const Expr *p_expression, Kind *r_kind) const {
+	if (!kind_of(p_expression->type, r_kind)) {
+		return false;
+	}
+	if (null_as(p_expression)) {
+		*r_kind = Kind::Any;
+	}
+	return true;
+}
+
 Kind Lowerer::natural(Expr *p_expression) {
 	Kind kind = Kind::Void;
 	if (p_expression->type && p_expression->type->kind == Type::Null) {
 		return Kind::Obj;
+	}
+	if (null_as(p_expression)) {
+		return Kind::Any;
 	}
 	if (!kind_of(p_expression->type, &kind)) {
 		if (refused_types_.insert(p_expression->type).second) {

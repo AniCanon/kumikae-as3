@@ -111,6 +111,12 @@ class Lowerer {
 	std::string class_name(const Symbol *p_class) const;
 
 	bool kind_of(const Type *p_type, Kind *r_kind) const;
+	// Whether an expression's value may be null though its type holds none: `x as int` where x is no int
+	// (uint, Number and Boolean alike), which the checker types int as Adobe's compiler does, and a choice
+	// between values (`?:`, `&&`, `||`, a comma's last) one of which is such. Its value is held untyped.
+	bool null_as(const Expr *p_expression) const;
+	// The kind an expression's value is held in: its type's, or untyped where null_as() says so.
+	bool value_kind(const Expr *p_expression, Kind *r_kind) const;
 
 	// Declared in Godot's API.
 	static bool is_godot(const Symbol *p_symbol);

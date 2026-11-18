@@ -9,11 +9,11 @@ namespace ir {
 // Where the left of an Int64 and a Boolean or a String stands against the right: below 0, 0 or above.
 uint32_t Operators::wide_order(Expr *p_left, Expr *p_right, uint32_t p_position) {
 	Kind left_kind = Kind::Void;
-	l_.kind_of(p_left->type, &left_kind);
+	l_.value_kind(p_left, &left_kind);
 	const bool wide_first = left_kind == Kind::I64;
 	Expr *other = wide_first ? p_right : p_left;
 	Kind other_kind = Kind::Void;
-	l_.kind_of(other->type, &other_kind);
+	l_.value_kind(other, &other_kind);
 	uint32_t x = l_.settled(l_.expression(p_left, wide_first ? Kind::I64 : (other_kind == Kind::Str ? Kind::Str : Kind::F64)), p_right, p_position);
 	uint32_t y = l_.expression(p_right, wide_first ? (other_kind == Kind::Str ? Kind::Str : Kind::F64) : Kind::I64);
 	uint32_t order = l_.reg(Kind::F64);

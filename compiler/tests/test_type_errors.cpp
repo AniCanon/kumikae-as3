@@ -35,6 +35,7 @@ static void expect(const std::string &p_source, std::initializer_list<const char
 
 #define UNRELATED(from, to) "can't use a value of type '" from "' where '" to "' is expected"
 #define NEEDS_CAST(from, to) "a value of type '" from "' may not be a '" to "'; use 'as' or a cast"
+#define NEEDS_AS(from, to) "a value of type '" from "' may not be a '" to "'; use 'as'"
 
 static void test_conversions_accepted() {
 	expect(program("var a:int = 1.5; var b:Number = 1; var c:uint = -1; var d:Boolean = \"x\"; var e:Object = 1;\n"
@@ -64,6 +65,17 @@ static void test_conversions_rejected() {
 					NEEDS_CAST("Object", "Function"), NEEDS_CAST("Base", "Sub"), UNRELATED("Array", "Vector.<int>"),
 					NEEDS_CAST("Object", "Vector.<int>"), UNRELATED("Number", "String"), UNRELATED("Sub", "Class"),
 					UNRELATED("String", "Number") });
+}
+
+// The advice names a cast only where calling the type is one (src/casts.h): a class or an interface of the
+// program's, a conversion, a Vector. Array(x) makes an array, Date(x) gives text and Error(x) makes an error.
+static void test_cast_advice() {
+	expect(program("var a:Sub = /*!*/obj; var b:Shape = /*!*/obj; var c:String = /*!*/obj; var d:Function = /*!*/obj;\n"
+				   "var e:Vector.<int> = /*!*/obj; var f:Array = /*!*/obj; var g:Date = /*!*/obj; var h:Error = /*!*/obj;\n"
+				   "var i:RegExp = /*!*/obj; var j:TypeError = /*!*/new Error();"),
+			{ NEEDS_CAST("Object", "Sub"), NEEDS_CAST("Object", "Shape"), NEEDS_CAST("Object", "String"), NEEDS_CAST("Object", "Function"),
+					NEEDS_CAST("Object", "Vector.<int>"), NEEDS_AS("Object", "Array"), NEEDS_AS("Object", "Date"), NEEDS_AS("Object", "Error"),
+					NEEDS_AS("Object", "RegExp"), NEEDS_AS("Error", "TypeError") });
 }
 
 static void test_stores() {
@@ -508,6 +520,11 @@ static void test_godot_classes() {
 			{ "'_toString' is marked 'override' but no base class has a method to override" });
 	// The tag means nothing in a program's own files.
 	expect("package { public class Main { public function run():void { new Helper(); } } }\n[Abstract] class Helper {}\n", {});
+	// One of Godot's objects is cast or asked by 'as'; one of its value types by neither, so neither is advised.
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "public function run(o:Object, n:Node):void { var a:Node2D = /*!*/n; var b:Sprite2D = /*!*/o; var c:Vector2 = /*!*/o; var d:Color = /*!*/o; } } }\n",
+			{ NEEDS_CAST("Node", "Node2D"), NEEDS_CAST("Object", "Sprite2D"), "a value of type 'Object' may not be a 'Vector2'",
+					"a value of type 'Object' may not be a 'Color'" });
 }
 
 int main() {
@@ -524,6 +541,7 @@ int main() {
 	test_argument_types();
 	test_conversions_accepted();
 	test_conversions_rejected();
+	test_cast_advice();
 	test_stores();
 	test_places_take_no_null();
 	test_unknown_is_silent();

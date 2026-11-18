@@ -2,6 +2,8 @@
 // Each follows what the interpreter does (vm/interpreter_errors.cpp), so that both say the same.
 #include "native_host.h"
 
+#include "stack.h"
+
 namespace kas3 {
 namespace rt {
 
@@ -69,8 +71,23 @@ bool error_constructor(const Host &p_host, uint32_t p_function) {
 
 } // namespace
 
-void stack_overflow(Context *c) {
+bool overdue(Context *c) {
+	Host &host = *c->host;
+	return host.limit.look([&](uint32_t p_limit) { host.asked->raise(host.module.error_class, vm::timeout_message(p_limit)); });
+}
+
+bool stack_overflow(Context *c) {
+	// Asked by the watch, and not by the depth or the stack themselves: the call goes on if it has time left.
+	if (c->host->limit.asked()) {
+		if (overdue(c)) {
+			return true;
+		}
+		if (c->depth < MAX_DEPTH && !vm::stack_below(c->stack_floor.load(std::memory_order_relaxed))) {
+			return false;
+		}
+	}
 	c->host->library().raise_overflow();
+	return true;
 }
 
 void raise_null(Context *c) {
@@ -139,8 +156,8 @@ void rethrow(Context *c, Slot p_any, uint32_t p_register, bool *r_traced) {
 
 bool catches(Context *c, uint32_t p_type) {
 	Host &host = *c->host;
-	if (host.stopped || host.carried) {
-		return false; // Nothing generated code holds yet: see thunk().
+	if (host.stopped || host.carried || host.limit.up) {
+		return false; // Nothing generated code holds yet (see thunk()), or Error #1502, which nothing catches.
 	}
 	if (p_type == NONE) {
 		return true;

@@ -58,6 +58,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
+| Casts and conversions | `Enemy(value)` casts to a class or an interface: it gives the value when it is one, `null` for `null`, and TypeError #1034 for anything else. `int(x)`, `uint(x)`, `Number(x)`, `String(x)` and `Boolean(x)` convert. `Array(x)`, `Object(x)` and `Vector.<T>(x)` do what they do in Flash |
 | Collections | `Array`, `Vector.<T>`, `flash.utils.Dictionary`, and object literals |
 | Untyped values | Properties, methods and library calls by name on a `*` or `Object` value. A name that isn't there is Flash's ReferenceError #1069 |
 | Standard library | `String`, `Number`, `Math`, `Date`, `RegExp`, `JSON`, `Error` and its subclasses, and the top-level functions such as `parseInt`, `isNaN` and `encodeURIComponent` |
@@ -84,8 +85,11 @@ The compiler reports each of these as an error with its own message.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.**
 - **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
   value works: `list.push`, `text.charAt`.
-- **A cast written as a call to a class:** `Enemy(value)` or `Date(value)`. Use `value as Enemy`. The
-  conversions `int(x)`, `Number(x)`, `String(x)` and `Boolean(x)` work.
+- **`Date`, `RegExp`, `Error` or `Dictionary` called as a function:** `Date(value)`. In Flash none of
+  these is a cast: `Date(value)` gives the time as text, and `Error(value)` creates an error. Use
+  `value as Date`.
+- **`is`, `as` and a cast with one of Godot's value types:** `value as Vector2`, `Vector2(value)`. Store
+  the value in a variable of that type instead: a `*` value is checked as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
   class that extends `RegExp`.
 
@@ -139,7 +143,9 @@ A value of type A fits where B is expected when one of these holds:
   [Using AS3 in Godot](godot.md#collections).
 
 When B is a subclass of A, the error asks for a cast:
-`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`.
+`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`. Where calling the type isn't a cast, as
+with `Array` or `Date`, the error says `use 'as'` alone, and for one of Godot's value types it gives no
+advice.
 
 ### How expressions are typed
 
@@ -150,7 +156,7 @@ When B is a subclass of A, the error asks for a cast:
 | `+` with a `String` on either side | `String` |
 | A whole-number literal | `int` if it fits, then `uint`, then `Number` |
 | An assignment | The type of what is assigned to |
-| `x as T` | `T` |
+| `x as T` | `T`. The value is `null` when `x` isn't a `T`, for `int`, `uint`, `Number` and `Boolean` too: stored in a variable of such a type, the `null` becomes `0` or `false` |
 | `v[i]` on a vector, with a numeric `i` | The element type. Any other index is `*` |
 | An unknown member of `Object`, `Array`, `Dictionary`, `Date`, `RegExp` or `Error` | `*` |
 | A call through a `Function`, `Class` or `Object` value | `*` |
@@ -179,7 +185,7 @@ conversion, #1125 for a vector index out of range, #1023 for a stack overflow.
 | Situation | What happens |
 |---|---|
 | Recursion without end | Error #1023 at the 10,001st nested call. The program doesn't crash |
-| A script that runs too long | Error #1502 after 15 seconds, which no `catch` stops. Native code doesn't have this limit yet |
+| A script that runs too long | Error #1502 after 15 seconds, which no `catch` stops and no `finally` runs after |
 | A regular expression that backtracks without end | An `Error` after ten million steps, plus a thousand for each character of the text |
 | An `Array` or `Vector` that contains itself, converted to text | Error #1023 |
 | A pattern that can't be parsed | A `SyntaxError` where the `RegExp` is created |

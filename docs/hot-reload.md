@@ -94,17 +94,31 @@ what that doesn't rebuild, such as nodes outside the scene. A scene whose own `.
 
 ## What it costs
 
-To rerun a constructor, the interpreter remembers the arguments each object was built with. It does that
-only in a debug build inside Godot. An exported game and native code remember nothing and pay nothing.
+To rerun a constructor, the game remembers the arguments each object was built with. It does that only in
+a debug build inside Godot, on the interpreter and in the native code that Play builds. An exported game
+remembers nothing and pays nothing, and neither does native code built without `--remember`.
 
-On a benchmark that does nothing but create and drop objects, remembering costs about 2.5%. For a class
-whose constructor can't be rerun, the interpreter keeps the first values too, and the cost is 7% to 9%.
+| Creating and dropping objects, and nothing else | Cost of remembering |
+|---|---|
+| On the interpreter | About 2.5% |
+| On the interpreter, for a class whose constructor can't be rerun, where the first values are kept too | 7% to 9% |
+| In native code, two million objects with a text field | 10% more instructions |
+| In native code, a frame that creates 20,000 objects of four numbers | 27% more instructions |
+
+Native code pays more in proportion because it does so little else to create an object. A game whose
+frames aren't made of object creation sees none of it. A library built with `--remember` that runs where
+nothing is remembered, such as an exported game, tests one flag for each object it creates, which costs
+about 3% on the same two programs.
 
 ## Limits
 
 - **Native code isn't reloaded yet.** Hot reload is a feature of the interpreter. If you edit a script
   while the game runs as native code, the game moves onto the interpreter with its state, and reloads work
-  from there. Objects created before that move aren't updated in place.
+  from there. Objects created as native code are updated in place like any others.
+- **Native code keeps the arguments, not the first values.** An object created as native code by a
+  constructor that couldn't be rerun at the time isn't updated, even after an edit makes the constructor
+  rerunnable. The interpreter updates such an object. The log names the class and says why.
+- **A program library you build by hand remembers nothing** unless you pass `--remember` to `kas3c cpp`.
 - **A real phone can't see the folder you edit.** Reload works in the iOS Simulator, which shares your
   disk. Sending edits to a device is planned.
 - **Removing a class that still has live objects stops the reload.** Godot tells you to restart.

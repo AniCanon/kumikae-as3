@@ -25,7 +25,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
-		"       kas3c cpp [--godot] [--unit] <file>... -o <folder>\n"
+		"       kas3c cpp [--godot] [--unit] [--remember] <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -59,10 +59,14 @@ static const char *const USAGE =
 		"                the project's program library, which the Godot extension loads\n"
 		"       --unit   the whole program in program.cpp alone: what a release is built\n"
 		"                from, since the C++ compiler then sees every function at once\n"
+		"       --remember  constructors tell the host what each object is made with,\n"
+		"                so that hot reload can update objects made by native code:\n"
+		"                for a game that is being edited, not for a release\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
-		"       Protocol: errors as you type, go to definition, find references, hover,\n"
-		"       outline and symbol search. The project is the folder the editor opens.\n"
+		"       Protocol: errors as you type, go to definition, find references,\n"
+		"       completion, signature help, hover, outline and symbol search. The project\n"
+		"       is the folder the editor opens.\n"
 		"\n"
 		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
 
@@ -297,6 +301,8 @@ static int run_cpp(int p_argc, char **p_argv) {
 			folder = p_argv[++i];
 		} else if (std::strcmp(p_argv[i], "--unit") == 0) {
 			options.one_unit = true;
+		} else if (std::strcmp(p_argv[i], "--remember") == 0) {
+			options.remembers = true;
 		} else {
 			rest.push_back(p_argv[i]);
 		}

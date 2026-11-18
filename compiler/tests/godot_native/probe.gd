@@ -46,6 +46,7 @@ func _places() -> void:
 	print("PROBE grown=", places.call("grown"))
 	print("PROBE refused=", places.call("refused"))
 	print("PROBE methods=", places.call("methods"))
+	print("PROBE ends=", places.call("ends"))
 	var line := Line2D.new()
 	var keeper := Node.new()
 	print("PROBE given=", places.call("given", line, keeper), " ", line.points, " ", keeper.get_meta("points"), " ", keeper.get_meta("nested"), " ",

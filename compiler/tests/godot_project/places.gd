@@ -42,6 +42,10 @@ func refused() -> String:
 	return joined(["Error #1034: Type Coercion failed: cannot convert null to Vector2.", 2, 2, 2, 2, 2, 2, "made", range % 2, range % 3,
 			"Error #1126: Cannot change the length of a fixed Vector.", Vector2(3, 4), joined([Vector2(1, 2), Vector2(3, 4)], ",")], ";")
 
+func ends() -> String:
+	var range := "Error #1125: The index %d is out of range %d."
+	return joined([Vector2(9, 12), range % [3, 3], 3, joined([Vector2(7, 7), Vector2(3, 4), Vector2(7, 7)], ","), range % [4, 3], 6, 2, range % [3, 2]], ";")
+
 func methods() -> String:
 	var said := []
 	var v: Array[Vector2] = [Vector2(3, 0), Vector2(1, 1), Vector2(2, 2)]
@@ -84,6 +88,7 @@ func _physics_process(_delta: float) -> bool:
 	show("grown", ask("grown"), grown())
 	show("no value is refused", ask("refused"), refused())
 	show("methods", ask("methods"), methods())
+	show("ends", ask("ends"), ends())
 	var line := Line2D.new()
 	var keeper := Node.new()
 	var points := PackedVector2Array([Vector2(), Vector2(0, 0), Vector2(2, 1), Vector2(3, 1.5), Vector2(4, 2)])

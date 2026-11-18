@@ -252,6 +252,7 @@ output = compare("emits.gd", [
     "a parameter of the script's class takes the object that carries the script, one of a class that extends it, and null",
     "an object that has been freed is null there", "an object without the script, or with another, is refused",
     "a field of the script's class set from Godot", "as and is on a node", "as and is on an untyped value",
+    "a cast to the script's class on a node", "a cast of an untyped value, to the script's class and to Godot's", "a cast of the script's own object",
     "such a field is not set to an object without the script", "and is set to one of a class that extends it", "and to null",
     "an untyped value stored where the script's class is declared", "what an engine call gives, as the script's class",
     "a method of the class that extends it", "a listener's parameter of the script's class",
@@ -402,7 +403,7 @@ output = compare("untyped.gd", [
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
     "a toString() that throws, caught where the text was asked for",
     "an int plus one stays an int", "a Godot value and an untyped one",
-    "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "a part is written to the object named before the value", "the other object is untouched",
+    "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "the script's own object held untyped is its node", "a part is written to the object named before the value", "the other object is untouched",
     "minusOne of an int stays an int", "twice of an int stays an int", "stepped of an int stays an int",
     "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
     "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
@@ -505,21 +506,35 @@ compare("cycles.gd", [
     "on an Object, what an AS3 static holds stays whole when Godot frees the Object",
 ])
 
-# A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
-with tempfile.TemporaryDirectory() as limited:
-    copy = os.path.join(limited, "project")
-    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
-    with open(os.path.join(copy, "project.godot"), "a") as settings:
-        settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
-    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300)
-    output = run.stdout + run.stderr
-    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 6, output[-1500:])
-    for name, got, want in values:
-        check("timeout.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
-    check("timeout.gd: Flash's error, where the loop is", output.count(
-        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
-        "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
+def timeout_test(label, native=False):
+    """A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give. With
+    `native`, the scripts run as native code, by the library Play built in a run before: they are stopped
+    the same way, and the same is said."""
+    with tempfile.TemporaryDirectory() as limited:
+        copy = os.path.join(limited, "project")
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
+        with open(os.path.join(copy, "project.godot"), "a") as settings:
+            settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
+        environment = dict(os.environ, **{play_godot.SWITCH: "1" if native else "0"})
+        if native:
+            first = subprocess.run([godot, "--headless", "--path", copy, "--quit-after", "5"], capture_output=True, text=True, timeout=300, env=environment)
+            check("%s: a run before builds the library" % label, play_godot.BUILDS in first.stdout + first.stderr and play_godot.settled(copy) and
+                  len(play_godot.libraries(copy)) == 1, (first.stdout + first.stderr)[-900:])
+        run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300, env=environment)
+        output = run.stdout + run.stderr
+        values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 6, output[-1500:])
+        check("%s: the scripts run %s" % (label, "as native code" if native else "on the interpreter"), (play_godot.USED in output) == native, output[:900])
+        for name, got, want in values:
+            check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
+        check("%s: Flash's error, where the loop is" % label, output.count(
+            "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
+            "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
+        play_godot.settled(copy)
+
+
+timeout_test("timeout.gd")
+timeout_test("timeout.gd, as native code", native=True)
 
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
@@ -551,7 +566,7 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
 # A vector of Vector2s or of Vector2is holds each value in its place: never null, a copy read out and a copy
 # stored, the places themselves handed to Godot as a packed array's elements.
 compare("places.gd", [
-    "grown", "no value is refused", "methods", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
+    "grown", "no value is refused", "methods", "ends", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
     "given: none", "given: whole numbers", "a larger value type", "a larger value type: to Godot", "taken",
 ])
 
@@ -561,7 +576,21 @@ compare("places.gd", [
 RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	private var token:Token = new Token(100);
-	override public function _ready():void { word = "%s"; token.y = 7; }
+	private var stamp:Stamp;
+	private var last:Pair;
+	private var worded:Worded;
+	private var spare:Number = 0;
+	override public function _ready():void { word = "%s"; token.y = 7; churn(); }
+	private function churn():void {
+		for (var i:int = 0; i < 64; i++) { var pair:Pair = new Pair(1000 + i, 2); spare += pair.b; }
+		last = pair;
+		pair = null;
+		for (i = 5; i < 8; i++) { worded = new Worded(i); }
+		stamp = new Stamp(3, 4);
+	}
+	public function stamped():String { return stamp.a + "/" + stamp.b; }
+	public function paired():String { return last.a + "/" + last.b; }
+	public function wordedNow():String { return worded.label + worded.w; }
 	public function said():String { return word%s; }
 	public function limit():String { return LIMIT; }
 	public function firstNow():String { return first; }
@@ -573,14 +602,31 @@ class Token {
 	public var y:Number;
 	public function Token(p_y:Number) { w = Restart.WIDTH; y = p_y - Restart.WIDTH; }
 }
+class Pair {
+	public var a:Number;
+	public var b:Number;
+	public function Pair(p_a:Number, p_b:Number) { a = p_a; b = p_b * Restart.WIDTH; }
+}
+class Worded {
+	public var w:Number;
+	public var label:String = "n";
+	public function Worded(p_w:Number) { w = p_w * Restart.WIDTH; }
+}
+class Stamp {
+	private static var made:int = 0;
+	public var a:Number;
+	public var b:Number;
+	public function Stamp(p_a:Number, p_b:Number) { a = p_a; b = p_b + Restart.WIDTH - Restart.WIDTH;%s }
+}
 """
 
 
 def restart_test(label, native=False):
     """Runs restart.gd in a copy of the project. With `native`, the game starts as native code, by the library
-    Play built in a run before: the first edit moves it onto the interpreter, and the one object that was
-    made before it (as native code, which remembers nothing of what objects are made with) is not updated
-    in place by the edit after: that is said, and a restart shows the new code on it as on the rest."""
+    Play built in a run before, which tells what its objects are made with: the first edit moves it onto the
+    interpreter, and the object that was made before it, as native code, is updated in place like any
+    other. There the first edit changes the constant too, so that the object's first values are what the
+    native constructor gives for its arguments, run again; the edit after changes it once more."""
     with tempfile.TemporaryDirectory() as edited:
         copy = os.path.join(edited, "project")
         shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
@@ -593,10 +639,14 @@ def restart_test(label, native=False):
         unused = "\n\tpublic var unused:int;"
         first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";\n\tpublic static const WIDTH:Number = %s;"
         made = "\n\tpublic var made:String = \"%s\";"
-        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a", 24), "one", ' + "!"'),
-                           "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"'),
-                           "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made'),
-                           "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made')}.items():
+        early = 26 if native else 24  # The width as the first edit has it.
+        # Stamp's constructor counts in a static variable as the game starts, so it can't be run again; every
+        # edit takes that away.
+        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", "", " made++;"),
+                           "restart_body.txt": RESTART % (unused + first % ("a", "a", early), "one", ' + "!"', ""),
+                           "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"', ""),
+                           "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made', ""),
+                           "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made', "")}.items():
             with open(os.path.join(copy, name), "w") as file:
                 file.write(text)
         environment = dict(os.environ)
@@ -608,20 +658,24 @@ def restart_test(label, native=False):
         run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 13, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
         check("%s: the game %s" % (label, "starts as native code" if native else "runs on the interpreter"), (play_godot.USED in output) == native, output[:900])
-        # What native code made is not updated in place: it keeps the width it was made with.
-        in_place = "a constant edited: an object alive that was made from it is updated in place"
         for name, got, want in values:
-            if native and name == in_place:
-                check("%s: an object made as native code is not updated in place" % label, got == "24.0", "got %r" % got)
-            else:
-                check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told what was updated in place, and what was not and why" % label,
-              ("ActionScript: objects not updated in place: Restart (it extends Godot's Node2D), Token (an object of it was made while the scripts ran "
-               "as native code, which does not remember what objects are made with). Restart the scene to see the new code on those." if native else
-               "ActionScript: objects updated in place: Token. Not updated: Restart (it extends Godot's Node2D). "
-               "Restart the scene to see the new code on those.") in output, output[-1500:])
+            # The width after the first edit is the driver's to show and this test's to know: an object
+            # native code made takes the constant that edit changed, and keeps what the game gave it.
+            want = "%d.0" % early if name == "the first edit: the width of an object alive" else want
+            want = "1063/%d" % (2 * early) if name == "the first edit: an object made where another had been is made again from its own arguments" else want
+            want = "n%d" % (7 * early) if name == "the first edit: an object that holds text, made after others of its class, is made again from its own arguments" else want
+            check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
+        # Stamp was made by a constructor that could not be run again. The interpreter kept its first values,
+        # and makes it again once the edit lets its constructor run again; native code kept nothing of it, and
+        # no arguments of the object that was there before it are taken for its own.
+        told = ("ActionScript: objects updated in place: Pair, Token, Worded. Not updated: Restart (it extends Godot's Node2D), Stamp (an object of it was "
+                "made while the scripts ran as native code, by a constructor that could not be run again then). Restart the scene to see the new "
+                "code on those." if native else
+                "ActionScript: objects updated in place: Pair, Stamp, Token, Worded. Not updated: Restart (it extends Godot's Node2D). Restart the scene to "
+                "see the new code on those.")
+        check("%s: Godot is told what was updated in place, and what was not and why" % label, output.count(told) >= (2 if native else 1), output[-1500:])
         if native:
             check("%s: the libraries built ahead end, and none fails" % label, play_godot.settled(copy) and
                   not glob.glob(os.path.join(play_godot.cache(copy), "*.failed")), str(play_godot.held(copy)))

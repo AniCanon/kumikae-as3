@@ -63,6 +63,9 @@ package game {
 - **Only public members are visible to Godot.** GDScript can call a public method by its AS3 name, read and
   write a public field, and use a public getter or setter as a property.
 - **A script class can extend another script class.**
+- **`as` and a cast work on Godot's classes and on your script classes.** `node as Coin` gives the `Coin`
+  that the node carries, or `null`. `Coin(node)` gives it too, and raises TypeError #1034 if the node has no
+  such script.
 - **A class that extends no Godot class is a plain AS3 object.** It has no node behind it, and you can't
   hand it to Godot.
 - **A script on a reference-counted Godot class,** such as `RefCounted` or `Resource`, lives while AS3 or
@@ -290,7 +293,7 @@ as its source and the AS3 stack trace. The game carries on.
 - **An error in a listener comes out of the `emit()` that ran it,** so a `catch` around the `emit()` catches
   it.
 - **A call from the engine that runs longer than 15 seconds is stopped** with Error #1502, and the game
-  carries on. This limit applies on the interpreter, not yet in native code.
+  carries on. The limit is the same on the interpreter and in native code.
 
 ## Tests in a project
 
@@ -300,14 +303,14 @@ from running. A run that starts from a scene or script inside a test folder incl
 
 ## Native code
 
-By default your scripts run on the interpreter, which needs no build step and gives you
-[hot reload](hot-reload.md). The same scripts can run as native code.
+Your scripts run on the interpreter, which needs no build step, or as native code. Either way you have
+[hot reload](hot-reload.md).
 
-- **When you press Play.** Turn on the project setting `actionscript/native/play`. The first run after an
-  edit starts on the interpreter while the extension builds a program library in the background, and the
-  next run is native. Builds are cached under `.godot/kas3`. This works on macOS and needs Xcode's
-  command line tools. If there's no C++ compiler or a build fails, Godot prints one warning and the
-  interpreter runs the scripts.
+- **When you press Play.** On macOS the extension builds a program library by itself. The first run after
+  an edit starts on the interpreter while the library builds in the background, and the next run is native.
+  Builds are cached under `.godot/kas3`. This needs Xcode's command line tools. If there's no C++ compiler
+  or a build fails, Godot prints one warning and the interpreter runs the scripts. The project setting
+  `actionscript/native/play` turns the build off. On other systems it's off unless you turn it on.
 - **By hand.** Build a program library with `kas3c cpp` and put it in the project's `bin` folder. See
   [the extension's README](../compiler/godot_ext/README.md#the-program-library).
 
@@ -318,7 +321,7 @@ By default your scripts run on the interpreter, which needs no build step and gi
 
 | Project setting | Default | What it does |
 |---|---|---|
-| `actionscript/native/play` | Off | Builds and runs native code when a game runs from its project folder |
+| `actionscript/native/play` | On, on macOS. Off elsewhere | Builds and runs native code when a game runs from its project folder |
 | `actionscript/limits/script_timeout_seconds` | `15` | How long a call from the engine can run before Error #1502 stops it. `0` means no limit |
 | `actionscript/tests/folders` | `["res://tests"]` | The folders whose scripts are left out of the game |
 

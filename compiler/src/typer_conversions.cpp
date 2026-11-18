@@ -1,5 +1,7 @@
 #include "typer.h"
 
+#include "casts.h"
+
 namespace kas3 {
 
 bool Typer::primitive(const Type *p_type) const {
@@ -192,11 +194,16 @@ void Typer::store(Expr *p_value, const Type *p_to) {
 	switch (fits(p_value->type, p_to)) {
 		case Fit::Yes:
 			break;
-		case Fit::Cast:
+		case Fit::Cast: {
+			// Only a type that casts or converts when it is called is advised that way, and one of Godot's
+			// value types, which `as` does not ask of either, is advised nothing.
+			const bool casts = p_to->kind == Type::Vector || (p_to->kind == Type::Instance && class_call(p_to->symbol) != ClassCall::Other);
+			const bool neither = p_to->kind == Type::Instance && is_godot_value_type(p_to->symbol);
 			error(p_value->offset, "a value of type " + quoted(compilation_.type_name(p_value->type)) +
 										   " may not be a " + quoted(compilation_.type_name(p_to)) +
-										   "; use 'as' or a cast");
+										   (casts ? "; use 'as' or a cast" : neither ? "" : "; use 'as'"));
 			break;
+		}
 		case Fit::No:
 			error(p_value->offset, "can't use a value of type " + quoted(compilation_.type_name(p_value->type)) +
 										   " where " + quoted(compilation_.type_name(p_to)) + " is expected");

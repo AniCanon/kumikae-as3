@@ -17,9 +17,14 @@ static_assert(NONE == ir::NONE, "the program table and the IR write `none` alike
 
 Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		program(p_program), module(p_embedder.module ? native_module(*p_embedder.module, p_program) : stub_module(p_program)),
-		output(p_embedder.output), handles(p_embedder.handles) {
+		output(p_embedder.output), handles(p_embedder.handles), limit(context, p_embedder.clock) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
+	// Before anything is made: an object is made with room for what it was constructed with.
+	if (p_embedder.remember && program.remembers) {
+		interpreter->remember_constructions(true);
+		context.remembers = interpreter->remembers();
+	}
 	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
@@ -38,17 +43,34 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	// does not look at and no one but the program holds.
 	for (uint32_t i = 0; i < module.classes.size(); i++) {
 		const ir::Class &klass = module.classes[i];
-		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in &&
-				klass.fields.size() + 1 < ObjectCache::SIZES && !interpreter->heap().list_for(i);
+		// Where what objects are constructed with is remembered, an object has room for that after its
+		// fields (vm/constructions.h): the block kept is the whole of it, and as it is made again its
+		// fields are emptied, and the first slot of that room, which says nothing is remembered of the
+		// new object until its constructor tells. Only where nothing remembered is counted: where an
+		// argument may be text, the heap frees the object, and gives the text up.
+		vm::Constructions *const remembered = interpreter->heap().constructions;
+		const size_t slots = klass.fields.size() + (remembered ? remembered->room(i) : 0);
+		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in && slots + 1 < ObjectCache::SIZES &&
+				!interpreter->heap().list_for(i) && (!remembered || remembered->room(i) == 0 || remembered->plain_arguments(i));
 		uint32_t numbers = 0;
 		for (size_t at = 0; at < klass.fields.size() && plain; at++) {
 			plain = !ir::is_held(klass.fields[at].kind);
 			numbers |= klass.fields[at].kind == Kind::F64 ? uint32_t(1) << at : 0;
 		}
-		class_cached.push_back(plain ? static_cast<uint8_t>(klass.fields.size() + 1) : 0);
+		class_cached.push_back(plain ? static_cast<uint8_t>(slots + 1) : 0);
+		// Generated code keeps the record of an object whose arguments are numbers and Booleans, where the
+		// object is made (remembered_here), whether or not the object's block is one that is kept.
+		const bool records = remembered && remembered->plain_arguments(i) && klass.fields.size() <= UINT8_MAX;
+		if (records) {
+			remembered->kept_by_native(i);
+		}
 		class_numbers.push_back(numbers);
+		class_fields.push_back(plain || records ? static_cast<uint8_t>(klass.fields.size()) : 0);
 	}
 	context.class_numbers = class_numbers.data();
+	context.class_fields = class_fields.data();
+	class_tells.assign(module.classes.size(), 0);
+	context.class_tells = class_tells.data();
 	context.cache = &cache;
 	context.class_cached = class_cached.data();
 	if (std::getenv("KAS3_NATIVE_COUNTS")) {
@@ -65,6 +87,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.program = &program;
 	context.api = runtime_api();
 	context.host = this;
+	limit.set(p_embedder.time_limit);
 }
 
 void Host::clear_globals() {
@@ -100,12 +123,16 @@ void Host::say_counts() const {
 			std::fprintf(stderr, "kas3:   %llu %s\n", static_cast<unsigned long long>(thunk_counts[i]), what.c_str());
 		}
 	}
+	if (context.remembers) {
+		std::fprintf(stderr, "kas3:   told of %llu constructions, %zu remembered now\n", static_cast<unsigned long long>(told), interpreter->remembered());
+	}
 	for (uint32_t use : unresolved) {
 		std::fprintf(stderr, "kas3:   unresolved %s\n", asked_of(module, module.functions[thunk_function(program.uses[use])].code[0]).c_str());
 	}
 }
 
 Host::~Host() {
+	limit.set(0); // Its thread reads the context.
 	if (!thunk_counts.empty()) {
 		say_counts();
 	}
@@ -141,6 +168,25 @@ Object *new_object(Context *c, uint32_t p_class) {
 		vm::reset_fields(klass, object);
 	}
 	return object;
+}
+
+// A record as remembered_here() writes one is the record the interpreter's own code reads.
+static_assert(RECORD_NOTHING == vm::Constructions::NOTHING && RECORD_ARGUMENTS == vm::Constructions::ARGUMENTS &&
+				offsetof(vm::Constructions::Record, kept) == 0 && offsetof(vm::Constructions::Record, arguments) == sizeof(uint32_t) &&
+				offsetof(vm::Constructions::Record, values) == sizeof(Slot),
+		"generated code writes an object's record where it is made");
+
+void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count) {
+	Host &host = *c->host;
+	host.told++;
+	host.interpreter->constructing(p_function, p_arguments, p_count);
+	// A class of whose objects only the arguments are kept, as they come: from here on generated code
+	// keeps them itself. Asked once the class is known not to be one already.
+	const uint32_t owner = host.module.functions[p_function].owner;
+	if (owner != NONE && !host.class_tells[owner] && host.class_fields[owner] == host.module.classes[owner].fields.size()) {
+		const vm::Constructions *const remembered = host.interpreter->heap().constructions;
+		host.class_tells[owner] = remembered && remembered->copies_arguments(owner);
+	}
 }
 
 void *copy_handle(Context *c, void *p_handle) {
@@ -185,8 +231,8 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	Host &host = *c->host;
 	// The interpreter refuses an entry with the stack nearly used up, and one that is refused has no frame
 	// to catch its error in: Error #1023 is raised here, where generated code can catch it.
-	if (vm::stack_below(c->stack_floor ? c->stack_floor : vm::stack_floor())) {
-		stack_overflow(c);
+	const uintptr_t floor = c->stack_floor.load(std::memory_order_relaxed);
+	if (vm::stack_below(floor ? floor : vm::stack_floor()) && stack_overflow(c)) {
 		return empty();
 	}
 	const uint32_t function = host.thunk_function(p_thunk);
@@ -306,9 +352,13 @@ void Host::use_class(uint32_t p_class, bool p_from_code) {
 }
 
 bool Host::run() {
+	// Each is a call from outside, counted with the interpreter's own: what the library calls back
+	// meanwhile is inside it, and its time is the call's (Error #1502).
 	for (uint32_t i = 0; i < program.initializer_count; i++) {
 		Slot none = empty();
+		interpreter->entered();
 		program.functions[program.initializers[i]].entry(&context, nullptr, 0, &none);
+		interpreter->left();
 		if (context.failing) {
 			report();
 			return false;
@@ -318,6 +368,8 @@ bool Host::run() {
 	if (entry == NONE) {
 		return true;
 	}
+	// The entry class set up, made and constructed: one call from outside, as the interpreter makes it.
+	interpreter->entered();
 	if (!class_used[entry]) {
 		use_class(entry, false);
 	}
@@ -334,6 +386,7 @@ bool Host::run() {
 		Slot none = empty();
 		constructor.entry(&context, arguments.data(), 1, &none);
 	}
+	interpreter->left();
 	const bool ran = !context.failing;
 	if (!ran) {
 		report();
