@@ -566,7 +566,7 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
 # A vector of Vector2s or of Vector2is holds each value in its place: never null, a copy read out and a copy
 # stored, the places themselves handed to Godot as a packed array's elements.
 compare("places.gd", [
-    "grown", "no value is refused", "methods", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
+    "grown", "no value is refused", "methods", "ends", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
     "given: none", "given: whole numbers", "a larger value type", "a larger value type: to Godot", "taken",
 ])
 
