@@ -22,9 +22,13 @@ internal object Clutter {
      * The folders at a game's root that hold builds, not the game: a Simulator build stages a copy of the
      * project in `.build`. The IDE does not index them, so search and navigation never offer a copy of a
      * script, in which nothing is completed. `.idea` is the IDE's own, and `.godot` holds what Rider's Godot
-     * support registers.
+     * support registers: of it, only `.godot/kas3` is left out, where Play keeps the game as C++, its
+     * libraries and their logs, written again at each save.
      */
-    fun unindexed(root: String): List<String> = (folders - setOf(".idea", ".godot", ".run")).map { "$root/$it" }
+    fun unindexed(root: String): List<String> =
+        (folders - setOf(".idea", ".godot", ".run")).map { "$root/$it" } + "$root/$PLAY_BUILDS"
+
+    private const val PLAY_BUILDS = ".godot/kas3"
 
     fun isClutter(name: String, isFolder: Boolean): Boolean =
         if (isFolder) name in folders else endings.any(name::endsWith)

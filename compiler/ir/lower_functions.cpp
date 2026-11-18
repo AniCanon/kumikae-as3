@@ -76,6 +76,7 @@ bool Functions::called_value(const Symbol *p_symbol) {
 		case SymbolKind::Field:
 		case SymbolKind::Parameter:
 		case SymbolKind::Local:
+		case SymbolKind::LocalFunction: // A function declared in a function is a variable that holds it.
 		case SymbolKind::CatchVariable:
 			return true;
 		case SymbolKind::Property: // A getter that gives a function: `o.action(3)` calls what it gives.

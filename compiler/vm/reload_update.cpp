@@ -14,6 +14,16 @@ using Record = Constructions::Record;
 
 void Reload::carry_record(Object *p_old, Object *p_fresh) {
 	const Record *kept = from_.constructions_ && to_.constructions_ ? from_.constructions_->of(p_old) : nullptr;
+	// Native code remembered nothing at all, or nothing of this class, whose chain could not be run again
+	// as it was built: why the object has no record is said by its class at this reload and those after.
+	if (!kept && from_.native_ && to_.constructions_ && to_.constructions_->room(p_fresh->klass) != 0) {
+		const std::string &name = to_.module_.classes[p_fresh->klass].name;
+		if (!from_.constructions_) {
+			to_.constructions_->made_natively(name);
+		} else if (!from_.constructions_->told_of(p_old->klass)) {
+			to_.constructions_->made_once_natively(name);
+		}
+	}
 	if (!kept) {
 		return;
 	}
@@ -145,8 +155,8 @@ bool Reload::constant_changed(const std::string &p_name) const {
 	if (before >= from_.globals_.size() || from_.module_.globals[before].kind != kind) {
 		return true;
 	}
-	if (Constructions::plain(kind, from_.globals_[before]) && Constructions::plain(kind, to_.globals_[after])) {
-		return !Constructions::same(kind, from_.globals_[before], to_.globals_[after]);
+	if (Constructions::plain(kind, global_of(from_, before)) && Constructions::plain(kind, to_.globals_[after])) {
+		return !Constructions::same(kind, global_of(from_, before), to_.globals_[after]);
 	}
 	const std::string owner = p_name.substr(0, p_name.rfind('.'));
 	return std::find(changed_statics_.begin(), changed_statics_.end(), owner) != changed_statics_.end();
@@ -242,7 +252,11 @@ InPlace Reload::update_in_place(const std::vector<std::string> &p_run_once) {
 		} else if (unknown) {
 			done.left.emplace_back(name, !to_.constructions_ ? "what its objects were made with is not remembered"
 					: unfit_.count(index)					 ? "its constructor's parameters changed"
-															 : "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null");
+					: to_.constructions_->natively_made().count(name)
+							? "an object of it was made while the scripts ran as native code that does not remember what objects are made with"
+					: to_.constructions_->once_natively_made().count(name)
+							? "an object of it was made while the scripts ran as native code, by a constructor that could not be run again then"
+							: "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null");
 		}
 	}
 	std::sort(done.updated.begin(), done.updated.end());

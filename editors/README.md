@@ -1,103 +1,108 @@
-# Editors
+# Editor support
 
-`kas3c lsp` is a language server: an editor starts it, and it reports the compiler's errors as you type and
-answers go to definition, find references, hover, completion, signature help, outline and symbol search. It is the same program as
-`kas3c check`, so the two never disagree.
+This page shows how to set up an editor for ActionScript 3. Editing works through a language server,
+`kas3c lsp`, which is the compiler itself. Your editor shows the same errors as `kas3c check` and as Godot.
 
-Build it first:
+| Editor | What you get | Set it up |
+|---|---|---|
+| Rider, IntelliJ IDEA | Language support, a project wizard, run configurations, a test runner, a settings editor and an iOS Simulator panel | [Rider and IntelliJ IDEA](#rider-and-intellij-idea) |
+| VS Code | Language support and syntax coloring | [VS Code](#vs-code) |
+| Any editor with a Language Server Protocol client | Language support | [Other editors](#other-editors) |
+
+## Before you start
+
+Build the compiler. The language server is the same program.
 
 ```sh
 cmake -S compiler -B compiler/build
-cmake --build compiler/build
+cmake --build compiler/build -j
 ```
 
-The server is then `compiler/build/kas3c`. The steps below use its full path; a copy on your `PATH` works
-too.
+The server is then `compiler/build/kas3c`.
 
-Open the folder that holds `project.godot`, or any folder inside it. Every `.as` file in the project is
-part of the program.
+In your editor, open the folder that holds `project.godot`, or any folder inside it. Every `.as` file in
+the project is part of the program.
 
-> **Editor validation:**
-> - **VS Code 1.145:** works. With the client below, VS Code started the server, opened a script that
->   extends `CharacterBody2D`, received its two errors, and received the shorter list after the file changed.
->   This was confirmed from a log of the messages between the two, and the owner saw both errors underlined
->   in the editor.
->   It found one fault, now fixed: VS Code starts a server with `--stdio`, which `kas3c lsp` used to reject.
-> - **Rider RD-262.10968.170:** the native plugin passes automated sandbox checks for pairing,
->   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
->   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
-> - **Free unified IDEA IU-261.22158.277 with LSP4IJ 0.21.0:** automated sandbox checks cover Enter/Tab,
->   snippets, imports, overrides, parameter help, navigation and outline. See the
->   [follow-up results](../docs/results/2026-11-completion-followup.md) for the compatibility matrix.
+## Rider and IntelliJ IDEA
 
-> **Windows: built for, not yet tried.** The server reads and writes its messages in binary, checks a
-> pipe for input without blocking, opens files by their UTF-8 names and spells Windows paths one way
-> (drives, shares, `\` and letter case); those rules are tested on every system. It has not been built or
-> run on Windows itself. The JetBrains plugin looks for `kas3c.exe` there.
+1. Build the plugin. You need JDK 25 and Rider 2026.2 installed. See
+   [the plugin's README](jetbrains/README.md#build-the-plugin) for the details.
+
+   ```sh
+   cd editors/jetbrains
+   ./gradlew buildPlugin
+   ```
+
+2. In the IDE, open **Settings > Plugins**, click the gear icon, and choose **Install Plugin from Disk**.
+3. Select the zip file in `editors/jetbrains/build/distributions/`.
+4. Restart the IDE.
+
+The plugin bundles `kas3c` when the compiler was built before the plugin, so there's nothing else to
+configure.
+
+In IntelliJ IDEA, also install the **LSP4IJ** plugin from **Settings > Plugins**. Rider doesn't need it.
+
+The [plugin's README](jetbrains/README.md) describes everything the plugin does.
 
 ## VS Code
 
-The client is in [`vscode/`](vscode/). It needs one library from npm.
+The client is in [`vscode/`](vscode/README.md). It isn't published to the marketplace, so you run it from
+this repository.
+
+1. Install the client's one dependency:
+
+   ```sh
+   cd editors/vscode
+   npm install
+   ```
+
+2. Open the `editors/vscode` folder in VS Code and choose **Run > Start Debugging**. A second window opens
+   with the extension loaded.
+3. In that window, open your project.
+4. Set **Kumikae AS3: Server Path** (`kas3.serverPath`) to the full path of `kas3c`.
+
+| Setting | What it does | Default |
+|---|---|---|
+| `kas3.serverPath` | The `kas3c` program: a full path, or a name found on the `PATH` | `kas3c` |
+| `kas3.godot` | Loads Godot's API | On |
+| `kas3.declarations` | More [declaration files](../docs/language.md#declaration-files) to load | None |
+
+## Other editors
+
+Point your editor's Language Server Protocol client at this command, for files that end in `.as`:
 
 ```sh
-cd editors/vscode
-npm install
+kas3c lsp
 ```
 
-Then, in VS Code: **Run > Start Debugging** with the `editors/vscode` folder open starts a second window
-with the extension loaded. In that window, open your project and set **Kumikae AS3: Server Path**
-(`kas3.serverPath`) to the full path of `kas3c`.
-
-| Setting | What it does |
-|---|---|
-| `kas3.serverPath` | The `kas3c` program. Default: `kas3c`, found on the `PATH`. |
-| `kas3.godot` | Load Godot's API. Default: on. |
-| `kas3.declarations` | More declaration files. |
-
-The colouring is a small grammar: keywords, strings, comments and numbers.
-
-## Rider and IntelliJ IDEA Community
-
-The [Kumikae JetBrains plugin](jetbrains/) connects `kas3c lsp` through Rider's native LSP client or
-LSP4IJ in IntelliJ IDEA.
-It provides AS3 highlighting, completion, argument help, navigation and local bracket/quote assistance,
-as well as project/run tools and the Simulator panel. Install the plugin ZIP built from the same
-compiler revision; it bundles `kas3c` when a compiler build is available. See the plugin README for the
-supported Rider build and build commands.
-
-For IntelliJ IDEA, install and enable **LSP4IJ 0.21.0** from Settings → Plugins, then install Kumikae.
-IDEA's [unified distribution](https://www.jetbrains.com/help/idea/intellij-idea-single-distribution.html)
-includes the free features that replaced Community Edition; this adapter
-does not use an Ultimate API or require a paid subscription. Rider uses its native client and does not
-require LSP4IJ. Installing LSP4IJ in Rider does not start a second AS3 server. Android Studio is outside
-the scope. See the plugin README for the specific builds checked.
-
-## Any other editor
-
-Anything with a Language Server Protocol client works: the command is `kas3c lsp`, over standard input and
-output, for files ending in `.as`.
+The server talks over standard input and output.
 
 | Option | What it does |
 |---|---|
-| `--no-godot` | Don't load Godot's API. |
-| `--declarations <file>` | Load one more declaration file. May be repeated. |
+| `--no-godot` | Doesn't load Godot's API |
+| `--declarations <file>` | Loads one more declaration file. You can repeat it |
+| `--stdio` | Accepted and ignored, because some clients add it |
 
 ## What works
 
 | Feature | Notes |
 |---|---|
-| Errors as you type | What `kas3c check` reports. A file with a syntax error shows only that; files that use nothing of it keep their other errors. |
-| Go to definition | Locals, parameters, fields, methods, classes, imports, inherited members, and Godot's API. |
-| Find references | Across the project's files. |
-| Hover | The declaration, and the class or package it belongs to. |
-| Outline | The classes and members of a file. |
-| Symbol search | The project's own classes, functions and members, then Godot's classes and the built-in library's. |
+| Errors as you type | What `kas3c check` reports. A file with a syntax error shows only that error. Files that use nothing from it keep their other errors |
+| Completion | Members after a dot, types, imports, names in reach, override stubs, and language blocks such as `try` and `for`. See [Completion and typing help](completion.md) |
+| Signature help | The declaration being called and the active parameter |
+| Go to definition | Locals, parameters, fields, methods, classes, imports, inherited members, and Godot's API |
+| Find references | Across the project's files |
+| Hover | The declaration, and the class or package it belongs to |
+| Outline | The classes and members of a file |
+| Symbol search | The project's own definitions, then Godot's classes and the built-in library's |
 
-[Completion and typing assistance](completion.md) covers chained members, types, imports, visible names,
-Tab replacement, callable snippets and argument help. Features that depend on client capabilities have
-plain-text and ordinary-edit fallbacks.
+When you go to the definition of something in Godot's API, the editor opens a read-only copy of the
+declarations, which the server writes to the system's temporary folder.
 
-Not yet: rename and Godot's documentation in hover.
+## What doesn't work yet
 
-Going to the definition of something in Godot's API opens a read-only copy of the declarations, which the
-server writes to the system's temporary folder.
+- Rename and code actions.
+- Godot's documentation in hover.
+- A debugger. See the [roadmap](../docs/roadmap.md).
+- Windows and Linux. The server and the plugin are written to run there, and neither has been built or
+  run on them.

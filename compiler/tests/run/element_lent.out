@@ -3,5 +3,10 @@ c2 c5 c4true
 null: Error #1009: Cannot access a property or method of a null object reference.
 past: Error #1125: The index 9 is out of range 6.
 c13new100 147 c5
-c0 3 0
+bump: Error #1125: The index 6 is out of range 6. 213
+none: Error #1009: Cannot access a property or method of a null object reference.
+63 27 caught r5 33
+r0 3 0
 0.5
+99.5 t01madet1 -1 new
+bc2 0

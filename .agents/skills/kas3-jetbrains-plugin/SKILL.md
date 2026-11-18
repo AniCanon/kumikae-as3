@@ -1,12 +1,12 @@
 ---
 name: kas3-jetbrains-plugin
-description: Use when changing anything under editors/jetbrains/ in kumikae-as3 (the JetBrains IDE plugin: tool windows, the iOS Simulator panel, its local service, run configurations, settings) — the fixed stack (Kotlin, Compose Swing, IntelliJ Platform Gradle Plugin, ktlint), where state, I/O and views live, how to test without an IDE, and the UI probe.
+description: Use when changing anything under editors/jetbrains/ in kumikae-as3 (the JetBrains IDE plugin: tool windows, the iOS Simulator panel, its local service, run configurations, settings). Covers the fixed stack (Kotlin, Compose Swing, IntelliJ Platform Gradle Plugin, ktlint), where state, I/O and views live, how to test without an IDE, and the UI probe.
 ---
 
 # Changing the JetBrains plugin
 
-Read `AGENTS.md`, then `editors/jetbrains/README.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md`. They are the
-authority; this is what gets broken most.
+Read `AGENTS.md`, then `editors/jetbrains/README.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md`. They're the
+authority. This page lists what gets broken most.
 
 ## The stack is fixed
 
@@ -14,11 +14,11 @@ authority; this is what gets broken most.
   Gradle Plugin, ktlint. The versions are in `build.gradle.kts`: change one only when asked to.
 - **UI is Compose Swing** (`org.jetbrains.compose.swing:swing-ui`), mounted through `composePanel` in
   `ui/ComposeHost.kt`. Not hand-built Swing panels, not the UI DSL, not Jewel, not Skia Compose.
-- Native Swing controls only where the IDE's own behaviour is needed (a painted picture that takes the
+- Native Swing controls only where the IDE's own behavior is needed (a painted picture that takes the
   mouse, a console, a table model, a file browser), mounted through `Native` / `NativeScrollPane`.
 - No second dependency-injection container, no Android `ViewModel`, no coroutines scope of your own where
   `BackgroundTasks` already does the job.
-- A dependency that is not already in `build.gradle.kts` is a question for the owner, not a line to add.
+- A dependency that is not already in `build.gradle.kts` is a question for a maintainer, not a line to add.
 
 ## Where things live
 
@@ -74,9 +74,10 @@ python3 -m unittest discover -s tests -v
 
 ## Do not
 
-- Start the owner's real IDE or change its settings: only the sandbox the Gradle plugin starts.
-- Erase, create, shut down or install onto a Simulator that you did not create. Never kill a process you
-  did not start; stop the ones you did.
-- Load or download idb, an IDE, a JDK or any tool without the owner's yes.
-- Claim the plugin works in an IDE because it compiles. Say what was seen, by whom, and what was not.
-- Copy anything about a games console, or any personal identifier, into this repository.
+- Start a person's real IDE or change its settings: only the sandbox the Gradle plugin starts.
+- Erase, create, shut down or install onto a Simulator that you didn't create. Never kill a process you
+  didn't start. Stop the ones you did.
+- Download an IDE, a JDK or any other tool without a maintainer's yes.
+- Claim the plugin works in an IDE because it compiles. Say what was run, and what wasn't.
+- Copy anything about a games console's SDK, tools or results, or any personal identifier, into this
+  repository.

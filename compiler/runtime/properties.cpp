@@ -48,18 +48,18 @@ Object *new_array(Context *c, const Slot *p_values, uint32_t p_count) {
 	const Slot asked[] = { slot(p_count), slot(false) };
 	Vector *made = static_cast<Vector *>(c->host->builtin(Builtin::NewArray, asked).p);
 	for (uint32_t i = 0; made && i < p_count; i++) {
-		made->data[i] = shared(c, p_values[i]);
+		vm::slots_of(made)[i] = shared(c, p_values[i]);
 	}
 	return made;
 }
 
-Slot *element_added(Context *, Object *p_vector, uint32_t p_index) {
+void *element_added(Context *, Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
 	if (!vector || p_index != vector->length || vector->fixed || p_index >= vm::MAX_VECTOR_LENGTH || !vm::vector_reserve(vector, p_index + 1)) {
 		return nullptr;
 	}
 	vector->length = p_index + 1;
-	return vector->data + p_index; // Empty: the room past a vector's end always is.
+	return static_cast<char *>(vector->places) + p_index * vm::place_size(vector); // Empty: the room past a vector's end always is.
 }
 
 } // namespace rt

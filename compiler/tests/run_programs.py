@@ -10,6 +10,10 @@ Usage: run_programs.py <path to kas3c> <tests dir> [--update]
   run/godot/X.as      a script for Godot: `kas3c ir --godot` of it must print X.ir (it does not run here).
   run/refused/X.as    uses something the interpreter does not run yet: status 1, nothing on standard
                       output, and X.err on standard error.
+  run/stopped/X.as    never ends by itself: with a tenth of a second for a call (KAS3_TIME_LIMIT_MS=100) it is
+                      stopped by Error #1502, status 1, with X.out on standard output and standard error that
+                      begins with X.err (all of it where the program is at one line when its time is up; the
+                      error's first line alone where it may be anywhere).
   corpus/, golden/    every other test program: it runs or is refused, and never crashes.
 
 Expected output for numbers, strings and evaluation order was produced by Node from a line-by-line
@@ -115,6 +119,17 @@ for path in sorted(glob.glob(os.path.join(refused, "*.as"))):
     named = ("is not supported by the interpreter yet" in result.stderr or "the program's first class" in result.stderr or
              "has no class to start" in result.stderr)
     check(name + " status", result.returncode == 1 and result.stdout == "" and named, "exit %d" % result.returncode)
+
+stopped = os.path.join(folder, "stopped")
+for path in sorted(glob.glob(os.path.join(stopped, "*.as"))):
+    name = "stopped/" + os.path.basename(path)
+    result = run("run", [os.path.basename(path)], stopped, {"KAS3_TIME_LIMIT_MS": "100"})
+    compare(name + " output", result.stdout, path[:-3] + ".out")
+    begins = open(path[:-3] + ".err").read()
+    check(name + " errors", begins.startswith("Error: Error #1502: ") and result.stderr.startswith(begins),
+          "\n--- expected to begin with\n%s--- actual\n%s" % (begins, result.stderr[:600]))
+    check(name + " status", result.returncode == 1, "exit %d" % result.returncode)
+check("found the programs the time limit stops", len(glob.glob(os.path.join(stopped, "*.as"))) >= 5)
 
 # Everything else in the test tree: run it or refuse it, but never crash, hang or leak.
 others = sorted(glob.glob(os.path.join(tests, "corpus", "*.as")) + glob.glob(os.path.join(tests, "golden", "**", "*.as"),

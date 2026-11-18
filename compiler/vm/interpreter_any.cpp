@@ -46,7 +46,7 @@ Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
 		key.kind = Kind::I64;
 		key.slot.bits = 0;
 		key.slot.l = i;
-		if (!host_.handles.index_get(p_array, key, untyped, &made->data[i], &error)) {
+		if (!host_.handles.index_get(p_array, key, untyped, &slots_of(made)[i], &error)) {
 			release_object(made);
 			raise(module_.error_class, error);
 			return nullptr;
@@ -123,7 +123,11 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
 		case Op::AnyIsGodot:
-			result(Kind::Bool, of_bool(any::tag(b) == AnyTag::Godot && host_.handles.is_class(any::pointer(b), module_.engine_names[p_in.c].name)));
+			if (void *const held = any::tag(b) == AnyTag::Value ? any::pointer(b) : engine_object_in(module_, b)) {
+				result(Kind::Bool, of_bool(host_.handles.is_class(held, module_.engine_names[p_in.c].name)));
+			} else {
+				result(Kind::Bool, of_bool(false));
+			}
 			break;
 		default:
 			break;

@@ -54,6 +54,17 @@ class ClutterTest {
         assertFalse(Clutter.unindexed(root).any { it.startsWith("/games/sprint/src") })
     }
 
+    @Test fun `what Play builds under Godot's folder is kept out of the IDE's index, and nothing else of it`() {
+        // Play writes the game as C++, the libraries built from it and their logs under `.godot/kas3`, again
+        // at each save: indexed, every save would index generated code nobody opens.
+        val unindexed = Clutter.unindexed("/games/sprint")
+        assertTrue("/games/sprint/.godot/kas3" in unindexed)
+        assertFalse("/games/sprint/.godot" in unindexed)
+        assertTrue(unindexed.filter { it.startsWith("/games/sprint/.godot") } == listOf("/games/sprint/.godot/kas3"))
+        // The folder is still Godot's and the IDE's to hide in the Game view, whole.
+        assertTrue(Clutter.hideFolder(".godot", projectRoot = true))
+    }
+
     @Test fun `source packages named build remain visible`() {
         assertFalse(Clutter.hideFolder("build", projectRoot = false))
         assertTrue(Clutter.hideFolder("build", projectRoot = true))

@@ -1,4 +1,14 @@
-# AS3 tests
+# Testing
+
+Kumikae Testing lets you write tests for your game in ActionScript 3. It has three parts:
+
+- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing): `TestCase`, `Suite` and
+  `Assert`.
+- **A command-line runner,** `runner.py`, which runs the tests a project lists and reports each case.
+- **Rider integration,** in the [plugin](../editors/jetbrains/README.md#tests), which shows results in the
+  IDE's Tests window.
+
+Tests run on the interpreter, with `kas3c run` or inside Godot. Nothing is downloaded.
 
 Mark public no-argument instance methods with `[Test]` and point a manifest target at the fixture directory:
 
@@ -10,78 +20,108 @@ The runner uses the compiler’s syntax tree and creates a fresh fixture for eac
 qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
 Rider uses the same IDs for the gutter, test results, reruns and source navigation.
 
+## Write a test case
 
-Kumikae Testing is a small first-party AS3 library, a Python command-line runner,
-and a Rider adapter. It uses the existing interpreter and Godot; it downloads
-nothing. Keep assertions and fixtures in AS3, process/protocol handling in Python,
-and IDE presentation in the JetBrains plugin.
-
-## Write a case
+A test case is a class that extends `TestCase` and overrides `run`. The examples on this page test this
+class from a game, in `src/Score.as`:
 
 ```actionscript
-package game.tests {
-    import app.anicanon.kumikae.testing.Assert;
-    import app.anicanon.kumikae.testing.TestCase;
+package game {
+    public class Score {
+        public var points:int;
 
-    public class ScoreCase extends TestCase {
-        private var initial:int;
-
-        public function ScoreCase(label:String, initial:int) {
-            super(label);
-            this.initial = initial;
+        public function Score(points:int = 0) {
+            this.points = points;
         }
 
-        override public function setUp():void {
-            // Construct a fresh fixture here.
-        }
-
-        override public function run():void {
-            Assert.assertEquals(initial + 1, initial + 1, "Score increases");
-            Assert.assertTrue(initial >= 0, "Initial score is nonnegative");
-        }
-
-        override public function tearDown():void {
-            // Release fixture resources here, including after a failure.
+        public function add(amount:int):void {
+            points += amount;
         }
     }
 }
 ```
 
-Register named cases in an entry class's constructor:
+The test case, in `tests/ScoreCase.as`:
 
 ```actionscript
-var suite:Suite = new Suite("Scoring");
-suite.add(new ScoreCase("Starts empty", 0));
-suite.add(new ScoreCase("Existing score", 10));
-if (!suite.run()) {
-    throw new Error("Scoring tests failed");
+package game.tests {
+    import game.Score;
+    import app.anicanon.kumikae.testing.Assert;
+    import app.anicanon.kumikae.testing.TestCase;
+
+    public class ScoreCase extends TestCase {
+        private var initial:int;
+        private var score:Score;
+
+        public function ScoreCase(name:String, initial:int) {
+            super(name);
+            this.initial = initial;
+        }
+
+        override public function setUp():void {
+            score = new Score(initial);
+        }
+
+        override public function run():void {
+            score.add(10);
+            Assert.assertEquals(initial + 10, score.points, "Adding points raises the score");
+            Assert.assertTrue(score.points >= 0, "A score is never negative");
+        }
+
+        override public function tearDown():void {
+            score = null;
+        }
+    }
 }
-trace("PASS scoring suite");
 ```
 
-Each case runs `setUp`, `run`, then `tearDown`. A setup failure skips `run`;
-teardown still runs. The suite continues after failures, including thrown values
-with an empty message. Constructor arguments provide typed parameter cases with
-individual names and results. Cases are sequential; a Godot integration harness
-owns its frame-based lifecycle and process timeout.
+- **Each case runs `setUp`, `run`, then `tearDown`.** If `setUp` fails, `run` is skipped. `tearDown` runs
+  either way.
+- **Constructor arguments make parameter cases.** The same class, constructed with different values, gives
+  several cases with their own names and results.
+- **A case's name is one line** and doesn't contain `::`.
 
-Names must be nonempty single lines without `::`, which separates stable selection
-identities. The adapter rejects unsupported names with an error. Failure details
-may contain arbitrary punctuation and newlines. Each source file defines one class.
+| Assertion | Fails when |
+|---|---|
+| `Assert.assertTrue(value, message)` | `value` is false |
+| `Assert.assertEquals(expected, actual, message)` | The two differ |
+| `Assert.fail(message)` | Always |
 
-The conventions take cues from [FlexUnit assertions](https://flex.apache.org/flexunit/asdoc/flexunit/org/flexunit/Assert.html)
-and [fixture lifecycle](https://flex.apache.org/flexunit/tutorial/flexunit/Unit-6.html),
-[Kotlin's named tests and assertions](https://kotlinlang.org/docs/jvm-test-using-junit.html),
-[Swift Testing's named parameter cases](https://developer.apple.com/documentation/testing/parameterizedtesting),
-and [MSTest's setup and cleanup](https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-mstest-writing-tests-lifecycle).
-This is not a FlexUnit compatibility layer. `[Test]`/`[Before]` discovery, function
-callbacks, automatic expression capture and parallel execution are not implemented.
-Explicit `TestCase` subclasses use ordinary AS3 virtual dispatch and provide a
-portable, deliberate registration API without relying on metadata discovery.
+## Collect cases into a suite
 
-## Register project targets
+A suite is built in the constructor of an entry class. `kas3c run` constructs that class, which runs the
+suite. This one is `tests/ScoringSuite.as`:
 
-Put `kas3-tests.json` beside `project.godot`:
+```actionscript
+package game.tests {
+    import app.anicanon.kumikae.testing.Suite;
+
+    public class ScoringSuite {
+        public function ScoringSuite() {
+            var suite:Suite = new Suite("Scoring");
+            suite.add(new ScoreCase("Starts empty", 0));
+            suite.add(new ScoreCase("Existing score", 10));
+            if (!suite.run()) {
+                throw new Error("Scoring tests failed");
+            }
+            trace("PASS scoring suite");
+        }
+    }
+}
+```
+
+A suite carries on after a failure, so one run reports every failing case. Registration is explicit:
+adding a method or a `[Test]` tag doesn't register a case. Cases run one after another.
+
+To run the suite directly, pass the entry file first, then the rest of the program and the library:
+
+```sh
+kas3c run tests/ScoringSuite.as tests/ScoreCase.as src/Score.as <repository>/testing/as3/app/anicanon/kumikae/testing/*.as
+```
+
+## List the tests of a project
+
+Put a manifest named `kas3-tests.json` beside `project.godot`:
 
 ```json
 {
@@ -91,43 +131,68 @@ Put `kas3-tests.json` beside `project.godot`:
     "source": "tests/ScoringSuite.as",
     "entryClass": "game.tests.ScoringSuite",
     "events": true,
-    "command": ["{compiler}", "run", "tests/ScoringSuite.as", "{sources}"],
+    "command": [
+      "{compiler}", "run", "tests/ScoringSuite.as", "{sources}",
+      "{library}/app/anicanon/kumikae/testing/Assert.as",
+      "{library}/app/anicanon/kumikae/testing/Suite.as",
+      "{library}/app/anicanon/kumikae/testing/TestCase.as"
+    ],
     "sources": ["src/**/*.as", "tests/**/*.as"],
-    "exclude": ["src/presentation/**/*.as"],
     "marker": "PASS scoring suite",
     "timeout": 120
   }]
 }
 ```
 
-The project must include the library's `as3/app/anicanon/kumikae/testing/*.as` sources in its
-test source list. The sample's `tools/sync_test_framework.py` copies that version
-locally for Godot imports and can verify it with `--check`. Exclude tests from
-production exports. `{library}` expands to this runner's library directory when
-an external source path is preferable. `{compiler}`, `{godot}` and `{project}`
-expand to existing programs and the manifest directory. Commands are argument
-arrays, executed without a shell. Only registered commands execute.
+| Field | Meaning |
+|---|---|
+| `name` | The test's name. Unique, one line, with no `::` |
+| `command` | The program to run, as an array of arguments. It's run without a shell |
+| `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
+| `exclude` | Optional. Patterns for files to leave out of `sources` |
+| `marker` | A line the program must print when it has finished. Without it, the test fails |
+| `timeout` | Optional. Seconds before the test is stopped. The default is 120 |
+| `events`, `entryClass` | For a suite: report each case separately, and the class that runs the suite |
+| `source` | The file the test's result links to |
 
-Legacy assertion scripts and Godot scenes can omit `events`/`entryClass`. They
-appear as one test each and must print an exact completion-marker line. The
-runner rejects nonzero exits, engine/compiler errors, missing completion markers,
-timeouts, malformed events and incomplete suites. A missing requested case fails
-even when other selected cases pass. Cancellation terminates the owned process
-group, including children that outlive their parent.
+In a command, `{compiler}` is `kas3c`, `{godot}` is Godot, `{project}` is the manifest's folder, and
+`{library}` is this folder's `as3` directory.
+
+A test without `events` and `entryClass` is one result: a plain script, or a Godot scene run with
+`{godot}`. It passes when the process exits with status 0 and prints its marker.
+
+Keep tests in the project's `tests` folder. The Godot extension leaves that folder out of the game, so a
+mistake in a test can't stop the game. See
+[Using AS3 in Godot](../docs/godot.md#tests-in-a-project).
+
+## Run the tests
 
 ```sh
 python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/kas3c
-python3 testing/runner.py /path/to/project/kas3-tests.json --case 'Scoring::Scoring::Starts empty'
 ```
 
-Single-case execution generates a temporary AS3 entry that sets `Suite.only` and
-constructs the registered entry class. Original source files are never rewritten.
-The temporary directory is removed on exit. CLI entry constructors must finish the
-suite and report its result. Godot integration targets are filtered at scene level.
+The last line of output is a count, such as `AS3 tests: 1 passed, 0 failed`. The exit status is 0 only
+when every test passed.
 
-## Source actions for named methods
+To run one case, name it as `<test>::<suite>::<case>`:
 
-A structured target can map its cases to fixture methods:
+```sh
+python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/kas3c \
+    --case 'Scoring::Scoring::Starts empty'
+```
+
+`--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`.
+
+A test fails when its process exits with a nonzero status, prints a compiler or engine error, doesn't
+print its marker, runs past its timeout, or doesn't finish its suite. Asking for a case that doesn't exist
+fails too. Stopping the runner stops the processes it started.
+
+## Run tests in Rider
+
+Choose the **AS3 Tests** run configuration and select the manifest. See
+[the plugin's README](../editors/jetbrains/README.md#tests).
+
+To get a Run icon beside a test method, map the suite's cases to methods in the manifest:
 
 ```json
 "cases": [
@@ -136,41 +201,35 @@ A structured target can map its cases to fixture methods:
 ]
 ```
 
-`suite` and `name` must match the emitted Suite/TestCase identities. `source` is
-relative to the manifest and `method` names a top-level AS3 fixture method.
-Duplicate identities are rejected. Parameter cases may share a source/method;
-its gutter runs all mapped datasets, while result reruns retain each identity. Helpers do not receive
-case gutters. Results navigate to the mapped method in the mapped source file.
+`suite` and `name` must match what the suite reports. `method` names a method in `source`. The icon beside
+the method runs that case alone, and the icon beside the class runs every case mapped to the file.
 
-The sample marks scenario methods with familiar `[Test]` metadata and creates a
-fresh fixture for every registered case. Its `ModelSuite` and `ModelCase` are
-generated from the manifest by `tools/sync_test_cases.py`; `--check` detects stale
-registration. Typed helper arguments implement separately named parameter cases.
-Registration is explicit: adding `[Test]` alone does not register a case, and the
-framework does not yet implement reflective metadata discovery.
+## What isn't there
 
-## Rider
+- **Metadata.** Discovery supports public no-argument instance methods marked with `[Test]`. Use the bundled library for setup and teardown.
+- **No parallel runs.**
+- **No asynchronous cases.** A test that needs frames to pass runs as a Godot scene, as one result.
 
-Choose **AS3 Tests** in Run Configurations and select the manifest. The sample
-ships that configuration. The class gutter and file context menu run all cases
-registered for that file. A mapped method's gutter or context menu runs only that
-case; other files and cases are excluded. The native Tests tree shows individual
-framework cases, failure details, and **Rerun Failed Tests**. Error failures retain their
-AS3 stack: navigation opens the first application frame at its failing line, and each
-stack frame is clickable. Thrown values without a stack fall back to the registered method. Suite/case identity is retained in the name.
-The adapter uses the IDE's bundled test-runner module, not an external dependency.
+## How results are reported
 
-## Protocol and verification
+A suite prints one record for each event, in a format that needs no escaping in AS3:
 
-Version 1 events use length-framed text so labels and multiline failure messages
-need no escaping in AS3. A record starts with
-`@kas3-test-v1 EVENT NAME_LENGTH MESSAGE_LENGTH`, a newline, the name, a newline,
-the message, and a newline. Lengths count UTF-16 code units, matching AS3 String.length. The adapter validates
-ordering, names, size limits and complete lifecycles before emitting escaped
-TeamCity service messages. Raw program output cannot inject test events into Rider.
+```text
+@kas3-test-v1 testStarted 12 0
+Starts empty
 
-Run `python3 -m unittest discover -s testing/tests -v`. With a built compiler, also
-run `kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as`.
-The fixture intentionally records a failed case and verifies continuation and
-teardown; its final marker is `PASS framework lifecycle`. The JetBrains sandbox
-probe separately verifies that the native tree shows a pass and a failure.
+```
+
+The first line has the event, the length of the name, and the length of the message, both in UTF-16 code
+units. The name and the message follow, each on its own line. The runner checks the order, the names and
+the lengths before it reports anything, so a program's ordinary output can't inject a test result.
+
+## Test the library itself
+
+```sh
+python3 -m unittest discover -s testing/tests -v
+compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as
+```
+
+The second command runs a fixture that records a failing case on purpose and checks that the suite carries
+on. Its last line is `PASS framework lifecycle`.

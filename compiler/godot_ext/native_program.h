@@ -37,7 +37,11 @@ public:
 	static std::string path();
 	// The library at that path for this module: null, with why in words, if it can't be loaded or was
 	// built from other sources than the module was compiled from.
-	static std::unique_ptr<NativeProgram> load(const std::string &p_path, const ir::Module &p_module, GodotHost &p_engine, std::string *r_why);
+	// p_time_limit: how long a call from the engine may run, in milliseconds, as the interpreter is told.
+	// p_remember: what objects are constructed with is remembered, as the interpreter is told, where the
+	// library is built to tell.
+	static std::unique_ptr<NativeProgram> load(const std::string &p_path, const ir::Module &p_module, GodotHost &p_engine, uint32_t p_time_limit,
+			bool p_remember, std::string *r_why);
 	~NativeProgram();
 	NativeProgram(const NativeProgram &) = delete;
 	NativeProgram &operator=(const NativeProgram &) = delete;
@@ -48,6 +52,9 @@ public:
 	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
 		return host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
 	}
+	// Whether a function of the scripts is in progress, generated or the interpreter's: the scripts are not
+	// reloaded meanwhile.
+	bool running() const { return host_->interpreter->in_call() || host_->interpreter->depth() > 0 || host_->context.depth > 0; }
 	// The engine freed a script instance: generated code that kept an object it found looks again.
 	void instance_freed() { host_->context.freed.fetch_add(1, std::memory_order_relaxed); }
 };

@@ -39,7 +39,8 @@ struct StackFrame {
 };
 
 // Objects let go of, kept to be the next ones made (rule 14: objects from free lists by size): for each
-// number of fields, a list of blocks through `gc_next`. Only objects of classes that hold nothing counted
+// number of slots (an object's fields, and the room after them where the host remembers what objects are
+// constructed with), a list of blocks through `gc_next`. Only objects of classes that hold nothing counted
 // and that the collector does not look at are kept (Context::class_cached), so one let go of has nothing
 // to give up; each block is the heap's own, and goes back to it when the host ends.
 struct ObjectCache {
@@ -53,11 +54,19 @@ struct ObjectCache {
 // reached through this.
 struct Context {
 	bool failing = false; // An error is on its way out: `pending` holds it.
+	// Set by the host's watch on how long a call from outside has run, from a thread of its own
+	// (runtime/time_limit.h): a function reads it once in ROUNDS times round its loops (alarmed), and asks
+	// overdue() when it is set.
+	std::atomic<bool> alarm{ false };
+	// The host remembers what objects are constructed with (vm/constructions.h): a program library built
+	// to tell says so as a constructor begins (constructing).
+	bool remembers = false;
 	Slot pending{}; // What was thrown, untyped, with a reference of its own.
 	uint32_t depth = 0; // Generated functions in progress.
 	// Where the thread's stack is nearly used up, as an address: a function whose frame is below it does
-	// not go on (stack_low). 0 where the host does not know the stack's size.
-	uintptr_t stack_floor = 0;
+	// not go on (stack_low). 0 where the host does not know the stack's size. The watch puts it above
+	// every frame to have the clock looked at where a function is entered, so it is read as it stands.
+	std::atomic<uintptr_t> stack_floor{ 0 };
 	StackFrame *frames = nullptr; // The innermost of them, where they are kept.
 	Slot *globals = nullptr; // Static fields and package variables, by the module's numbers.
 	Str *const *strings = nullptr; // The program's string constants.
@@ -83,18 +92,99 @@ struct Context {
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;
 	Host *host = nullptr;
-	// The host's cache of objects, and for each class 0, or one more than its number of fields if its
+	// The host's cache of objects, and for each class 0, or one more than its number of slots if its
 	// objects are kept there.
 	ObjectCache *cache = nullptr;
 	const uint8_t *class_cached = nullptr;
 	const uint32_t *class_numbers = nullptr; // For such a class: bit i says its field i is a Number, which starts NaN.
+	// For such a class, and for one whose objects' records generated code keeps: how many of its slots
+	// are its fields. Any after them are the room where the host remembers what the object was constructed
+	// with (vm/constructions.h), whose first slot says whether anything is remembered.
+	const uint8_t *class_fields = nullptr;
+	// For each class: not 0 once the host has been told of one of its objects being constructed, and
+	// keeps of each its arguments as they come and nothing more. The next are remembered where they are
+	// made (remembered_here), with no word to the host.
+	const uint8_t *class_tells = nullptr;
 };
+
+// What the first slot of an object's record says (vm::Constructions::Record, whose numbers these are):
+// nothing is remembered of the object, or its constructor's arguments are.
+constexpr uint32_t RECORD_NOTHING = 0;
+constexpr uint32_t RECORD_ARGUMENTS = 1;
 
 // Whether the function this is written in has its frame below the context's floor: the C++ stack is nearly
 // used up, which is Error #1023 like calls nested too deep, never a crash. Always inline: it is the frame of
 // the function that asks.
 __attribute__((always_inline)) inline bool stack_low(const Context *c) {
-	return reinterpret_cast<uintptr_t>(__builtin_frame_address(0)) < c->stack_floor;
+	return reinterpret_cast<uintptr_t>(__builtin_frame_address(0)) < c->stack_floor.load(std::memory_order_relaxed);
+}
+
+// How many times a function goes round its loops between two looks at the alarm: it counts them in a
+// local, so that a loop stays one the C++ compiler can count the rounds of (and do several of at once),
+// and the alarm's byte is read once for all of them. As many as the interpreter runs statements between
+// two looks at its clock.
+constexpr uint32_t ROUNDS = 4096;
+
+// Where a counted loop's counter is held to before the next look at the alarm (a stretch's end): ROUNDS
+// steps on, no further than the loop's own end, and no further than the last value from which one more
+// step stays in the counter's type (p_edge is the type's greatest value, or its least for a counter that
+// goes down). A counter short of it has that many rounds to go at most, and the loop's own test holds. No
+// stretch (NO_STRETCH_UP, which no counter is short of) with a step that is nothing or goes the other way,
+// and where the next step would wrap.
+constexpr int64_t NO_STRETCH_UP = INT64_MIN;
+constexpr int64_t NO_STRETCH_DOWN = INT64_MAX;
+inline int64_t stretch_up(int64_t p_counter, int64_t p_end, int64_t p_step, int64_t p_edge) {
+	const int64_t whole = p_edge + 1 - p_step;
+	if (p_step <= 0 || p_counter >= whole) {
+		return NO_STRETCH_UP;
+	}
+	const int64_t far = p_counter + p_step * static_cast<int64_t>(ROUNDS);
+	const int64_t near = far < p_end ? far : p_end;
+	return near < whole ? near : whole;
+}
+inline int64_t stretch_down(int64_t p_counter, int64_t p_end, int64_t p_step, int64_t p_edge) {
+	const int64_t whole = p_edge - 1 + p_step;
+	if (p_step <= 0 || p_counter <= whole) {
+		return NO_STRETCH_DOWN;
+	}
+	const int64_t far = p_counter - p_step * static_cast<int64_t>(ROUNDS);
+	const int64_t near = far > p_end ? far : p_end;
+	return near > whole ? near : whole;
+}
+// The same for an int that counts up by 1 to an end no int is past: no step wraps short of it, and there
+// is always a stretch where the loop's own test holds.
+inline int64_t stretch_near(int64_t p_counter, int64_t p_end) {
+	const int64_t far = p_counter + static_cast<int64_t>(ROUNDS);
+	return far < p_end ? far : p_end;
+}
+// And for an int that is a vector's index, by any step: with a step that is nothing or goes the other way,
+// or a counter below 0, no index is short of what this gives, though it is not 0. A step that wraps leaves
+// a counter below 0, which is short of nothing.
+inline uint32_t stretch_index_near(int64_t p_counter, int64_t p_end, int64_t p_step) {
+	const int64_t far = p_counter + p_step * static_cast<int64_t>(ROUNDS);
+	const int64_t near = far < p_end ? far : p_end;
+	return static_cast<uint32_t>(near > 0 ? near : 0);
+}
+// The same for a counter that goes up as the index of a vector, the stretch's end an index too: 0, which
+// no index is short of, where there is no stretch, for a counter below 0 and for one at the loop's end.
+inline uint32_t stretch_index(int64_t p_counter, int64_t p_end, int64_t p_step, int64_t p_edge) {
+	const int64_t whole = p_edge + 1 - p_step;
+	if (p_counter < 0 || p_step <= 0 || p_counter >= p_end || p_counter >= whole) {
+		return 0;
+	}
+	const int64_t limit = p_end < whole ? p_end : whole;
+	const int64_t most = p_step * static_cast<int64_t>(ROUNDS);
+	const uint32_t out = static_cast<uint32_t>(limit - p_counter > most ? p_counter + most : limit);
+	// Said outright, for the C++ compiler: an index short of the stretch's end is short of the loop's.
+	if (static_cast<int64_t>(out) > p_end) {
+		__builtin_unreachable();
+	}
+	return out;
+}
+
+// Whether the host's watch asks for the clock to be looked at.
+inline bool alarmed(const Context *c) {
+	return KAS3_UNLIKELY(c->alarm.load(std::memory_order_relaxed));
 }
 
 } // namespace rt

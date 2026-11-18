@@ -6,6 +6,9 @@ extends Node
 ## [--frames=N] [--warmup=N] [--verify-frames=N]
 ## With --verify-frames a verify run ends after exactly that many frames, whatever the clock says: two such
 ## runs of different lengths give what a frame costs in anything counted for the whole process.
+## Both runs must be long enough that .NET has finished optimising the C# script (some thousands of frames
+## of a benchmark that takes a tenth of a millisecond): its first few hundred frames run code it has not
+## optimised yet, and count two or three times the instructions its later frames take.
 
 const BENCHES: PackedStringArray = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_traffic",
 		"nbody", "sieve", "array_conversion", "saxpy", "shapes", "alloc"]

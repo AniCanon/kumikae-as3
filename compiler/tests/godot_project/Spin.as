@@ -3,7 +3,8 @@ package {
 
 	// A script stuck in a loop: timeout.gd checks it is stopped with Flash's error, and the game goes on.
 	public class Spin extends Node {
-		public var turns:int;
+		// A Number: native code goes round often enough in half a second to take an int past its greatest.
+		public var turns:Number = 0;
 		public function forever():int { while (true) { turns++; } return 0; }
 		public function caught():String { try { for (;;) {} } catch (e:*) { return "caught"; } return "out"; }
 		// A listener that runs too long: its error comes out of emit(), and a catch does not stop it either.

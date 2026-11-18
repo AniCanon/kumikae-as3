@@ -69,10 +69,10 @@ Vector *array_new(Library &p_library, uint32_t p_class, const Slot *p_values, si
 	}
 	Vector *made = p_library.fresh_vector(p_class, length);
 	for (size_t i = 0; made && spread && i < p_count; i++) {
-		made->data[i] = p_library.heap.share(Kind::Any, p_values[i]);
+		slots_of(made)[i] = p_library.heap.share(Kind::Any, p_values[i]);
 	}
 	if (made && !spread) {
-		std::fill(made->data, made->data + made->length, any::hole()); // A length alone: no element is written.
+		std::fill(slots_of(made), slots_of(made) + made->length, any::hole()); // A length alone: no element is written.
 	}
 	return made;
 }
@@ -91,7 +91,7 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 	if (p_length >= old) {
 		if (p_library.class_of(p_vector).array) {
 			// An Array's new places are holes until something is written to them.
-			std::fill(p_vector->data + old, p_vector->data + p_length, any::hole());
+			std::fill(slots_of(p_vector) + old, slots_of(p_vector) + p_length, any::hole());
 		}
 		p_vector->length = p_length;
 		return true;
@@ -100,9 +100,9 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 	// to this very vector, and it must find the vector whole, with empty room past its end.
 	std::vector<Slot> gone;
 	if (ir::is_held(kind)) {
-		gone.assign(p_vector->data + p_length, p_vector->data + old);
+		gone.assign(slots_of(p_vector) + p_length, slots_of(p_vector) + old);
 	}
-	std::fill(p_vector->data + p_length, p_vector->data + old, Slot());
+	clear_places(p_vector, p_length, old);
 	p_vector->length = p_length;
 	for (Slot &each : gone) {
 		p_library.heap.drop(kind, each);
@@ -117,7 +117,7 @@ bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 	const ir::Class &klass = p_library.class_of(p_vector);
 	if (klass.element == Kind::Any && klass.element_check != ir::NONE) {
 		// A Vector.<Object>: what an Object variable starts as, where a Vector.<*>'s place is undefined.
-		std::fill(p_vector->data + p_from, p_vector->data + p_vector->length, any::null());
+		std::fill(slots_of(p_vector) + p_from, slots_of(p_vector) + p_vector->length, any::null());
 		return true;
 	}
 	if (!klass.element_zero || klass.element_bare != ir::Bare::None) {
@@ -125,8 +125,8 @@ bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 	}
 	for (uint32_t i = p_from; i < p_vector->length; i++) {
 		std::string error;
-		p_vector->data[i].p = p_library.heap.source.construct(klass.element_type, nullptr, 0, &error);
-		if (!p_vector->data[i].p) {
+		slots_of(p_vector)[i].p = p_library.heap.source.construct(klass.element_type, nullptr, 0, &error);
+		if (!slots_of(p_vector)[i].p) {
 			p_library.runner.raise(p_library.module().error_class, error.empty() ? "the engine refused" : error);
 			return false;
 		}
@@ -161,26 +161,44 @@ bool read_element(Library &p_library, const ir::Class &p_class, Slot p_place, Sl
 	return r_value->p != nullptr;
 }
 
-bool write_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_value) {
+bool place_for(Library &p_library, const ir::Class &p_class, Slot p_value, Slot *r_place) {
 	if (p_class.element_bare == ir::Bare::None) {
-		p_library.heap.put(p_class.element, r_place, p_library.heap.share(p_class.element, p_value));
+		*r_place = p_library.heap.share(p_class.element, p_value);
 		return true;
 	}
-	Slot whole;
-	whole.bits = 0;
-	if (!p_value.p || !p_library.heap.handles.unboxed(p_class.element_bare, p_value.p, &whole)) {
+	r_place->bits = 0;
+	if (!p_value.p || !p_library.heap.handles.unboxed(p_class.element_bare, p_value.p, r_place)) {
 		return coercion_failed(p_library, p_value.p ? any::godot_value(p_value.p) : any::null(), Kind::Val, p_class.element_check);
 	}
-	r_place = whole;
 	return true;
 }
 
-bool put_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_owned) {
-	if (p_class.element_bare == ir::Bare::None) {
-		p_library.heap.put(p_class.element, r_place, p_owned);
+bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_value) {
+	if (p_vector->narrow) {
+		numbers_of(p_vector)[p_index] = p_value.i; // The number itself: nothing is counted.
 		return true;
 	}
-	const bool stored = write_element(p_library, p_class, r_place, p_owned);
+	const ir::Class &klass = p_library.class_of(p_vector);
+	Slot made;
+	if (!place_for(p_library, klass, p_value, &made)) {
+		return false;
+	}
+	// What the place held is let go of last, by the kind it is counted as: none, where it held a value whole.
+	p_library.heap.put(place_kind(klass), slots_of(p_vector)[p_index], made);
+	return true;
+}
+
+bool put_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_owned) {
+	const ir::Class &klass = p_library.class_of(p_vector);
+	if (p_vector->narrow) {
+		numbers_of(p_vector)[p_index] = p_owned.i;
+		return true;
+	}
+	if (klass.element_bare == ir::Bare::None) {
+		p_library.heap.put(klass.element, slots_of(p_vector)[p_index], p_owned);
+		return true;
+	}
+	const bool stored = write_element(p_library, p_vector, p_index, p_owned);
 	p_library.heap.drop(Kind::Val, p_owned);
 	return stored;
 }
@@ -195,14 +213,15 @@ bool element_to_any(Library &p_library, const ir::Class &p_class, Slot p_place, 
 	return !p_library.runner.failing();
 }
 
-bool element_from_any(Library &p_library, const ir::Class &p_class, Slot p_any, Slot &r_place) {
+bool element_from_any(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_any) {
+	const ir::Class &klass = p_library.class_of(p_vector);
 	Slot value;
-	return from_any(p_library, p_any, p_class.element, p_class.element_check, &value) && put_element(p_library, p_class, r_place, value);
+	return from_any(p_library, p_any, klass.element, klass.element_check, &value) && put_element(p_library, p_vector, p_index, value);
 }
 
 bool vector_get(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_index, Slot *r_out) {
 	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, p_vector->length)) {
-		return read_element(p_library, p_library.class_of(p_vector), p_vector->data[*at], r_out);
+		return read_element(p_library, p_library.class_of(p_vector), place(p_vector, *at), r_out);
 	}
 	// An index that names no element: of an Array, the property named by the number; of a Vector, AS3's
 	// RangeError.
@@ -224,7 +243,7 @@ bool vector_set(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_
 		if (grows && !resize_vector(p_library, p_vector, *at + 1)) {
 			return false;
 		}
-		if (write_element(p_library, klass, p_vector->data[*at], p_value)) {
+		if (write_element(p_library, p_vector, *at, p_value)) {
 			return true;
 		}
 		if (grows) {
@@ -257,7 +276,6 @@ namespace {
 // Vector.<T>(x) of an object that is no Array or Vector: as long as its `length`, of what it holds under each
 // index, each converted (avmplus's TypedVectorClassBase::call: getLengthProperty(), then getUintProperty(i)).
 bool vector_from_object(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_out) {
-	const ir::Class &klass = p_library.module().classes[p_class];
 	const auto read = [&](std::string_view p_name, Slot *r_value) {
 		Str *name = new_string(p_name);
 		if (!name) {
@@ -282,7 +300,7 @@ bool vector_from_object(Library &p_library, uint32_t p_class, Slot p_source, Slo
 		Slot element;
 		ok = read(std::to_string(i), &element);
 		if (ok) {
-			ok = element_from_any(p_library, klass, element, made->data[i]);
+			ok = element_from_any(p_library, made, i, element);
 			p_library.heap.drop_any(element);
 		}
 	}
@@ -314,14 +332,13 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 		return object ? vector_from_object(p_library, p_class, p_source, r_out) : coercion_failed(p_library, p_source, Kind::Obj, p_class);
 	}
 	const Vector *from = static_cast<const Vector *>(object);
-	const ir::Class &klass = p_library.module().classes[p_class];
 	Vector *made = p_library.fresh_vector(p_class, from->length);
 	bool ok = made != nullptr;
 	for (uint32_t i = 0; ok && i < made->length; i++) {
 		// One taken out of the source as an earlier element spoke is undefined.
 		Slot element = any::undefined();
-		ok = i >= from->length || element_to_any(p_library, p_library.class_of(from), from->data[i], &element);
-		ok = ok && element_from_any(p_library, klass, element, made->data[i]);
+		ok = i >= from->length || element_to_any(p_library, p_library.class_of(from), place(from, i), &element);
+		ok = ok && element_from_any(p_library, made, i, element);
 		p_library.heap.drop_any(element);
 	}
 	if (!ok) {

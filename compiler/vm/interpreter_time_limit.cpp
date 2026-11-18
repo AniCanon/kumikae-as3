@@ -15,6 +15,9 @@ void Interpreter::look_at_clock() {
 }
 
 void Interpreter::entering() {
+	if (entries_ == 0 && native_) {
+		native_->call_began();
+	}
 	if (entries_ == 0 && time_limit_) {
 		entered_ = host_.clock.elapsed();
 		countdown_ = STATEMENTS_PER_LOOK;

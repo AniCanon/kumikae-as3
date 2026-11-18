@@ -23,7 +23,9 @@ struct InPlace {
 };
 
 // Built between two interpreters that share a host: the one that has been running, and one made for the
-// new build that has run nothing yet. Neither may be in the middle of a call.
+// new build that has run nothing yet. Neither may be in the middle of a call. The one that has been running
+// may be the one a program library's host keeps (its functions' bodies native code): its objects are laid
+// out as the interpreter's own, and it is moved the same way, onto a build the interpreter runs.
 //
 // An object is moved by making one of the class of the same name in the new program and giving it what
 // the old one held, field by field, by name. A field that is new, or whose kind changed, starts empty:
@@ -46,6 +48,11 @@ class Reload {
 
 	// An object of the class has no place in the new program: said, and null.
 	Object *lost(uint32_t p_old_class);
+	// A static field or package variable of the old program, and whether a class of it has had its static
+	// fields given their values: where the old program's code is native (vm/native_code.h), native code
+	// keeps both.
+	static Slot global_of(const Interpreter &p_program, size_t p_index);
+	static bool used_in(const Interpreter &p_program, size_t p_class);
 
 	// What a field or a static field held, as the new one holds it: nothing, if the new one is declared
 	// to hold another class of object (or of Godot's, by its name there) than the one that was there.

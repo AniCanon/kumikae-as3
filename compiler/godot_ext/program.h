@@ -52,6 +52,8 @@ public:
 	bool valid() const { return valid_; }
 	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }
 	bool native() const { return native_ != nullptr; }
+	// Whether a function of the scripts is in progress, by whichever runs them.
+	bool running() { return native_ ? native_->running() : interpreter_->depth() > 0; }
 	// Godot calling a function of the scripts, by whichever runs them: the first argument of a method is
 	// its object, and a result is the caller's to give up. False if it failed: the error has been reported,
 	// or is carried to the script's own call of the engine that led here.
@@ -70,7 +72,9 @@ public:
 	// script object alive is moved onto the new code with what it holds, and the objects whose constructors
 	// would give them other values now are updated in place where that can be done (vm/reload.h); what was
 	// and what was not is said in one line. With errors, the errors are reported and the game carries on
-	// with the scripts it had. Not to be called while a script runs.
+	// with the scripts it had. Not to be called while a script runs. A game that runs as native code is
+	// moved the same way onto the interpreter, which runs the new code from then on, and says so: native
+	// code is not reloaded in a running game, and the library of the new code is built for the next run.
 	static void reload();
 	// The same, asked for now (the language's reload_scripts(), Godot's debugger): refused while AS3 runs.
 	static void reload_now();

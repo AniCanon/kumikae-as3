@@ -36,7 +36,7 @@ export prints one table; with --runs N, the best of the runs is kept per cell.
   vectors  1,000,000 rounds of Vector2 arithmetic and normalized()
   vectors3 1,000,000 rounds of Vector3 arithmetic, normalized() and dot()
 
-Then the frame benchmarks (frames/, the eleven of stage 0b: docs/results/2026-11-stage-0b-desktop.md), unless
+Then the frame benchmarks (frames/, described in docs/performance.md), unless
 --no-frames: each is a script on a node, left to Godot's frames at a fixed 60 a second, and what is timed is
 the whole frame. frames/runner.gd warms each up for 300 frames and two seconds, then takes the median of 600
 frames, in microseconds; with --runs N the median of the runs' medians is given, and for C# and native code
@@ -131,7 +131,7 @@ def export(godot, extension, where):
         config.write('<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n'
                      '    <add key="cache" value="%s" />\n  </packageSources>\n</configuration>\n' % nuget_cache())
     # The editor's first scan learns of the extension and the C# project; quitting in the same frame crashes
-    # Godot (see the compiler's README), so it is given time.
+    # Godot (see tests/README.md), so it is given time.
     step("the editor's first scan", [godot, "--headless", "--editor", "--quit-after", "300", "--path", project], project)
     step("dotnet build", ["dotnet", "build", "CmpCs.csproj", "-v", "q"], project)
     os.makedirs(os.path.join(project, "out"))  # Godot exports only into a folder that is there.
@@ -193,7 +193,7 @@ def missing(godot):
 
 def run_once(program, library=None):
     """{(workload, language): microseconds} from one run of an export; with a program library, AS3 is native."""
-    environment = dict(os.environ)
+    environment = dict(os.environ, KAS3_NATIVE_PLAY="0")  # Native code is the library named, and nothing Play builds.
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library
@@ -213,7 +213,7 @@ def run_once(program, library=None):
 
 def frame_once(program, bench, language, library=None, more=()):
     """What frames/runner.gd says of one benchmark in one language: its JSON line."""
-    environment = dict(os.environ)
+    environment = dict(os.environ, KAS3_NATIVE_PLAY="0")  # Native code is the library named, and nothing Play builds.
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library

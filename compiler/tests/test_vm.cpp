@@ -125,6 +125,44 @@ static void test_time_limit() {
 		CHECK_EQ(host.errors, std::string());
 		interpreter.release_object(object);
 	}
+	// Whoever keeps native code's time is told of each call from outside that no other is running inside,
+	// however it is made: the start, an object made, a method called. Not of one made inside another.
+	{
+		struct Told final : vm::NativeCode {
+			vm::Interpreter *program = nullptr;
+			uint32_t began = 0;
+			uint32_t inside = 0; // How many of those began with a call already in progress.
+			void call_began() override {
+				began++;
+				inside += program->in_call() ? 1 : 0;
+			}
+			[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+			void clear_globals() override {}
+			vm::Slot *global(uint32_t) override { return nullptr; }
+			bool statics_given(uint32_t) const override { return false; }
+			[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+		} told;
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		told.program = &interpreter;
+		interpreter.set_native(&told);
+		CHECK(interpreter.start());
+		const uint32_t started = told.began;
+		vm::Object *object = interpreter.construct(spin);
+		CHECK_EQ(told.began, started + 1);
+		vm::Slot sum;
+		sum.bits = 0;
+		CHECK(interpreter.call_method(object, "quick", nullptr, 0, &sum));
+		CHECK_EQ(told.began, started + 2);
+		// A call a host counts itself (native code run for the engine), and one made inside it.
+		interpreter.entered();
+		CHECK_EQ(told.began, started + 3);
+		CHECK(interpreter.call_method(object, "quick", nullptr, 0, &sum));
+		interpreter.left();
+		CHECK_EQ(told.began, started + 3);
+		CHECK_EQ(told.inside, (uint32_t)0);
+		interpreter.release_object(object);
+	}
 	// Flash's own words for its own limit, 15 seconds.
 	{
 		Recorder host;
@@ -526,11 +564,12 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		r_value->bits = found == wholes.end() ? 0 : found->second;
 		return found != wholes.end();
 	}
-	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *) override {
+	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_class, const vm::Vector *p_vector, std::string *) override {
 		void *made = box();
 		std::string elements;
-		for (size_t i = 0; i < p_count; i++) {
-			elements += (i ? ", " : "") + (p_vector.element_bare != ir::Bare::None ? show_whole(p_elements[i].bits) : show(vm::Argument{ p_vector.element, p_elements[i] }));
+		for (uint32_t i = 0; i < p_vector->length; i++) {
+			const vm::Slot held = vm::place(p_vector, i);
+			elements += (i ? ", " : "") + (p_class.element_bare != ir::Bare::None ? show_whole(held.bits) : show(vm::Argument{ p_class.element, held }));
 		}
 		log += "collection " + std::string(p_type) + "[" + elements + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
@@ -1649,6 +1688,8 @@ static void test_engine_calls() {
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
+		// A class of Godot's constants is no type a value can be cast to.
+		"function f(x:*):void { var k:* = Key(x); }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
 		// `super` written in a function expression is not the method's.
 		"function f():void { var g:Function = function():void { super.queueFree(); }; }",
@@ -1821,9 +1862,15 @@ struct Edited {
 	bool godot = false; // The sources name Godot's classes.
 	bool remember = true;
 	vm::NativeCode *native = nullptr; // Stands for a program's native code, which this one does not run.
+	// That native code is built to tell what its objects are constructed with (a program library built with
+	// --remember): the test tells for it (told()), since the interpreter runs the constructors here.
+	bool native_tells = false;
 	// The old program's objects are let go of as soon as they are moved, as Godot's host lets go of each
 	// instance's: they are gone by the time the objects alive are updated.
 	bool let_go_early = false;
+	// The host asks every program it makes to remember, whatever the one before it did (the Godot
+	// extension's, in a debug build): the program a game that ran as native code is moved onto.
+	bool host_remembers = false;
 
 	std::unique_ptr<ir::Module> build(const std::string &p_source) {
 		auto built = std::make_unique<ir::Module>();
@@ -1844,7 +1891,7 @@ struct Edited {
 			program->set_native(native);
 		}
 		if (remember) {
-			program->remember_constructions();
+			program->remember_constructions(native_tells);
 		}
 		CHECK(program->start());
 		game = program->construct(class_named(*module, "Game"), nullptr);
@@ -1861,6 +1908,9 @@ struct Edited {
 			dropped.release_object(reload.object(game));
 		}
 		auto fresh = std::make_unique<vm::Interpreter>(*next, recorder);
+		if (host_remembers) {
+			fresh->remember_constructions();
+		}
 		vm::InPlace done;
 		vm::Object *moved = nullptr;
 		{
@@ -1890,6 +1940,17 @@ struct Edited {
 	void call(const char *p_method) {
 		vm::Slot result;
 		CHECK(program->call_method(game, p_method, nullptr, 0, &result));
+	}
+	// What native code says as the constructor of the object a field of the game holds begins: the
+	// arguments it was called with, after the object itself.
+	void told(const char *p_field, std::vector<vm::Slot> p_arguments) {
+		vm::Object *made = static_cast<vm::Object *>(field(p_field).p);
+		CHECK(made != nullptr);
+		vm::Slot self;
+		self.bits = 0;
+		self.p = made;
+		p_arguments.insert(p_arguments.begin(), self);
+		program->constructing(module->classes[made->klass].constructor, p_arguments.data(), p_arguments.size());
 	}
 	// An object of the class, made by the host as Godot makes a script's, held by a field of the game.
 	void hold(const char *p_field, const char *p_class) {
@@ -2122,6 +2183,7 @@ static void test_reload_in_place_memory() {
 		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
 		void clear_globals() override {}
 		vm::Slot *global(uint32_t) override { return nullptr; }
+		bool statics_given(uint32_t) const override { return false; }
 		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
 	} none;
 	Edited compiled;
@@ -2130,6 +2192,157 @@ static void test_reload_in_place_memory() {
 	compiled.call("churn");
 	CHECK_EQ(compiled.program->remembered(), (size_t)0);
 	compiled.end();
+}
+
+// A program whose code is native (a program library's) moved onto a build the interpreter runs, as an edit
+// of a game that runs as native code does it: its static fields are where native code keeps them, a class
+// native code gave its static fields is not given them again, and its objects, of which nothing is
+// remembered, are said to have been made as native code, at this reload and at those after.
+static void test_reload_from_native() {
+	const std::string source =
+			"package { public class Game { public static var count:int = 3; public var kept:Shot = new Shot(2); public var seen:Number = 0;\n"
+			"  public function look():void { seen = count + Late.v; } public function more():void { kept = new Shot(4); } } }\n"
+			"class K { public static const N:Number = 1; }\n"
+			"class Late { public static var v:int = 7; }\n"
+			"class Shot { public var n:Number; public function Shot(p:Number) { n = p + K.N; } }\n";
+	struct Native final : vm::NativeCode {
+		std::vector<vm::Slot> statics;
+		std::vector<uint8_t> used;
+		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+		void clear_globals() override {}
+		vm::Slot *global(uint32_t p_index) override { return &statics[p_index]; }
+		bool statics_given(uint32_t p_class) const override { return used[p_class] != 0; }
+		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+	} native;
+	Edited edited;
+	edited.native = &native;
+	edited.host_remembers = true;
+	edited.start(source);
+	CHECK_EQ(edited.program->remembered(), (size_t)0);
+	// What native code would hold by now: its own values of the static fields, and Late used, which the
+	// interpreter standing for it here never touched.
+	const auto global = [&](const char *p_name) {
+		const auto found = std::find_if(edited.module->globals.begin(), edited.module->globals.end(), [&](const ir::Global &p_global) { return p_global.name == p_name; });
+		CHECK(found != edited.module->globals.end());
+		return static_cast<size_t>(found - edited.module->globals.begin());
+	};
+	native.statics.assign(edited.module->globals.size(), vm::Slot{});
+	native.used.assign(edited.module->classes.size(), 0);
+	native.statics[global("Game.count")].i = 42;
+	native.statics[global("Late.v")].i = 9;
+	native.used[class_named(*edited.module, "Game")] = 1;
+	native.used[class_named(*edited.module, "Late")] = 1;
+	const std::string natively = "an object of it was made while the scripts ran as native code that does not remember what objects are made with";
+	const std::string next = with(source, "N:Number = 1", "N:Number = 5");
+	CHECK_EQ(edited.edit(next), "updated:; Game: Game() makes an object; Shot: " + natively);
+	edited.call("look");
+	CHECK_EQ(edited.number("seen"), 51.0); // 42 and 9: native code's, and Late's 9 not made 7 again.
+	CHECK_EQ(edited.number("kept.n"), 3.0); // As it was made.
+	// The interpreter runs it from here on: an edit after is of a program that remembers, and the object
+	// made before is still one of which nothing is.
+	CHECK_EQ(edited.edit(with(next, "N:Number = 5", "N:Number = 6")), "updated:; Game: Game() makes an object; Shot: " + natively);
+	CHECK_EQ(edited.number("kept.n"), 3.0);
+	// One made since is remembered, and updated in place.
+	edited.call("more");
+	CHECK_EQ(edited.number("kept.n"), 10.0);
+	CHECK_EQ(edited.edit(with(next, "N:Number = 5", "N:Number = 8")), std::string("updated: Shot; Game: Game() makes an object"));
+	CHECK_EQ(edited.number("kept.n"), 12.0);
+	edited.end();
+}
+
+// The same where the native code tells what its objects are constructed with, as a program library built
+// for a game that is being edited does: an object made as native code has its arguments remembered, in the
+// room every object is made with, and the reload onto the interpreter updates it in place as it does an
+// object the interpreter made. Its first values are what the old program's chain gives for the arguments,
+// run again by the old program. A class whose chain could not be run again as the library was built is
+// told of by nobody, and says so; an object made with an object for an argument says that.
+static void test_reload_from_native_that_tells() {
+	const std::string source =
+			"package { public class Game { public var kept:Shot = new Shot(2); public var moved:Shot = new Shot(3, \"m\");\n"
+			"  public var loud:Loud = new Loud(1); public var held:Holder = new Holder(kept);\n"
+			"  public function push():void { moved.n = 99; } public function more():void { kept = new Shot(4); } } }\n"
+			"class K { public static const N:Number = 1; public static const TAG:String = \"-\"; }\n"
+			"class Shot { public var n:Number; public var tag:String;\n"
+			"  public function Shot(p:Number, t:String = \"s\") { n = p + K.N; tag = t + K.TAG; } }\n"
+			"class Loud { public var n:Number; public function Loud(p:Number) { n = p + K.N; trace(\"loud\"); } }\n"
+			"class Holder { public var n:Number; public function Holder(of:Shot) { n = K.N; } }\n";
+	struct Native final : vm::NativeCode {
+		std::vector<vm::Slot> statics;
+		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+		void clear_globals() override {}
+		vm::Slot *global(uint32_t p_index) override { return &statics[p_index]; }
+		bool statics_given(uint32_t) const override { return true; }
+		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+	};
+	const auto number = [](double p_value) {
+		vm::Slot slot;
+		slot.bits = 0;
+		slot.d = p_value;
+		return slot;
+	};
+	for (const bool early : { false, true }) {
+		Native native;
+		Edited edited;
+		edited.native = &native;
+		edited.native_tells = true;
+		edited.host_remembers = true;
+		edited.let_go_early = early;
+		// The static fields are native code's: here, what the interpreter standing for it gave them.
+		edited.start(source);
+		const auto global = [&](const char *p_name) {
+			const auto found = std::find_if(edited.module->globals.begin(), edited.module->globals.end(), [&](const ir::Global &p_global) { return p_global.name == p_name; });
+			CHECK(found != edited.module->globals.end());
+			return static_cast<size_t>(found - edited.module->globals.begin());
+		};
+		native.statics.assign(edited.module->globals.size(), vm::Slot{});
+		vm::Str *const dash = vm::new_string("-");
+		native.statics[global("K.N")].d = 1;
+		native.statics[global("K.TAG")].p = dash;
+		// Nothing is remembered of a constructor the interpreter ran under native code: only what is told.
+		CHECK(edited.program->remembers());
+		CHECK_EQ(edited.program->remembered(), (size_t)0);
+		vm::Slot tag;
+		tag.bits = 0;
+		tag.p = vm::new_string("m");
+		edited.told("kept", { number(2) });
+		edited.told("moved", { number(3), tag });
+		edited.told("held", { edited.field("kept") }); // An object for an argument: told of, and not remembered.
+		if (vm::release(static_cast<vm::Str *>(tag.p))) {
+			vm::free_string(static_cast<vm::Str *>(tag.p));
+		}
+		CHECK_EQ(edited.program->remembered(), (size_t)2);
+		edited.call("push"); // The game changes a field of one.
+		const std::string once = "an object of it was made while the scripts ran as native code, by a constructor that could not be run again then";
+		const std::string not_plain = "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null";
+		const std::string next = with(with(source, "N:Number = 1", "N:Number = 5"), "TAG:String = \"-\"", "TAG:String = \"+\"");
+		CHECK_EQ(edited.edit(next), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: Loud() prints");
+		CHECK_EQ(edited.number("kept.n"), 7.0); // 2 and the constant's 5.
+		CHECK_EQ(edited.text("kept.tag"), std::string("s+")); // Its default, given again.
+		CHECK_EQ(edited.number("moved.n"), 99.0); // What the game gave it is kept.
+		CHECK_EQ(edited.text("moved.tag"), std::string("m+"));
+		CHECK_EQ(edited.number("loud.n"), 2.0);
+		CHECK_EQ(edited.number("held.n"), 1.0);
+		// A second edit starts from what the first gave; the field the game changed is still the game's.
+		const std::string third = with(next, "N:Number = 5", "N:Number = 6");
+		CHECK_EQ(edited.edit(third), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: Loud() prints");
+		CHECK_EQ(edited.number("kept.n"), 8.0);
+		CHECK_EQ(edited.number("moved.n"), 99.0);
+		// An edit that lets Loud's constructor be run again: the object made as native code has nothing
+		// remembered, since nobody told of it, and that is what is said.
+		const std::string quiet = with(with(third, " trace(\"loud\");", ""), "N:Number = 6", "N:Number = 7");
+		CHECK_EQ(edited.edit(quiet), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: " + once);
+		CHECK_EQ(edited.number("loud.n"), 2.0);
+		CHECK_EQ(edited.number("kept.n"), 9.0);
+		// One made since, by the interpreter, is remembered as any of its own.
+		edited.call("more");
+		CHECK_EQ(edited.number("kept.n"), 11.0);
+		CHECK_EQ(edited.edit(with(quiet, "N:Number = 7", "N:Number = 8")), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: " + once);
+		CHECK_EQ(edited.number("kept.n"), 12.0);
+		if (vm::release(dash)) {
+			vm::free_string(dash);
+		}
+		edited.end();
+	}
 }
 
 // Which objects are remembered at all, and that what is remembered of one goes with it however it ends: a
@@ -3359,6 +3572,60 @@ static void test_collector_leaves_vectors_of_nodes() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// A vector of objects of a class that holds no object, like every class that extends it, holds nothing
+// that leads back to it: the cycle collector does not look at it, however long it is (a frame of a
+// game that keeps twenty thousand such objects in a vector does not walk them). A vector whose elements
+// may hold an object is looked at as ever: one of a class that holds one, of a class extended by one that
+// does, of an interface, of vectors that are looked at. A loop through such a vector is still freed.
+static void test_collector_leaves_vectors_of_plain_objects() {
+	const char *source = "package { public class Pool {\n"
+						 "public var dots:Vector.<Dot> = new Vector.<Dot>();\n"
+						 "public var rows:Vector.<Vector.<Dot>> = new Vector.<Vector.<Dot>>();\n"
+						 "public var links:Vector.<Link> = new Vector.<Link>();\n"
+						 "public var sorts:Vector.<Sort> = new Vector.<Sort>();\n"
+						 "public var named:Vector.<Named> = new Vector.<Named>();\n"
+						 "public var chains:Vector.<Vector.<Link>> = new Vector.<Vector.<Link>>();\n"
+						 "public function fill(many:int):void {\n"
+						 "  for (var i:int = 0; i < many; i++) { dots.push(new Dot()); }\n"
+						 "  rows.push(dots); links.push(new Link()); named.push(new Dot()); chains.push(links);\n"
+						 "}\n"
+						 "public function tie():void { var knot:Knot = new Knot(); knot.back = sorts; sorts.push(knot); sorts = new Vector.<Sort>(); }\n"
+						 "} }\n"
+						 "interface Named {}\n"
+						 "class Dot implements Named { public var x:Number = 1; public var on:Boolean; }\n"
+						 "class Link { public var next:Link; }\n"
+						 "class Sort { public var n:int; }\n"
+						 "class Knot extends Sort { public var back:Vector.<Sort>; }\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Pool.as");
+	{
+		Recorder recorder;
+		vm::Interpreter interpreter(module, recorder);
+		CHECK(interpreter.start());
+		const auto looked_at = [&](const char *p_class) { return interpreter.heap().list_for(class_named(module, p_class)) != nullptr; };
+		CHECK(!looked_at("Vector.<Dot>"));
+		CHECK(!looked_at("Vector.<Vector.<Dot>>"));
+		CHECK(looked_at("Vector.<Link>"));
+		CHECK(looked_at("Vector.<Sort>")); // A Knot is a Sort, and holds an object.
+		CHECK(looked_at("Vector.<Named>")); // Whatever implements it may.
+		CHECK(looked_at("Vector.<Vector.<Link>>"));
+		vm::Object *pool = interpreter.construct(class_named(module, "Pool"));
+		vm::Slot many;
+		many.bits = 0;
+		many.i = 1000;
+		CHECK(interpreter.call_method(pool, "fill", &many, 1, nullptr));
+		const size_t filled = vm::live_objects();
+		// A vector of Sorts that a Knot inside it holds, and nothing else does.
+		CHECK(interpreter.call_method(pool, "tie", nullptr, 0, nullptr));
+		CHECK_EQ(vm::live_objects(), filled + 2);
+		interpreter.collect();
+		CHECK_EQ(vm::live_objects(), filled);
+		interpreter.release_object(pool);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A loop that passes through the engine: a script object holds one of its objects, which holds the script
 // object back (as a Godot object holds a listener that is a method of it). The engine is asked to let go
 // of what it holds; if something else holds a copy, everything stays.
@@ -3784,6 +4051,8 @@ int main() {
 	test_reload_in_place_values();
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
+	test_reload_from_native();
+	test_reload_from_native_that_tells();
 	test_reload_in_place_kept();
 	test_reload_in_place_turns();
 	test_reload_in_place_early();
@@ -3797,6 +4066,7 @@ int main() {
 	test_kept_by_the_engine();
 	test_script_object_arrives();
 	test_collector_leaves_vectors_of_nodes();
+	test_collector_leaves_vectors_of_plain_objects();
 	test_engine_result_is_the_registers_own();
 	test_no_engine();
 	test_engine_listeners();

@@ -1,12 +1,24 @@
-# `tools/`
+# `tools/`: the command line and the build's helpers
 
 | File | Job |
 |---|---|
-| `kas3c.cpp` | The command line: `parse`, `check`, `ir`, `run`, `lsp`. It only reads arguments and calls the libraries; no rule of the language lives here |
-| `check_style.py` | The size limits and the ban on banner comments from [the C++ guide](../../docs/cpp-guidelines.md). Runs with the tests (`style`, `style_self_test`) |
-| `style_baseline.txt` | What is over a limit today. It is empty, and may only stay empty: do not add to it |
-| `bench_recheck.cpp` | Times a re-check after a body, signature, member and hub edit, and after a file joins and leaves the program, until the file and until the program is checked; `--soak N` renames a method, a class and a package and prints resident memory. Uses only the Workspace's long-standing calls, so it builds against an older revision for `tests/bench/recheck.py` |
-| `case_table.py` | Writes `vm/case_table.cpp`, how `toUpperCase()` and `toLowerCase()` change a character, from the Unicode data of the Python that runs it: `python3 tools/case_table.py vm/case_table.cpp` |
+| `kas3c.cpp` | The command line: `parse`, `check`, `run`, `ir`, `cpp` and `lsp`. It reads arguments and calls the libraries. No rule of the language lives here. [The compiler's README](../README.md#the-kas3c-command-line) describes the commands |
+| `check_style.py` | The size limits and the ban on banner comments from the [C++ guidelines](../../docs/cpp-guidelines.md). It runs with the tests, as `style` and `style_self_test` |
+| `style_baseline.txt` | Files allowed over a limit. It's empty and must stay empty |
+| `bench_recheck.cpp` | Times a re-check after an edit to a body, a signature, a member, and a method every file calls, and after a file joins and leaves the program. `--soak N` repeats renames and prints resident memory |
+| `embed_runtime.py` | Writes the runtime's headers as C++ for the Godot extension, so that the extension can build a project's program library wherever it's installed. CMake runs it |
+| `case_table.py` | Writes `vm/case_table.cpp`, the table behind `toUpperCase()` and `toLowerCase()`, from the Unicode data of the Python that runs it |
 
-A new rule in the guide that can be checked by a program is added to `check_style.py` with a case in its
-self-test, so that the guide and the check never say different things.
+## Run the style check
+
+```sh
+python3 compiler/tools/check_style.py compiler
+```
+
+## Rules
+
+- **A rule in the guidelines that a program can check goes into `check_style.py`,** with a case in its
+  self-test, so that the guide and the check never disagree.
+- **Don't add to `style_baseline.txt`.** Split the file or the function instead.
+- **`bench_recheck.cpp` uses only the `Workspace` calls that older revisions have,** so that
+  `tests/bench/recheck.py` can build it against an older revision and compare.

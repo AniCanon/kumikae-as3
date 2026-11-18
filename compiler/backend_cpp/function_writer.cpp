@@ -33,20 +33,46 @@ Signature signature_of(const ir::Function &p_function) {
 	return signature;
 }
 
-FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts) :
+FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts,
+		bool p_remembers) :
 		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack),
-		facts_(p_facts) {
+		remembers_(p_remembers), facts_(p_facts) {
 	analyse();
+}
+
+// The constructor of a class whose chain can be run again says what its object is constructed with, as it
+// begins and before a default is given: the arguments as they came, and how many. Which classes' objects
+// are remembered, and that a base's constructor run by `super(...)` is not the object's own, is the
+// host's to say (vm/constructions.h). An argument held inline is no plain value: the object has no record,
+// and the host is told only that one of its class was made.
+std::string FunctionWriter::told() const {
+	const uint32_t owner = function_.owner;
+	if (!remembers_ || owner == NONE || module_.classes[owner].constructor != index_ || function_.parameters == 0 || ir::constructor_refusal(module_, owner)) {
+		return std::string();
+	}
+	std::string values;
+	bool plain = true;
+	for (uint32_t i = 0; i < function_.parameters; i++) {
+		plain = plain && parts(i).empty();
+		values += (i ? ", " : "") + ("slot(" + register_name(i) + ")");
+	}
+	const std::string count = takes_count(function_) ? "n" : std::to_string(function_.parameters);
+	// An object the host keeps only the arguments of is remembered here, where it is made (remembered_here).
+	const std::string call = plain ? "const Slot t[] = { " + values + " }; if (!remembered_here(c, " + register_name(0) + ", " + std::to_string(owner) + ", t, " +
+											 count + ")) { constructing(c, " + std::to_string(index_) + ", t, " + count + "); }"
+								   : "constructing(c, " + std::to_string(index_) + ", nullptr, 0);";
+	return "\tif (KAS3_UNLIKELY(c->remembers)) { " + call + " }\n";
 }
 
 void FunctionWriter::analyse() {
 	targets_.assign(function_.code.size() + 1, false);
+	rounds_.assign(function_.code.size() + 1, false);
 	written_.assign(function_.registers.size(), false);
-	for (const Instruction &in : function_.code) {
-		if (in.op == Op::Jump) {
-			targets_[in.a] = true;
-		} else if (in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
-			targets_[in.b] = true;
+	for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
+		const Instruction &in = function_.code[pc];
+		if (const uint32_t target = jump_target(in); target != NONE) {
+			targets_[target] = true;
+			rounds_[target] = rounds_[target] || target <= pc;
 		}
 		const char first = ir::op_shape(in.op)[0];
 		if ((first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op)) {
@@ -62,6 +88,7 @@ void FunctionWriter::analyse() {
 	shadow_.assign(function_.registers.size(), std::string());
 	borrowed_.assign(function_.registers.size(), NONE);
 	lent_.assign(function_.registers.size(), false);
+	find_classes();
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
@@ -71,6 +98,7 @@ void FunctionWriter::analyse() {
 	find_kept();
 	find_last_uses();
 	find_twice();
+	find_counted();
 }
 
 std::string_view FunctionWriter::parts(uint32_t p_register) const {
@@ -209,7 +237,7 @@ void FunctionWriter::raw_thunk(const Instruction &p_in) {
 }
 
 void FunctionWriter::dispatch(const Instruction &p_in) {
-	const bool written = whole_conversion(p_in) || whole_comparison(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
+	const bool written = counted(p_in) || whole_conversion(p_in) || whole_comparison(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
 			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
@@ -278,13 +306,21 @@ void FunctionWriter::generic(const Instruction &p_in) {
 }
 
 void FunctionWriter::instruction(const Instruction &p_in) {
+	// A counted loop's first stretch begins as the loop is entered; a round goes to the label after.
+	if (const std::optional<Counts> how = counts(pc_)) {
+		body_ += how->start + ":;\n";
+		line(how->begin);
+		body_ += how->label + ":;\n";
+	}
 	// Around what may see or change a field kept in a local, memory and the local are made to agree.
 	const std::string before = kept_written_back(pc_);
 	const std::string after = kept_read_again(pc_);
 	if (!before.empty()) {
 		line(before);
 	}
-	if (!engine(p_in) && !fast_place(p_in)) {
+	if (pc_ == joined_) {
+		joined_ = NONE; // Written with the instruction before it.
+	} else if (!engine(p_in) && !fast_place(p_in)) {
 		generic(p_in);
 	}
 	if (!after.empty()) {
@@ -324,6 +360,10 @@ std::string FunctionWriter::prologue() const {
 		add("bool traced = false;");
 		unused += " (void)traced; (void)line;";
 	}
+	if (std::find(rounds_.begin(), rounds_.end(), true) != rounds_.end()) {
+		add("uint32_t rounds = ROUNDS;"); // Until the next look at the host's alarm (jump()).
+		unused += " (void)rounds;";
+	}
 	add(unused);
 	const bool gives = function_.result != Kind::Void;
 	if (gives) {
@@ -334,7 +374,8 @@ std::string FunctionWriter::prologue() const {
 	// from outside): it keeps no count itself, sets no error, and its one frame fits in what the stack's
 	// floor leaves free.
 	if (fails_) {
-		add("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH || stack_low(c))) { stack_overflow(c); return" + std::string(gives ? " result" : "") + "; }");
+		// The host's watch asks for the clock by the floor: then the function goes on, unless its time is up.
+		add("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH || stack_low(c)) && stack_overflow(c)) { return" + std::string(gives ? " result" : "") + "; }");
 		add("c->depth++;");
 		// Whether a call from here is one too deep: asked once, of a count nothing moves while this runs.
 		add("const bool deep = c->depth >= MAX_DEPTH;");
@@ -349,7 +390,7 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
-	out += still_declared() + kept_declared() + twice_declared();
+	out += told() + still_declared() + kept_declared() + twice_declared() + counted_declared();
 	if (has_owner_alias_) {
 		// The script's own Godot object: found once, and again only after the engine has freed a script's.
 		add("void *self = object_of(c, field<Ref>(r0, 0));");
@@ -456,7 +497,9 @@ std::string FunctionWriter::write() {
 	for (size_t pc = 0; pc <= function_.code.size(); pc++) {
 		body_ += copies[pc];
 		if (labelled[pc]) {
-			body_ += "L" + std::to_string(pc) + ":;\n";
+			// A counted loop's own jump back goes past its start: the label is for whatever else comes here.
+			body_ += (rounds_counted(static_cast<uint32_t>(pc)) ? "RL" + std::to_string(pc) + ":;\n" : std::string()) +
+					(counts(static_cast<uint32_t>(pc)) ? "[[maybe_unused]] " : "") + "L" + std::to_string(pc) + ":;\n";
 		}
 		if (retried_[pc]) {
 			body_ += "S" + std::to_string(pc) + ":;\n";

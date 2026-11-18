@@ -190,7 +190,7 @@ static void test_math() {
 // A vector's memory: its length, its room, and that it is counted among the objects alive.
 static void test_vectors() {
 	const size_t objects = live_objects();
-	Vector *vector = new_vector(7, 3, false, 0, nullptr);
+	Vector *vector = new_vector(7, 3, false, 0, false, nullptr);
 	CHECK(vector != nullptr);
 	CHECK_EQ(vector->klass, 7u);
 	CHECK_EQ(vector->references, 1u);
@@ -198,22 +198,45 @@ static void test_vectors() {
 	CHECK(!vector->fixed);
 	CHECK(vector->capacity >= 3);
 	for (uint32_t i = 0; i < 3; i++) {
-		CHECK_EQ(vector->data[i].bits, (uint64_t)0);
-		vector->data[i].i = (int32_t)i + 1;
+		CHECK_EQ(slots_of(vector)[i].bits, (uint64_t)0);
+		slots_of(vector)[i].i = (int32_t)i + 1;
 	}
 	CHECK(vector_reserve(vector, 1000));
 	CHECK(vector->capacity >= 1000);
 	CHECK_EQ(vector->length, 3u);
-	CHECK_EQ(vector->data[2].i, 3);
-	CHECK_EQ(vector->data[999].bits, (uint64_t)0); // Room that was added is empty.
+	CHECK_EQ(slots_of(vector)[2].i, 3);
+	CHECK_EQ(slots_of(vector)[999].bits, (uint64_t)0); // Room that was added is empty.
 	CHECK(vector_reserve(vector, 2)); // Never shrinks.
 	CHECK(vector->capacity >= 1000);
 	CHECK_EQ(live_objects(), objects + 1);
 	free_vector(vector);
 	CHECK_EQ(live_objects(), objects);
-	Vector *empty = new_vector(7, 0, true, 0, nullptr);
+	Vector *empty = new_vector(7, 0, true, 0, false, nullptr);
 	CHECK(empty && empty->length == 0 && empty->fixed);
 	free_vector(empty);
+	CHECK_EQ(live_objects(), objects);
+	// A vector of ints or of uints: each place is four bytes, the number itself, and a place read as a slot
+	// holds it in its first four bytes with nothing after them. The sanitizer build holds the room to that.
+	Vector *narrow = new_vector(7, 3, false, 0, true, nullptr);
+	CHECK(narrow && narrow->narrow && place_size(narrow) == 4);
+	CHECK_EQ(place_size(vector == nullptr ? narrow : narrow), sizeof(int32_t));
+	for (uint32_t i = 0; i < 3; i++) {
+		CHECK_EQ(numbers_of(narrow)[i], 0);
+		Slot value;
+		value.bits = 0;
+		value.u = 4000000000u + i;
+		set_place(narrow, i, value);
+	}
+	CHECK(vector_reserve(narrow, 1000));
+	CHECK_EQ(place(narrow, 2).bits, (uint64_t)4000000002u);
+	CHECK_EQ(numbers_of(narrow)[999], 0);
+	numbers_of(narrow)[999] = -5;
+	move_places(narrow, 0, narrow, 998, 2);
+	CHECK_EQ(place(narrow, 1).i, -5);
+	CHECK_EQ(place(narrow, 1).bits, (uint64_t)0xfffffffbu);
+	clear_places(narrow, 0, 1000);
+	CHECK_EQ(numbers_of(narrow)[1], 0);
+	free_vector(narrow);
 	CHECK_EQ(live_objects(), objects);
 }
 

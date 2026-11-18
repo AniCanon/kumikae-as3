@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Calls each method of Probe.as, of Entry.as and of the test project's Places.as and Emits.as and prints what
+# Calls each method of Probe.as, of Entry.as and of the test project's Places.as, Loops.as and Emits.as and prints what
 # it gives: run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two
 # outputs to each other.
 var killer: Node
@@ -8,6 +8,14 @@ var entry: Node2D
 var emits: RefCounted
 var frames := 0
 var waiting: Node2D
+
+
+# Calls back into the script as it is freed (Probe.as, clears()).
+class Dying extends RefCounted:
+	var target
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and target != null:
+			target.call("dies")
 
 
 # Godot calling into a script (Entry.as).
@@ -38,6 +46,8 @@ func _places() -> void:
 	print("PROBE grown=", places.call("grown"))
 	print("PROBE refused=", places.call("refused"))
 	print("PROBE methods=", places.call("methods"))
+	print("PROBE ends=", places.call("ends"))
+	print("PROBE parts=", places.call("parts"))
 	var line := Line2D.new()
 	var keeper := Node.new()
 	print("PROBE given=", places.call("given", line, keeper), " ", line.points, " ", keeper.get_meta("points"), " ", keeper.get_meta("nested"), " ",
@@ -48,6 +58,26 @@ func _places() -> void:
 	print("PROBE taken=", places.call("taken", line, [Vector2(0.5, 0.25), Vector3(1, 2, 3), null]))
 	line.free()
 	keeper.free()
+
+
+# Loops over Godot's collections (the test project's Loops.as, which loops.gd holds to what GDScript gives).
+func _loops() -> void:
+	var loops := Node2D.new()
+	loops.set_script(load("res://Loops.as"))
+	root.add_child(loops)
+	for child_name in ["first", "second"]:
+		var child := Node.new()
+		child.name = child_name
+		loops.add_child(child)
+	var table := {"a": 1, 2: "two", "c": Vector2(3, 4)}
+	var growing := [1, 2]
+	print("PROBE loops=", loops.call("childNames"), " ", loops.call("sum", [1, 2.5, 4]), " ", loops.call("untypedElements", [7, "s", true, Vector2(1, 2), null]),
+			" ", loops.call("indices", [4, 5]), " ", loops.call("keys", table), " ", loops.call("textKeys", {"x": 1}), " ", loops.call("values", table),
+			" ", loops.call("untilNegative", [3, 0, 4, -1, 5]), " ", loops.call("grown", growing), growing, " ", loops.call("erasedOnTheWay", {"a": 1, "b": 2, "c": 3}),
+			" ", loops.call("pairs", [1, 2, 3]), " ", loops.call("packedIndices", PackedInt32Array([5, 6])))
+	print("PROBE keyed=", loops.call("has", table, 2), loops.call("has", table, "2"), " ", loops.call("remove", table, 2), table, " ", loops.call("removeNamed", {"b": 1}),
+			" ", loops.call("wrongElement", [loops, 5]), " ", loops.call("scripted", [loops, loops]), " ", loops.call("points", [Vector2(1, 2), Vector2(3, 4)]),
+			" ", loops.call("missing"))
 
 
 # What signals carry between AS3 and Godot (the test project's Emits.as, by the rows emits.gd holds to what
@@ -67,10 +97,18 @@ func _initialize() -> void:
 	print("PROBE given=", probe.call("given"))
 	print("PROBE carried=", probe.call("carried"))
 	print("PROBE engine=", probe.call("engine"))
+	print("PROBE field objects=", probe.call("fieldObjects"))
+	print("PROBE in handles=", probe.call("inHandles"))
+	var dying := Dying.new()
+	dying.target = probe
+	print("PROBE holds=", probe.call("holds", dying))
+	dying = null
+	print("PROBE clears=", probe.call("clears"))
 	print("PROBE script=", probe.call("script", 1000))
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))
 	print("PROBE speaks=", probe.call("speaks"))
+	print("PROBE kinds=", probe.call("kinds", Vector2(1, 2)), " / ", probe.call("kinds", Color(1, 0, 0)), " / ", probe.call("kinds", 5), " / ", probe.call("kinds", null))
 	print("PROBE gone=", probe.call("gone"))
 	print("PROBE gone uncaught=", probe.call("goneUncaught"))
 	print("PROBE queued=", probe.call("queue"))
@@ -79,6 +117,7 @@ func _initialize() -> void:
 	print("PROBE after=", probe.call("script", 1))
 	_enter()
 	_places()
+	_loops()
 	emits = load("res://emits_cases.gd").new()
 	emits.begin(root)
 	_emits_said(0)

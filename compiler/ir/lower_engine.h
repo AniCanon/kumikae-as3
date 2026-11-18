@@ -44,6 +44,17 @@ public:
 	static bool on_object(const Expr *p_member);
 	bool stored_element(const Expr *p_expression);
 
+	// Whether a type is Godot's Dictionary, and whether it is one of Godot's collections reached by a
+	// whole index: its Array, or a packed array.
+	bool is_dictionary(const Type *p_type) const;
+	bool is_indexed(const Type *p_type);
+	// `key in table` and `delete table[key]` on Godot's Dictionary: its own `has` and `erase`.
+	uint32_t dictionary_has(Binary *p_in);
+	uint32_t dictionary_erase(Index *p_target, uint32_t p_position);
+	// A call of a method of one of Godot's values by its AS3 name, on registers that hold what it takes.
+	// Nothing if the name table has no such method.
+	std::optional<uint32_t> method_of(std::string_view p_class, std::string_view p_method, Kind p_result, std::string_view p_godot_result, std::vector<uint32_t> p_arguments, uint32_t p_position);
+
 	// The engine's one object of a singleton class. Everything written `Input.x` is then a member of it.
 	uint32_t singleton(const Symbol *p_class, uint32_t p_position);
 

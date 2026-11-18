@@ -6,6 +6,8 @@ package {
 	// run_godot.py's native probe runs every method here as native code too, held to the interpreter.
 	public class Places extends Node2D {
 		private var kept:Vector.<Vector2> = new <Vector2>[new Vector2(1, 1)];
+		private var cells:Vector.<int>;
+		[Signal] public var shortened:Signal;
 
 		// Made with a length, made longer, added to at the end, and each place read and written.
 		public function grown():String {
@@ -87,6 +89,41 @@ package {
 			return said.join(";");
 		}
 
+		private function sumOf(v:Vector.<Vector2>, count:int):Vector2 {
+			var total:Vector2 = new Vector2(0, 0);
+			for (var i:int = 0; i < count; i++) { total += v[i]; }
+			return total;
+		}
+
+		private function setEach(v:Vector.<Vector2>, count:int, value:Vector2):void {
+			for (var i:int = 0; i < count; i += 2) { v[i] = value; }
+		}
+
+		private function onShortened():void { cells.length = cells.length - 2; }
+
+		private var rung:int;
+		private function ring(count:int):void {
+			for (var i:int = 0; i < count; i++) {
+				rung += cells[i];
+				shortened.emit();
+			}
+		}
+
+		// A loop that goes past the end of a vector of places, reading and storing; and one whose vector a
+		// listener Godot calls each round makes shorter.
+		public function ends():String {
+			var v:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4), new Vector2(5, 6)];
+			var said:Array = [sumOf(v, 3)];
+			try { said.push(sumOf(v, 5)); } catch (a:RangeError) { said.push(a.message); }
+			try { setEach(v, 6, new Vector2(7, 7)); } catch (b:RangeError) { said.push(v.length, v, b.message); }
+			cells = new <int>[1, 2, 3, 4, 5, 6, 7, 8];
+			shortened.add(onShortened);
+			rung = 0;
+			try { ring(8); } catch (c:RangeError) { said.push(rung, cells.length, c.message); }
+			shortened.remove(onShortened);
+			return said.join(";");
+		}
+
 		// Handed to Godot: the places as a packed array's elements, or each as a value of an Array.
 		public function given(line:Line2D, keeper:Node):int {
 			var v:Vector.<Vector2> = new Vector.<Vector2>(1);
@@ -129,6 +166,43 @@ package {
 			}
 			deep[1] = deep[0] + deep[21];
 			said.push(deep.length, deep[1], deep.shift(), deep[0] == deep[1], String(deep.slice(19)));
+			return said.join(";");
+		}
+
+		// One part of an element changed where it is: the element is read, changed, and written back into the
+		// vector, its index worked out once. A vector that holds the values themselves, and one of a larger
+		// type that holds a reference to each.
+		public function parts():String {
+			var kept:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
+			kept[0].x = 9;
+			kept[0].y += 1;
+			kept[1].x++;
+			--kept[1].y;
+			var at:int = 0;
+			kept[at++].x *= 2;
+			kept[1][0] = 7;
+			var cells:Vector.<Vector2i> = new Vector.<Vector2i>(1);
+			cells[0].x = 5;
+			cells[0].y -= 2;
+			var deep:Vector.<Vector3> = new <Vector3>[new Vector3(1, 2, 3)];
+			deep[0].z = 8;
+			deep[0].x += 0.5;
+			var tints:Vector.<Color> = new <Color>[new Color(0, 0, 0)];
+			tints[0].r = 1;
+			tints[0].a -= 0.5;
+			var boxes:Vector.<Rect2> = new <Rect2>[new Rect2(0, 0, 1, 1)];
+			boxes[0].size.x = 6;
+			boxes[0].position += new Vector2(1, 1);
+			var said:Array = [kept, at, cells, deep, tints, boxes];
+			var copy:Vector2 = kept[0];
+			copy.x = -1;
+			said.push(kept[0].x);
+			try { kept[5].x = 1; } catch (e:RangeError) { said.push(e.errorID); }
+			var none:Vector.<Vector3> = new Vector.<Vector3>(1);
+			none[0].x = 1;
+			said.push(none[0]);
+			var holds:Vector.<Vector3> = new <Vector3>[null];
+			try { holds[0].x = 1; } catch (missing:Error) { said.push("no value"); }
 			return said.join(";");
 		}
 

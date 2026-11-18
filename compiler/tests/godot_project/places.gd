@@ -37,10 +37,40 @@ func grown() -> String:
 		v.append(Vector2(i, -i))
 	return "%d %d %s %s %s %s %s %s %s" % [count, v.size(), joined(Array(v.slice(0, 6)), " "), v[44], int(v[0].x), v[0] == v[1], v[1] == first, false, true]
 
+func parts() -> String:
+	var kept := PackedVector2Array([Vector2(1, 2), Vector2(3, 4)])
+	kept[0].x = 9
+	kept[0].y += 1
+	kept[1].x += 1
+	kept[1].y -= 1
+	var at := 0
+	kept[at].x *= 2
+	at += 1
+	kept[1][0] = 7
+	var cells: Array[Vector2i] = [Vector2i()]
+	cells[0].x = 5
+	cells[0].y -= 2
+	var deep: Array[Vector3] = [Vector3(1, 2, 3)]
+	deep[0].z = 8
+	deep[0].x += 0.5
+	var tints: Array[Color] = [Color(0, 0, 0)]
+	tints[0].r = 1
+	tints[0].a -= 0.5
+	var boxes: Array[Rect2] = [Rect2(0, 0, 1, 1)]
+	boxes[0].size.x = 6
+	boxes[0].position += Vector2(1, 1)
+	var copy := kept[0]
+	copy.x = -1
+	return joined([joined(Array(kept), ","), at, joined(cells, ","), joined(deep, ","), joined(tints, ","), joined(boxes, ","), int(kept[0].x), 1125, Vector3(1, 0, 0), "no value"], ";")
+
 func refused() -> String:
 	var range := "Error #1125: The index %d is out of range 2."
 	return joined(["Error #1034: Type Coercion failed: cannot convert null to Vector2.", 2, 2, 2, 2, 2, 2, "made", range % 2, range % 3,
 			"Error #1126: Cannot change the length of a fixed Vector.", Vector2(3, 4), joined([Vector2(1, 2), Vector2(3, 4)], ",")], ";")
+
+func ends() -> String:
+	var range := "Error #1125: The index %d is out of range %d."
+	return joined([Vector2(9, 12), range % [3, 3], 3, joined([Vector2(7, 7), Vector2(3, 4), Vector2(7, 7)], ","), range % [4, 3], 6, 2, range % [3, 2]], ";")
 
 func methods() -> String:
 	var said := []
@@ -84,6 +114,8 @@ func _physics_process(_delta: float) -> bool:
 	show("grown", ask("grown"), grown())
 	show("no value is refused", ask("refused"), refused())
 	show("methods", ask("methods"), methods())
+	show("ends", ask("ends"), ends())
+	show("a part of an element", ask("parts"), parts())
 	var line := Line2D.new()
 	var keeper := Node.new()
 	var points := PackedVector2Array([Vector2(), Vector2(0, 0), Vector2(2, 1), Vector2(3, 1.5), Vector2(4, 2)])

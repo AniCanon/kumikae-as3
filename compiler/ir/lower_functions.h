@@ -19,6 +19,11 @@ public:
 	void make_environment(FunctionDecl *p_decl);
 	std::optional<Place> captured_place(const Symbol *p_symbol, uint32_t p_position);
 	uint32_t closure_value(FunctionExpr *p_expression);
+	// A function declared in a function: its variable, and the values of all those a body declares.
+	void declare_function(FunctionDecl *p_decl);
+	void nested_functions(Node *p_body);
+	// The function of a declaration written in the one being lowered, as a value given its environment.
+	uint32_t closure_of(FunctionDecl *p_decl, bool p_expression, uint32_t p_position);
 	void lower_pending_functions();
 	// Function values (lower_functions.cpp).
 	uint32_t function_value(Expr *p_expression);

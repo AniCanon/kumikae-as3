@@ -1,141 +1,149 @@
-# Kotlin and Compose conventions
+# Contributing to the plugin
 
-Follow [JetBrains' Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html).
-The `.editorconfig` here selects IntelliJ's Kotlin style, four-space indentation,
-120-column lines and trailing commas. Prefer explicit imports, immutable local
-values, named arguments for ambiguous calls and related declarations grouped by
-responsibility. UI-emitting `@Composable` functions use PascalCase; other
-functions use camelCase.
+This page has the conventions for the plugin's Kotlin and Compose code, and the checks to run before you
+open a pull request. The repository's [CONTRIBUTING.md](../../CONTRIBUTING.md) applies too. For the
+structure of the code, read [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Run `./gradlew ktlintFormat` to format, and `./gradlew check` to run the style
-check and the tests. `buildPlugin` also requires the style check. It covers
-production Kotlin, tests and Gradle Kotlin scripts, in both modules. Do not add
-blanket suppressions or a baseline to get a new finding past it.
+## The stack
 
-Keep files small and single-purpose: aim for under 300 lines. No banner
-comments. A comment says why, not what.
+The stack is fixed. Don't add a language, a framework or a dependency without opening an issue first.
+
+| What | Uses |
+|---|---|
+| Build | Gradle through the wrapper (`./gradlew`), and the IntelliJ Platform Gradle Plugin |
+| Language | Kotlin, on a JDK 25, with the Compose compiler plugin |
+| UI | Compose Swing UI, mounted through `composePanel` in `ui/ComposeHost.kt` |
+| Style | ktlint for Kotlin, and Xcode's swift-format for the Swift helper |
+| Tests | JUnit, on the JUnit Platform |
+| The Simulator helper | Swift 6, with no package dependencies |
+
+The versions are in `build.gradle.kts`. The build compiles against an installed Rider and never downloads
+an IDE or a JDK.
+
+## Checks
+
+From this folder, with `JAVA_HOME` set to a JDK 25:
+
+```sh
+./gradlew check buildPlugin
+python3 -m unittest discover -s tests -v
+```
+
+- `check` runs the style check and the tests of both modules. On macOS with Swift installed, it also lints
+  the Swift helper.
+- `buildPlugin` refuses to build while the style check fails.
+- `./gradlew ktlintFormat` fixes most style findings. `./gradlew formatSimulatorBridge` formats the Swift.
+- `./gradlew verifyPlugin` runs JetBrains' plugin verifier against the installed Rider and IntelliJ IDEA.
+  `RIDER_HOME` and `IDEA_HOME` say where they are.
+
+Read the test count after you change the build. A missing test engine gives a green build that ran
+nothing.
+
+## Kotlin
+
+Follow [JetBrains' Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html). The
+`.editorconfig` selects IntelliJ's Kotlin style, 120-column lines and trailing commas.
+
+- Prefer explicit imports, immutable local values, and named arguments where a call would be ambiguous.
+- A `@Composable` function that emits UI is named in PascalCase. Other functions are camelCase.
+- Keep files small, with one purpose each. Aim for under 300 lines.
+- Write no banner comments. A comment says why, not what.
+- Don't add a blanket suppression or a baseline to get a style finding past the check.
 
 ## Tests first
 
 Write the test, watch it fail for the reason you expect, then make it pass.
-State changes belong in `SimulatorWindowControllerTest`, with
-`ManualBackgroundTasks` deciding when work runs and when its result arrives.
-JSON mapping belongs in `ApiSimulatorRepositoryTest`. Anything in `core` is
-tested there with JUnit 4; both modules run on the JUnit Platform, so either
-style of test is picked up. Read the test count after a build change: a missing
-engine gives a green build that ran nothing.
 
-The wire protocol is shared with `simulator.py`. Keep its Python client tests
-green, and change `protocol.md`, the service and both clients together.
+| A change to | Is tested in |
+|---|---|
+| What the Simulator window shows or does | `SimulatorWindowControllerTest`, with `ManualBackgroundTasks` deciding when work runs and when its result arrives |
+| How protocol JSON maps to types | `ApiSimulatorRepositoryTest` |
+| Anything in `core/` | `core`'s own tests |
+| The wire protocol | [protocol.md](protocol.md), the service, both clients and the Python client's tests, changed together |
 
-## Dependency injection
+## Where things live
 
-Resolve IDE services and paths at plugin entry points, then pass dependencies to
-ordinary controllers and views. `SimulatorToolWindowFactory` is the entry point;
-`SimulatorComposition` chooses the concrete services. Do not create a live
-repository in a default argument of a view or controller. Views receive a
-controller and forward user actions; controllers own requests and state
-changes. Put file, process and IDE-service access behind injected interfaces.
-Workers belong to the window that disposes them.
+| Thing | Lives in | Never in |
+|---|---|---|
+| State the screen shows | A window controller, as observable state | A Swing component or a view |
+| Requests, processes, files, JSON | A repository behind a typed interface, injected | A controller, a view or a composable |
+| Threads | `BackgroundTasks`, injected, with results delivered on the UI thread | An executor inside a view |
+| The choice of concrete services | The composition root (`*Composition`) and the tool-window factory | A default argument of a view or a controller |
+| Layout, text, enabled and disabled | Composables that take values and callbacks | A controller |
 
-IDE light services are a platform exception: JetBrains [does not support
-constructor injection of other services](https://plugins.jetbrains.com/docs/intellij/plugin-services.html#constructor).
-Resolve those when a method needs them. Do not introduce a second DI container
-or look up services inside composables.
+Resolve IDE services and paths at the plugin's entry points, then pass them to ordinary controllers and
+views. IDE light services are the one exception: JetBrains
+[doesn't support constructor injection](https://plugins.jetbrains.com/docs/intellij/plugin-services.html#constructor)
+of other services, so resolve those when a method needs them. Don't add a second dependency-injection
+container, and don't look up services inside composables.
 
-## Compose Runtime over Swing
+## Lifetimes
 
-Apply Google's [state ownership](https://developer.android.com/develop/ui/compose/state-hoisting),
-[composition model](https://developer.android.com/develop/ui/compose/mental-model) and
-[side-effect guidance](https://developer.android.com/develop/ui/compose/side-effects)
-to Compose Swing and the IDE's lifecycle:
+- Every worker, composition and session belongs to its window's `Disposable` and is disposed with it, on
+  the UI thread.
+- After disposal, nothing is delivered. A late result is dropped.
+- A result for something that's no longer current, such as another device, is dropped.
+- A second action while one runs is refused with a status the user sees. It's never queued in silence.
+- A hidden window doesn't poll.
 
-- Keep a draft form value at the nearest composition that uses it. State that
-  the controller shares with the view lives in the controller as observable
-  state; pass values and callbacks to composables. Text, selections and button
-  availability belong in observable state, not in retained Swing controls.
-- Keep composable bodies free of I/O and of changes visible outside the
-  composition. Requests stay in the controller. Use an effect only when the
-  work belongs to the composition, such as pushing a new picture into the
-  native screen.
-- `remember` may cache a value; it is not an effect and not a safe place to
-  attach a retained Swing control to a new parent. Use `SwingNode`'s factory
-  and update phases for that. `NativeScrollPane` sets its viewport there.
-- Key retained native nodes by component identity, as `Native` does, so that
-  replacing the control replaces the node. Apply changing text and sizes
-  through `SwingNode.update`, not only in the factory.
-- A reusable composable takes a default `SwingModifier` as its first optional
-  parameter and forwards it to its root. Do not apply a caller's modifier to
-  several children.
-- Dispose compositions through their owning disposable on the UI thread;
-  `composePanel` does this.
-- Do not mark mutable Swing components `@Stable` or `@Immutable`, add
-  `derivedStateOf` without a measured need, or bring Android `ViewModel` or
-  Activity APIs into this plugin.
+## Compose over Swing
 
-Run `./gradlew runIde -PuiProbe` after any change to presentation or lifecycle,
-and look at the pictures in `build/reports/ui/`. Text that is cut off,
-controls that overlap and unreadable colours are defects.
+The plugin applies Google's guidance on
+[where to hoist state](https://developer.android.com/develop/ui/compose/state-hoisting),
+[thinking in Compose](https://developer.android.com/develop/ui/compose/mental-model) and
+[side effects](https://developer.android.com/develop/ui/compose/side-effects) to Compose Swing and the
+IDE's lifecycle.
 
-For other languages and documentation, follow the repository's own guides.
+- **Hoist shared state to the controller.** Keep a draft form value at the nearest composition that uses
+  it. Text, selections and whether a button is enabled belong in observable state, not in retained Swing
+  controls.
+- **Keep composable bodies free of I/O** and of changes visible outside the composition. Use an effect only
+  when the work belongs to the composition, such as pushing a new picture into the native screen.
+- **`remember` caches a value.** It isn't an effect, and it isn't where a retained Swing control is
+  attached to a new parent. Use `SwingNode`'s factory and update phases for that.
+- **Key a retained native node by the component's identity,** as `Native` does, so that replacing the
+  control replaces the node.
+- **A reusable composable takes a `SwingModifier` as its first optional parameter** and passes it to its
+  root.
+- **Use native Swing controls only where the IDE's own behavior is needed,** such as a painted picture
+  that takes the mouse, or a console. Mount them through `Native` and `NativeScrollPane`.
+- **Don't** mark mutable Swing components `@Stable` or `@Immutable`, add `derivedStateOf` without a
+  measured need, or bring Android's `ViewModel` or Activity APIs into the plugin.
 
-The sandbox probe also uses the installed AS3 editor handlers for pairing and indentation, then opens
-a temporary project to exercise native LSP lookup and Tab/Enter acceptance. `language.txt`,
-`typing-times.txt`, `completion-*.txt` and `completion-heap.txt` accompany the light/dark PNGs. Timings
-include IDE scheduling; retained heap samples include the whole IDE and are not a leak proof. The
-probe plugin is excluded from the distributable ZIP.
+## Checks in a sandbox IDE
 
-The native lookup probe supplies an activation event to its sandbox frame when launched in the
-background; it does not steal desktop focus or test OS activation. It trusts only its generated
-fixture path and restores the sandbox's trust settings when finished.
-During the completion probe, `UiProbeFocus` also enables the IDE's test control for window deactivation
-events, then restores its previous value on the UI thread even when a check fails. Without it, a delayed
-background-window event can close a valid lookup through the popup manager. Regression checks dispatch
-deactivation and lost-focus events while a lookup is open, then continue native typing, Backspace,
-Enter/Tab and Undo checks. This control exists only in the sandbox probe; ordinary IDE focus behavior
-is not changed or verified by it.
+These start an IDE with separate settings under `.intellijPlatform/sandbox/`. They never touch your own
+IDE's settings. Run one at a time.
 
-For a lifecycle control, run `KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe`.
-It opens plain-text files, confirms each project closes and is disposed, and records the same heap
-samples. Save the reports before another probe overwrites `build/reports/ui/`.
-The AS3 probe also verifies generated imports and override declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
-non-whitespace text, including closing braces, and check the final caret before the throwing body.
-Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
-Generated overrides repeat six times each. Undo resolves the exact `TextEditor` under test, including
-when another tab with a local or global edit is selected. Temporary projects contain `.idea/.gitignore`
-before opening: Rider's asynchronous creation of that file otherwise inserts a global command above
-the completion in Undo history. The probe neither clears history nor suppresses confirmation. An
-unexpected Undo dialog is captured, cancelled and fails the check with its message and command state.
-`UiProbeRiderDiagnostics` checks read access at the installed native descriptor's receive boundary.
-`UiProbeDiagnostics` checks actual error highlights before and after an 80-line shrink and forty rapid
-replacements, then verifies errors can appear and clear again, followed by parameter help, navigation
-and outline checks. The probe scrolls the caret into view before requesting a visible parameter hint.
-IDEA also checks injected stale/current publications, an uncommitted edit, refresh requests for equal values
-and replies after client disposal through the production adapter and native diagnostic cache.
-The focused publication check holds write access before the cache monitor and observes the injected
-refresh boundary; the separate shrink/burst check verifies real editor highlights.
-`UiProbeStatementCompletion` checks seven language blocks, immediate insertion Undo, navigation through
-all tab stops and the final caret, and mirrored catch-name editing. Rider exposes the snippet as its
-lookup string; LSP4IJ exposes the item label. The probe matches either representation. Undo after Tab
-navigation is a separate native template-history operation; the probe does not override that history.
+```sh
+./gradlew runIde
+```
 
-Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
-and weak closed-project counts. Combine it with the control flag for the same plain-text workload.
-`KUMIKAE_COMPLETION_RETENTION_CHECK=1` enables the same zero-retention assertion on the short run.
-These runs collect soft caches (`-XX:SoftRefLRUPolicyMSPerMB=0`, probe JVM only) and allow up to ten seconds
-for native delayed work to finish. They also check a reopened visible Problems window, concurrent
-projects and frame reuse. No native cache is cleared by the plugin. Do not compare these heap samples
-with runs using the default soft-cache policy. A final acceptance run must omit `KUMIKAE_COMPLETION_HEAP_DUMP`;
-that option is for diagnosing a failure. Keep each run's reports with its log to avoid reading stale counts.
-The test plugin cancels the pinned Rider's evaluation feedback survey and IDEA's first-run UI onboarding
-dialog, which otherwise block project opening. It matches those two exact classes and uses Cancel;
-license dialogs and production IDE settings are untouched. Callback failures fail the probe.
+This starts the installed Rider with the plugin loaded, for trying a change by hand.
 
-## Language-client compatibility checks
+### The UI probe
 
-After changing a client adapter, run the following sequentially with installed JDK 25, Rider and IDEA.
-The build resolves the declared LSP4IJ 0.21.0 dependency; use `--offline` after caching it. IDE binaries
-come from `RIDER_HOME` and `IDEA_HOME` (or the application defaults in the build), never a download task.
+```sh
+./gradlew runIde -PuiProbe
+```
+
+The UI probe is a second, test-only plugin that exists only in the sandbox. It's never part of the plugin
+zip. Without showing a window, it:
+
+- Mounts the real Simulator panel over a synthetic service, in the light theme and the dark theme, and
+  presses Refresh, Boot, Launch and Install through the real buttons.
+- Types in a real editor: pairing, indentation, completion with Enter and Tab, snippets, automatic
+  imports, override stubs, undo, signature help, hover, navigation and outline.
+- Writes pictures and `result.txt` to `build/reports/ui/`. The task fails unless the result is `passed`.
+
+Run it after any change to a view, a lifetime or a language client, and look at the pictures. Text that's
+cut off, controls that overlap, and unreadable colors are defects.
+
+The probe proves layout and wiring. It doesn't prove behavior against a real Simulator.
+
+### Both IDEs, with and without LSP4IJ
+
+After you change a language client, run all four combinations, one after another:
 
 ```sh
 ./gradlew --offline check buildPlugin verifyPlugin
@@ -145,25 +153,37 @@ come from `RIDER_HOME` and `IDEA_HOME` (or the application defaults in the build
 ./gradlew --offline runRiderWithoutLsp4ij -PuiProbe
 ```
 
-`runIdea` uses LSP4IJ; `runIde` checks Rider's native client with LSP4IJ installed but no competing AS3
-server or handlers. The two `WithoutLsp4ij` tasks disable that plugin in separate sandboxes. IDEA then
-checks the install notification and local editing; Rider still runs the complete semantic probe.
-Reports are under `build/reports/ui-idea`, `ui`, `ui-runIdeaWithoutLsp4ij` and
-`ui-runRiderWithoutLsp4ij`, respectively. Preserve them before another run.
+| Task | Checks | Reports in |
+|---|---|---|
+| `runIdea` | IntelliJ IDEA with LSP4IJ | `build/reports/ui-idea` |
+| `runIdeaWithoutLsp4ij` | The install notification, and typing help without a server | `build/reports/ui-runIdeaWithoutLsp4ij` |
+| `runIde` | Rider's own client, with LSP4IJ installed and unused | `build/reports/ui` |
+| `runRiderWithoutLsp4ij` | Rider's own client | `build/reports/ui-runRiderWithoutLsp4ij` |
 
-Each semantic run opens and disposes three projects. It checks Enter/Tab, continued typing and
-Backspace, snippet navigation, prefix refresh, generated edits and Undo, parameter help, hover
-documentation, go to declaration and outline. `UiProbeHover` asks for quick documentation on a method
-call and waits for a shown pane with the server's signature (its code block) and the method's owner.
-It does not move the mouse: the platform shows no mouse hover while another application has the
-desktop's focus, and the probe runs in the background; quick documentation uses the same documentation
-targets and rendering. IDEA without LSP4IJ checks that no documentation target answers and nothing
-with server text is shown. The probe waits for each client's indexing gate before invoking the first
-completion; IDEA checks LSP4IJ's readiness in the same UI-thread turn as invocation. Parameter help
-waits for the live template to finish and activates the sandbox before displaying its hint. No fixed
-delay stands in for readiness. It also mounts the panel and writes light/dark images for inspection.
+Save a run's reports before the next run overwrites them.
 
-For changes confined to AS3 test integration, use `KUMIKAE_TEST_ACTIONS_PROBE=1` with
-`runIde -PuiProbe` and `runIdea -PuiProbe`. This opens one disposable project and
-checks file/method actions, helper exclusion, the bundled compiler/runner result tree
-and navigation to the actual failing assertion. It skips completion sampling.
+### Opt-in probes
+
+Each of these is switched on by an environment variable and never runs in an ordinary test run.
+
+| Variable | With | What it does |
+|---|---|---|
+| `KUMIKAE_TEST_ACTIONS_PROBE=1` | `runIde -PuiProbe` | Checks only the AS3 test integration: gutter actions, the result tree, and navigation to a failing line |
+| `KUMIKAE_COMPLETION_CONTROL_PROBE=1` | `runIde -PuiProbe` | Opens the same projects as plain text, with no AS3 session, to tell a platform warning from one the plugin causes |
+| `KUMIKAE_COMPLETION_RETENTION_PROBE=1` | `runIde -PuiProbe` | Opens and closes ten projects over ten minutes and counts closed projects that are still held |
+| `KUMIKAE_SIMULATOR_LIVE_PROBE=1` | `runIde -PuiProbe` | Drives a Simulator that is already booted, through the real panel and the native helper |
+| `KUMIKAE_SIMULATOR_MEMORY_PROBE=1` | `runIde -PuiProbe` | Ten minutes of synthetic frames through a mounted panel, with memory samples |
+| `KUMIKAE_FRAME_RETENTION_PROBE=1` | `:test --tests '*FrameRetentionProbe'` | Paints synthetic frames through the panel's own classes in a plain JVM, and counts retained images |
+| `KUMIKAE_NATIVE_LIFECYCLE_PROBE=1` | `:core:test --tests '*NativeLifecycleProbe'` | Creates one disposable Simulator and checks shutdown, reboot and reselection. It deletes only the device it created |
+
+The helper's own probes are in [its README](native/SimulatorBridge/README.md#probes).
+
+To log the messages between the IDE and the language server, run
+`./gradlew runIde -PlspTrace=<existing folder>`. The logs contain source text. Keep them out of the
+repository.
+
+## Don't
+
+- Start a person's real IDE or change its settings. Use only the sandbox that Gradle starts.
+- Erase, create, shut down or install onto a Simulator that the test didn't create.
+- Claim that the plugin works in an IDE because it compiles. Say what was run, and what wasn't.

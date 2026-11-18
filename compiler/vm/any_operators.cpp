@@ -308,8 +308,8 @@ bool same_function(const ir::Module &p_module, const Object *p_a, const Object *
 		if (!bound_a || !bound_b || bound_a == bound_b) {
 			return bound_a && bound_a == bound_b;
 		}
-		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
-		return named && bound_a->data[0].bits == bound_b->data[0].bits;
+		const bool named = static_cast<const Str *>(any::pointer(slots_of(bound_a)[1]))->view() == static_cast<const Str *>(any::pointer(slots_of(bound_b)[1]))->view();
+		return named && slots_of(bound_a)[0].bits == slots_of(bound_b)[0].bits;
 	}
 	return own_field(a, ir::FUNCTION_FIRST).p == own_field(b, ir::FUNCTION_FIRST).p && own_field(a, ir::FUNCTION_FIRST).p;
 }

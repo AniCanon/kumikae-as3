@@ -1,5 +1,6 @@
-// What a function's code reaches by calling: said once, for everything in ir/ that follows calls (what
-// changed between two builds, what a constructor chain does). Nothing outside ir/ includes this.
+// What a function's code reaches by calling: said once, for everything that follows calls (what changed
+// between two builds, what a constructor chain does, and what the C++ backend knows of a call through a
+// method table: which class extends which, and whether a call is on the method's own object).
 #pragma once
 
 #include "ir_module.h"

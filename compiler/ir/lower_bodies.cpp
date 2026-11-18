@@ -113,6 +113,7 @@ void Bodies::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl)
 	if (p_decl->body) {
 		Statements(l_).declare_locals(p_decl->body);
 		Functions(l_).make_environment(p_decl);
+		Functions(l_).nested_functions(p_decl->body);
 		Statements(l_).statement(p_decl->body);
 	}
 	end(p_decl->end ? p_decl->end - 1 : p_decl->offset);
@@ -125,7 +126,7 @@ bool Bodies::names_arguments(Block *p_body) {
 	walk(p_body, [&](Node *p_node) {
 		const Symbol *symbol = p_node->kind == NodeKind::Name ? static_cast<Name *>(p_node)->symbol : nullptr;
 		found = found || (symbol && symbol->kind == SymbolKind::Arguments);
-		return p_node->kind != NodeKind::FunctionExpr;
+		return p_node->kind != NodeKind::FunctionExpr && p_node->kind != NodeKind::FunctionStmt;
 	});
 	return found;
 }
@@ -204,6 +205,7 @@ void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	if (decl && decl->body) {
 		Statements(l_).declare_locals(decl->body);
 		Functions(l_).make_environment(decl);
+		Functions(l_).nested_functions(decl->body);
 	}
 	first_values(p_class, index);
 	// Then the base class's constructor, unless the body calls it itself.

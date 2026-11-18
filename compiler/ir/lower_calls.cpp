@@ -1,7 +1,11 @@
 #include "lower_calls.h"
+
+#include "casts.h"
 #include "lower_dynamic.h"
 #include "lower_engine_calls.h"
+#include "lower_expressions.h"
 #include "lower_functions.h"
+#include "lower_library.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
 
@@ -51,11 +55,13 @@ Expr *Lowerer::writer(const List<Expr *> &p_expressions, uint32_t p_from, uint32
 uint32_t Calls::call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind) {
 	// A function with no return type written gives `*`; `:void` is written, and gives nothing.
 	Kind kind = Kind::Any;
-	if (p_function->type && !l_.kind_of(l_.compilation_.type_of(p_function->type), &kind)) {
-		l_.refuse(p_position, "a call to a function that returns '" + l_.compilation_.type_name(l_.compilation_.type_of(p_function->type)) + "'");
+	const Type *const type = p_function->type ? l_.compilation_.type_of(p_function->type) : nullptr;
+	if (type && !l_.kind_of(type, &kind)) {
+		l_.refuse(p_position, "a call to a function that returns '" + l_.compilation_.type_name(type) + "'");
 	}
 	*r_kind = kind;
-	return kind == Kind::Void ? NONE : l_.reg(kind);
+	// One of Godot's values comes back with its type, whatever is done with it next.
+	return kind == Kind::Void ? NONE : type ? l_.engine_reg(kind, type) : l_.reg(kind);
 }
 
 // super(...): the base class's constructor. It has no value: the checker lets nothing use it.
@@ -86,11 +92,15 @@ uint32_t Calls::written_value(Expr *p_value, Kind p_conversion, uint32_t p_posit
 		return out;
 	}
 	Kind given = Kind::Void;
-	bool known = l_.kind_of(p_value->type, &given);
+	bool known = l_.value_kind(p_value, &given);
 	if (known && (given == Kind::I64 || p_conversion == Kind::I64) && !Lowerer::is_null(p_value)) {
 		return l_.convert(l_.wide_operand(p_value, p_conversion), p_conversion, p_position, true);
 	}
 	return l_.expression(p_value, p_conversion);
+}
+
+bool Calls::kind_named(const Type *p_type) {
+	return l_.check_for(p_type, Kind::Val).value_or(NONE) != NONE;
 }
 
 uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
@@ -98,19 +108,91 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (p_type == l_.array_ && l_.array_) {
 		return Vectors(l_).vector_new(l_.compilation_.instance_type(l_.array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
 	}
-	if ((p_type == l_.function_ || p_type == l_.class_type_) && p_type && p_call->arguments.count == 1) {
-		// Function(x), Class(x): a cast, which a store into one is. Not one, AS3's TypeError #1034.
-		return l_.from_untyped(l_.any_value(p_call->arguments[0]), l_.compilation_.instance_type(p_type), Kind::Obj, position);
+	if (class_call(p_type) == ClassCall::Cast) {
+		// A cast, which a store of an untyped value into the type is: the value itself when it is of the
+		// type, null for null and undefined, and for anything else AS3's TypeError #1034. One of Godot's
+		// objects arrives at a script's class, and a script's object at one of Godot's, as for `as`.
+		const Type *type = l_.compilation_.instance_type(p_type);
+		Kind kind = Kind::Void;
+		if (p_call->arguments.count != 1) {
+			l_.error(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "' takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
+			return l_.default_value(p_want, position);
+		}
+		// One of Godot's value types is checked by Godot's name for it: a class with none (an enum's
+		// class of constants) is no cast.
+		const bool named = kind_named(type);
+		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref || (kind == Kind::Val && named))) {
+			return l_.from_untyped(l_.any_value(p_call->arguments[0]), type, kind, position);
+		}
 	}
 	if (p_type == l_.object_ && p_call->arguments.count <= 1) {
 		return Dynamic(l_).object_from(p_call->arguments.count ? p_call->arguments[0] : nullptr, position);
 	}
+	if (const std::optional<uint32_t> made = class_function(p_call, p_type)) {
+		return *made;
+	}
 	Kind conversion = Kind::Void;
 	if (!l_.kind_of_class(p_type, &conversion) || p_call->arguments.count > 1) {
-		l_.refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
+		l_.refuse(p_call->callee->offset, "a call of the class '" + std::string(p_type->name) + "'");
 		return l_.default_value(p_want, position);
 	}
 	return conversion_of(p_call->arguments, conversion, position);
+}
+
+// A class of the library that does something of its own when it is called, as in avmplus. Error(message)
+// and its subclasses of the library make a new error, as `new` does. RegExp(x) gives x itself when it is a
+// RegExp and no flags are given, and a new RegExp otherwise. Date(...) gives the time now as text,
+// whatever it is called with.
+std::optional<uint32_t> Calls::class_function(Call *p_call, Symbol *p_type) {
+	const uint32_t position = p_call->offset;
+	if (!p_type->unit || !p_type->unit->is_builtin) {
+		return std::nullopt;
+	}
+	New made;
+	made.kind = NodeKind::New;
+	made.offset = p_call->offset;
+	made.end = p_call->end;
+	made.type = l_.compilation_.instance_type(p_type);
+	made.callee = p_call->callee;
+	made.has_arguments = true;
+	if (p_type->name == "Date" && p_type == l_.compilation_.builtin("Date")) {
+		for (Expr *argument : p_call->arguments) {
+			l_.expression(argument, Kind::Void);
+		}
+		const uint32_t now = Expressions(l_).evaluate(&made, Kind::Obj);
+		const uint32_t out = l_.reg(Kind::Str);
+		l_.emit(Op::DateCall, position, out, date_code(DateFunction::Text, static_cast<uint32_t>(DateText::Full)), l_.arguments({ now }));
+		return out;
+	}
+	made.arguments = p_call->arguments;
+	if (l_.is_error(p_type)) {
+		return Expressions(l_).evaluate(&made, Kind::Obj);
+	}
+	if (p_type->name != "RegExp" || p_type != l_.compilation_.builtin("RegExp") || p_call->arguments.count > 2) {
+		return std::nullopt;
+	}
+	const std::optional<uint32_t> klass = Library::class_of(l_, p_type);
+	if (p_call->arguments.count == 0 || !klass) {
+		return Expressions(l_).evaluate(&made, Kind::Obj);
+	}
+	const uint32_t undefined = l_.reg(Kind::Any);
+	l_.emit(Op::AnyConst, position, undefined, 0);
+	const uint32_t pattern = l_.settled(l_.any_value(p_call->arguments[0]), p_call->arguments.count > 1 ? p_call->arguments[1] : nullptr, position);
+	const uint32_t flags = p_call->arguments.count > 1 ? l_.any_value(p_call->arguments[1]) : undefined;
+	const uint32_t out = l_.reg(Kind::Obj);
+	const uint32_t is_one = l_.reg(Kind::Bool);
+	l_.emit(Op::AnyIs, position, is_one, pattern, *klass);
+	const uint32_t not_one = l_.emit(Op::JumpIfNot, position, is_one, 0);
+	const uint32_t no_flags = l_.reg(Kind::Bool);
+	l_.emit(Op::AnyStrictEq, position, no_flags, flags, undefined);
+	const uint32_t with_flags = l_.emit(Op::JumpIfNot, position, no_flags, 0);
+	l_.emit(Op::FromAny, position, out, pattern, *klass);
+	const uint32_t done = l_.emit(Op::Jump, position, 0);
+	l_.patch(not_one, l_.here());
+	l_.patch(with_flags, l_.here());
+	l_.emit(Op::RegExpCall, position, out, static_cast<uint32_t>(RegExpFunction::New), l_.arguments({ pattern, flags }));
+	l_.patch(done, l_.here());
+	return out;
 }
 
 uint32_t Calls::conversion_of(const List<Expr *> &p_arguments, Kind p_conversion, uint32_t p_position) {
@@ -142,7 +224,11 @@ uint32_t Calls::trace_call(Call *p_call) {
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = Lowerer::writer(p_call->arguments, i + 1);
 		Kind kind = Kind::Void;
-		const bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.kind_of(p_call->arguments[i]->type, &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.value_kind(p_call->arguments[i], &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		if (Lowerer::gives_nothing(p_call->arguments[i])) {
+			spoken_later = true; // What a call that gives nothing gives: undefined.
+			kind = Kind::Any;
+		}
 		values.push_back(l_.settled(l_.expression(p_call->arguments[i], spoken_later ? kind : Kind::Str), later, p_call->offset));
 	}
 	std::vector<uint32_t> list;
@@ -225,7 +311,8 @@ uint32_t Calls::call(Call *p_call, Kind p_want) {
 	if (const std::optional<uint32_t> called = Functions(l_).function_method(p_call)) {
 		return *called; // f.call(), f.apply()
 	}
-	Symbol *symbol = l_.callee_symbol(callee);
+	const bool on_null_as = callee->kind == NodeKind::Member && l_.null_as(static_cast<Member *>(callee)->object);
+	Symbol *symbol = on_null_as ? nullptr : l_.callee_symbol(callee);
 	if (!symbol) {
 		if (const std::optional<uint32_t> by_name = EngineCalls(l_).signal_call_by_name(p_call)) {
 			return *by_name;

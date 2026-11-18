@@ -59,7 +59,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
 	const ir::Class &klass = module_.classes[p_vector->klass];
 	if (p_key.index && *p_key.index < p_vector->length) {
-		return element_to_any(library_, klass, p_vector->data[*p_key.index], r_value);
+		return element_to_any(library_, klass, place(p_vector, *p_key.index), r_value);
 	}
 	if (p_key.index && !klass.array) {
 		raise_range(*p_key.index, p_vector->length);
@@ -126,7 +126,8 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
 		return method_value(p_holder, p_key.text, r_value);
 	}
-	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class) {
+	const bool library_error = klass.built_in && module_.error_class != NONE && is_class(p_object, module_.error_class);
+	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class || p_object->klass == module_.function_class || library_error) {
 		return true; // Dynamic in AS3, and nothing can be added to one here: undefined.
 	}
 	if (klass.built_in && p_object->klass != module_.class_class) {
@@ -197,7 +198,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 	} else if (klass && klass->element != Kind::Void) {
 		const Vector *vector = static_cast<const Vector *>(object);
 		const bool element = p_key.index && *p_key.index < vector->length &&
-				(!klass->array || !any::is_hole(vector->data[*p_key.index]));
+				(!klass->array || !any::is_hole(slots_of(vector)[*p_key.index]));
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (klass) {

@@ -7,20 +7,43 @@
 #include "values.h"
 
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace kas3 {
 namespace rt {
 
 // A vector's element by an int or a uint index, if the index names one: nothing for no vector, a negative
-// index or one past the end.
-inline Slot *element(Object *p_vector, int32_t p_index) {
-	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && static_cast<uint32_t>(p_index) < vector->length ? vector->data + static_cast<uint32_t>(p_index) : nullptr;
-}
+// index or one past the end. element() is for places that are slots, number() for the four bytes of an int
+// or a uint (Vector::narrow). Which a vector's are is not asked here for a slot: generated code calls
+// element() where the element's register is of any kind but an int's or a uint's, the register's kind is
+// the kind the vector's class holds (the lowerer types an element by the vector's declared type, as the
+// interpreter relies on when it counts what it reads), and a register declared to hold a vector holds no
+// vector of another class: vector types do not convert to one another, and an untyped value is checked
+// against the class as it is stored (tests/run/vector_narrow.as). It is the same trust a pointer read
+// out of a place has always had. number() does ask, which costs a vector of ints one test and keeps a
+// read of four bytes inside a vector whose places are eight.
 inline Slot *element(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && p_index < vector->length ? vector->data + p_index : nullptr;
+	return vector && p_index < vector->length ? vm::slots_of(vector) + p_index : nullptr;
+}
+inline Slot *element(Object *p_vector, int32_t p_index) {
+	return element(p_vector, static_cast<uint32_t>(p_index));
+}
+inline int32_t *number(Object *p_vector, uint32_t p_index) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->narrow && p_index < vector->length ? vm::numbers_of(vector) + p_index : nullptr;
+}
+inline int32_t *number(Object *p_vector, int32_t p_index) {
+	return number(p_vector, static_cast<uint32_t>(p_index));
+}
+// The places of a vector, for a loop that keeps them in a local: nothing for no vector (and for one that
+// has no room yet). Which sort they are is asked for numbers and not for slots, as of one element.
+inline Slot *slots_in(Object *p_vector) {
+	return p_vector ? vm::slots_of(static_cast<Vector *>(p_vector)) : nullptr;
+}
+inline int32_t *numbers_in(Object *p_vector) {
+	return p_vector && static_cast<Vector *>(p_vector)->narrow ? vm::numbers_of(static_cast<Vector *>(p_vector)) : nullptr;
 }
 
 // The vector, if its places hold what the code that asks reads and writes there: one of Godot's values
@@ -51,30 +74,79 @@ inline Object *made_object(Context *c, uint32_t p_class) {
 	found->klass = p_class;
 	found->gc_next = nullptr;
 	const uint32_t numbers = c->class_numbers[p_class];
-	for (uint32_t i = 0; i + 1 < size; i++) {
+	const uint32_t fields = c->class_fields[p_class];
+	for (uint32_t i = 0; i < fields; i++) {
 		field<Slot>(found, i) = (numbers >> i) & 1 ? slot(std::numeric_limits<double>::quiet_NaN()) : empty();
+	}
+	// What the block's last object was constructed with is not this one's: the record after the fields
+	// says nothing is remembered, and the rest of it is read only once a constructor has filled it.
+	if (fields + 1 < size) {
+		field<Slot>(found, fields) = empty();
 	}
 	return found;
 }
 
+// What an object is constructed with, remembered where it is made: for a class the host keeps only the
+// arguments of (Context::class_tells), an object of the class itself that has no record yet. The record is
+// the host's, after the object's fields: what there is of it and how many arguments, then each argument
+// after the object. An object of another class is one whose constructor called this one by `super(...)`:
+// its own tells of it, and there is nothing to keep here. False where the host is to be told (constructing).
+inline bool remembered_here(Context *c, Object *p_object, uint32_t p_class, const Slot *p_arguments, uint32_t p_count) {
+	if (!c->class_tells[p_class]) {
+		return false;
+	}
+	if (p_object->klass != p_class) {
+		return true;
+	}
+	Slot *const record = &field<Slot>(p_object, c->class_fields[p_class]);
+	uint32_t head[2];
+	std::memcpy(head, record, sizeof head);
+	if (head[0] != RECORD_NOTHING) {
+		return false;
+	}
+	head[0] = RECORD_ARGUMENTS;
+	head[1] = p_count - 1;
+	std::memcpy(record, head, sizeof head);
+	for (uint32_t i = 1; i < p_count; i++) {
+		record[i] = p_arguments[i];
+	}
+	return true;
+}
+
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
 // which is added (empty). Nothing for any other index, a fixed vector or no memory.
-//     Slot *element_added(Object *p_vector, uint32_t p_index);
+//     void *element_added(Object *p_vector, uint32_t p_index);
 inline Slot *element_to_write(Context *c, Object *p_vector, uint32_t p_index) {
 	Slot *const there = element(p_vector, p_index);
-	return there ? there : element_added(c, p_vector, p_index);
+	return there ? there : static_cast<Slot *>(element_added(c, p_vector, p_index));
 }
 inline Slot *element_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : element_to_write(c, p_vector, static_cast<uint32_t>(p_index));
+}
+inline int32_t *number_to_write(Context *c, Object *p_vector, uint32_t p_index) {
+	if (int32_t *const there = number(p_vector, p_index)) {
+		return there;
+	}
+	return p_vector && static_cast<Vector *>(p_vector)->narrow ? static_cast<int32_t *>(element_added(c, p_vector, p_index)) : nullptr;
+}
+inline int32_t *number_to_write(Context *c, Object *p_vector, int32_t p_index) {
+	return p_index < 0 ? nullptr : number_to_write(c, p_vector, static_cast<uint32_t>(p_index));
 }
 
 // Where push() of one value writes it, in a vector with room for one more: the room past a vector's end is
 // empty, so nothing is let go of there, and whoever writes it then counts the element in (`length`).
 // Nothing for no vector, a fixed one, or one that must grow first: the library's.
+inline bool has_room(const Vector *p_vector) {
+	return p_vector && !p_vector->fixed && p_vector->length < p_vector->capacity && p_vector->length < vm::MAX_VECTOR_LENGTH;
+}
 inline Slot *push_room(Object *p_vector) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	const bool room = vector && !vector->fixed && vector->length < vector->capacity && vector->length < vm::MAX_VECTOR_LENGTH;
-	return KAS3_LIKELY(room) ? vector->data + vector->length : nullptr;
+	return KAS3_LIKELY(has_room(vector)) ? vm::slots_of(vector) + vector->length : nullptr;
+}
+// The same in a vector of ints or of uints.
+inline int32_t *number_room(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return KAS3_LIKELY(has_room(vector) && vector->narrow) ? vm::numbers_of(vector) + vector->length : nullptr;
 }
 
 // What holds a property, and a key that is a String: null for a register that holds anything else.
@@ -147,12 +219,13 @@ inline Str *text_of(Context *c, bool p_value) {
 	return text_of_flag(c, p_value);
 }
 
-// A typed value as an untyped one, with a reference of its own.
-inline Slot to_any(Context *c, int32_t p_value) {
-	return any_integer(c, p_value);
+// A typed value as an untyped one, with a reference of its own. A whole number and a Boolean are their
+// own bits (vm/any.h), written here.
+inline Slot to_any(Context *, int32_t p_value) {
+	return vm::any::integer(p_value);
 }
-inline Slot to_any(Context *c, bool p_value) {
-	return any_boolean(c, p_value);
+inline Slot to_any(Context *, bool p_value) {
+	return vm::any::boolean(p_value);
 }
 inline Slot to_any(Context *c, Str *p_value) {
 	retain(c, p_value);
@@ -163,7 +236,7 @@ inline Slot to_any(Context *c, Object *p_value) {
 	return any_object(c, p_value);
 }
 inline Slot to_any(Context *c, uint32_t p_value) {
-	return p_value <= static_cast<uint32_t>(INT32_MAX) ? any_integer(c, static_cast<int32_t>(p_value)) : any_number(c, p_value);
+	return p_value <= static_cast<uint32_t>(INT32_MAX) ? vm::any::integer(static_cast<int32_t>(p_value)) : any_number(c, p_value);
 }
 // A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
 // number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.

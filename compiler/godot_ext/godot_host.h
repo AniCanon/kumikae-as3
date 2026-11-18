@@ -118,7 +118,7 @@ public:
 	void error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) override;
 	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
 	[[nodiscard]] void *attach_new(uint32_t p_class, vm::Object *p_object, std::string *r_error) override;
-	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *r_error) override;
+	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_class, const vm::Vector *p_vector, std::string *r_error) override;
 	[[nodiscard]] void *boxed(ir::Bare p_type, vm::Slot p_value, std::string *r_error) override;
 	[[nodiscard]] bool unboxed(ir::Bare p_type, void *p_handle, vm::Slot *r_value) override;
 	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,

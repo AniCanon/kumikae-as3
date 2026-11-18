@@ -26,10 +26,9 @@ void FunctionWriter::find_still() {
 		counts_nothing[i] = counts_nothing[i] || borrowed_[i] != NONE;
 	}
 	std::vector<uint32_t> read, written;
+	bool runs = false; // Something in it may run code, and code may write any static field that is no constant.
 	for (const Instruction &in : function_.code) {
-		if (in.op == Op::Call || may_run_code(module_, function_, in, counts_nothing)) {
-			return; // Something in it may run code, and code may write any static field.
-		}
+		runs = runs || is_call(in.op) || may_run_code(module_, function_, in, counts_nothing);
 		if (in.op == Op::GetGlobal && !ir::is_held(kind(in.a))) {
 			read.push_back(in.b);
 		} else if (in.op == Op::SetGlobal) {
@@ -39,10 +38,31 @@ void FunctionWriter::find_still() {
 	std::sort(read.begin(), read.end());
 	read.erase(std::unique(read.begin(), read.end()), read.end());
 	for (const uint32_t each : read) {
-		if (std::find(written.begin(), written.end(), each) == written.end()) {
+		if (std::find(written.begin(), written.end(), each) == written.end() && (!runs || own_constant(each))) {
 			still_.push_back(each);
 		}
 	}
+}
+
+// Whether a static field is a constant of the function's own class or of one that class extends. Such a
+// class's static fields are being given their values, or have been, by the time any of its functions runs
+// (a class is set up before it is used, its bases first), and what gives them is not running beside the
+// function but waiting beneath it or done: the constant is what it is for as long as the function runs.
+// Not in a function that itself sets the constant's class up (InitClass): there the lowerer did not take
+// the class for set up, and the constant is read where the function reads it.
+bool FunctionWriter::own_constant(uint32_t p_global) const {
+	const ir::Global &global = module_.globals[p_global];
+	const size_t dot = global.name.rfind('.');
+	if (!global.is_const || dot == std::string::npos) {
+		return false;
+	}
+	const std::string_view owner = std::string_view(global.name).substr(0, dot);
+	for (uint32_t at = function_.owner; at != NONE && at < module_.classes.size(); at = module_.classes[at].base) {
+		if (module_.classes[at].name == owner) {
+			return std::none_of(function_.code.begin(), function_.code.end(), [&](const Instruction &p_in) { return p_in.op == Op::InitClass && p_in.a == at; });
+		}
+	}
+	return false;
 }
 
 void FunctionWriter::read_global(const Instruction &p_in) {
@@ -63,14 +83,7 @@ std::string FunctionWriter::still_declared() const {
 }
 
 bool FunctionWriter::object(const Instruction &p_in) {
-	// A field of the method's own object is read through the class's struct; any other object's class is
-	// not known here, and its field is reached by its number.
-	const auto field = [&](uint32_t p_object, uint32_t p_field, Kind p_kind) {
-		if (is_this(p_object) && p_field < module_.classes[function_.owner].fields.size()) {
-			return own_field(p_field);
-		}
-		return "field<" + std::string(type_of(p_kind)) + ">(" + reg(p_object) + ", " + std::to_string(p_field) + ")";
-	};
+	const auto field = [&](uint32_t p_object, uint32_t p_field, Kind p_kind) { return field_of(p_object, p_field, p_kind); };
 	switch (p_in.op) {
 		case Op::Move:
 			if (p_in.a == p_in.b) { // A register moved to itself is nothing, and C++ warns of it.
@@ -191,13 +204,11 @@ bool FunctionWriter::flow(const Instruction &p_in) {
 			return true;
 		}
 		case Op::Jump:
-			line("goto " + label(p_in.a) + ";");
+			line(jump(p_in.a));
 			return true;
 		case Op::JumpIf:
-			line("if (" + reg(p_in.a) + ") goto " + label(p_in.b) + ";");
-			return true;
 		case Op::JumpIfNot:
-			line("if (!" + reg(p_in.a) + ") goto " + label(p_in.b) + ";");
+			line("if (" + std::string(p_in.op == Op::JumpIf ? "" : "!") + reg(p_in.a) + ") { " + jump(p_in.b) + " }");
 			return true;
 		case Op::Return:
 			// The result is the caller's: a register that owns its reference hands it over.

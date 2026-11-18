@@ -107,7 +107,7 @@ Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_t
 			release_object(array);
 			return nullptr;
 		}
-		array->data[i] = any::string(piece);
+		slots_of(array)[i] = any::string(piece);
 	}
 	if (!array) {
 		return nullptr;
@@ -126,7 +126,7 @@ Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_t
 	bool ok = property("input", any::string(input)) && property("index", any::integer(p_found.captures[0]));
 	for (size_t i = 0; ok && i < p_program.names.size(); i++) {
 		if (!p_program.names[i].empty() && i + 1 < count) {
-			ok = property(text_of_units(p_program.names[i]), share(Kind::Any, array->data[i + 1]));
+			ok = property(text_of_units(p_program.names[i]), share(Kind::Any, slots_of(array)[i + 1]));
 		}
 	}
 	if (!ok) {

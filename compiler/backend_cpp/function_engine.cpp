@@ -98,6 +98,11 @@ bool FunctionWriter::holds(uint32_t p_register, std::string_view p_type) const {
 	return has_parts(p_type) && parts(p_register) == p_type;
 }
 
+bool FunctionWriter::holds_handle(uint32_t p_register, std::string_view p_type) const {
+	return (kind(p_register) == Kind::Val || kind(p_register) == Kind::Ref) && parts(p_register).empty() && p_register < function_.engine_types.size() &&
+			function_.engine_types[p_register] == p_type;
+}
+
 void FunctionWriter::find_inline() {
 	inline_.assign(function_.registers.size(), false);
 	// Every type with parts: what Godot does with one it does on the bare value (function_values.cpp).
@@ -161,6 +166,20 @@ void FunctionWriter::find_aliases() {
 	for (uint32_t i = 0; i < alias_.size(); i++) {
 		alias_[i] = other[i] ? Alias::None : alias_[i];
 		has_owner_alias_ = has_owner_alias_ || alias_[i] == Alias::Owner;
+	}
+	asked_.assign(function_.registers.size(), false);
+	for (const Instruction &in : function_.code) {
+		const uint32_t on = in.op == Op::HostGet ? in.b : in.op == Op::HostSet ? in.a :
+				in.op == Op::HostCall && !function_.argument_lists[in.c].empty() ? function_.argument_lists[in.c][0] : NONE;
+		if (on != NONE && kind(on) == Kind::Ref) {
+			asked_[on] = true;
+		}
+		// And one handed to a method or a property that takes an object, which is given the object itself.
+		for (const uint32_t given : in.op == Op::HostCall ? function_.argument_lists[in.c] : std::vector<uint32_t>{ in.op == Op::HostSet ? in.c : NONE }) {
+			if (given != NONE && kind(given) == Kind::Ref) {
+				asked_[given] = true;
+			}
+		}
 	}
 }
 
@@ -297,6 +316,13 @@ std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, st
 	if (has_parts(p_type) && parts(p_register) == p_type) {
 		return "&" + reg(p_register);
 	}
+	// One of Godot's objects, where the parameter is of exactly the class the register is declared to hold:
+	// the object behind the handle, which is none for no handle and for an object Godot has freed, as the
+	// library gives Godot null for both.
+	if (held == Kind::Ref && holds_handle(p_register, p_type)) {
+		line("void *const " + temporary + " = " + object_behind(p_register) + ";");
+		return "&" + temporary;
+	}
 	if (p_type == "StringName" && held == Kind::Str && text_[p_register] != NONE) {
 		const std::string name = "c->names[" + std::to_string(thunks_.name_index(text_[p_register])) + "]";
 		*r_guard += " && " + name;
@@ -345,8 +371,11 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	}
 	const size_t missing = parameters.size() - std::min(parameters.size(), given.size());
 	const bool gives = result != "void";
-	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 2 || (out != NONE && (!gives || !holds(out, result))) ||
-			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result)))) {
+	// What comes back in a handle is made where a new handle keeps it, by the host (EngineApi::call_kept).
+	const bool kept = in_handle(result);
+	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 2 ||
+			(out != NONE && (!gives || !(kept ? holds_handle(out, result) : holds(out, result)))) ||
+			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result) || kept))) {
 		return false;
 	}
 	// The temporaries are written into a piece of their own: if an argument does not fit, nothing was.
@@ -367,18 +396,25 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		}
 		addresses += (i ? ", " : "") + *address;
 	}
-	line("if (KAS3_LIKELY(" + guard + ")) {");
+	line("if (KAS3_LIKELY(" + guard + (kept ? " && " + resolved + ".handle" : "") + ")) {");
 	if (!parameters.empty()) {
 		line("const void *const p[] = { " + addresses + " };");
 	}
 	const std::string type = result == "float" ? "double" : result == "bool" ? "uint8_t" : whole_type(result) ? "int64_t" : std::string(result);
-	if (gives) {
-		line(type + " v{};");
+	const std::string given_to = "(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", ";
+	if (kept) {
+		line("const Val v{ c->engine->call_kept" + given_to + resolved + ".handle) };");
+	} else {
+		if (gives) {
+			line(type + " v{};");
+		}
+		line("c->engine->call" + given_to + (gives ? "&v" : "nullptr") + ");");
 	}
-	line("c->engine->call(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", " + (gives ? "&v" : "nullptr") + ");");
 	// What Godot ran meanwhile may have been a listener of the program's, and that may have raised.
-	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + fail() + " }");
-	if (out != NONE) {
+	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + std::string(kept ? "release(c, v); " : "") + fail() + " }");
+	if (kept) {
+		line(out != NONE ? "put(c, " + reg(out) + ", v);" : "release(c, v);");
+	} else if (out != NONE) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}
 	line("} else");

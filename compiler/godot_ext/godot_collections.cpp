@@ -174,9 +174,11 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		Array array;
 		array.resize(static_cast<int64_t>(vector->length));
 		Variant *const places = places_of(array);
+		const vm::Slot *const slots = vector->narrow ? nullptr : vm::slots_of(vector);
 		for (uint32_t i = 0; i < vector->length; i++) {
 			// An object, typed or untyped, goes this same way, so that what it can't be is an error here.
-			const vm::Slot held = element == ir::Kind::Any ? vm::any::filled(vector->data[i]) : vector->data[i];
+			const vm::Slot at = slots ? slots[i] : vm::place(vector, i);
+			const vm::Slot held = element == ir::Kind::Any ? vm::any::filled(at) : at;
 			const bool untyped_object = element == ir::Kind::Any && vm::any::tag(held) == vm::AnyTag::Object;
 			const vm::Object *object = element == ir::Kind::Obj ? static_cast<const vm::Object *>(held.p)
 					: untyped_object							? static_cast<const vm::Object *>(vm::any::pointer(held))
@@ -205,12 +207,22 @@ namespace {
 
 // A packed array of whole numbers: each element must be one, and within what the array's elements hold.
 template <typename Packed>
-bool whole_numbers(ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, int64_t p_least, int64_t p_most, std::string_view p_holds, Variant *r_made,
+bool whole_numbers(ir::Kind p_kind, const vm::Vector *p_vector, int64_t p_least, int64_t p_most, std::string_view p_holds, Variant *r_made,
 		std::string *r_error) {
+	const size_t p_count = p_vector->length;
 	Packed packed;
 	packed.resize(static_cast<int64_t>(p_count));
+	// A vector of ints is what a packed array of 32-bit integers holds: its places are copied in one go.
+	if (p_kind == ir::Kind::I32 && p_vector->narrow && sizeof(packed[0]) == sizeof(int32_t) && p_least == INT32_MIN) {
+		if (p_count) {
+			std::memcpy(static_cast<void *>(packed.ptrw()), static_cast<const void *>(vm::numbers_of(p_vector)), p_count * sizeof(int32_t));
+		}
+		*r_made = packed;
+		return true;
+	}
+	const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
 	for (size_t i = 0; i < p_count; i++) {
-		const Variant value = to_variant(p_kind, p_elements[i]);
+		const Variant value = to_variant(p_kind, slots ? slots[i] : vm::place(p_vector, i));
 		if (value.get_type() != Variant::INT) {
 			*r_error = "element " + std::to_string(i) + " of the Vector is not a whole number, and Godot takes " + std::string(p_holds) + " here";
 			return false;
@@ -228,12 +240,14 @@ bool whole_numbers(ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, 
 
 // A packed array whose elements are of one of Godot's types (or, for numbers, of either number type).
 template <typename Packed, typename Element>
-bool values_of(ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, Variant::Type p_type, Variant::Type p_also, std::string_view p_holds, Variant *r_made,
+bool values_of(ir::Kind p_kind, const vm::Vector *p_vector, Variant::Type p_type, Variant::Type p_also, std::string_view p_holds, Variant *r_made,
 		std::string *r_error) {
+	const size_t p_count = p_vector->length;
 	Packed packed;
 	packed.resize(static_cast<int64_t>(p_count));
+	const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
 	for (size_t i = 0; i < p_count; i++) {
-		const Variant value = to_variant(p_kind, p_elements[i]);
+		const Variant value = to_variant(p_kind, slots ? slots[i] : vm::place(p_vector, i));
 		const bool missing_text = p_type == Variant::STRING && p_kind == ir::Kind::Str && value.get_type() == Variant::NIL;
 		if (value.get_type() != p_type && value.get_type() != p_also && !missing_text) {
 			*r_error = "element " + std::to_string(i) + " of the Vector is " + (value.get_type() == Variant::NIL ? std::string("null") : std::string("of another type")) +
@@ -250,7 +264,9 @@ bool values_of(ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, Vari
 // A vector whose places hold one of Godot's values whole: the places themselves are a packed array of
 // that type's elements, copied in one go; into an Array, each as a value of its own. Any other packed
 // array holds elements of another type, which the checker refuses before a program runs.
-bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Slot *p_elements, size_t p_count, Variant *r_made, std::string *r_error) {
+bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Vector *p_vector, Variant *r_made, std::string *r_error) {
+	const vm::Slot *const p_elements = vm::slots_of(p_vector); // A place that holds a value whole is a slot.
+	const size_t p_count = p_vector->length;
 	if (p_type == "PackedVector2Array" && p_bare == ir::Bare::Vector2) {
 		PackedVector2Array packed;
 		packed.resize(static_cast<int64_t>(p_count));
@@ -276,42 +292,44 @@ bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Slot *p
 
 } // namespace
 
-void *GodotHost::collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *r_error) {
-	const ir::Kind p_kind = p_vector.element;
+void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, const vm::Vector *p_vector, std::string *r_error) {
+	const ir::Kind p_kind = p_class.element;
 	Variant made;
 	bool ok = true;
-	if (p_vector.element_bare != ir::Bare::None) {
-		ok = bare_collection(p_type, p_vector.element_bare, p_elements, p_count, &made, r_error);
+	if (p_class.element_bare != ir::Bare::None) {
+		ok = bare_collection(p_type, p_class.element_bare, p_vector, &made, r_error);
 	} else if (p_type == "PackedByteArray") {
-		ok = whole_numbers<PackedByteArray>(p_kind, p_elements, p_count, 0, 255, "a byte", &made, r_error);
+		ok = whole_numbers<PackedByteArray>(p_kind, p_vector, 0, 255, "a byte", &made, r_error);
 	} else if (p_type == "PackedInt32Array") {
-		ok = whole_numbers<PackedInt32Array>(p_kind, p_elements, p_count, INT32_MIN, INT32_MAX, "a 32-bit integer", &made, r_error);
+		ok = whole_numbers<PackedInt32Array>(p_kind, p_vector, INT32_MIN, INT32_MAX, "a 32-bit integer", &made, r_error);
 	} else if (p_type == "PackedInt64Array") {
-		ok = whole_numbers<PackedInt64Array>(p_kind, p_elements, p_count, INT64_MIN, INT64_MAX, "a 64-bit integer", &made, r_error);
+		ok = whole_numbers<PackedInt64Array>(p_kind, p_vector, INT64_MIN, INT64_MAX, "a 64-bit integer", &made, r_error);
 	} else if (p_type == "PackedFloat32Array") {
-		ok = values_of<PackedFloat32Array, double>(p_kind, p_elements, p_count, Variant::FLOAT, Variant::INT, "numbers", &made, r_error);
+		ok = values_of<PackedFloat32Array, double>(p_kind, p_vector, Variant::FLOAT, Variant::INT, "numbers", &made, r_error);
 	} else if (p_type == "PackedFloat64Array") {
-		ok = values_of<PackedFloat64Array, double>(p_kind, p_elements, p_count, Variant::FLOAT, Variant::INT, "numbers", &made, r_error);
+		ok = values_of<PackedFloat64Array, double>(p_kind, p_vector, Variant::FLOAT, Variant::INT, "numbers", &made, r_error);
 	} else if (p_type == "PackedStringArray") {
-		ok = values_of<PackedStringArray, String>(p_kind, p_elements, p_count, Variant::STRING, Variant::STRING, "strings", &made, r_error);
+		ok = values_of<PackedStringArray, String>(p_kind, p_vector, Variant::STRING, Variant::STRING, "strings", &made, r_error);
 	} else if (p_type == "PackedVector2Array") {
-		ok = values_of<PackedVector2Array, Vector2>(p_kind, p_elements, p_count, Variant::VECTOR2, Variant::VECTOR2, "Vector2s", &made, r_error);
+		ok = values_of<PackedVector2Array, Vector2>(p_kind, p_vector, Variant::VECTOR2, Variant::VECTOR2, "Vector2s", &made, r_error);
 	} else if (p_type == "PackedVector3Array") {
-		ok = values_of<PackedVector3Array, Vector3>(p_kind, p_elements, p_count, Variant::VECTOR3, Variant::VECTOR3, "Vector3s", &made, r_error);
+		ok = values_of<PackedVector3Array, Vector3>(p_kind, p_vector, Variant::VECTOR3, Variant::VECTOR3, "Vector3s", &made, r_error);
 	} else if (p_type == "PackedVector4Array") {
-		ok = values_of<PackedVector4Array, Vector4>(p_kind, p_elements, p_count, Variant::VECTOR4, Variant::VECTOR4, "Vector4s", &made, r_error);
+		ok = values_of<PackedVector4Array, Vector4>(p_kind, p_vector, Variant::VECTOR4, Variant::VECTOR4, "Vector4s", &made, r_error);
 	} else if (p_type == "PackedColorArray") {
-		ok = values_of<PackedColorArray, Color>(p_kind, p_elements, p_count, Variant::COLOR, Variant::COLOR, "Colors", &made, r_error);
+		ok = values_of<PackedColorArray, Color>(p_kind, p_vector, Variant::COLOR, Variant::COLOR, "Colors", &made, r_error);
 	} else {
 		// An Array, or a place that takes anything: each element as Godot holds a value of its kind.
 		Array array;
-		array.resize(static_cast<int64_t>(p_count));
+		array.resize(static_cast<int64_t>(p_vector->length));
 		Variant *const places = places_of(array);
-		for (size_t i = 0; i < p_count && ok; i++) {
+		const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
+		for (uint32_t i = 0; i < p_vector->length && ok; i++) {
+			const vm::Slot held = slots ? slots[i] : vm::place(p_vector, i);
 			if (p_kind == ir::Kind::Obj) {
-				ok = object_element(static_cast<const vm::Object *>(p_elements[i].p), &places[i], r_error);
+				ok = object_element(static_cast<const vm::Object *>(held.p), &places[i], r_error);
 			} else {
-				place(&places[i], p_kind, p_elements[i]);
+				place(&places[i], p_kind, held);
 			}
 		}
 		made = array;

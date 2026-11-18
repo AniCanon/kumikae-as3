@@ -1,160 +1,136 @@
-# Kumikae AS3 for JetBrains IDEs
+# Kumikae AS3 for Rider and IntelliJ IDEA
 
-## Install in Rider
+A plugin for writing Godot games in ActionScript 3. It adds language support, a project wizard, run
+configurations for desktop, iOS and Android, embedded device displays, a test runner, and editors
+for `project.godot` and scenes.
 
-In **Settings → Plugins → ⚙ → Install Plugin from Disk**, select the Kumikae AS3 ZIP and restart Rider.
-The macOS development distribution includes the compiler, test runner and mobile AS3 runtimes.
-Install Godot for desktop play and export. iOS also uses Xcode and an installed Simulator runtime.
-Android export uses the Android SDK, Build Tools, matching Godot export templates and an ARM64 device.
+This page is for someone using the plugin. To change it, read [ARCHITECTURE.md](ARCHITECTURE.md) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-Open the game's folder and double-click **project.godot** for its scene, artwork and viewport.
-Use **Run → Add Game Target…**, choose a Godot preset, pick a destination in the toolbar and press **Run**.
-**View → Tool Windows → Game Devices** lists the available iOS simulators and Android virtual devices.
-Desktop play, mobile launches and test suites share the **Kumikae AS3** group in Run Configurations.
+## Requirements
 
-Click the icon or splash in **General** to open the artwork gallery. Search by filename or folder,
-select a thumbnail and inspect its preview before choosing **Use Icon** or **Use Splash**.
-**Browse…** also accepts local images. **Import and Use** copies the selected file into the game's
-`assets/` folder, giving it a unique name when needed. **Apply** saves the assignment.
-The splash preview uses the project's launch window size, background, filtering and boot stretch mode.
-The main scene list shows the project's scenes. **Display** previews the actual width, height and aspect ratio.
-Rider saves these settings to Godot's files. The **Game** project view identifies source and test
-roots, and the gutter beside an AS3 test runs that method or fixture. Open a scene to inspect its
-node tree and attached scripts. Use **Open in Godot** for the 2D or 3D canvas.
+| | |
+|---|---|
+| IDE | Rider 2026.2, or IntelliJ IDEA 2026.1. The plugin accepts builds 261.22158.277 through 262.10968.170, and has been checked on those two |
+| IntelliJ IDEA only | The LSP4IJ plugin, version 0.21.0. Rider uses its own language client |
+| Operating system | macOS. The Simulator panel exists only on macOS. Windows and Linux are untested |
+| To run a game | Godot 4.7 |
+| For the Simulator | Xcode |
 
-The macOS 0.2.0 build was exercised in Rider 2026.2.3.1 with Support Sprint on iOS Simulator and an
-ARM64 Android emulator. The IDE probes covered target selection, embedded pointer input, the project
-artwork and viewport, test results and navigation to a failing assertion. The plugin verifier checked
-Rider RD-262.10968.170 and IntelliJ IDEA IU-261.22158.277.
+There is no AS3 debugger yet.
 
-The plugin integrates ActionScript 3 with Rider's native LSP client and IntelliJ IDEA Community/free
-unified IDEA through LSP4IJ. Both use the same compiler language server and local typing handlers.
-In IDEA, install and enable **LSP4IJ** (tested version 0.21.0) in **Settings > Plugins**; Rider does not
-require it. It also provides project/run tools and an iOS Simulator panel. See
-[completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
-[completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
-The Simulator's own measurements are described below. The [completion follow-up results](../../docs/results/2026-11-completion-followup.md)
-cover generated edits, diagnostics, Undo and project lifetime checks. The plugin keeps Rider's split
-Problems view and owns the cleanup needed by the tested Rider build. Install, update and uninstall
-require an IDE restart.
+## Build the plugin
 
-The automated validation of 2026-11-16 passes: the verifier finds no internal API in either IDE build, and
-the four sandbox probes pass, hover included. See the [current results](../../docs/results/2026-11-completion-followup.md#validation).
+You need a JDK 25, and Rider 2026.2 installed. The build compiles against the installed IDE and never
+downloads one.
 
-Still left for a person: acceptance of the editing workflow by hand (and production focus behavior, which
-the background sandbox cannot show), a first run on Windows, and IDE builds older or newer than the two
-installed ones, which were not verified because that needs a download.
+Build the compiler first, so that the plugin bundles `kas3c`. Build the Godot extension too if you want the
+project wizard to set up new projects with it. See [the compiler's README](../../compiler/README.md#build-and-test).
 
-| Checked | By | Result |
-|---|---|---|
-| Compilation, style check and plugin zip | Automated build, 2026-11-16 | `./gradlew check buildPlugin` succeeds, with no compiler warnings. |
-| Service tests (`core`) | Automated build | 85 pass; three opt-in live probes skip in ordinary checks. |
-| Plugin tests (language, project tools, panel and adapters) | Automated build | 174 pass; one opt-in retention probe skips in ordinary checks. |
-| Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin`, 2026-11-16 | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0: on each, 0 internal, 6 deprecated, 45 experimental and 1 scheduled-for-removal API usages. |
-| Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, hover documentation, navigation and outline pass where the client is enabled; missing IDEA dependency is reported, and no hover is shown without it. |
-| Native Swift tests | `swift test` | 38 pass in 20 suites. |
-| Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
-| Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |
-| Native helper/reader endurance | Owned 60 Hz fixture, 600.020 seconds | 59.90 reader frames/s, 59.60 distinct raster ticks/s; 29,975 inputs, p95 6.72 ms and max 57.84 ms. Whole-panel cadence and the historical 82 ms event remain unverified. |
-| Standalone frame retention | Production repository/controller/screen, synthetic frames | 7,800 distinct paints; full-GC heap 48.023–48.097 MiB, one retained stream image; zero images and 35.097 MiB hidden. Whole IDE/Compose not measured. |
-| Agent client tests | `python3 -m unittest` | 9 pass. |
-| Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
-| The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
-| Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
-| The panel in a Rider window, by a person | Owner | Snapshot version was slow; live version still needs the owner's acceptance. |
-| Native panel against a booted Simulator | Automated visible sandbox probe | 63.45 distinct frames painted/s at 1206×2622; observation-to-paint p50 21.48 ms, p95 32.13 ms; press-to-input barrier acknowledgment 3.95–18.70 ms. These are not optical presentation or application-response timings. |
-| Native ten-minute visible panel | Automated sandbox probe | Mean 58.92 frames/s, minute windows 46.39–64.23; helper RSS 41.78–53.94 MiB. IDE heap samples were bounded but ended higher; absence of IDE memory growth is not established. |
-| Earlier idb ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
-| idb input against a booted Simulator | `simulator.py` and the sandbox panel probe | Density 3; Home, taps and Settings swipes observed. Earlier text, Lock and Rotate commands were accepted, without a separate visual confirmation. |
+From this folder, with `JAVA_HOME` set to the JDK 25:
 
-The designs (`docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md` and
-`2026-11-14-simulator-native-design.md`, kept out of the repository)
-compare screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
-give the detail behind this table. [ARCHITECTURE.md](ARCHITECTURE.md) describes the
-parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
+```sh
+./gradlew buildPlugin
+```
 
-## What is implemented
+The zip is written to `build/distributions/`.
 
-- Native LSP completion with typed member chains, imports, lexical scopes, replacement ranges,
-  capability-aware callable snippets, automatic type imports, override stubs and signature help.
-- AS3 statement templates for `try/catch`, `if`, `while`, `do/while`, `for`, `for each` and `switch`,
-  with native Tab navigation and linked names. See the [completion guide](../completion.md).
-- Local paired punctuation, quote handling and Enter indentation using the IDE's settings. AS3 tokens
-  drive editing while the shared TextMate grammar supplies colors.
-- A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
-  running one has its own tab, and closing the tab shuts it down. Zoom, a console drawer and a
-  drawn device body (with the camera housing on the models that have one) are in the device's tab.
-- The **iOS** tab of **Game Devices** on macOS. Select a device, boot it, view its
-  screen, install an explicit `.app`, launch a bundle, and read console output.
-- Full-resolution native pictures after the owner's private-input switch. A
-  service-owned Swift helper reads the Simulator framebuffer into one mapped slot.
-  Copies happen off the UI thread; only the newest picture survives. Static device
-  decoration is cached at display density, with a 16 MiB allocation limit. If the
-  helper cannot start, the panel reports the native failure and retries. The status
-  line identifies native capture and its pixel dimensions. With input off, the panel retains JPEG
-  snapshots, capped at two requests per second. Hidden windows and the Simulators list stop pictures.
-  Failed live streams report a retry with bounded backoff. A guest input service
-  still starting after reboot keeps the native route available for that retry.
-- One action at a time. A button pressed while another action runs is refused
-  with a message, never queued. A picture that arrives after the device changed,
-  or after a boot, launch or rotation, is thrown away. A device picked while an
-  action runs is refused too; the list returns to the service's device.
-- An agent command-line client that talks to the same service as the panel.
-  It saves PNG screenshots, reads logs and the test report, and offers input.
-- Native input tracks press, movement and release live; pending moves coalesce.
-  Taps, ASCII keys, Unicode paste, Home and Lock use the same persistent helper. Native
-  rotation changes the guest orientation, turns the picture and remaps touch. Native capture and input require the owner's switch.
-- Tests for protocol validation, geometry, device parsing, command construction,
-  log limits, process timeouts, session cleanup and HTTP authentication, and for
-  the panel's state: stale pictures, refused actions, failures, the console
-  cursor, input permission, hidden windows and late results after closing.
+| What the build needs | Where it looks |
+|---|---|
+| Rider | `RIDER_HOME`, or `/Applications/Rider.app` |
+| Gradle and the libraries | Downloaded by the Gradle wrapper on the first build. Add `--offline` after that |
+| Swift 6, for the Simulator helper | The installed Xcode. Without it, the helper is skipped and the build says so |
 
-The bundled helper is the only live capture and input backend. It loads private Apple interfaces only
-after the existing opt-in. It accepts Apple-silicon iPhone and iPad devices when the selected Xcode passes the
-runtime capability checks; a build deny list can reject a known incompatibility
-with its reason. Only Xcode 27.0 build 27A266a has been measured. Missing or
-changed capabilities and unsupported devices report an error. The legacy idb backend
-and installer have been removed.
+## Install the plugin
 
-This is the beginning of the one plugin planned in roadmap stage 6. It connects `kas3c lsp` for
-completion, argument help, errors and navigation; AS3 breakpoints and stepping remain planned.
-The Simulator panel is absent on Windows and Linux. The supported targets are Rider and IntelliJ IDEA
-Community/free unified IDEA. Android Studio is outside the scope. Other operating systems remain
-unverified; the compatibility range and exact tested builds are listed below.
+1. In the IDE, open **Settings > Plugins**.
+2. Click the gear icon and choose **Install Plugin from Disk**.
+3. Select the zip file from `build/distributions/`.
+4. Restart the IDE. Installing, updating and uninstalling all need a restart.
 
-## Project settings, scenes and packages
+In IntelliJ IDEA, install **LSP4IJ** from **Settings > Plugins** as well. If it's missing, the plugin shows
+a notification when you open an AS3 file. Typing help works without it, and completion and errors don't.
 
-Open `project.godot` to use the **Settings** editor alongside its source editor.
-General contains the application name, main scene and icon chooser/preview. Display
-contains viewport size, stretch mode and the seven Godot orientation policies.
-Export edits the application identifier and icon of an existing iOS or Android
-preset. Apply changes the IDE documents in one undoable command. Save the project
-before exporting; rebuild an installed app to change its orientation policy.
-A landscape-only game's layout must still be adapted before using portrait.
+### How the plugin finds the compiler
 
-Unknown settings and comments are preserved. Invalid values and external source
-changes are reported. Reload discards the current draft and reads the source again.
-Preset-specific drafts survive switching presets. Signing settings remain in the
-export source. Use **Add Game Target** to add a preset. Select **Export** or **Export All** and choose an output
-folder. Each export gets its own directory. Release signing uses the credentials configured in Godot.
-**Properties** displays additional Godot settings, including dictionaries and arrays entered in Source.
+The plugin uses the first `kas3c` it finds, in this order:
 
-Open a `.tscn` to use its **Scene** editor. The outline shows native node types and
-attached AS3 paths. Open Script navigates to the source; Attach/Detach changes the
-script resource and node assignment, with undo. Attach currently accepts a script
-that directly extends the node's native type, with an explicit native import or
-qualified base name. Inherited/instanced scenes and other base relationships must
-be edited in Godot. The source editor remains available for the complete format.
-AS3 class gutters and **Find Attached Scene Nodes** in the editor menu navigate
-back to scenes that attach the script.
+1. A build in the project or in a folder above it: `compiler/build/kas3c` or `build/kas3c`.
+2. The one bundled with the plugin.
+3. The `PATH`, then `/opt/homebrew/bin` and `/usr/local/bin`, then `~/.local/bin`.
 
-The **Game** tree compacts empty directory chains under `src` and `tests` into
-package names such as `com.supportsprint`. Its context menu has **Compact AS3
-Packages**, **Show AS3 Members** and **Show Generated Files**. These options change presentation;
-ordinary project views and physical directories remain available. Package rename
-refactoring is not implemented.
+Rebuilding the compiler elsewhere doesn't update the copy inside an installed plugin. Rebuild and
+reinstall the plugin to update it.
 
-## AS3 tests
+## Language support
+
+Errors as you type, completion, signature help, go to definition, find references, hover and outline come
+from the compiler's language server. Bracket pairing and indentation are the plugin's own. See
+[Completion and typing help](../completion.md).
+
+## Create a project
+
+Choose **File > New Project > AS3 Godot Game**. The wizard creates a small game that runs: a
+`project.godot`, a scene, two scripts, and the extension's files.
+
+- **Package name.** The app's identifier, such as `com.studio.game`. Left empty, it's made from the
+  project's name.
+- **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and an
+  Simulator run configuration. Android adds its own export preset. Companion plugins can contribute additional targets.
+
+## Run the game
+
+Opening a project that has a `project.godot` and at least one `.as` file adds a run configuration named
+**Game**, of the type **Kumikae AS3 → Game**. Press Run. The game starts in Godot, and what it prints appears in
+the Run window.
+
+| Field | Left empty |
+|---|---|
+| Godot | Found on the `PATH`, in `/opt/homebrew/bin` or `/usr/local/bin`, or in `/Applications` |
+| Project folder | This project |
+| Scene | The project's main scene |
+
+Edit a script while the game runs and save. The game takes the new code and keeps its state. See
+[Hot reload](../../docs/hot-reload.md).
+
+## Run on iOS or Android
+
+Open **Run → Add Game Target…** and choose a Godot export preset. In **Game Devices → Simulators**,
+start a simulator or Android virtual device. Select the destination in the run toolbar and press **Run**.
+Rider reads the application identifier from the preset, builds the game, installs it and launches it.
+iOS requires Xcode and a Simulator runtime. Android requires the Android SDK, matching Godot export
+templates and an ARM64 destination. The macOS distribution bundles the AS3 runtimes and Simulator template.
+
+## The iOS Simulator panel
+
+Open **View → Tool Windows → Game Devices** and select an iOS simulator. The iOS tab displays its
+screen, input controls and console. Android devices open in the Android tab.
+
+### Live picture and input
+
+At first the panel shows snapshots, at most two a second, taken with Xcode's public `simctl` tool.
+
+To see a live picture and to tap, drag and type in the panel, choose **Switch input on for live picture**
+from the menu and confirm. The panel then uses a bundled helper that reads the Simulator's screen and sends
+input through private Apple interfaces. The choice is remembered.
+
+- The helper works with iPhone and iPad simulators on a Mac with Apple silicon.
+- It checks that the installed Xcode has the interfaces it needs, and reports an error if not. Only Xcode
+  27.0 has been tested.
+- Taps, drags, Home, Lock and rotation work. Typing sends ASCII as key presses. Other text goes through the
+  simulator's pasteboard, and iOS may ask you to allow the paste.
+- There is no multi-touch and no audio.
+- Hiding the panel stops the helper.
+
+### The console
+
+The console shows what the launched app prints. It keeps the most recent 128,000 characters or so and marks
+where older output was dropped. It isn't the whole iOS system log.
+
+Changing device, launching again, or closing the project stops the console's process, which can stop the
+app it launched. The Simulator stays booted.
+
+## Tests
 
 Click the gutter beside a method to run that test, or beside a class to run its fixture.
 Use **Run Game Tests** on the Tests folder for the default target. Context runs use the local test
@@ -167,238 +143,88 @@ New games keep model code in `src/<package>`, engine scripts in its `view` packa
 test cases and test suites. Use **New → ActionScript Package** for a namespace. An empty `[Suite]`
 collects its directory's fixtures in Rider. Give the suite typed fixture fields to select a subset.
 
-The [testing guide](../../testing/README.md) describes the AS3 assertion library,
-`TestCase` setup/teardown, typed parameter cases, manifest and CLI. This is a new
-framework for this runtime, inspired by AS3, Kotlin, Swift and C# conventions;
-it does not implement FlexUnit metadata discovery. Existing Godot integration
-scenes can be registered as individual process-level tests.
+[Testing](../../testing/README.md) describes the library, the manifest and the command-line runner.
 
-## Build
+## Project settings and scenes
 
-The build needs JDK 25 and an installed Rider 2026.2 (build 262.10968.170). It uses
-the Gradle wrapper (Gradle 9.8.1), Kotlin 2.4.10 with the Compose compiler plugin,
-the IntelliJ Platform Gradle Plugin 2.20.0, ktlint 1.8.0 and Compose Swing UI
-0.1.0-alpha06, plus LSP4IJ 0.21.0 for the optional IDEA adapter. It compiles against the installed IDE
-and never downloads one.
-Rider's own runtime is a JDK 25. Building the native helper also needs installed
-Swift 6; `buildSimulatorBridge` runs `swift build -c release` and bundles the
-executable and its resource bundle in `native/`. Without installed Swift on macOS
-that task logs a skip. It downloads nothing. Run `swift test` in
-`native/SimulatorBridge` for the helper tests.
+**`project.godot`.** Open the file to use the **Settings** editor beside its source. It edits the
+application's name, main scene and icon, the viewport size, stretch mode and orientation, and the
+identifier and icon of an existing iOS or Android export preset. Settings and comments it doesn't know are
+kept. **Apply** changes the file in one undoable step.
 
-From this directory, with `JAVA_HOME` set to a JDK 25:
+Click the icon or splash in **General** to open the artwork gallery. Search by filename or folder,
+select a thumbnail and inspect its preview before choosing **Use Icon** or **Use Splash**.
+**Browse…** also accepts local images. **Import and Use** copies the selected file into the game's
+`assets/` folder, giving it a unique name when needed. **Apply** saves the assignment.
+The splash preview uses the project's launch window size, background, filtering and boot stretch mode.
 
-```sh
-./gradlew check buildPlugin
-python3 -m unittest discover -s tests -v
-```
+Choose **Add Game Target** for a new preset, or **Export** or **Export All** to build existing targets. **Properties** shows additional Godot settings entered in Source.
 
-`check` runs the Kotlin style check and tests of both modules, plus strict Swift
-lint when installed Swift on macOS is available. `./gradlew formatSimulatorBridge`
-formats native Swift with Xcode’s installed swift-format. Native builds and plugin
-packaging also require this lint check. `buildPlugin`
-refuses to build while the style check fails, and puts a zip in
-`build/distributions/`. `./gradlew ktlintFormat` fixes most style findings.
-`./gradlew verifyPlugin` runs JetBrains' plugin verifier against installed Rider and IDEA, including
-the LSP4IJ dependency. `IDEA_HOME` selects IDEA; its default is `/Applications/IntelliJ IDEA.app`.
+**Scenes.** Open a `.tscn` file to use the **Scene** editor. Its outline shows each node's type and the AS3
+script attached to it. You can open a script, and attach or detach one. Attaching accepts a script that
+directly extends the node's type. Edit inherited and instanced scenes in Godot.
 
-Rider is found through the `RIDER_HOME` environment variable, or at
-`/Applications/Rider.app` when it is not set. The wrapper uses your normal Gradle
-home. On a machine that has not built this before, it downloads Gradle 9.8.1 and
-the dependencies named above; add `--offline` once they are cached. No JDK is
-downloaded: without a JDK 25 the build stops.
+**From a script to its scenes.** A gutter icon on an AS3 class, and **Find Attached Scene Nodes** in the
+editor's menu, show the scene nodes that use the script.
 
-## Run a sandbox IDE
+**The Game view.** The project view has a **Game** pane that shows empty folder chains under `src` and
+`tests` as package names, such as `com.studio.game`. Its menu has **Compact AS3 Packages**, **Show AS3 Members** and **Show Generated Files**.
 
-```sh
-./gradlew runIde
-```
+## Use the Simulator from the command line
 
-This starts the installed Rider with separate settings and plugin files under
-`.intellijPlatform/sandbox/`. It does not touch your own Rider settings. Open this
-worktree or the Godot test project, then **View > Tool Windows > iOS Simulator**.
+`simulator.py` is a client for the same local service the panel uses. A script or a coding agent can use it
+to drive the Simulator while you watch in the panel. It needs only Python's standard library.
 
-## Check the panel without a person
+1. In the panel's menu, choose **Copy agent endpoint path**. The file holds a local port and a secret
+   token. Keep it private.
+2. Pass that path to the client:
 
-```sh
-./gradlew runIde -PuiProbe
-```
+   ```sh
+   SESSION=/path/shown/in/the/panel/session.json
+   python3 simulator.py --session "$SESSION" devices
+   python3 simulator.py --session "$SESSION" select --device '<id from devices>'
+   python3 simulator.py --session "$SESSION" boot --device '<id from devices>'
+   python3 simulator.py --session "$SESSION" screenshot --device '<id from devices>' --out build/screen.png
+   python3 simulator.py --session "$SESSION" tap --frame build/screen.png.json 120 300
+   python3 simulator.py --session "$SESSION" launch --device '<id from devices>'
+   python3 simulator.py --session "$SESSION" log --cursor 0
+   ```
 
-This adds a second, test-only plugin to the sandbox. It mounts the real panel
-with a synthetic service, in the light and the dark theme, without showing a
-window. It presses Refresh, Boot, Launch and Install through the real buttons,
-checks what the panel then displays, and writes pictures and `result.txt` to
-`build/reports/ui/`. The task fails unless the result is `passed`. Look at the
-pictures after any change to the layout. The default probe never talks to a
-Simulator and is never part of the plugin zip.
-An explicitly enabled `KUMIKAE_SIMULATOR_LIVE_PROBE=1` run uses the already booted
-demo device's Home and Settings, real Swing pointer phases and native input. Adding
-`KUMIKAE_SIMULATOR_ENDURANCE_PROBE=1` extends that run by ten minutes, sampling CPU,
-heap and RSS. The live run requires the native route, checks that hiding the panel
-releases its helper, and reports measurements without asserting performance targets.
+The other commands are `status`, `shutdown`, `install`, `terminate`, `report`, `text`, `button`, `rotate`
+and `swipe`. Add `--help` after any command.
 
-## Isolated native checks
+- **Coordinates are pixels in a saved screenshot,** not points and not positions on your Mac. Save a new
+  screenshot after a rotation.
+- **Stale input is refused.** The `.json` saved beside a screenshot records the screen's geometry. If the
+  geometry has changed since, the tap fails.
+- **Don't retry input blindly after a timeout.** It may have reached the device.
+- **Input needs the same switch as the panel.**
 
-No probe starts as part of an ordinary test run. With the release helper already
-built, `KUMIKAE_NATIVE_LIFECYCLE_PROBE=1 ./gradlew --offline :core:test --tests '*NativeLifecycleProbe'`
-creates one disposable iPhone using an installed runtime. It checks external
-shutdown, reboot, session shutdown/boot and selection recovery. It captures frames
-from an already booted Simulator for the selection check, sends it no input, and
-deletes only the device it created, including after failures. A pre-existing probe
-name is refused. `ProbeDeviceOwnerTest` covers lost creation replies and cleanup
-errors with fake commands.
+The service listens only on `127.0.0.1`. There is one selected device for each session, shared by the
+panel and every client. [protocol.md](protocol.md) has the wire format.
 
-The owned rotation/Unicode and ten-minute timing probes are documented in the
-[native helper README](native/SimulatorBridge/README.md#measurements-and-limits).
-They also delete their disposable device on failure; no IDE is started.
-
-`KUMIKAE_FRAME_RETENTION_PROBE=1 ./gradlew --offline :test --tests '*FrameRetentionProbe'`
-paints 7,800 fresh 1206×2622 images through the production repository, controller
-and native screen in a standalone test JVM. It shows no window and uses no
-Simulator. Live heap histograms force full collections; samples include the GC's
-recorded after-collection heap, weak image counts and verified distinct paints.
-It covers these objects, not a mounted Compose view or the whole IDE.
-
-`KUMIKAE_SIMULATOR_MEMORY_PROBE=1 ./gradlew --offline runIde -PuiProbe` is a separate
-ten-minute IDE probe with synthetic frames and a mounted, undisplayed production
-view. It writes `memory.csv` and live histograms under `build/reports/ui/`, including
-hidden/disposed samples. **This probe was prepared but not run in the follow-up:**
-the owner's sandbox IDE was in use. Do not run it beside another sandbox session.
-
-## Use the panel
-
-Choose an available iOS device. Boot does not erase or create one. Type an absolute
-path to a Simulator `.app` into **App**, then press **Install**. The default bundle
-is `org.kumikae.as3test`; its app is `kas3test.app`. **Launch restarts that app.**
-Do not install a device-only export. The custom Apple-silicon Simulator template
-is separate work; this plugin does not build it.
-
-For a check without the Godot app, select the booted device and launch
-`com.apple.Preferences`. The underlying Xcode commands were tested with Settings.
-The panel itself has been drawn by the UI probe, not yet used by a person.
-
-The console belongs to the session. Changing device, relaunching, closing the
-project or stopping the standalone service closes its console process. Xcode
-forwards signals to the app, so this may stop the app launched by the session.
-It leaves the Simulator booted. Apps started elsewhere are not attached or stopped.
-Hiding the panel leaves the service available to an agent and keeps collecting logs.
-
-Logs are chunks of text with cursors, kept in 256 Ki characters of memory. The
-panel retains 128 Ki characters. Older output is discarded with a flag. No growing
-log files are created. These are the launcher's console pipes, not all iOS unified
-logs. App streams may be combined by `simctl`. An empty console is not a passing
-test. The `report` command reads `Documents/as3test.txt` from the app's data
-container. That path was read from the actual Simulator export: 14 passed, 0 failed.
-
-## Use the same session from an agent
-
-Copy the endpoint file's path with **⋮ > Copy agent endpoint path** in the panel. It holds a local port and a
-secret token. Keep it private. The client refuses a descriptor readable by other
-users. The server listens only on `127.0.0.1`. There is one selected device per
-session, shared by the IDE and every connected agent.
-
-```sh
-SESSION=/absolute/path/shown/in/the/panel/session.json
-python3 simulator.py --session "$SESSION" devices
-python3 simulator.py --session "$SESSION" select --device '<id from devices>'
-python3 simulator.py --session "$SESSION" boot --device '<id from devices>'
-python3 simulator.py --session "$SESSION" screenshot --device '<id from devices>' --out build/screen.png
-python3 simulator.py --session "$SESSION" tap --frame build/screen.png.json 120 300
-python3 simulator.py --session "$SESSION" swipe --frame build/screen.png.json 120 500 120 200 --duration-ms 400
-python3 simulator.py --session "$SESSION" text --device '<id from devices>' 'hello'
-python3 simulator.py --session "$SESSION" button --device '<id from devices>' home
-python3 simulator.py --session "$SESSION" rotate --device '<id from devices>' landscape_left
-python3 simulator.py --session "$SESSION" launch --device '<id from devices>'
-python3 simulator.py --session "$SESSION" log --cursor 0
-python3 simulator.py --session "$SESSION" report --device '<id from devices>'
-```
-
-Use `--help` after any command. Save a new screenshot after rotation. Tap and swipe
-coordinates are pixels in that screenshot, not points or coordinates on the Mac.
-The saved `.json` carries the device and geometry generation. A generation is a
-number that changes when the service loses or changes its known screen geometry.
-Stale input is refused. Failed commands return a nonzero exit code. Do not retry
-input blindly after a timeout: it may already have reached the device.
-
-To run the same service without an IDE:
+### Run the service without an IDE
 
 ```sh
 ./gradlew :core:installDist
 core/build/install/kumikae-simulator/bin/kumikae-simulator --state-dir "$PWD/build/agent"
 ```
 
-The launcher needs a Java 25 on `JAVA_HOME` or the `PATH`, because the service is
-compiled for the same Java as the plugin. It prints an endpoint file path. Keep that process running and point the client
-at that file. Ctrl+C closes it. All session files go under the supplied directory.
-The exact wire format is in [protocol.md](protocol.md).
+The service needs Java 25. It prints the path of its endpoint file. Keep it running, and point the client
+at that file.
 
-## Input: the owner's switch
-
-The existing **⋮ > Switch input on…** confirmation permits private Apple interfaces
-for pictures and input and remembers the choice. Live pictures use the bundled native
-helper. With the switch off, pictures use public `simctl`. Missing frameworks, symbols,
-unsupported Xcode builds or startup failures display a reason and retry with bounded
-backoff. Input already submitted is never replayed.
-
-The helper's private surface and Xcode guard are documented in
-[native/SimulatorBridge/README.md](native/SimulatorBridge/README.md). It owns no
-Simulator window and needs no Screen Recording permission. Hiding the panel stops
-its frame subscription and helper. Reopening creates a fresh connection.
-
-The standalone service has no panel to ask. Set its explicit opt-in and helper path:
+The service has no panel to ask about input, so opt in with the environment:
 
 ```sh
 export KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1
-export KUMIKAE_SIMULATOR_NATIVE=/absolute/path/to/simulator-bridge
+export KUMIKAE_SIMULATOR_NATIVE=/path/to/simulator-bridge
 ```
 
-ASCII text uses US keyboard usages. Other printable Unicode uses the selected
-guest’s pasteboard and Command-V; accept the guest’s Allow Paste prompt when shown.
-Apps may refuse paste, particularly in secure fields. Controls, invalid surrogate
-pairs and text longer than 4096 UTF-16 code units are refused. Native drags follow the pointer
-live. There is no multi-touch or audio. Lock is implemented but has
-not been visually verified on the shared device. Native rotation follows the
-guest's interface orientation; an app may restrict which orientations it accepts.
+## Limits
 
-## Layout of the code
-
-| Path | Job |
-|---|---|
-| `native/SimulatorBridge/` | Swift library, thin executable, shared frame layout and native tests. |
-| `core/` | Kotlin service, Xcode commands, optional input adapter, protocol and tests. No IDE imports. Also the standalone service. |
-| `src/main/kotlin/.../panel/` | The tool window: repository, controller, composed view, the painted screen. |
-| `src/main/kotlin/.../ui/` | The Compose host and the small shared composables. |
-| `src/main/resources/META-INF/plugin.xml` | One plugin ID and a shared Game Devices window. |
-| `src/test/kotlin/` | Panel tests, the manual scheduler, and the UI probe. |
-| `src/uiProbe/plugin.xml` | Descriptor of the test-only probe plugin. |
-| `simulator.py` | Python standard-library agent client. Builds no Simulator commands. |
-| `tests/` | Client tests with a fake local service. No IDE or Simulator needed. |
-
-Android virtual devices use the Android SDK and a separate embedded display in the same Game Devices window. The local simulator service and its command-line client operate the iOS tab.
-
-## Names and compatibility: the owner's to change
-
-These were decided when the plugin moved to the same build and structure as the
-owner's other JetBrains plugin. They are recorded here so they are easy to revisit.
-
-- Plugin id and package root: `app.anicanon.kumikae.as3`. The service's package is
-  `app.anicanon.kumikae.as3.simulator`. Vendor: AniCanon. Name: Kumikae AS3.
-- The base plugin requires platform and TextMate support. Optional descriptors isolate Rider's native
-  LSP integration from IDEA's LSP4IJ integration; neither client is required to load local editor tools.
-- The descriptor accepts builds 261.22158.277 through 262.10968.170. Validation covers the endpoints:
-  IDEA 2026.1 (IU-261.22158.277, free unified distribution) and Rider 2026.2.3.1 (RD-262.10968.170).
-  Other builds in that range and the older standalone Community distribution are unverified.
-  Compose Swing is an alpha; widening the range requires runtime panel and editor checks.
-- iOS simulation and the embedded Android display use the macOS native helper.
-- The service and the plugin both target Java 25.
-- The default bundle in the panel stays `org.kumikae.as3test`, the test app's
-  identifier. It is not the plugin's identity.
-
-### Running a file or one test
-
-Named case mappings in `kas3-tests.json` connect fixture methods to their suite
-identities. Use the class gutter or file context menu to run that file's cases;
-use a mapped method's gutter/context menu for that case only. Result navigation
-opens the method for passing tests and the failing assertion line for Error failures.
-The native failure details show clickable AS3 stack frames. Helpers have no Run icon. The [framework guide](../../testing/README.md)
-describes registration; `[Test]` metadata alone is not discovery.
+- No debugger.
+- No rename refactoring, for names or for packages.
+- The Simulator panel has no multi-touch and no audio.
+- The plugin has been checked by automated editing tests in Rider and IntelliJ IDEA. It needs wider use by
+  people.
+- Android Studio isn't supported.

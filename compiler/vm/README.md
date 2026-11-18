@@ -1,101 +1,145 @@
 # `vm/`: the interpreter
 
-Runs a module of IR. It is the same program under `kas3c run`, inside Godot, and in the tests; only the
-host differs.
+The interpreter runs a module of IR. It's the same code under `kas3c run`, inside Godot and in the tests.
+Only the host differs. This folder also holds AS3's standard library, which native code shares.
+
+**Depends on:** `ir/ir.h` and the C++ standard library. It includes no Godot header and nothing from
+`src/`.
+
+## The host
+
+The interpreter knows where it runs only through four interfaces, gathered in `host.h`:
+
+| Interface | What it gives |
+|---|---|
+| `Output` (`output.h`) | Where `trace` and uncaught errors go |
+| `EngineHandles` (`engine_handles.h`) | What can be done to an engine value the interpreter holds: call it, read it, compare it, free it |
+| `EngineSource` (`engine_source.h`) | Where engine values come from: constructors, singletons, constants, defaults |
+| `Clock` (`clock.h`) | The time and the time zone, for `Date` and the time limit |
+
+`godot_ext/` implements them with Godot's calls. `no_engine.h` and `standalone_host.cpp` answer where there
+is no engine, and the tests use a recorder.
+
+Each instruction that asks something of the engine is prepared once, when the program loads:
+`EngineHandles::prepare()` is called for every such instruction, and `run()` carries out what it kept. A
+host that keeps nothing gets the request by name instead.
+
+## Files
 
 | Files | Job |
 |---|---|
-| `interpreter.h`, `interpreter_records.h`, `interpreter.cpp` | Frames, calls, the public entry points; the records the class keeps (a frame, a kept trace, a property's key and the rest) |
-| `interpreter_errors.cpp` | Errors: raising one, catching it, its stack trace, and reporting it to the host |
-| `interpreter_run.cpp` | The loop: one case per operation |
-| `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
-| `stack` | The C++ stack a program runs on: where a thread's is nearly used up (Error #1023 for one more call from outside, for the interpreter and native code alike), and the thread with a large one that a program run on its own is given |
-| `interpreter_host.cpp` | Requests to the engine, one function per operation |
-| `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
-| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on; and what the library reads once and no frame owns (the host's clock, methods and Godot's operators by name, the one value of each static function) |
-| `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
-| `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have; what a vector's places are kept as (`place_kind()`) |
+| `interpreter.h`, `interpreter.cpp`, `interpreter_records.h` | Frames, calls, and the public entry points |
+| `interpreter_run.cpp` | The loop: one case for each operation |
+| `interpreter_errors.cpp`, `interpreter_time_limit.cpp` | Raising and catching errors, stack traces, and the time limit (Error #1502) |
+| `interpreter_host.cpp`, `interpreter_godot_refuses.cpp` | Requests to the engine, and the checks made before one |
+| `interpreter_objects.cpp`, `interpreter_conversions.cpp` | Creating objects, and conversions the loop hands on |
+| `stack` | The C++ stack a program runs on, and the point where it's nearly used up (Error #1023) |
+| `heap`, `runtime` | The lifetime of objects and strings |
+| `fields.h` | Where an object's fields are. The one accessor every field read and write goes through |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
-| `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
-| `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
-| `value_text.cpp`, `function_calls.cpp` | A value put into words (`String(x)`, a vector's elements, an object's own `toString()`, ECMAScript's ToPrimitive) and a function value made and called with untyped arguments, as such functions: the program's own code is run by its function's number (`Runner::run`) |
-| `text_methods`, `text_calls.cpp` | A String's methods, and a number in a radix or in digits, as such functions |
-| `vector_elements.cpp`, `vector_methods.cpp`, `vector_sort.cpp`, `vector_calls.h` | `Vector.<T>` and Array as such functions: making, indexing, length, the methods, sort and sortOn |
-| `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), and what it answers for `Unmoved` |
-| `table`, `interpreter_properties.cpp`, `interpreter_property_reads.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest; reading one, and whether one is there, in its own file), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
-| `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name; what the program's static fields reach, and the container classes a newer build must keep |
-| `constructions` | What each object alive was constructed with, kept only while a host asks (`Interpreter::remember_constructions`), in room after the object's own slots that it is then made with (`Heap::object_slots`): no table, nothing allocated or looked up as an object is made or freed. Where the class's constructor chain can be run again (`ir::constructor_refusal`), the arguments alone; where it can't, the fields as the constructor left them too. Plain values only, so nothing kept holds an object |
-| `reload_update.cpp` | For `reload`: the objects alive updated in place (`update_in_place`). A class whose constructor chain depends only on its arguments and constants (`ir::constructor_chain`) has the new chain run on a throwaway object with what each object was made with, and a field the program has not changed since takes its new first value. The first values of an object remembered by its arguments alone are what the old program's chain gives, run again here before that program goes |
-| `any`, `interpreter_any.cpp`, `any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<`, `-` and the rest (Godot's own operator first, for one of its values) as functions of plain values |
-| `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
-| `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
-| `regex.h`, `regex_tree.h`, `regex_parser.h`, `regex_parse.cpp`, `regex_parse_escapes.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree (its structure, then its escapes and classes), the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
-| `regexp_methods.cpp`, `regexp_strings.cpp` | The instructions of RegExp (`new`, `exec`, `test`, its properties) and of String's methods that take one (`match`, `search`, `replace`, `split`); the patterns read, kept by source and flags |
-| `date_time`, `date_parse.cpp`, `date_methods.cpp` | Date: ECMAScript's arithmetic of times, AS3's texts and what `Date.parse` reads, and the instructions, with local time from the host's clock |
-| `library_calls.h`, `library_calls.cpp` | A method of the library called by name on an untyped value (`u.push(1)`), or read as a function bound to its value (`u.push`): the arguments converted as `ir/library_methods.h` says, and the typed operation run on registers set past the running frame's, by one helper class (`LibraryCall`), a friend of the interpreter |
-| `class_values.cpp`, `class_statics.cpp` | Classes as values: the one object for each class, `x is c`, `new c(a)`, `c(x)`; and a class's public static members by name on such a value (`c.create()`, `c.count`) |
-| `library_members.cpp` | RegExp's and Date's properties and methods by name on an untyped value (`u.lastIndex`, `u.getTime()`), by the names `ir/library_names.h` gives |
-| `json_text` | JSON text on its own: the grammar read into a builder's calls, with a stack of its own (no recursion), and a String written as Quote() writes it |
-| `json_work.h`, `json_methods.cpp`, `json_stringify.cpp` | JsonCall: what is read made into Objects and Arrays and revived, and stringify, by one helper class (`Json`), a friend of the interpreter |
-| `uri_text` | `escape`, `unescape` and the four URI functions |
-| `number_text`, `string_methods.cpp` | Numbers as text and text as numbers (radix, `toFixed` and the rest, `parseInt`, `parseFloat`); the instructions that run `String`'s methods and those |
-| `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource`, `Clock` |
-| `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h`, `clock.h` | The four interfaces and the values they pass; `SystemClock` is the system's time and zone (`standalone_host.cpp`), which a host without a clock of its own gets |
-| `no_engine.h`, `standalone_host.cpp` | The answers where there is no engine |
+| `collector` | The cycle collector |
+| `library` | The standard library as functions of plain values, with no interpreter frame |
+| `value_text.cpp`, `function_calls.cpp`, `object_calls.cpp` | A value as text, and a function value called |
+| `text_methods`, `text_calls.cpp`, `string_methods.cpp`, `number_text` | `String`'s methods, and numbers as text |
+| `text_units`, `case_table.cpp` | Strings by UTF-16 unit, and case mapping |
+| `vector_*.cpp`, `vector_calls.h`, `interpreter_vectors.cpp` | `Vector.<T>` and `Array` |
+| `table`, `interpreter_properties*.cpp`, `interpreter_property_*.cpp` | `Object`, `Dictionary` and properties by name |
+| `any`, `any_operators.cpp`, `any_calls.cpp`, `interpreter_any.cpp` | The untyped value (`*`) and its operators |
+| `numeric`, `math.cpp` | Number conversions C++ leaves undefined, and `Math` |
+| `regex*`, `regexp_methods.cpp`, `regexp_strings.cpp` | The regular expression engine, and `RegExp` |
+| `date_*` | `Date` |
+| `json_*` | `JSON` |
+| `uri_text` | `escape`, `unescape` and the URI functions |
+| `class_values.cpp`, `class_statics.cpp` | Classes as values |
+| `library_calls`, `library_members.cpp`, `interpreter_library.cpp`, `interpreter_functions.cpp` | Library methods called by name on an untyped value, and function values |
+| `reload`, `reload_update.cpp`, `constructions` | Hot reload: moving live objects onto a new build, and updating them in place |
+| `native_code.h` | How the interpreter hands a function to native code |
 
 ## Rules
 
-- **No Godot header, and nothing from `src/`.** It includes `ir/ir.h` and the standard library.
-- **The engine is known only through the interfaces.** Something new asked of Godot is a new entry on
-  `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from).
-  `NoEngine` must answer it, and the recorder in `tests/test_vm.cpp` must record it.
-- **Each engine instruction is worked out once, when the program loads:** `EngineHandles::prepare()` is
-  asked for every instruction that names something of Godot's (an `E` operand), and `run()` carries out
-  what it kept. A host that keeps nothing, or can't run one with the values it is given, gets the requests
-  by name (`call`, `get`, `operate` and the rest), which say what is wrong.
-- **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
-- **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
-  `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.
-- **An object of a program's class is made with `Heap::object_slots()` slots,** never `slots_of()` alone:
-  where what objects are constructed with is remembered, each has room for it after its own slots, and
-  one made without that room would be written past its end. That is also why remembering is asked for
-  before a program makes anything, and never of a program with native code.
-- **Where a field is is said once, in `fields.h`.** Nothing else turns a field's number into a place in the
-  object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
-  that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
-  generated code's own accessor (`runtime/values.h`), which is handed the slot by the generator.
-- **A vector of `Vector2`s or of `Vector2i`s holds each value in its place** (`ir::Class::element_bare`,
-  `Vector::bare`): eight bytes, never a handle and never null, with nothing to count (`place_kind()` is then a
-  kind that counts nothing, which is what moving, copying and letting go of places go by). A value crosses
-  into a register, which holds a handle, by `read_element()`, and back by `write_element()` or `put_element()`
-  (`library.h`; untyped, `element_to_any()` and `element_from_any()`): the host makes the handle and reads it
-  (`EngineHandles::boxed`, `unboxed`), and no value (null) stored is AS3's TypeError #1034 (the checker
-  has refused `null` itself written there: `src/held_in_place.h` is where the types are named). Nothing else reads a
-  place of such a vector as its element's kind.
-- **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
-  elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
-  each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for
-  Object literals and Dictionary) adds its slots there and nowhere else; `may_hold_objects()` beside it
-  says which classes the collector looks at. Every object is made with `heap_.list_for(class)` as its
-  list, so that the collector sees it.
-- **The collector looks only at what can lead back to a script object** (`may_hold_objects()`, `held.h`): not
-  at a vector of numbers, and not at a vector of Godot's objects of a class that is never
-  reference-counted (`ir::Class::element_counted`, which the lowerer works out from the class: nodes),
-  since only a reference-counted object of Godot's is a node of the collector's.
-- **The cycle collector deletes by trial** (`collector.h`): an object whose count of references is more than
-  the references from other objects is held from outside, and so is what it reaches. It needs no list of
-  roots. The host calls `collect_step()` with a budget of work; the interpreter collects once more when it
-  goes, and `kas3c run` reports what is still alive after that.
+### Speed
+
+- **Nothing is allocated for each instruction, and no text is built on the path that succeeds.**
+- **Measure a change to the loop.** A change to `interpreter_run.cpp` comes with numbers from
+  `tests/bench/run_bench.py <build> --against <other build>`. Even moving a two-line helper into a header
+  has made the loop measurably slower.
+
+### The engine
+
+- **Something new asked of Godot is a new entry on `EngineHandles` or `EngineSource`.** `NoEngine` must
+  answer it, and the recorder in `tests/test_vm.cpp` must record it.
+
+### Errors
+
 - **Every failure is an AS3 error** with a class, a message and a stack line. Handles and objects are
-  released on the error path too: the tests count what is left alive.
+  released on the error path too. The tests count what is left alive.
+- **The interpreter never recurses in C++ for an AS3 call.** It keeps its own stack of frames, so runaway
+  recursion is an AS3 error, not a crash, and a debugger can walk the frames.
+- **A runaway script is stopped.** Every loop passes a statement marker, where the clock is read once in
+  4,096 statements.
 
-## What a table holds
+### Memory layout
 
-An Object or a Dictionary (`klass.table`), and an Array's `properties` when the pointer is not null, hold
-their keys and values in `Entries` (vm/table.h). `each_held()` visits them through `each_entry()`: for each
-entry whose key is not undefined, the key (a String, or a Dictionary's object key, held strongly) and the
-value, both untyped. A deleted entry has both undefined and holds nothing. Before freeing an object, or the
-collector emptying its garbage, `take_entries()` takes the properties out and the caller lets go of them:
-engine code run meanwhile finds the table empty, never half emptied.
+- **Where a field is, is said once, in `fields.h`.** Nothing else turns a field's number into a place in
+  the object or counts an object's slots.
+- **Create an object of a program's class with `Heap::object_slots()` slots,** never `slots_of()` alone.
+  When hot reload remembers constructor arguments, each object has room for them after its own slots.
+- **A `Vector.<int>` or `Vector.<uint>` stores four bytes for each element.** Every other vector stores an
+  eight-byte slot. Reach a vector's places through `place()`, `set_place()`, `move_places()` and
+  `clear_places()` in `runtime.h`. Nothing else names the memory.
+- **A `Vector.<Vector2>` or `Vector.<Vector2i>` stores each value in place:** eight bytes, never a handle
+  and never `null`. A value crosses into a register through `read_element()` and back through
+  `write_element()`. Storing `null` is TypeError #1034.
 
-Tests: `test_vm`, `test_runtime`, the `programs` group, and the sanitizer build.
+### The collector
+
+- **What a container holds is said once, in `each_held()`.** Freeing an object releases each slot it
+  visits, and the collector follows each. A new kind of container adds its slots there and nowhere else.
+- **The collector needs no list of roots.** An object with more references than other objects hold on it
+  is held from outside, and so is everything it reaches. The rest is a cycle and is freed.
+- **The collector looks only at what can lead back to a script object** (`may_hold_objects()`). It skips a
+  vector of numbers, and a vector of Godot objects of a class that's never reference counted, such as
+  nodes. Twenty thousand particles in a vector aren't walked every frame.
+- **Collection runs in steps.** The host calls `collect_step()` with a budget of work. The interpreter
+  collects once more when it ends, and `kas3c run` reports what is still alive after that.
+
+### Tables
+
+An `Object` or a `Dictionary`, and the extra properties of an `Array`, keep their keys and values in
+`Entries` (`table.h`), in the order each key was first set. A deleted entry holds nothing. Before an object
+is freed, `take_entries()` takes its properties out, so that engine code run meanwhile finds the table
+empty and never half emptied.
+
+## Library behavior
+
+The library follows the AS3 language reference. Where that leaves a question open, it follows the source
+of avmplus, and the code names the file it read. These choices are worth knowing before you change the
+library:
+
+- **Strings** are stored as UTF-8 and counted, indexed and compared by UTF-16 unit.
+- **Property order** is the order of first assignment. AS3 leaves it unspecified. A fixed order means a
+  program's output never depends on a hash.
+- **Array holes.** An index never written, or deleted, is a hole and not an element that holds
+  `undefined`. `for in`, `for each`, `in` and `hasOwnProperty` skip holes. Reading one gives `undefined`.
+  `sort` puts defined elements first, then elements that hold `undefined`, then holes. Every `Array` is
+  dense: avmplus's sparse form isn't implemented.
+- **Values as text.** An `Array` writes nothing for a `null` or `undefined` element. A `Vector` writes
+  `null` and `undefined`. An `Array` or `Vector` that contains itself, or nests deeper than 500
+  levels, raises Error #1023 when it's converted to text.
+- **Numbers as text.** `toString(radix)` writes only the whole part of a number in a radix other than 10.
+- **`arguments`.** A function that names `arguments` accepts more arguments than it declares, as one with
+  `...rest` does.
+- **Regular expressions** run on the interpreter's own backtracking engine, over UTF-16 units. It counts
+  its steps and stops at a limit.
+- **`Date`** asks the host's clock for the time and for the zone's offset at a moment.
+- **JSON** reads and writes by ECMA-262, fifth edition. The parser keeps its own stack and doesn't recurse.
+- **Operators on an untyped value that holds a Godot value** ask Godot's own operator first. Where Godot
+  has none for the two operands, the answer is AS3's.
+
+`Date`'s texts, JSON's error numbers and the URI functions' errors haven't been compared with a running
+Flash Player.
+
+## Tests
+
+`test_vm`, `test_runtime`, `test_library`, the `programs` group, and the sanitizer build. Every program in
+`tests/run/` must leave nothing alive when it ends.

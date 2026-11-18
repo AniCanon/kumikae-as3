@@ -40,6 +40,11 @@ with tempfile.TemporaryDirectory() as folder:
 
     result = run("--help")
     check("help", result.returncode == 0 and result.stdout.startswith("usage: kas3c parse [--dump-ast] <file>..."))
+    # What the language server answers (lsp/README.md), each said in the help.
+    served = result.stdout[result.stdout.find("\nlsp    "):]
+    for answer in ("errors as you type", "go to definition", "find references", "completion", "signature help", "hover", "outline",
+                   "symbol search"):
+        check("help says the language server answers: " + answer, answer in " ".join(served.split()))
 
     result = run()
     check("no arguments", result.returncode == 2 and result.stderr.startswith("usage: kas3c parse") and

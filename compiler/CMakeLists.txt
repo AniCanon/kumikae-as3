@@ -108,10 +108,19 @@ if(KAS3_GODOT_CPP)
     set(GODOTCPP_TARGET "template_release" CACHE STRING "" FORCE)
     add_subdirectory(${KAS3_GODOT_CPP} ${CMAKE_CURRENT_BINARY_DIR}/godot-cpp EXCLUDE_FROM_ALL)
     file(GLOB KAS3_GODOT_SOURCES CONFIGURE_DEPENDS godot_ext/*.cpp)
-    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES})
+    # What Play builds a project's program library from is carried by the extension: the headers generated
+    # code is built against, and one word for them and the backend together (tools/embed_runtime.py).
+    file(GLOB KAS3_PLAY_INPUTS CONFIGURE_DEPENDS runtime/*.h vm/*.h ir/*.h backend_cpp/*.cpp backend_cpp/*.h)
+    set(play_runtime_path "${CMAKE_CURRENT_BINARY_DIR}/play_runtime_data.cpp")
+    add_custom_command(OUTPUT ${play_runtime_path}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py ${CMAKE_CURRENT_SOURCE_DIR} ${play_runtime_path}
+        DEPENDS ${KAS3_PLAY_INPUTS} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py
+        COMMENT "Embedding the runtime's headers")
+    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${play_runtime_path})
+    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
-    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm)
+    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3backend_cpp)
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     # -DKAS3_GODOT_OUTPUT=<folder> puts it elsewhere: a build under the sanitizers must not take the place of
@@ -137,6 +146,9 @@ foreach(test_source ${KAS3_TESTS})
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+# The one that tests a part of the host generated code runs in, with no program: built with that part.
+target_sources(test_time_limit PRIVATE runtime/time_limit.cpp)
+target_include_directories(test_time_limit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir)
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)

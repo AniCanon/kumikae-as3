@@ -127,6 +127,10 @@ bool has_parts(std::string_view p_godot_type) {
 	return std::find(std::begin(NAMES), std::end(NAMES), p_godot_type) != std::end(NAMES);
 }
 
+bool in_handle(std::string_view p_godot_type) {
+	return p_godot_type == "Dictionary" || p_godot_type == "Array" || p_godot_type == "Callable" || p_godot_type == "RID";
+}
+
 std::string_view parts_of(const ir::Function &p_function, uint32_t p_register) {
 	// A parameter is never held inline: a caller may give null, which a struct can't say.
 	if (p_register < p_function.parameters || p_function.registers[p_register] != Kind::Val || p_register >= p_function.engine_types.size()) {

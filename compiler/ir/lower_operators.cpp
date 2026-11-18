@@ -9,7 +9,7 @@ namespace ir {
 bool Lowerer::whole(const Expr *p_expression) {
 	return is_whole_number(p_expression, [this](const Expr *p_operand) {
 		Kind kind = Kind::Void;
-		return kind_of(p_operand->type, &kind) && is_integral(kind);
+		return value_kind(p_operand, &kind) && is_integral(kind);
 	});
 }
 
@@ -142,7 +142,7 @@ uint32_t Operators::godot_object_of(uint32_t p_object, Expr *p_written, uint32_t
 }
 
 // An untyped value and one of Godot's classes: whether it holds such an object decides.
-uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class) {
+uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class, Kind p_kind) {
 	const uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	const bool test = p_binary->op == TokenKind::KwIs;
@@ -152,7 +152,7 @@ uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class)
 	if (test) {
 		return fits;
 	}
-	uint32_t out = l_.engine_reg(Kind::Ref, p_binary->type);
+	uint32_t out = l_.engine_reg(p_kind, p_binary->type);
 	l_.emit(Op::ConstNull, position, out);
 	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
 	l_.emit(Op::FromAny, position, out, value, p_godot_class);
@@ -225,13 +225,21 @@ uint32_t Operators::type_test(Binary *p_binary) {
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
 	uint32_t godot_class = 0;
 	const bool godot_target = symbol && Lowerer::is_godot(symbol) && l_.is_godot_object(symbol);
-	if (!godot_target && (l_.untyped(left) || (!l_.is_vector(written) && !Lowerer::is_null(left) && l_.natural(left) != Kind::Obj))) {
+	// A number, a Boolean or a String is asked of the value as it runs, whatever is on the left: an object
+	// or `null` is none, and gives false or null like any other value that is not one.
+	const bool plain = symbol && (symbol == l_.int_ || symbol == l_.uint_ || symbol == l_.number_ || symbol == l_.boolean_ || symbol == l_.string_);
+	if (!godot_target && (l_.untyped(left) || plain || (!l_.is_vector(written) && !Lowerer::is_null(left) && l_.natural(left) != Kind::Obj))) {
 		if (const std::optional<uint32_t> tested = any_type_test(p_binary)) {
 			return *tested;
 		}
 	}
 	if (godot_target && l_.untyped(left) && l_.engine_name(symbol, std::string_view(), &godot_class)) {
 		return untyped_godot_test(p_binary, godot_class);
+	}
+	if (symbol && Lowerer::is_godot(symbol) && !godot_target && l_.engine_name(symbol, std::string_view(), &godot_class)) {
+		// One of Godot's value types (Vector2, Color, its Array): whatever is on the left, what the value
+		// is as the line runs decides, by Godot's name for its type.
+		return untyped_godot_test(p_binary, godot_class, Kind::Val);
 	}
 	if (godot_target && l_.engine_name(symbol, std::string_view(), &godot_class)) {
 		return godot_test(p_binary, godot_class);
@@ -243,8 +251,8 @@ uint32_t Operators::type_test(Binary *p_binary) {
 		uint32_t out = l_.reg(Kind::Bool);
 		l_.emit(Op::ObjToBool, position, out, l_.expression(left, Kind::Obj));
 		return out;
-	} else if (symbol == l_.object_ && l_.object_ && l_.natural(left) == Kind::Any) {
-		// An untyped value or an Object: everything but null and undefined is an Object, and stays what it is.
+	} else if (symbol == l_.object_ && l_.object_) {
+		// Any value, whatever its type: everything but null and undefined is an Object, and stays what it is.
 		const uint32_t value = l_.any_value(left);
 		const uint32_t null = l_.reg(Kind::Any);
 		l_.emit(Op::AnyConst, position, null, 1);
@@ -290,8 +298,8 @@ uint32_t Operators::arithmetic(Binary *p_binary, Kind p_want) {
 		return l_.convert(any_operate(*op, a, b, position), l_.natural(p_binary), position);
 	}
 	Kind left_kind = Kind::Void, right_kind = Kind::Void;
-	l_.kind_of(left->type, &left_kind);
-	l_.kind_of(right->type, &right_kind);
+	l_.value_kind(left, &left_kind);
+	l_.value_kind(right, &right_kind);
 	bool strings = p_binary->op == TokenKind::Plus && l_.is_string_type(p_binary->type);
 	// An object beside `+` is what ECMAScript's ToPrimitive gives with no hint: its class's own valueOf(),
 	// or else its text (a Date's too), decided as it runs. Beside a String, one with no valueOf() of its

@@ -228,7 +228,7 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 			kind = Kind::Ref;
 		}
 		Kind own = Kind::Void;
-		if (kind == Kind::Void && l_.kind_of(p_arguments[i]->type, &own) && Lowerer::is_numeric(own) && l_.whole(p_arguments[i])) {
+		if (kind == Kind::Void && l_.value_kind(p_arguments[i], &own) && Lowerer::is_numeric(own) && l_.whole(p_arguments[i])) {
 			// Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 			kind = Kind::I64;
 		}

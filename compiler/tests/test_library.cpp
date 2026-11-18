@@ -89,7 +89,7 @@ Slot of_number(double p_value) {
 }
 
 std::string element_text(const Vector *p_vector, uint32_t p_index) {
-	return std::string(static_cast<const Str *>(any::pointer(p_vector->data[p_index]))->view());
+	return std::string(static_cast<const Str *>(any::pointer(slots_of(p_vector)[p_index]))->view());
 }
 
 void test_split() {
@@ -247,7 +247,10 @@ void test_vectors() {
 	CHECK(vector_call(library, VectorMethod::Slice, part, 3, &out));
 	Vector *sliced = static_cast<Vector *>(out.p);
 	CHECK_EQ(sliced->length, 2u);
-	CHECK_EQ(sliced->data[1].i, 11);
+	// A vector of ints holds each in four bytes, and so does what is cut out of it.
+	CHECK(vector->narrow && sliced->narrow);
+	CHECK_EQ(numbers_of(sliced)[1], 11);
+	CHECK_EQ(place(sliced, 1).bits, static_cast<uint64_t>(11));
 	heap.release_object(sliced);
 	// An element by an index of any kind; one past the end is added, further out is the RangeError.
 	CHECK(vector_get(library, vector, Kind::F64, of_number(2), &out));
@@ -434,8 +437,9 @@ void test_words() {
 	CHECK(recorder.ran.size() == 1 && recorder.ran[0] == std::make_pair(SAY, static_cast<size_t>(1)));
 	// An Array's words are its elements', and nothing of it and no undefined is written.
 	Vector *list = vector_new(library, ARRAY, 3, false);
-	list->data[0] = any::integer(7);
-	list->data[2] = any::object(made);
+	CHECK(!list->narrow); // An Array's elements are untyped: a slot each.
+	slots_of(list)[0] = any::integer(7);
+	slots_of(list)[2] = any::object(made);
 	retain(made);
 	words.clear();
 	CHECK(vector_text(library, list, "-", &words));

@@ -1,13 +1,18 @@
 package {
-	// Objects, Strings and untyped values handed from where they are made to a variable or a field: in a
-	// loop, where each round's takes the place of the last; with an error between the making and the
-	// handing over; and a variable read again after it was copied. Native code hands over the reference
+	// Objects, Strings and untyped values handed from where they are made to a variable, a field or a
+	// vector's place: in a loop, where each round's takes the place of the last; with an error between the
+	// making and the handing over; a variable read again after it was copied; a place past the vector's end
+	// and one in a fixed vector, which the library is left. Native code hands over the reference
 	// where the copy is the last use; nothing may be let go of twice or kept for ever (the runner counts).
 	public class last_use {
 		private var kept:Item;
 		private var label:String;
 		private var any:*;
 		private static var shared:Item;
+		private var items:Vector.<Item> = new Vector.<Item>();
+		private var texts:Vector.<String> = new Vector.<String>(2, true);
+		private var mixed:Array = [];
+		public var slies:Vector.<Sly> = new Vector.<Sly>(1);
 
 		public function last_use() {
 			var total:int = 0;
@@ -33,6 +38,47 @@ package {
 			var copy:String = text;
 			trace(text, copy);
 			trace(pick(true).value, pick(false).value);
+			trace(places(4), items.length, items[0].value, items[3].value, texts, mixed);
+			try {
+				texts[2] = "t" + items.length;
+			} catch (e:Error) {
+				trace(e.message, texts);
+			}
+			try {
+				items[1] = new Item(-5);
+			} catch (e:Error) {
+				trace(e.message, items[1].value);
+			}
+			try {
+				items[9] = new Item(9);
+			} catch (e:Error) {
+				trace(e.message, items.length);
+			}
+			trace(sly(), slies.length, slies[0], slies[1]);
+		}
+
+		// The constructor puts another vector in the field the store's vector was read from: the object goes
+		// into the vector that was there before, which goes with it.
+		private function sly():int {
+			slies[0] = new Sly(this, 7);
+			return slies[0] == null ? -1 : slies[0].n;
+		}
+
+		// Each round's object takes the place of the last round's, and is added where the vector ends; one
+		// stored and then read again keeps its own reference.
+		private function places(rounds:int):int {
+			var total:int = 0;
+			for (var round:int = 0; round < rounds; round++) {
+				for (var i:int = 0; i < 4; i++) {
+					items[i] = new Item(round * 10 + i);
+					texts[i % 2] = "t" + round + i;
+					mixed[i] = new Item(i);
+				}
+				var again:Item = new Item(round);
+				items[2] = again;
+				total += again.value + items[2].value + items[3].value + (mixed[1] as Item).value;
+			}
+			return total;
 		}
 
 		private function pick(first:Boolean):Item {
@@ -54,5 +100,14 @@ class Item {
 			throw new Error("negative");
 		}
 		value = given;
+	}
+}
+
+class Sly {
+	public var n:int;
+
+	public function Sly(owner:last_use, n:int) {
+		owner.slies = new Vector.<Sly>(2);
+		this.n = n;
 	}
 }

@@ -36,7 +36,8 @@
 	X(method_make, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	X(function_length, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	/* Errors (operations.h says what each is for). */ \
-	X(stack_overflow, void, (Context *c), (c)) \
+	X(stack_overflow, bool, (Context *c), (c)) \
+	X(overdue, bool, (Context *c), (c)) \
 	X(raise_null, void, (Context *c), (c)) \
 	X(call_failed, bool, (Context *c), (c)) \
 	X(out_of_memory, void, (Context *c), (c)) \
@@ -49,6 +50,7 @@
 	X(error_stack, Str *, (Context *c, Object *p_error), (c, p_error)) \
 	X(forget_kept, void, (Context *c), (c)) \
 	X(use_class, void, (Context *c, uint32_t p_class), (c, p_class)) \
+	X(constructing, void, (Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count), (c, p_function, p_arguments, p_count)) \
 	X(is_class, bool, (const Context *c, const Object *p_object, uint32_t p_class), (c, p_object, p_class)) \
 	X(thunk, Slot, (Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated), (c, p_thunk, p_given, r_updated)) \
 	X(trace, void, (Context *c, Str *const *p_texts, uint32_t p_count), (c, p_texts, p_count)) \
@@ -64,7 +66,7 @@
 	X(arguments_of, Object *, (Context *c, uint32_t p_function, const Slot *p_parameters, uint32_t p_given, Object *p_callee), \
 			(c, p_function, p_parameters, p_given, p_callee)) \
 	/* The fast paths that are not inline (fast.h says what each takes and leaves). */ \
-	X(element_added, Slot *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
+	X(element_added, void *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
 	X(holder_of_any, Object *, (Context *c, Slot p_any), (c, p_any)) \
 	X(key_of_any, Str *, (Context *c, Slot p_any), (c, p_any)) \
 	X(property, Slot *, (const Context *c, Object *p_holder, const Str *p_key), (c, p_holder, p_key)) \
