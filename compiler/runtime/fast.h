@@ -219,12 +219,13 @@ inline Str *text_of(Context *c, bool p_value) {
 	return text_of_flag(c, p_value);
 }
 
-// A typed value as an untyped one, with a reference of its own.
-inline Slot to_any(Context *c, int32_t p_value) {
-	return any_integer(c, p_value);
+// A typed value as an untyped one, with a reference of its own. A whole number and a Boolean are their
+// own bits (vm/any.h), written here.
+inline Slot to_any(Context *, int32_t p_value) {
+	return vm::any::integer(p_value);
 }
-inline Slot to_any(Context *c, bool p_value) {
-	return any_boolean(c, p_value);
+inline Slot to_any(Context *, bool p_value) {
+	return vm::any::boolean(p_value);
 }
 inline Slot to_any(Context *c, Str *p_value) {
 	retain(c, p_value);
@@ -235,7 +236,7 @@ inline Slot to_any(Context *c, Object *p_value) {
 	return any_object(c, p_value);
 }
 inline Slot to_any(Context *c, uint32_t p_value) {
-	return p_value <= static_cast<uint32_t>(INT32_MAX) ? any_integer(c, static_cast<int32_t>(p_value)) : any_number(c, p_value);
+	return p_value <= static_cast<uint32_t>(INT32_MAX) ? vm::any::integer(static_cast<int32_t>(p_value)) : any_number(c, p_value);
 }
 // A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
 // number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.
