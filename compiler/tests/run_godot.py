@@ -402,7 +402,7 @@ output = compare("untyped.gd", [
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
     "a toString() that throws, caught where the text was asked for",
     "an int plus one stays an int", "a Godot value and an untyped one",
-    "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "a part is written to the object named before the value", "the other object is untouched",
+    "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "the script's own object held untyped is its node", "a part is written to the object named before the value", "the other object is untouched",
     "minusOne of an int stays an int", "twice of an int stays an int", "stepped of an int stays an int",
     "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
     "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",

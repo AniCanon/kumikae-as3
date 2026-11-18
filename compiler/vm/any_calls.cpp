@@ -221,19 +221,34 @@ bool object_from_any(Library &p_library, Slot p_value, uint32_t p_check, Slot *r
 // An untyped value into one of Godot's values or objects, of the class named by p_check if it is not NONE.
 bool engine_from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_out) {
 	const AnyTag tag = any::tag(p_value);
+	// A script object is the Godot object it is attached to, where one of Godot's objects is declared.
+	void *const held = p_kind == Kind::Ref ? engine_object_in(p_library.module(), p_value) : tag == AnyTag::Value ? any::pointer(p_value) : nullptr;
 	// One of Godot's objects that has been freed is null where an object is declared, as everywhere.
 	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null ||
 			(tag == AnyTag::Godot && p_kind == Kind::Ref && !p_library.heap.handles.present(any::pointer(p_value)));
-	const bool fits = (p_kind == Kind::Val ? tag == AnyTag::Value : tag == AnyTag::Godot) &&
-			(p_check == NONE || p_library.heap.handles.is_class(any::pointer(p_value), p_library.module().engine_names[p_check].name));
+	const bool fits = held && (p_check == NONE || p_library.heap.handles.is_class(held, p_library.module().engine_names[p_check].name));
 	if (nothing || fits) {
-		r_out->p = nothing ? nullptr : p_library.heap.handles.copy(any::pointer(p_value));
+		r_out->p = nothing ? nullptr : p_library.heap.handles.copy(held);
 		return true;
 	}
 	return coercion_failed(p_library, p_value, p_kind, p_check);
 }
 
 } // namespace
+
+void *engine_object_in(const ir::Module &p_module, Slot p_value) {
+	const AnyTag tag = any::tag(p_value);
+	if (tag == AnyTag::Godot) {
+		return any::pointer(p_value);
+	}
+	if (tag != AnyTag::Object) {
+		return nullptr;
+	}
+	Object *const object = static_cast<Object *>(any::pointer(p_value));
+	const ir::Class &klass = p_module.classes[object->klass];
+	const bool attached = !klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref;
+	return attached ? owner_field(object).p : nullptr;
+}
 
 // AS3's TypeError #1034, in Flash's words: the value as text where it has one, else its type, and the type
 // it was to be. False.

@@ -61,6 +61,15 @@ package {
 		public function holdsNode(value:*):Boolean { return value is Node; }
 		public function holdsNode2D(value:*):Boolean { return value is Node2D; }
 		public function asNodeOrNull(value:*):Node { return value as Node; }
+		// The script's own object held untyped is the Godot object it is attached to, as it is held typed.
+		public function selfHeld():Array {
+			var held:* = this;
+			var object:Object = this;
+			var stored:Node = held;
+			var plain:* = [1];
+			return [held is Node, held is Node2D, held is Sprite2D, (held as Node) != null, String((held as Node).name) == String(name), object is Node,
+					(object as Node2D) != null, (object as Sprite2D) == null, stored != null, plain is Node, (plain as Node) == null];
+		}
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
 		public function stepped(value:*):* { value++; return value; }

@@ -105,6 +105,10 @@ Slot any_wide(Library &p_library, int64_t p_value);
 // (or, for one of Godot's, the engine name) p_check unless that is NONE. The value made has a reference
 // of its own. False if it raised; coercion_failed() raises AS3's TypeError #1034 for it, and gives false.
 [[nodiscard]] bool from_any(Library &p_library, Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+// The handle on the Godot object an untyped value is: one of Godot's objects it holds, or the one that a
+// script object of a class that extends one of Godot's is attached to. Null for any other value. The handle
+// stays the value's own.
+void *engine_object_in(const ir::Module &p_module, Slot p_value);
 bool coercion_failed(Library &p_library, Slot p_value, ir::Kind p_kind, uint32_t p_check);
 // `is` on an untyped value: of a class, or one of the ANY_IS_ tests of the value itself (5.0 is an int).
 bool any_is(Library &p_library, Slot p_value, uint32_t p_type);
