@@ -53,11 +53,13 @@ Expr *Lowerer::writer(const List<Expr *> &p_expressions, uint32_t p_from, uint32
 uint32_t Calls::call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind) {
 	// A function with no return type written gives `*`; `:void` is written, and gives nothing.
 	Kind kind = Kind::Any;
-	if (p_function->type && !l_.kind_of(l_.compilation_.type_of(p_function->type), &kind)) {
-		l_.refuse(p_position, "a call to a function that returns '" + l_.compilation_.type_name(l_.compilation_.type_of(p_function->type)) + "'");
+	const Type *const type = p_function->type ? l_.compilation_.type_of(p_function->type) : nullptr;
+	if (type && !l_.kind_of(type, &kind)) {
+		l_.refuse(p_position, "a call to a function that returns '" + l_.compilation_.type_name(type) + "'");
 	}
 	*r_kind = kind;
-	return kind == Kind::Void ? NONE : l_.reg(kind);
+	// One of Godot's values comes back with its type, whatever is done with it next.
+	return kind == Kind::Void ? NONE : type ? l_.engine_reg(kind, type) : l_.reg(kind);
 }
 
 // super(...): the base class's constructor. It has no value: the checker lets nothing use it.
