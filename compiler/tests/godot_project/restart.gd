@@ -80,6 +80,7 @@ func _process(_delta: float) -> bool:
 		# they are not this one's (Restart.as, churn()).
 		show("the first edit: an object a constructor that runs once made, in the place of one let go", current_scene.call("stamped"), "3/4")
 		show("the first edit: an object made where another had been is made again from its own arguments", current_scene.call("paired"), "?")
+		show("the first edit: an object that holds text, made after others of its class, is made again from its own arguments", current_scene.call("wordedNow"), "?")
 		put("ready")
 		stage = 2
 	elif stage == 2 and acted:
