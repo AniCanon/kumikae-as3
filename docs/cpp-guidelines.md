@@ -1,29 +1,29 @@
 # C++ guidelines
 
-How the C++ in `compiler/` is written. The owner asked for this on 2026-11-14, after the files had grown
-too large to work in. A check in the test suite (`compiler/tools/check_style.py`) enforces the rules that
-a script can judge; a reviewer holds a change to the rest.
+This page says how the C++ in `compiler/` is written. It's for anyone changing that code. A check in the
+test suite (`compiler/tools/check_style.py`) enforces the rules that a script can judge. A reviewer holds
+a change to the rest.
 
 The language is C++17, built with `-fno-exceptions -fno-rtti -Wall -Wextra -Werror`.
 
 ## The principles behind the rules
 
-The rules below are SOLID and DRY, applied to this code base. Where a rule does not settle a case, the
+The rules below are SOLID and DRY, applied to this codebase. Where a rule doesn't settle a case, the
 principle does.
 
 | Principle | What it means here | Where |
 |---|---|---|
 | **S**ingle responsibility | A file, a class and a function each have one job, and one reason to change. | Sections 1 and 2 |
-| **O**pen for extension, closed for change | A new Godot feature or a new backend is added beside what is there, not by editing every layer. The interpreter knows the engine only as `vm::Host`; a new IR operation is one line in one table plus its case. | Section 2 |
-| **L**iskov substitution | Anything that implements `vm::Host` can stand in for any other: Godot, the stand-alone host, the recorder the tests use. A host never needs to know which interpreter called it. | Section 2 |
-| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split: a host that only prints implements `Output`, not the engine's entries. A split follows a real difference in who implements what, not a name. | Section 2 |
+| **O**pen for extension, closed for change | A new Godot feature or a new backend is added beside what is there, not by editing every layer. The interpreter knows the engine only as `vm::Host`. A new IR operation is one line in one table plus its case. | Section 2 |
+| **L**iskov substitution | Anything that implements `vm::Host` can stand in for any other: Godot, the standalone host, the recorder the tests use. A host never needs to know which interpreter called it. | Section 2 |
+| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split. A host that only prints implements `Output`, not the engine's entries. A split follows a real difference in who implements what, not a name. | Section 2 |
 | **D**ependency inversion | Layers depend on an interface the lower layer owns, never on the layer above: `vm/` and `ir/` include no Godot header. | Section 2 |
 | **DRY** | Every rule, constant and message is written once. Two layers that must agree read the same source. | Section 3 |
 
 ## 1. Size
 
 There is no standard number. Style guides that give one sit between 300 and 1,000 lines for a file and
-between 40 and 100 for a function. These are ours:
+between 40 and 100 for a function. These are this project's:
 
 | What | Aim for | The check fails above |
 |---|---|---|
@@ -33,22 +33,22 @@ between 40 and 100 for a function. These are ours:
 | Nesting inside a function | 3 levels | not checked |
 
 - A file has one job, and its name says what the job is. When a file needs a heading inside it to find
-  your way, it is two files.
+  your way, it's two files.
 - The one exception to the function limit is a dispatch `switch` with one short case per kind of thing:
   the interpreter's loop (one case per operation), the syntax tree's walker and its printer (one case
-  per kind of node). A case there is a few lines; anything longer is a named function that the case
+  per kind of node). A case there is a few lines. Anything longer is a named function that the case
   calls. Such functions are listed in the check by file and name.
-- Generated files (`godot_data.cpp` and its relatives) are not checked. Test files are not held to the
+- Generated files (`godot_data.cpp` and its relatives) aren't checked. Test files aren't held to the
   size limits: a test file is a list of cases, and reads from top to bottom.
 
 ## 2. One job each
 
 - **A class that is split across files keeps one header.** The lowerer keeps its state in one class, and
-  each group of what it lowers (statements, operators, calls, vectors…) is a helper class it befriends, with
+  each group of what it lowers (statements, operators, calls, vectors) is a helper class it befriends, with
   a header and a `lower_*.cpp` of its own, holding the lowerer by reference (`Lowerer &l_`).
 - **A function does one thing at one level.** If it needs a comment that says "now do the second part",
   the second part is a function with that name.
-- **Layers do not reach around each other.** `vm/` and `ir/` include no Godot header: everything goes
+- **Layers don't reach around each other.** `vm/` and `ir/` include no Godot header: everything goes
   through `vm/host.h`. The front end (`src/`) knows nothing of the IR.
 - **Depend on the narrow thing.** A function that needs a name takes a `std::string_view`, not the
   `Symbol` it came from.
@@ -60,18 +60,18 @@ between 40 and 100 for a function. These are ours:
 - A literal that appears twice is a named constant. An error message that appears twice is a function.
 - Three lines that appear three times are a function. Two similar functions that differ by a type are a
   template; by a value, a parameter.
-- Before writing a helper, search for it. Helpers shared by a layer live in that layer's `*_util.h`.
+- Before writing a helper, search for it.
 
 ## 4. Comments
 
 - **A comment says why, or what a reader could not know from the code:** the rule being followed, the
   case that makes the odd line necessary, the cost of the other choice.
 - **No banners.** `// ---- expressions ----` is a sign that the file should be split (section 1).
-- **No comment that repeats the code.** `// The owner.` above `owner = ...` goes.
+- **No comment that repeats the code.** `// The parent.` above `parent = ...` goes.
 - **No commented-out code.** Git keeps it.
-- Every declaration in a header that is not obvious from its name and types has one line saying what it
-  is for. A comment in a `.cpp` file belongs to the line below it.
-- Plain words, whole sentences, present tense, as in the rest of this repository.
+- Every declaration in a header that isn't obvious from its name and types has one line saying what it's
+  for. A comment in a `.cpp` file belongs to the line below it.
+- Use plain words, whole sentences and the present tense, as in the rest of this repository.
 
 ## 5. The language
 
@@ -88,14 +88,14 @@ Use what C++17 gives, where it makes the code say what it means:
 | `enum class` | Plain `enum`, integer flags |
 | `std::unique_ptr`, or a value | `std::shared_ptr` where there is one owner; raw `new` and `delete` |
 | `override` and `final` on every virtual that has them | Leaving the compiler to guess |
-| `noexcept` on moves and on functions that cannot fail | Nothing |
+| `noexcept` on moves and on functions that can't fail | Nothing |
 | A template or a function reference for a callback in a hot path | `std::function`, which allocates |
 | `std::array` and `std::size` | C arrays and `sizeof` arithmetic |
 | `static_cast` and the other named casts | C casts on pointers and classes |
 
 Not used: exceptions, RTTI, `dynamic_cast`, `std::any`, iostreams in the libraries, `using namespace` in
-a header, macros where a function or a constant does the job. (`godot_ext/` is built with RTTI, because
-godot-cpp needs it.)
+a header, and macros where a function or a constant does the job. `godot_ext/` alone is built with RTTI,
+because godot-cpp needs it.
 
 Names follow what is there: `snake_case` functions and variables, `PascalCase` types, `p_` for a
 parameter, `r_` for a result written through a pointer, a trailing `_` for a member.
@@ -109,18 +109,19 @@ The compiler is used in an editor on every keystroke, and the interpreter runs a
 - **No text is built on the path that succeeds.** An error message is built where the error is raised.
 - **A table that is searched is a hash map or a sorted array,** not a vector walked from the start, once
   it can hold more than a few dozen entries.
-- **Reserve** a vector whose size is known. **Move** what is not used again. Pass anything larger than
+- **Reserve** a vector whose size is known. **Move** what isn't used again. Pass anything larger than
   two words by `const &`.
 - **Measure.** A change made for speed comes with its numbers from `compiler/tests/bench/`, before and
   after. A clean-up must not make any of them worse by more than the noise between runs.
-- **Measure turn and turn about.** `run_bench.py <build> --against <other build>` runs the two builds
-  alternately. Timing one build after the other hides a difference of a few per cent, which is what a
-  tidy-up of the interpreter's loop can cost: a helper in a header for a two-line register write made the
-  loop 3% slower, and the same two lines as a local function inside the loop did not.
+- **Measure in alternating runs.** `run_bench.py <build> --against <other build>` runs the two builds in
+  turn. Timing one build after the other hides a difference of a few percent, which is what a clean-up of
+  the interpreter's loop can cost. A helper in a header for a two-line register write made the loop 3%
+  slower, and the same two lines as a local function inside the loop didn't.
 
 ## 7. Changing code
 
-- A clean-up changes no behaviour: no test changes with it, and the IR golden files stay byte for byte.
+- A clean-up changes no behavior: no test changes with it, and the IR golden files stay the same, byte for
+  byte.
 - One kind of change per commit: a move, a rename, or a rewrite. A move is done with no edits, so that
   the diff shows it as a move.
 - The suite is green after every commit, in the normal and the sanitizer builds before a merge.
