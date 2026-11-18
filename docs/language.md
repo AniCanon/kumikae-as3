@@ -83,11 +83,14 @@ The compiler reports each of these as an error with its own message.
 **Not built yet:**
 
 - **Weak keys:** `new Dictionary(true)`.
-- **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.**
+- **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.** Reading a name that one of
+  these doesn't have gives `undefined`, as in Flash.
 - **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
   value works: `list.push`, `text.charAt`.
+- **`is` and `as` with `Int64`.** Store the value in an `Int64` variable instead: it's converted, and
+  checked, as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
-  class that extends `RegExp`.
+  class that extends `RegExp` or `Dictionary`.
 
 `kas3c check` accepts some of these. `kas3c run` and Godot then refuse the program, or stop it where it
 reaches the construct, with an error that says `is not supported by the interpreter yet`.

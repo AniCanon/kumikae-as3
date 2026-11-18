@@ -126,7 +126,8 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
 		return method_value(p_holder, p_key.text, r_value);
 	}
-	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class) {
+	const bool library_error = klass.built_in && module_.error_class != NONE && is_class(p_object, module_.error_class);
+	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class || p_object->klass == module_.function_class || library_error) {
 		return true; // Dynamic in AS3, and nothing can be added to one here: undefined.
 	}
 	if (klass.built_in && p_object->klass != module_.class_class) {
