@@ -366,6 +366,12 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
+- A method of Godot's isn't a value: `timer.timeout.add(queueFree)` is refused. Pass a method of your own
+  that calls it.
+- A Godot class isn't a class value: `var kind:Class = Node2D` is refused. `is`, `as` and `new` take the
+  class by name.
+- A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
+  a variable of its type first.
 - A script class in the default package with the same name as a Godot class is ambiguous. Put it in a
   package.
 - `super._process(delta)` on a Godot virtual does nothing, as Godot's own empty versions do. It can't
