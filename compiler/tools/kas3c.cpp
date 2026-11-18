@@ -61,8 +61,9 @@ static const char *const USAGE =
 		"                from, since the C++ compiler then sees every function at once\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
-		"       Protocol: errors as you type, go to definition, find references, hover,\n"
-		"       outline and symbol search. The project is the folder the editor opens.\n"
+		"       Protocol: errors as you type, go to definition, find references,\n"
+		"       completion, signature help, hover, outline and symbol search. The project\n"
+		"       is the folder the editor opens.\n"
 		"\n"
 		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
 
