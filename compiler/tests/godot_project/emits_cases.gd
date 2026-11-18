@@ -323,6 +323,14 @@ func _script_objects() -> void:
 			[ear.as_mate(twin), ear.as_mate(twin_child), ear.as_mate(other), ear.as_mate(null), "false none false"])
 	row("as and is on an untyped value", [node.untypedMate(mate), node.untypedMate(child), node.untypedMate(other), node.untypedMate(5), node.untypedMate(null)],
 			[ear.untyped_mate(twin), ear.untyped_mate(twin_child), ear.untyped_mate(other), [false, false, false, true], ear.untyped_mate(null)])
+	# GDScript has no cast that refuses: what AS3's gives is written out.
+	row("a cast to the script's class on a node", [node.castMate(mate), node.castMate(child), node.castMate(other), node.castMate(null), node.castMate(gone)],
+			["Mate true", "Child false", "refused 1034", "none false", "none false"])
+	row("a cast of an untyped value, to the script's class and to Godot's",
+			[node.castUntyped(mate), node.castUntyped(other), node.castUntyped(5), node.castUntyped("text"), node.castUntyped(null)],
+			[["Mate", "Mate", "refused 1034"], ["refused 1034", str(other.name), "refused 1034"], ["refused 1034", "refused 1034", "refused 1034"],
+			["refused 1034", "refused 1034", "refused 1034"], ["none", "none", "none"]])
+	row("a cast of the script's own object", node.castSelf(), [true, true, true])
 	node.set("mate", other)
 	node.set("mate", 5)
 	row("such a field is not set to an object without the script", node.mateName(), "Mate")

@@ -1,4 +1,6 @@
 #include "lower_calls.h"
+
+#include "casts.h"
 #include "lower_dynamic.h"
 #include "lower_engine_calls.h"
 #include "lower_functions.h"
@@ -98,16 +100,26 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (p_type == l_.array_ && l_.array_) {
 		return Vectors(l_).vector_new(l_.compilation_.instance_type(l_.array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
 	}
-	if ((p_type == l_.function_ || p_type == l_.class_type_) && p_type && p_call->arguments.count == 1) {
-		// Function(x), Class(x): a cast, which a store into one is. Not one, AS3's TypeError #1034.
-		return l_.from_untyped(l_.any_value(p_call->arguments[0]), l_.compilation_.instance_type(p_type), Kind::Obj, position);
+	if (class_call(p_type) == ClassCall::Cast) {
+		// A cast, which a store of an untyped value into the type is: the value itself when it is of the
+		// type, null for null and undefined, and for anything else AS3's TypeError #1034. One of Godot's
+		// objects arrives at a script's class, and a script's object at one of Godot's, as for `as`.
+		const Type *type = l_.compilation_.instance_type(p_type);
+		Kind kind = Kind::Void;
+		if (p_call->arguments.count != 1) {
+			l_.error(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "' takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
+			return l_.default_value(p_want, position);
+		}
+		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref)) {
+			return l_.from_untyped(l_.any_value(p_call->arguments[0]), type, kind, position);
+		}
 	}
 	if (p_type == l_.object_ && p_call->arguments.count <= 1) {
 		return Dynamic(l_).object_from(p_call->arguments.count ? p_call->arguments[0] : nullptr, position);
 	}
 	Kind conversion = Kind::Void;
 	if (!l_.kind_of_class(p_type, &conversion) || p_call->arguments.count > 1) {
-		l_.refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
+		l_.refuse(p_call->callee->offset, "a call of the class '" + std::string(p_type->name) + "'");
 		return l_.default_value(p_want, position);
 	}
 	return conversion_of(p_call->arguments, conversion, position);

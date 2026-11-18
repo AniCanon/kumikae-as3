@@ -252,6 +252,7 @@ output = compare("emits.gd", [
     "a parameter of the script's class takes the object that carries the script, one of a class that extends it, and null",
     "an object that has been freed is null there", "an object without the script, or with another, is refused",
     "a field of the script's class set from Godot", "as and is on a node", "as and is on an untyped value",
+    "a cast to the script's class on a node", "a cast of an untyped value, to the script's class and to Godot's", "a cast of the script's own object",
     "such a field is not set to an object without the script", "and is set to one of a class that extends it", "and to null",
     "an untyped value stored where the script's class is declared", "what an engine call gives, as the script's class",
     "a method of the class that extends it", "a listener's parameter of the script's class",

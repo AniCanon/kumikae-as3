@@ -63,6 +63,9 @@ package game {
 - **Only public members are visible to Godot.** GDScript can call a public method by its AS3 name, read and
   write a public field, and use a public getter or setter as a property.
 - **A script class can extend another script class.**
+- **`as` and a cast work on Godot's classes and on your script classes.** `node as Coin` gives the `Coin`
+  that the node carries, or `null`. `Coin(node)` gives it too, and raises TypeError #1034 if the node has no
+  such script.
 - **A class that extends no Godot class is a plain AS3 object.** It has no node behind it, and you can't
   hand it to Godot.
 - **A script on a reference-counted Godot class,** such as `RefCounted` or `Resource`, lives while AS3 or

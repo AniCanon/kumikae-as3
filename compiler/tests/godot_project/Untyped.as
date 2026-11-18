@@ -68,7 +68,7 @@ package {
 			var stored:Node = held;
 			var plain:* = [1];
 			return [held is Node, held is Node2D, held is Sprite2D, (held as Node) != null, String((held as Node).name) == String(name), object is Node,
-					(object as Node2D) != null, (object as Sprite2D) == null, stored != null, plain is Node, (plain as Node) == null];
+					(object as Node2D) != null, (object as Sprite2D) == null, stored != null, String(Node2D(held).name) == String(name), plain is Node, (plain as Node) == null];
 		}
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
