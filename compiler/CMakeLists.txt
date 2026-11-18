@@ -146,8 +146,9 @@ foreach(test_source ${KAS3_TESTS})
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
-# The one that tests the host generated code runs in, with no program.
-target_link_libraries(test_time_limit PRIVATE kas3runtime)
+# The one that tests a part of the host generated code runs in, with no program: built with that part.
+target_sources(test_time_limit PRIVATE runtime/time_limit.cpp)
+target_include_directories(test_time_limit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir)
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
