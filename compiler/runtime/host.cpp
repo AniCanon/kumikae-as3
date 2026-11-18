@@ -58,11 +58,14 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 			numbers |= klass.fields[at].kind == Kind::F64 ? uint32_t(1) << at : 0;
 		}
 		class_cached.push_back(plain ? static_cast<uint8_t>(slots + 1) : 0);
-		if (plain && remembered) {
-			remembered->recycled(i);
+		// Generated code keeps the record of an object whose arguments are numbers and Booleans, where the
+		// object is made (remembered_here), whether or not the object's block is one that is kept.
+		const bool records = remembered && remembered->plain_arguments(i) && klass.fields.size() <= UINT8_MAX;
+		if (records) {
+			remembered->kept_by_native(i);
 		}
 		class_numbers.push_back(numbers);
-		class_fields.push_back(plain ? static_cast<uint8_t>(klass.fields.size()) : 0);
+		class_fields.push_back(plain || records ? static_cast<uint8_t>(klass.fields.size()) : 0);
 	}
 	context.class_numbers = class_numbers.data();
 	context.class_fields = class_fields.data();
@@ -177,12 +180,12 @@ void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint
 	Host &host = *c->host;
 	host.told++;
 	host.interpreter->constructing(p_function, p_arguments, p_count);
-	// A class whose objects are made again where they were, and of which only the arguments are kept, as
-	// they come: from here on generated code keeps them itself.
+	// A class of whose objects only the arguments are kept, as they come: from here on generated code
+	// keeps them itself. Asked once the class is known not to be one already.
 	const uint32_t owner = host.module.functions[p_function].owner;
-	const vm::Constructions *const remembered = host.interpreter->heap().constructions;
-	if (remembered && owner != NONE && host.class_cached[owner] && remembered->copies_arguments(owner)) {
-		host.class_tells[owner] = 1;
+	if (owner != NONE && !host.class_tells[owner] && host.class_fields[owner] == host.module.classes[owner].fields.size()) {
+		const vm::Constructions *const remembered = host.interpreter->heap().constructions;
+		host.class_tells[owner] = remembered && remembered->copies_arguments(owner);
 	}
 }
 

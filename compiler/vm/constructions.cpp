@@ -147,7 +147,7 @@ Constructions::Record *Constructions::add(Object *p_object, uint32_t p_function,
 	if (record->kept != NOTHING) {
 		give_up(plan, record);
 	} else {
-		used_ += plan.recycled ? 0 : 1;
+		used_ += plan.uncounted ? 0 : 1;
 	}
 	record->kept = ARGUMENTS;
 	record->arguments = p_arguments;
@@ -172,7 +172,7 @@ bool Constructions::keep_arguments(uint32_t p_class, const Slot *p_arguments, si
 	}
 	record->kept = ARGUMENTS;
 	record->arguments = given;
-	used_ += plan.recycled ? 0 : 1;
+	used_ += plan.uncounted ? 0 : 1;
 	return false;
 }
 
@@ -188,7 +188,7 @@ bool Constructions::keep_looked(Plan &p_plan, uint32_t p_class, Object *p_object
 	if (record->kept != NOTHING) {
 		give_up(p_plan, record);
 	} else {
-		used_ += p_plan.recycled ? 0 : 1;
+		used_ += p_plan.uncounted ? 0 : 1;
 	}
 	for (uint32_t i = 0; i < given; i++) {
 		record->values[i] = p_arguments[1 + i];

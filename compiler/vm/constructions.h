@@ -67,15 +67,16 @@ public:
 	// takes any number of arguments).
 	size_t room(uint32_t p_class) const { return plans_[p_class].room; }
 	// Whether nothing kept of an object of the class's arguments is counted: each is a number or a Boolean.
-	// Native code may then let go of such an object and make another in its place without a word
-	// (recycled()): its record is emptied with the object, and holds nothing to give up.
+	// Native code may then keep such an object's record itself, where the object is made, and let go of
+	// the object and make another in its place, without a word (kept_by_native()): the record holds
+	// nothing to give up.
 	bool plain_arguments(uint32_t p_class) const { return plans_[p_class].room != 0 && plans_[p_class].plain_arguments; }
-	// Whether an object of the class is remembered by a copy of its arguments and nothing more: none is
-	// looked at, and its chain is known to be one that can be run again.
-	bool copies_arguments(uint32_t p_class) const { return plans_[p_class].quick; }
-	// Objects of the class are let go of and made again where they are, by native code that tells of
-	// neither: they are not among those counted (size()).
-	void recycled(uint32_t p_class) { plans_[p_class].recycled = true; }
+	// Whether an object of such a class is remembered by a copy of its arguments and nothing more: its
+	// chain is known to be one that can be run again, and native code keeps its records.
+	bool copies_arguments(uint32_t p_class) const { return plans_[p_class].quick && plans_[p_class].uncounted; }
+	// Native code keeps the records of the class's objects, and tells neither of each one made nor of one
+	// let go: they are not among those counted (size()).
+	void kept_by_native(uint32_t p_class) { plans_[p_class].uncounted = true; }
 
 	// A call is being made: if it is the constructor of the class of the object it is called on (not a
 	// `super(...)` call), and that is a class whose objects are remembered, its arguments are kept.
@@ -103,7 +104,7 @@ public:
 				give_up(plan, record);
 			}
 			record->kept = NOTHING;
-			used_ -= plan.recycled ? 0 : 1;
+			used_ -= plan.uncounted ? 0 : 1;
 		}
 	}
 	// The object's record, if what it was constructed with is known from it: all of it, or the arguments
@@ -125,7 +126,7 @@ public:
 	// What the n-th value of a record of an object of the class is: an argument as its parameter holds
 	// it, or a field's first value.
 	ir::Kind kind_of(uint32_t p_class, const Record &p_record, uint32_t p_value) const;
-	size_t size() const { return used_; } // How many objects have one, but for those of classes that are recycled.
+	size_t size() const { return used_; } // How many objects have one, but for those of classes native code keeps the records of.
 	// The classes, by name, of which an object came here from a program that ran as native code built to
 	// remember nothing of what objects are made with (vm/reload.h): why such an object has no record.
 	// It is what a reload says, so it is kept for the reloads after, with the names it was given.
@@ -165,7 +166,7 @@ private:
 		// Its chain can be run again and none of its arguments is looked at: an object's arguments are
 		// copied, and that is all.
 		bool quick = false;
-		bool recycled = false; // See recycled().
+		bool uncounted = false; // See kept_by_native().
 		// In looked_: the arguments to look at, in order, then the fields.
 		uint32_t looked_arguments = 0;
 		uint32_t looked_fields = 0;

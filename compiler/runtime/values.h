@@ -97,11 +97,11 @@ struct Context {
 	ObjectCache *cache = nullptr;
 	const uint8_t *class_cached = nullptr;
 	const uint32_t *class_numbers = nullptr; // For such a class: bit i says its field i is a Number, which starts NaN.
-	// For such a class: how many of its slots are its fields. Any after them are the room where the host
-	// remembers what the object was constructed with (vm/constructions.h), whose first slot says whether
-	// anything is remembered.
+	// For such a class, and for one whose objects' records generated code keeps: how many of its slots
+	// are its fields. Any after them are the room where the host remembers what the object was constructed
+	// with (vm/constructions.h), whose first slot says whether anything is remembered.
 	const uint8_t *class_fields = nullptr;
-	// For such a class: not 0 once the host has been told of one of its objects being constructed, and
+	// For each class: not 0 once the host has been told of one of its objects being constructed, and
 	// keeps of each its arguments as they come and nothing more. The next are remembered where they are
 	// made (remembered_here), with no word to the host.
 	const uint8_t *class_tells = nullptr;
