@@ -165,7 +165,7 @@ void Statements::for_loop(Stmt *p_statement) {
 	statement(loop->body);
 	uint32_t update_at = l_.here();
 	if (loop->update) {
-		l_.expression(loop->update, Kind::Void);
+		l_.effect(loop->update);
 	}
 	l_.emit(Op::Jump, position, top);
 	if (out != NONE) {
@@ -283,7 +283,7 @@ void Statements::return_statement(Stmt *p_statement) {
 	Return *result = static_cast<Return *>(p_statement);
 	if (l_.constructor_ || l_.fn().result == Kind::Void) {
 		if (result->value) {
-			l_.expression(result->value, Kind::Void);
+			l_.effect(result->value);
 		}
 		leave_return(position, NONE);
 	} else {
@@ -331,7 +331,7 @@ void Statements::by_kind(Stmt *p_statement) {
 		case NodeKind::ImportStmt:
 			break;
 		case NodeKind::ExprStmt:
-			l_.expression(static_cast<ExprStmt *>(p_statement)->expr, Kind::Void);
+			l_.effect(static_cast<ExprStmt *>(p_statement)->expr);
 			break;
 		case NodeKind::VarStmt:
 			variables(static_cast<VarStmt *>(p_statement)->decl);

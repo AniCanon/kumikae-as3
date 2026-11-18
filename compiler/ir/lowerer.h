@@ -188,6 +188,10 @@ class Lowerer {
 
 	// Evaluates the expression and gives the register holding its value as p_want (Void: as it comes).
 	uint32_t expression(Expr *p_expression, Kind p_want);
+	// Evaluates an expression whose value nobody uses: a statement, a loop's update.
+	void effect(Expr *p_expression);
+	// Whether the expression is a call of something declared void.
+	static bool gives_nothing(const Expr *p_expression);
 
 	static double literal_value(const NumberLit *p_literal);
 

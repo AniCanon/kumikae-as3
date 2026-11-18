@@ -156,7 +156,11 @@ uint32_t Calls::trace_call(Call *p_call) {
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = Lowerer::writer(p_call->arguments, i + 1);
 		Kind kind = Kind::Void;
-		const bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.value_kind(p_call->arguments[i], &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.value_kind(p_call->arguments[i], &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		if (Lowerer::gives_nothing(p_call->arguments[i])) {
+			spoken_later = true; // What a call that gives nothing gives: undefined.
+			kind = Kind::Any;
+		}
 		values.push_back(l_.settled(l_.expression(p_call->arguments[i], spoken_later ? kind : Kind::Str), later, p_call->offset));
 	}
 	std::vector<uint32_t> list;
