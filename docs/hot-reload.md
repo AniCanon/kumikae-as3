@@ -96,17 +96,19 @@ what that doesn't rebuild, such as nodes outside the scene. A scene whose own `.
 
 To rerun a constructor, the game remembers the arguments each object was built with. It does that only in
 a debug build inside Godot, on the interpreter and in the native code that Play builds. An exported game
-remembers nothing and pays nothing.
+remembers nothing and pays nothing, and neither does native code built without `--remember`.
 
 | Creating and dropping objects, and nothing else | Cost of remembering |
 |---|---|
 | On the interpreter | About 2.5% |
 | On the interpreter, for a class whose constructor can't be rerun, where the first values are kept too | 7% to 9% |
-| In native code, two million objects with a text field | 20% more instructions |
-| In native code, a frame that creates 20,000 objects of four numbers | 2.4 times the instructions |
+| In native code, two million objects with a text field | 10% more instructions |
+| In native code, a frame that creates 20,000 objects of four numbers | 27% more instructions |
 
 Native code pays more in proportion because it does so little else to create an object. A game whose
-frames aren't made of object creation sees none of it.
+frames aren't made of object creation sees none of it. A library built with `--remember` that runs where
+nothing is remembered, such as an exported game, tests one flag for each object it creates, which costs
+about 3% on the same two programs.
 
 ## Limits
 
