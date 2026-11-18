@@ -187,8 +187,12 @@ static void test_switch() {
 	CHECK(play::wanted("", true));
 	CHECK(!play::wanted("", false));
 	CHECK(play::wanted("perhaps", true));
-	// With nothing said by either, Play builds nothing: native code is asked for.
+	// With nothing said by either, Play builds native code where its build has been run, and nowhere else.
+#if defined(__APPLE__)
+	CHECK(play::BY_DEFAULT);
+#else
 	CHECK(!play::BY_DEFAULT);
+#endif
 }
 
 // A build another run began is waited for only while it can still be going on.

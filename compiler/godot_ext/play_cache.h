@@ -178,10 +178,15 @@ inline std::string build_script(const Build &p_build) {
 	return script;
 }
 
-// What the project's setting is where the project does not set it. Off: an edit made while a game runs as
-// native code moves the game onto the interpreter, and the objects made before are not updated in place,
-// so native code is asked for until a reload is whole under it.
+// What the project's setting is where the project does not set it. On, where Play's build has been built
+// and run (macOS): native code stops a call that runs too long as the interpreter does, and an edit made
+// while a game runs as native code moves the game onto the interpreter with every object updated in place
+// as the interpreter's own are. Off on a system where the build is written and has never been run.
+#if defined(__APPLE__)
+inline constexpr bool BY_DEFAULT = true;
+#else
 inline constexpr bool BY_DEFAULT = false;
+#endif
 
 // Whether Play builds and runs native code: what the environment says (KAS3_NATIVE_PLAY: 0, off or false
 // against; 1, on or true for), and the project's setting where it says neither.

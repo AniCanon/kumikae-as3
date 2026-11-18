@@ -101,6 +101,7 @@ every run shares the test project.
   print the same.
 - **`play_godot.py`** tests the extension building a program library on Play: a project played twice,
   edited between runs, with the setting off, with no compiler, and with a compiler that fails.
+- **`timeout.gd`** runs on the interpreter and from a native start: a script stuck in a loop is stopped.
 - **Reload and restart** run from an interpreted start and from a native start.
 
 Every other run turns the Play build off with `KAS3_NATIVE_PLAY=0`.

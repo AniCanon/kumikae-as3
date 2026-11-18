@@ -8,7 +8,7 @@ These are held, with the probe's project (tests/godot_native), each run by Godot
              is native (by what it says, and by the host's counts), says what the first said of the
              scripts, and builds nothing.
   edit       a script edited between runs: the next run builds again, the one after is native.
-  switch     it is off with nothing said; the environment and the project's setting turn it on, and the
+  switch     it is on with nothing said; the environment and the project's setting turn it off, and the
              environment wins.
   compiler   no compiler (an empty PATH): one warning that names what to install, the interpreter runs.
              A compiler that fails: one warning with where its output is, the interpreter runs, and the
@@ -131,9 +131,9 @@ class Runner:
         check("play: native code says what the interpreter said", second == first, "\n".join(second[:5]))
         check("play: a run that finds its library builds nothing", settled(project, 5) and libraries(project) == built and
               os.stat(os.path.join(cache(project), built[0])).st_mtime_ns == written, str(libraries(project)))
-        # With nothing said either way, Play builds nothing: the interpreter runs, though the library is there.
-        status, text, _ = self.run(project, drop=(SWITCH,))
-        check("play: the interpreter is what a run gets with nothing said", status == 0 and USED not in text and BUILDS not in text, text[-900:])
+        # With nothing said either way, Play is on: the library that is there is what runs.
+        status, text, third = self.run(project, drop=(SWITCH,))
+        check("play: native code is what a run gets with nothing said", status == 0 and USED in text and BUILDS not in text and third == first, text[-900:])
         return first
 
     def edit(self, project, said):
@@ -162,12 +162,12 @@ class Runner:
         with open(settings) as file:
             original = file.read()
         with open(settings, "a") as file:
-            file.write("\n[actionscript]\n\nnative/play=true\n")
+            file.write("\n[actionscript]\n\nnative/play=false\n")
         status, text, lines = self.run(project, drop=(SWITCH,))
-        check("play: the project's setting turns it on", status == 0 and USED in text and len(lines) >= 8,
+        check("play: the project's setting turns it off", status == 0 and USED not in text and BUILDS not in text and "WARNING" not in text and len(lines) >= 8,
               "exit %d\n%s" % (status, text[-900:]))
-        status, text, _ = self.run(project, {SWITCH: "0"})
-        check("play: the environment's word is over the setting's", status == 0 and USED not in text and BUILDS not in text, "exit %d\n%s" % (status, text[-900:]))
+        status, text, _ = self.run(project, {SWITCH: "1"})
+        check("play: the environment's word is over the setting's", status == 0 and USED in text and BUILDS not in text, "exit %d\n%s" % (status, text[-900:]))
         with open(settings, "w") as file:
             file.write(original)
 

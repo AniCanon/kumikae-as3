@@ -114,7 +114,6 @@ code and isn't meant for release builds.
 
 ## What's next
 
-- Native code on by default when you press Play. It's opt-in today; see [How it works](how-it-works.md).
 - Native code on iOS and in exported games.
 - Larger Godot values (`Vector3`, `Color`) inline in vectors, fields and parameters.
 - Threads.

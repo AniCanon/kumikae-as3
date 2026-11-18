@@ -36,9 +36,9 @@ agreement.
 |---|---|---|
 | Runs your code by | Executing the IR | Compiling the IR to C++, then to machine code |
 | You need | Nothing extra | A C++ toolchain for the target |
-| Hot reload | Yes | Not yet |
+| Hot reload | Yes | The game moves onto the interpreter and reloads there |
 | Speed | For development | Level with or ahead of Godot C# |
-| Used for | Editing and debugging | Play (opt-in) and release builds |
+| Used for | Editing and debugging | Play and release builds |
 
 **The interpreter** runs inside a Godot extension that stock Godot 4.7 loads. It needs no build step, so you
 save a script and the running game takes the change. See [Hot reload](hot-reload.md).
@@ -47,11 +47,12 @@ save a script and the running game takes the change. See [Hot reload](hot-reload
 a program library, which the extension loads in place of the interpreter. There is no just-in-time compiler
 on any platform, because iOS and consoles forbid one. See [Performance](performance.md) for the techniques.
 
-The extension can build the program library for you when you press Play. On macOS, turn on the project
-setting `actionscript/native/play`: the first run after an edit starts on the interpreter while the library
-builds in the background, and the next run is native. Builds are cached under `.godot/kas3`. You can also
-build a library by hand with `kas3c cpp`. If there's no C++ toolchain, or a build fails, the extension says
-so once and runs the interpreter.
+The extension builds the program library for you when you press Play. On macOS this is on by default: the
+first run after an edit starts on the interpreter while the library builds in the background, and the next
+run is native. Builds are cached under `.godot/kas3`. When you save a script while the game runs as native
+code, the game moves onto the interpreter with its state and takes the change. The project setting
+`actionscript/native/play` turns the build off. You can also build a library by hand with `kas3c cpp`. If
+there's no C++ toolchain, or a build fails, the extension says so once and runs the interpreter.
 
 ### Keeping the two identical
 

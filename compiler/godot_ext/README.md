@@ -134,7 +134,8 @@ hands it to the interpreter and to the host of a program library alike.
 ### Building on Play
 
 With the project setting `actionscript/native/play` on, the extension builds the program library itself
-when a game runs from its project folder.
+when a game runs from its project folder. The setting is on by default on macOS, where the build has been
+run, and off elsewhere.
 
 - **The key.** A build is identified by the scripts as compiled, the runtime's layout, the backend and the
   runtime headers this extension carries, the C++ compiler, and the flags. If `.godot/kas3` has

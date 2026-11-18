@@ -48,6 +48,10 @@ state of the project changes.
 - **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
 - **Every test program gives the same output** on the interpreter and as native code.
 - **Level with or ahead of Godot C#** on all ten frame benchmarks. See [Performance](performance.md).
+- **Native code when you press Play,** on by default on macOS. The extension builds the program library
+  by itself, caches it, and falls back to the interpreter when there's no C++ toolchain. A script stuck in a
+  loop is stopped as on the interpreter, and an edit moves the running game onto the interpreter with its
+  objects updated in place.
 
 ### Editors and tools
 
@@ -57,13 +61,6 @@ state of the project changes.
   configurations for desktop and the iOS Simulator, a live Simulator panel, and a test runner.
 - **VS Code client** for the language server.
 - **A testing library** written in AS3.
-
-## In progress
-
-- **Native code when you press Play.** The extension can build the program library by itself when a
-  project runs on macOS, cache it, and fall back to the interpreter when there's no C++ toolchain. Turn it
-  on with the project setting `actionscript/native/play`. It's off by default until hot reload updates
-  objects created under native code.
 
 ## Next
 
