@@ -520,6 +520,11 @@ static void test_godot_classes() {
 			{ "'_toString' is marked 'override' but no base class has a method to override" });
 	// The tag means nothing in a program's own files.
 	expect("package { public class Main { public function run():void { new Helper(); } } }\n[Abstract] class Helper {}\n", {});
+	// One of Godot's objects is cast or asked by 'as'; one of its value types by neither, so neither is advised.
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "public function run(o:Object, n:Node):void { var a:Node2D = /*!*/n; var b:Sprite2D = /*!*/o; var c:Vector2 = /*!*/o; var d:Color = /*!*/o; } } }\n",
+			{ NEEDS_CAST("Node", "Node2D"), NEEDS_CAST("Object", "Sprite2D"), "a value of type 'Object' may not be a 'Vector2'",
+					"a value of type 'Object' may not be a 'Color'" });
 }
 
 int main() {

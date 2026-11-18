@@ -20,6 +20,21 @@ enum class ClassCall {
 	Other,
 };
 
+// Whether the class is one of Godot's value types (Vector2, Color): a value is said to be one neither by
+// a cast nor by `as`, which ask only of objects and of AS3's own values.
+inline bool is_godot_value_type(const Symbol *p_class) {
+	if (!p_class || !p_class->unit || p_class->kind != SymbolKind::Class || !p_class->unit->is_declaration ||
+			p_class->unit->source.path() != GODOT_DECLARATIONS_PATH) {
+		return false;
+	}
+	for (const Symbol *at = p_class; at && at->klass; at = at->klass->base) {
+		if (at->name == "GodotObject") {
+			return false;
+		}
+	}
+	return true;
+}
+
 inline ClassCall class_call(const Symbol *p_class) {
 	if (!p_class || !p_class->unit || (p_class->kind != SymbolKind::Class && p_class->kind != SymbolKind::Interface)) {
 		return ClassCall::Other;
