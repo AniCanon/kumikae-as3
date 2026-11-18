@@ -26,10 +26,9 @@ void FunctionWriter::find_still() {
 		counts_nothing[i] = counts_nothing[i] || borrowed_[i] != NONE;
 	}
 	std::vector<uint32_t> read, written;
+	bool runs = false; // Something in it may run code, and code may write any static field that is no constant.
 	for (const Instruction &in : function_.code) {
-		if (is_call(in.op) || may_run_code(module_, function_, in, counts_nothing)) {
-			return; // Something in it may run code, and code may write any static field.
-		}
+		runs = runs || is_call(in.op) || may_run_code(module_, function_, in, counts_nothing);
 		if (in.op == Op::GetGlobal && !ir::is_held(kind(in.a))) {
 			read.push_back(in.b);
 		} else if (in.op == Op::SetGlobal) {
@@ -39,10 +38,29 @@ void FunctionWriter::find_still() {
 	std::sort(read.begin(), read.end());
 	read.erase(std::unique(read.begin(), read.end()), read.end());
 	for (const uint32_t each : read) {
-		if (std::find(written.begin(), written.end(), each) == written.end()) {
+		if (std::find(written.begin(), written.end(), each) == written.end() && (!runs || own_constant(each))) {
 			still_.push_back(each);
 		}
 	}
+}
+
+// Whether a static field is a constant of the function's own class or of one that class extends. Such a
+// class's static fields are being given their values, or have been, by the time any of its functions runs
+// (a class is set up before it is used, its bases first), and what gives them is not running beside the
+// function but waiting beneath it or done: the constant is what it is for as long as the function runs.
+bool FunctionWriter::own_constant(uint32_t p_global) const {
+	const ir::Global &global = module_.globals[p_global];
+	const size_t dot = global.name.rfind('.');
+	if (!global.is_const || dot == std::string::npos) {
+		return false;
+	}
+	const std::string_view owner = std::string_view(global.name).substr(0, dot);
+	for (uint32_t at = function_.owner; at != NONE && at < module_.classes.size(); at = module_.classes[at].base) {
+		if (module_.classes[at].name == owner) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void FunctionWriter::read_global(const Instruction &p_in) {

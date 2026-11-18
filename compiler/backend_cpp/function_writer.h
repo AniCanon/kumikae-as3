@@ -130,9 +130,10 @@ class FunctionWriter {
 	std::vector<bool> lent_candidates() const;
 	// The static fields of numbers and Booleans that are locals for the whole function (`g4`), each read
 	// once as it begins: those it reads and never writes, where nothing in it runs code that could write
-	// one (rule 12, for statics). Sorted.
+	// one (rule 12, for statics), and the constants of its own class whatever it runs. Sorted.
 	std::vector<uint32_t> still_;
 	void find_still();
+	bool own_constant(uint32_t p_global) const;
 	void read_global(const ir::Instruction &p_in);
 	std::string still_declared() const;
 	// GetField written: from the local a kept field is in, with no reference counted into a register that

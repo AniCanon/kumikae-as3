@@ -69,7 +69,7 @@ to give a wrong answer if the proof were wrong.
 | Direct virtual calls | When the receiver's class is known, the call compares the object's class with the classes the program creates, four at most, and calls each one's function by name. A method with one implementation is a direct call. | `tests/run/virtual_calls.as` |
 | No error check after a call that can't fail | A function in which nothing can fail keeps no call depth and sets no error. | `tests/run/deep_leaf.as` |
 | Fields in locals | A number or Boolean field of `this` that a loop uses stays in a local. Memory is updated only around code that could see the field another way. | `tests/run/field_in_loop.as` |
-| Static fields in locals | A static number or Boolean that a function reads and never writes is read once. | `tests/run/static_still.as` |
+| Static fields in locals | A static number or Boolean that a function reads and never writes is read once. A constant of the function's own class is read once whatever the function runs. | `tests/run/static_still.as`, `tests/run/static_const_still.as` |
 | Fields through the class's struct | Tells the C++ compiler which field of which class a read or write touches. | `tests/run/field_classes.as` |
 | Loops over vectors | A loop that reads and writes vectors of numbers is written twice. The first copy keeps each vector's length and elements in locals. An index out of range jumps to the second copy, which is the loop as written. | `tests/run/vector_loops.as` |
 | Narrow vector elements | An element of a `Vector.<int>` is read and written as four bytes. | `tests/run/vector_narrow.as` |
