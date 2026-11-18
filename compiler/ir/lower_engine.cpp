@@ -241,7 +241,7 @@ uint32_t Engine::operand(Expr *p_expression, const Type *p_beside) {
 		return as_int32(l_.expression(p_expression, Kind::Void), p_expression->offset);
 	}
 	Kind kind = Kind::Void;
-	if (!l_.kind_of(p_expression->type, &kind) || !Lowerer::is_numeric(kind)) {
+	if (!l_.value_kind(p_expression, &kind) || !Lowerer::is_numeric(kind)) {
 		kind = Kind::Void;
 	} else if (kind == Kind::F64 && l_.whole(p_expression)) {
 		// A whole number worked out as a Number: Godot's integer holds every one. One that came out as not

@@ -11,7 +11,7 @@ bool Lowerer::untyped_type(const Type *p_type) const {
 
 bool Lowerer::untyped(const Expr *p_expression) const {
 	Kind kind = Kind::Void;
-	return p_expression && !is_null(p_expression) && kind_of(p_expression->type, &kind) && kind == Kind::Any;
+	return p_expression && !is_null(p_expression) && value_kind(p_expression, &kind) && kind == Kind::Any;
 }
 
 // Any expression as an untyped value; `null` as null.
@@ -164,14 +164,19 @@ std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 	if (test) {
 		return fits;
 	}
-	// `as`: the value as that type if it is one, otherwise null. The checker types `x as int` as an int,
-	// as Adobe's compiler does, so the null is what an int holds for it: 0 (false for a Boolean).
-	uint32_t out = target == Kind::F64 ? l_.reg(Kind::F64) : l_.default_value(target, position);
-	if (target == Kind::F64) {
-		l_.emit(Op::ConstF64, position, out, l_.number(0)); // Not the NaN a Number starts as.
+	// `as`: the value as that type if it is one, otherwise null. A number or a Boolean stays untyped, which
+	// holds the null (Lowerer::null_as): where it is stored in an int, the null becomes 0 there.
+	const bool untyped = Lowerer::is_numeric(target) || target == Kind::Bool;
+	uint32_t out = untyped ? l_.reg(Kind::Any) : l_.default_value(target, position);
+	if (untyped) {
+		l_.emit(Op::AnyConst, position, out, 1);
 	}
 	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
-	l_.emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
+	if (untyped) {
+		l_.emit(Op::Move, position, out, value);
+	} else {
+		l_.emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
+	}
 	l_.patch(skip, l_.here());
 	return out;
 }

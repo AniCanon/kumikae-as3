@@ -162,7 +162,7 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	if (index) {
 		// An int or a uint index is read in its own kind as it runs; anything else as a Number.
 		Kind kind = Kind::F64;
-		l_.kind_of(index->type, &kind);
+		l_.value_kind(index, &kind);
 		place.key = l_.settled(l_.expression(index, kind == Kind::I32 || kind == Kind::U32 ? kind : Kind::F64), p_later, p_target->offset);
 	}
 	return place;

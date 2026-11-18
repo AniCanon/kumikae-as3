@@ -86,7 +86,7 @@ uint32_t Calls::written_value(Expr *p_value, Kind p_conversion, uint32_t p_posit
 		return out;
 	}
 	Kind given = Kind::Void;
-	bool known = l_.kind_of(p_value->type, &given);
+	bool known = l_.value_kind(p_value, &given);
 	if (known && (given == Kind::I64 || p_conversion == Kind::I64) && !Lowerer::is_null(p_value)) {
 		return l_.convert(l_.wide_operand(p_value, p_conversion), p_conversion, p_position, true);
 	}
@@ -142,7 +142,7 @@ uint32_t Calls::trace_call(Call *p_call) {
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = Lowerer::writer(p_call->arguments, i + 1);
 		Kind kind = Kind::Void;
-		const bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.kind_of(p_call->arguments[i]->type, &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		const bool spoken_later = !Lowerer::is_null(p_call->arguments[i]) && l_.value_kind(p_call->arguments[i], &kind) && (kind == Kind::Obj || kind == Kind::Any);
 		values.push_back(l_.settled(l_.expression(p_call->arguments[i], spoken_later ? kind : Kind::Str), later, p_call->offset));
 	}
 	std::vector<uint32_t> list;
@@ -225,7 +225,8 @@ uint32_t Calls::call(Call *p_call, Kind p_want) {
 	if (const std::optional<uint32_t> called = Functions(l_).function_method(p_call)) {
 		return *called; // f.call(), f.apply()
 	}
-	Symbol *symbol = l_.callee_symbol(callee);
+	const bool on_null_as = callee->kind == NodeKind::Member && l_.null_as(static_cast<Member *>(callee)->object);
+	Symbol *symbol = on_null_as ? nullptr : l_.callee_symbol(callee);
 	if (!symbol) {
 		if (const std::optional<uint32_t> by_name = EngineCalls(l_).signal_call_by_name(p_call)) {
 			return *by_name;

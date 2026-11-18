@@ -75,7 +75,7 @@ uint32_t Dynamic::method_value(Member *p_member, uint32_t p_class) {
 
 bool Dynamic::by_name(const Expr *p_holder) const {
 	Kind kind = Kind::Void;
-	if (!p_holder || Lowerer::is_null(p_holder) || !l_.kind_of(p_holder->type, &kind)) {
+	if (!p_holder || Lowerer::is_null(p_holder) || !l_.value_kind(p_holder, &kind)) {
 		return false;
 	}
 	if (kind == Kind::Any) {
@@ -131,7 +131,7 @@ auto Dynamic::place(Expr *p_target, Expr *p_later) -> std::optional<Place> {
 	}
 	Index *index = static_cast<Index *>(p_target);
 	Kind key_kind = Kind::Void;
-	const bool numeric = l_.kind_of(index->index->type, &key_kind) && Lowerer::is_numeric(key_kind);
+	const bool numeric = l_.value_kind(index->index, &key_kind) && Lowerer::is_numeric(key_kind);
 	if (!by_name(index->object) || (l_.is_vector(index->object->type) && numeric) || index->object->kind == NodeKind::SuperExpr) {
 		return std::nullopt;
 	}
@@ -218,7 +218,9 @@ auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 		return std::nullopt;
 	}
 	Member *callee = static_cast<Member *>(p_call->callee);
-	const Symbol *symbol = callee->resolved();
+	// A number that may be null (`(x as Number).toFixed(1)`) is asked as an untyped value is, by the name:
+	// with null there, that is AS3's TypeError #1009.
+	const Symbol *symbol = l_.null_as(callee->object) ? nullptr : callee->resolved();
 	const bool object_method = symbol && symbol->owner == l_.object_ && symbol->name != "toString";
 	if (callee->object->kind == NodeKind::SuperExpr || (symbol && !object_method) || (!symbol && callee->name == "toString" && p_call->arguments.count == 0)) {
 		return std::nullopt;
