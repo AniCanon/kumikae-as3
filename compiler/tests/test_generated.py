@@ -161,6 +161,18 @@ with tempfile.TemporaryDirectory() as where:
                   loop)
             check("a counter that goes up to the vector's own length is its index with nothing more asked", "goto S" not in loop, loop)
 
+with tempfile.TemporaryDirectory() as where:
+    written = subprocess.run([kas3c, "cpp", "static_const_still.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "run"))
+    check("static_const_still.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        both = functions(where, "Sub.cpp").get("Sub_both", "")
+        inside = "".join(loops(both))
+        # MORE is Sub's own, and the function sets no class of its own up: read once. LIMIT is a base's, which
+        # the function sets up itself before it reads it: read where the function reads it, after that.
+        check("a constant of the function's own class is read once, before its loops", re.search(r"^\tconst int32_t g\d+ = c->globals\[\d+\]\.i;$", both, re.M) and
+              len(re.findall(r"^\tconst int32_t g\d+ = ", both, re.M)) == 1, both)
+        check("a constant of a class the function sets up itself is read after it is set up", "use_class(c, " in inside and "c->globals[" in inside, both)
+
 for failure in failures:
     print("FAIL " + failure[:2500])
 print("generated: %s" % ("OK" if not failures else "%d failed" % len(failures)))

@@ -48,6 +48,8 @@ void FunctionWriter::find_still() {
 // class's static fields are being given their values, or have been, by the time any of its functions runs
 // (a class is set up before it is used, its bases first), and what gives them is not running beside the
 // function but waiting beneath it or done: the constant is what it is for as long as the function runs.
+// Not in a function that itself sets the constant's class up (InitClass): there the lowerer did not take
+// the class for set up, and the constant is read where the function reads it.
 bool FunctionWriter::own_constant(uint32_t p_global) const {
 	const ir::Global &global = module_.globals[p_global];
 	const size_t dot = global.name.rfind('.');
@@ -57,7 +59,7 @@ bool FunctionWriter::own_constant(uint32_t p_global) const {
 	const std::string_view owner = std::string_view(global.name).substr(0, dot);
 	for (uint32_t at = function_.owner; at != NONE && at < module_.classes.size(); at = module_.classes[at].base) {
 		if (module_.classes[at].name == owner) {
-			return true;
+			return std::none_of(function_.code.begin(), function_.code.end(), [&](const Instruction &p_in) { return p_in.op == Op::InitClass && p_in.a == at; });
 		}
 	}
 	return false;
