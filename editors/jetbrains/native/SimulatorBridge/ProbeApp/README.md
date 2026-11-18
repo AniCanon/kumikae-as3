@@ -1,7 +1,9 @@
-# Owned Simulator probe app
+# ProbeApp
 
-A Swift/UIKit test fixture, compiled only with the installed simulator SDK by the
-opt-in native probe. It runs exclusively on the probe's disposable device. No
-package dependency, signing account, host window or network is needed. Its JSON
-report in Documents records actual text, interface orientation, drawing ticks and
-touch callbacks. The native helper uses none of this test app's code.
+A small UIKit app used only by the helper's [probes](../README.md#probes). A probe compiles it with the
+installed Simulator SDK and runs it on the disposable device that the probe creates.
+
+The app writes a JSON report to its Documents folder: the text it received, its interface orientation, its
+drawing ticks and its touch callbacks. A probe compares that report with what it sent.
+
+The app needs no package, signing account or network. The helper uses none of its code.

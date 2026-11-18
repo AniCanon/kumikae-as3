@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 500" width="1100" height="500" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="The parts of the JetBrains plugin">
+<title>The parts of the JetBrains plugin</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5F6368"/></marker></defs>
+<rect x="0.5" y="0.5" width="1099" height="499" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
+<text x="40" y="48" font-size="20" text-anchor="start" font-weight="bold" fill="#202124">The parts of the JetBrains plugin</text>
+<text x="40" y="72" font-size="13" text-anchor="start" font-weight="normal" fill="#5F6368">The IDE shows things. The compiler, Godot and the Simulator stay separate programs.</text>
+<rect x="40" y="100" width="330" height="360" rx="12" fill="#F8F9FA" stroke="#BDC1C6" stroke-dasharray="6 4"/>
+<text x="54" y="124" font-size="13" text-anchor="start" font-weight="bold" fill="#5F6368">The plugin, inside Rider or IntelliJ IDEA</text>
+<rect x="70" y="140" width="270" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="205.0" y="172.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Language support</text>
+<text x="205.0" y="188.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">LSP client, typing help, highlighting</text>
+<rect x="70" y="240" width="270" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="205.0" y="264.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Project and run tools</text>
+<text x="205.0" y="280.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">wizard, run configurations,</text>
+<text x="205.0" y="296.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">test runner, settings and scene editors</text>
+<rect x="70" y="340" width="270" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="205.0" y="372.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Simulator panel</text>
+<text x="205.0" y="388.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">the device&#x27;s screen, input, console</text>
+<rect x="520" y="140" width="220" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="630.0" y="172.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">kas3c lsp</text>
+<text x="630.0" y="188.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">the compiler as a language server</text>
+<polyline points="340,175 518,175" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<text x="430" y="165" font-size="12" text-anchor="middle" font-weight="normal" fill="#5F6368">LSP, standard I/O</text>
+<rect x="520" y="240" width="220" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="630.0" y="272.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Godot and the test runner</text>
+<text x="630.0" y="288.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">started as processes</text>
+<polyline points="340,275 518,275" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="520" y="340" width="220" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="630.0" y="364.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Simulator service</text>
+<text x="630.0" y="380.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">core/: one session,</text>
+<text x="630.0" y="396.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">local HTTP with a token</text>
+<polyline points="340,375 518,375" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="520" y="432" width="220" height="44" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="630.0" y="451.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">simulator.py</text>
+<text x="630.0" y="467.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">a command-line client</text>
+<polyline points="630,432 630,412" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="850" y="290" width="210" height="64" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="955.0" y="319.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">xcrun simctl</text>
+<text x="955.0" y="335.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">boot, install, launch, logs</text>
+<rect x="850" y="390" width="210" height="64" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="955.0" y="419.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">simulator-bridge</text>
+<text x="955.0" y="435.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">Swift helper: live screen, input</text>
+<polyline points="740,360 800,360 800,322 848,322" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<polyline points="740,390 800,390 800,422 848,422" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="850" y="140" width="210" height="70" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="955.0" y="172.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">iOS Simulator</text>
+<text x="955.0" y="188.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">the running device</text>
+<polyline points="955,290 955,212" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<polyline points="1060,422 1080,422 1080,175 1062,175" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+</svg>

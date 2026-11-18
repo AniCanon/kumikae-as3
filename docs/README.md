@@ -2,6 +2,8 @@
 
 | Page | Read it to learn |
 |---|---|
+| [Using AS3 in Godot](godot.md) | How to set up a project, and how Godot's API, signals and values read in AS3 |
+| [The AS3 language](language.md) | Which AS3 the compiler accepts and runs, what it adds, and where it differs from Flash |
 | [How it works](how-it-works.md) | How a script goes from an `.as` file to a running game |
 | [Performance](performance.md) | The numbers against Godot C#, and the techniques behind them |
 | [Hot reload](hot-reload.md) | What happens when you save a script while the game runs |

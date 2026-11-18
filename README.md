@@ -101,6 +101,9 @@ You need macOS, CMake 3.22 or later, a C++17 compiler, and Python 3 for the test
 To run scripts inside Godot, build the Godot extension and open the example game. The steps are in
 [examples/coin-dash](examples/coin-dash/README.md). To set up an editor, see [editors](editors/README.md).
 
+To write your own scripts, read [Using AS3 in Godot](docs/godot.md) and
+[The AS3 language](docs/language.md).
+
 ## How it works
 
 ![How an .as file becomes a running game](docs/diagrams/pipeline.svg)
@@ -140,7 +143,7 @@ The [roadmap](docs/roadmap.md) has the detail and the known limits.
 | [`editors/`](editors/README.md) | The Rider plugin and the VS Code client. |
 | [`testing/`](testing/README.md) | The AS3 testing library and its runner. |
 | [`examples/`](examples/coin-dash/README.md) | A small game written in AS3. |
-| [`docs/`](docs/README.md) | How it works, performance, hot reload and the roadmap. |
+| [`docs/`](docs/README.md) | The language, using AS3 in Godot, how it works, performance, hot reload and the roadmap. |
 
 To change the code, start with [CONTRIBUTING.md](CONTRIBUTING.md).
 

@@ -1,305 +1,208 @@
-# Plugin structure
+# Plugin architecture
 
-The plugin separates language support, project/run tools and the iOS Simulator panel. Compiler
-semantics stay in `kas3c`; editor interaction stays in the IDE. AS3 debugging remains planned.
+This page describes the parts of the plugin and the rules each follows. It's for someone changing the
+plugin. For the coding conventions, read [CONTRIBUTING.md](CONTRIBUTING.md). For what the plugin does,
+read the [README](README.md).
+
+![The parts of the JetBrains plugin](../../docs/diagrams/plugin.svg)
+
+The plugin has three parts: language support, project and run tools, and the iOS Simulator panel. Two
+rules hold across all three:
+
+- **The compiler owns the language.** What a name means, what completes, and what is an error come from
+  `kas3c`. The plugin holds no AS3 semantics.
+- **The IDE owns interaction.** Edits, snippets, undo and the Tab key go through the platform's own
+  pipeline. The plugin doesn't override them.
+
+## Layout of the code
+
+| Path | Holds |
+|---|---|
+| `src/main/kotlin/.../language/` | The language clients, the local lexer, and typing help |
+| `src/main/kotlin/.../project/` | The project wizard, file templates, and the Game view |
+| `src/main/kotlin/.../run/` | The Godot and iOS Simulator run configurations |
+| `src/main/kotlin/.../testing/` | The AS3 Tests run configuration and its result tree |
+| `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot` and scene editors |
+| `src/main/kotlin/.../panel/` | The Simulator tool window: repository, controller, view |
+| `src/main/kotlin/.../ui/` | The Compose host and the shared composables |
+| `src/main/resources/META-INF/` | `plugin.xml` and the optional descriptors for Rider and IntelliJ IDEA |
+| `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
+| `native/SimulatorBridge/` | The Swift helper that reads the Simulator's screen and sends input |
+| `simulator.py`, `tests/` | The command-line client and its tests |
+| `tools/build-ios-simulator.sh` | Builds a game for the iOS Simulator. The plugin carries it |
+| `src/test/kotlin/`, `src/uiProbe/` | Tests, and a test-only plugin that drives the real views in a sandbox IDE |
 
 ## Language support
 
-`As3LspSupportProvider` starts one project-wide native LSP client using the located compiler.
-Completion, signature help, diagnostics and navigation come from that server. Standard LSP edits and
-snippets go through the platform lookup pipeline; the plugin does not override Tab globally.
-Rider's public notification-handler hook wraps diagnostic version validation and native cache insertion
-in one read action. Rider sends incremental changes from `beforeDocumentChange`; without this boundary,
-a reply can cache old offsets under the new document version while the write is still in progress.
-The short, synchronous cache publication is not cancellable/retried because it has side effects.
-It checks project disposal inside the read action and adds no worker, queue or diagnostic cache.
+### Two clients, one server
 
-`As3Lsp4ijDiagnostics` rejects ranges outside the current document before building an annotation,
-including stale ranges after whole-document replacement. Empty-file diagnostics use an end-of-line
-annotation. `As3Lsp4ijClient` refreshes the client’s accepted diagnostic cache after publication, including
-identical diagnostics whose earlier repaint an edit invalidated. It rejects replies while an edit is
-uncommitted and skips refresh for mismatched versions or disposed clients. Cache publication and the
-refresh stamp share read access; the existing client queue coalesces refreshes. A signature-checked
-bridge reads LSP4IJ’s package-private version accessor, covered by the native probe. The server remains
-the source of diagnostic content.
+Both IDEs talk to the same `kas3c lsp`. The descriptors keep the two clients apart:
 
-On Rider RD-262.10968.170, `RiderProjectLifetime` owns the native Current File Problems panel even when
-the split view replaces its component. Closing also releases the captured frame's callbacks and
-painters and any global focus root belonging to a released editor. Cleanup checks both disposal and
-frame ownership before touching the old root; another project's frame is left intact.
-`RiderFeedbackLifetime` preserves native feedback eligibility while owning its idle subscription.
-`RiderDatabaseLifetime` constructs the native database startup activity with a project service's scope,
-so a project closed during startup cancels that work. Service lookups check disposal under read access.
-The exact-build bridge validates and invokes its native startup entry point; reflective calls need runtime
-coverage even when static verification passes. Extension replacements register before removing
-the original and roll back on failure. Each repair reports failure independently.
+| Descriptor | Loaded | Holds |
+|---|---|---|
+| `plugin.xml` | Always | The file type, typing help, project tools and the Simulator panel |
+| `as3-rider.xml` | In Rider | Rider's own LSP client (`As3LspSupportProvider`) |
+| `as3-idea.xml`, `as3-idea-lsp4ij.xml` | In IntelliJ IDEA, the second only with LSP4IJ | The LSP4IJ server, parameter help and outline |
 
-These bridges run only on the exact tested Rider build and validate native signatures before use.
-They do not modify IDE files. The plugin requires restart, and an unload veto protects native modules
-whose startup extensions it owns. The verifier cannot validate reflective calls: the stock IDE probes
-must pass before changing the supported build.
+Rider never loads an LSP4IJ class, even when that plugin is installed, and IntelliJ IDEA never loads a
+class of Rider's client. An IntelliJ IDEA project without LSP4IJ gets one notification when an AS3 file
+opens. The listener that shows it imports no client class, so a missing dependency can't break typing
+help.
 
-AS3 language-block templates use that same client pipeline. Their ordinary source text and tab-stop
-spans originate in compiler queries; no template catalogue or snippet parser is duplicated in Kotlin.
+`As3ServerLaunch` owns the server's command line for both. `As3ProjectLanguageService` finds the compiler
+(`CompilerLocator`) and refreshes Godot's declarations, on one project-owned alarm.
 
-`As3ParserDefinition` creates token-only PSI, sufficient for native editor integration. `As3Lexer`
-recognizes code, punctuation and non-code text, retaining lexical state at token boundaries for
-incremental highlighting. That state includes `Braces`: whether each open brace began a block or a
-value, which decides whether a slash after its `}` starts a regex or divides. Since a state holds all the
-lexer knows, it is a `RestartableLexer` (an experimental platform interface): the editor lexes again
-from a token near an edit, not from the top of the file. The editor keeps sixteen bits of such a state,
-so the whole state fits in them; `Braces` keeps only where the two innermost value braces are. `As3EditorHighlighterProvider` combines a structural highlighter with the
-existing TextMate highlighter. Its iterator intersects their intervals: AS3 supplies token kinds and
-TextMate supplies color attributes. Both receive the same document changes and belong to the editor;
-no document text or per-edit token history is copied into a separate cache.
+### Diagnostics and document versions
 
-`As3BraceMatcher` and `As3QuoteHandler` use those structural tokens. Quotes use the whole literal's
-boundaries even when TextMate splits it into escape/color segments. `As3LineIndentProvider` computes
-local indentation from existing tokens and project settings. `As3EnterHandler` applies that provider
-after native Enter because token-only PSI has no full formatter. None of these handlers reads files,
-starts processes or waits for the server.
+An editor that types ahead can receive errors for text it no longer has. Both clients guard against it:
 
-The sandbox `UiProbeLanguage` exercises native typing actions. `UiProbeCompletion` exercises the
-native lookup against the bundled server in a disposable project. The compiler tests separately cover
-scope/type semantics, wire capabilities, Unicode ranges and cache invalidation.
-`UiProbeFocus` scopes the platform's window-deactivation test control to those background sandbox runs
-and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
-ordinary live-editor focus remains controlled by the IDE.
+- **Rider.** Rider sends a change before the document is written. The plugin validates the version of a
+  diagnostics message and stores the message in one read action, so that a reply can't cache old offsets
+  under a new version.
+- **IntelliJ IDEA.** `As3Lsp4ijDiagnostics` rejects a range outside the current document.
+  `As3Lsp4ijClient` rejects a reply while an edit is uncommitted, and refreshes highlights after a
+  publication.
 
-## Project editors and tests
+The server stays the source of what the errors are.
 
-`settings/` separates source-preserving configuration models, an observable draft
-controller, the IDE document repository and the Compose form. The repository sees
-unsaved source edits, validates the entire draft, then changes both documents in
-one write command. Conflicting source revisions are rejected. Drafts are kept per
-export preset. Preview decoding belongs to the repository, never to composition.
+### Completion in LSP4IJ
 
-`scene/` parses node/resource headers and edits only an attachment. The IDE adapter
-checks a conservative direct native base and refuses unsupported scene inheritance.
-The outline controller owns selection/status; its Compose view forwards actions.
-Scene usages use project indexing and return source navigation targets.
+`As3Lsp4ijCompletion` refreshes suggestions as the prefix changes, and chooses the insert range for Enter
+and the replace range for Tab. The lookup owns its data. There's no item cache at project or application
+level. Snippets, additional edits and undo stay in the client.
 
-`testing/` integrates the IDE's bundled test runner with the repository's Python
-runner. A manifest declares executable argument arrays and source files. A normal
-Godot target produces one result; a framework suite emits validated events for
-individual cases. Failed-case reruns preserve suite/case identities. The compiler
-still owns language semantics; no AS3 reflection or new compiler syntax is added.
+### The local lexer and typing help
 
-## Simulator composition
+`As3ParserDefinition` creates a token-only PSI, which is enough for editor integration. `As3Lexer` tells
+code from comments, strings and regular expression literals.
+
+- **The lexer can restart anywhere.** Its whole state fits in the sixteen bits the editor keeps for each
+  token, so the editor lexes again from a token near an edit, not from the top of the file. The state
+  records whether each open brace began a block or a value, which decides whether a `/` after its `}`
+  starts a regular expression or divides.
+- **Colors come from TextMate.** `As3EditorHighlighterProvider` combines the lexer's token kinds with the
+  colors of the TextMate grammar shared with the VS Code client.
+- **Typing handlers are local.** `As3BraceMatcher`, `As3QuoteHandler`, `As3LineIndentProvider` and
+  `As3EnterHandler` use the tokens. None reads a file, starts a process or waits for the server.
+
+### Repairs to Rider
+
+On the one Rider build the plugin was tested with (`RD-262.10968.170`), the `Rider*Lifetime` classes
+release objects of Rider's own that would otherwise outlive a closed project. They run only on that exact
+build, check the signatures of what they call before they call it, and change no IDE file. Each repair
+reports its failure independently.
+
+The plugin verifier can't check reflective calls. Before you change the supported build, run the sandbox
+probes described in [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide).
+
+## Project tools
+
+- **`settings/`** separates four things: models that preserve the source text, a draft controller, a
+  repository over the IDE's documents, and the Compose form. The repository validates the whole draft and
+  changes the documents in one write command. A conflicting source edit is rejected.
+- **`scene/`** parses node and resource headers and edits only a script attachment. It refuses scene
+  inheritance it doesn't understand.
+- **`testing/`** connects the IDE's test runner to the repository's Python runner
+  ([testing/](../../testing/README.md)). It adds no AS3 reflection and no compiler syntax.
+- **`run/`** starts Godot for the desktop configuration. For the Simulator it builds the game with
+  `tools/build-ios-simulator.sh` and installs and launches it through the Simulator service.
+
+## The Simulator panel
 
 ```text
 SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
   SimulatorComposition       chooses the concrete services
-    LocalSimulatorService    starts the shared session; commands over HTTP, binary pictures directly
-    ApiSimulatorRepository   typed commands, binary pictures and decoded frames
+    LocalSimulatorService    starts the shared session
+    ApiSimulatorRepository   typed commands, pictures and decoded frames
     BackgroundWorker (x4)    actions, polling, stream startup, continuous touch
-  SimulatorWindowController  all requests and all state
-  SimulatorToolWindow        mounts the view, owns the two native controls and visibility-scoped timers
-    SimulatorView            Compose: a tab for the list and one per running device
+  SimulatorWindowController  every request and all state
+  SimulatorToolWindow        mounts the view; owns the two native controls
+    SimulatorView            Compose: a tab for the list and one for each running device
     DeviceListPage           every simulator, each with Boot or Shut down
-    DevicePage               tool bar, framed device with zoom, floating bar, console drawer
-    SimulatorScreen          native: paints the picture, mouse to gesture
+    DevicePage               toolbar, framed device with zoom, console drawer
+    SimulatorScreen          native: paints the picture, turns the mouse into gestures
 ```
 
-## The service and the two clients
+### The service
 
-`core/` is a plain Kotlin module with no IDE imports. It wraps `xcrun simctl` in a
-local HTTP service protected by a token, described in [protocol.md](protocol.md).
-It stays a separate Gradle module because it is also the standalone
-`kumikae-simulator` program that an agent can run without an IDE.
+`core/` wraps `xcrun simctl` in a local HTTP service protected by a token. [protocol.md](protocol.md)
+describes it. It's a separate Gradle module because it's also the standalone program that a script can
+run without an IDE.
 
-The tool window sends commands through `ApiClient`, the same authenticated HTTP
-interface that `simulator.py` uses. Binary screenshots and live pictures use the
-same `LocalSession` directly, avoiding base64, JSON and loopback copies for images.
-There is still one selection, one geometry authority and one console. The agent
-protocol is unchanged; no extra unauthenticated image endpoint is exposed.
+- **One session.** The panel and `simulator.py` share one selected device, one geometry and one console.
+- **Commands go over HTTP for both.** The panel reads pictures from the session directly, in process, so
+  no image is encoded as base64 or JSON.
+- **Slow operations run outside the session's lock.** Boot, shutdown and install can take two minutes. They
+  run one at a time, and a second is refused with `BUSY`. Status, the device list, the log and pictures
+  still answer.
+- **The service reaps only the processes it started.** A JVM shutdown hook waits for them if the IDE exits
+  while the session is still closing.
 
-`LocalSession` enables the bundled native helper after the private-input switch.
-Native startup failures reach the panel and retry; there is no legacy backend fallback.
-`NativeInput` owns a helper and a private temporary frame slot. `NativeBridgeConnection`
-validates readiness, calibrates clocks and serializes small control messages.
-`NativeFrameReader` maps the shared slot and copies a new sequence into a matching
-`BufferedImage` under a shared file lock. `NativeFrameFeed` does that work off the EDT
-and exposes one replaceable latest frame. Closing signals the worker; it reaps the
-helper and removes the mapping. No image crosses JSON and no image copy runs on the EDT.
+### The native helper
 
-The Swift library has device, frame source, frame sink and input protocols. Its
-`AppleSimulator` actor alone knows private Apple names, with separate extensions
-for the input connection and messages. It runtime-loads CoreSimulator and checks
-Objective-C signatures and private XPC export presence. Runtime capabilities
-are the Xcode compatibility gate; an empty-by-default build deny list records
-reasons for any known incompatibilities. A failed empty startup barrier is
-retryable after reboot, without replaying input. Capture polls the IOSurface seed
-on an 8 ms budget including copying and publication, and only copies changes.
-Its pixel buffer is reused; the JVM allocates its own image outside the slot lock
-and revalidates the header before copying. DTUHID sends down/move/up and waits for
-a separate guest-service barrier reply. Rotation uses a separate guest orientation service;
-its reply precedes feed closure. Oriented pixels and inverse touch coordinates
-share one transform. External orientation changes revoke the feed. The actor is
-single-use; reconnection creates another helper. Stdin EOF cancels active work and
-releases input and device references.
-See [the native package](native/SimulatorBridge/README.md) for the complete private
-surface and [protocol.md](protocol.md) for the shared frame layout.
+With the input switch on, `LocalSession` starts the Swift helper in `native/SimulatorBridge/`.
 
-`OwnedStreamProcesses` reaps only its own children; session shutdown waits for forced
-cleanup if needed. A JVM shutdown hook also waits for those children if the IDE exits
-while project disposal is still closing the session. Normal close unregisters the hook.
+- `NativeBridgeConnection` checks that the helper is ready and sends small control messages.
+- The helper writes each frame into a memory-mapped slot. `NativeFrameReader` copies a new frame out under
+  a shared file lock, and `NativeFrameFeed` does that work off the UI thread and keeps only the newest
+  frame.
+- A failure to start reaches the panel, which retries with a bounded backoff. There's no other backend to
+  fall back to.
 
-## Repository
+[The helper's README](native/SimulatorBridge/README.md) lists the private interfaces it uses.
 
-`SimulatorRepository` is the typed boundary: devices, status, select, boot,
-install, launch, screenshot, console page and input, in terms of
-`SimulatorDevice`, `SimulatorStatus`, `SimulatorFrame`, `ConsolePage` and
-`SimulatorInput`. Requests may block; reading a live frame slot never blocks or
-decodes. `ApiSimulatorRepository` is the only panel class that reads or writes
-protocol JSON. It decodes viewer snapshots on a worker; the core copies native frames. Nothing above the repository sees JSON, HTTP or a process.
+### Repository
 
-## Controller
+`SimulatorRepository` is the typed boundary: devices, status, select, boot, install, launch, screenshot,
+console page and input. `ApiSimulatorRepository` is the only panel class that reads or writes protocol
+JSON. Nothing above the repository sees JSON, HTTP or a process.
 
-`SimulatorWindowController` owns every request and every piece of state the
-window shows, as Compose observable state. It never constructs or touches a
-Swing component, so its tests need no IDE and no window.
+### Controller
 
-- **Independent workers.** Actions and polling each use a `BackgroundTasks`;
-  opening a stream uses a third, and continuous touch a fourth. Live frame copying
-  and decoding belong to the service. `TouchController` preserves press/release
-  order and replaces unsent moves with the newest point.
-  `PictureStreamController`, owned by the window controller, manages the stream
-  lifetime and 500 ms to 8 s capped retry backoff. A stopped stream clears the
-  picture and reports its retry. Input does not stop or wait for live video.
-- **One action at a time.** A second action while one runs is refused, and the
-  status line says so. Nothing is queued: a tap that runs seconds late is worse
-  than a tap that visibly did not happen.
-- **Stale pictures.** Selecting a device, booting, launching, rotating and any
-  failure advance a picture epoch. A poll remembers the epoch it started under
-  and its status and picture are dropped if the epoch has moved. A picture is
-  also dropped when it is for a device other than the selected one. This epoch
-  is the controller's own; the `generation` inside a frame is the service's
-  geometry counter, which input must quote back.
-- **Selection.** The device list and `selected` always agree, even when a
-  selection is refused because an action is running: an action must never name
-  a device the user cannot see. The service's own choice comes back with the
-  running action's result or the next poll, and the service refuses any request
-  for a device it has not selected. A poll's status repeats the device as it
-  was when selected, so a poll follows only its identity; the replies to select
-  and boot, and Refresh, carry the newer device state.
-- **Console.** The log cursor advances with every page, independent of the
-  epoch, so no output is lost or shown twice. A page that lost history is
-  marked. The text is capped at 128 Ki characters.
-- **Action failures** show their message, clear the picture and are written to the
-  console once. They are never retried automatically: a lost reply does not
-  prove that a boot or launch did nothing.
-- **Visibility.** A hidden window does not poll or stream. The list tab stops
-  pictures too. Late stream openings are closed, and late frames are discarded.
-  The service keeps collecting console output for an agent.
-- **Closing.** Disposal disposes all workers and closes the repository. A
-  result that is delivered afterwards changes nothing. `LocalSimulatorService`
-  hands the slow part of closing to its own thread, because closing waits for a
-  running command and a boot can take two minutes. A session that finishes
-  starting after the window closed is closed at once.
+`SimulatorWindowController` owns every request and every piece of state the window shows, as Compose
+observable state. It never creates or touches a Swing component, so its tests need no IDE and no window.
 
-## View
+- **One action at a time.** A second action while one runs is refused, and the status line says so. Nothing
+  is queued: a tap that runs seconds late is worse than a tap that visibly didn't happen.
+- **Stale pictures are dropped.** Selecting a device, booting, launching, rotating and any failure advance
+  a picture epoch. A poll remembers the epoch it started under, and its result is dropped if the epoch has
+  moved.
+- **The list and the selection always agree,** even when a selection is refused because an action is
+  running. An action must never name a device the user can't see.
+- **No console output is lost or shown twice.** The log cursor advances with every page, independent of
+  the picture epoch.
+- **A failed action is never retried automatically.** A lost reply doesn't prove that a boot or a launch
+  did nothing.
+- **A hidden window doesn't poll or stream.**
+- **After disposal, nothing is delivered.** A result that arrives late changes nothing. Closing hands its
+  slow part to its own thread, because it waits for a running command.
 
-`SimulatorToolWindow` mounts `SimulatorView` through `ui/ComposeHost.kt`, which
-ties the composition to the controller's disposal on the UI thread. Compose owns
-the layout and whether buttons are enabled. What the person set in the panel itself
-(the app to launch, whether the console shows) is `SimulatorPanelState`. Dialogs,
-menus and the clipboard are behind `SimulatorPrompts`, injected, so that the view
-opens nothing itself and the probe can answer for a person.
-Two controls stay native and are mounted through `Native` and
-`NativeScrollPane`: `SimulatorScreen`, which paints the fitted picture and turns
-mouse presses into gestures, and the console text area. The view pushes the
-picture and the console text into them when the state changes.
+### View
 
-The view schedules metadata polling at 500 ms and checks the newest decoded frame
-slot every 8 ms while showing. An empty slot changes no state and causes no repaint.
-The controller owns picture state. Normal frame replacement repaints only
-`DeviceFrame.screen`; geometry and layout changes repaint the whole native control.
-`DeviceBodyCache` retains one decoration image at the current display density;
-geometry or density changes replace it, so live frames do not rasterize the static bezel.
-The cache is capped at 16 MiB; larger zoomed views paint decoration directly.
-Clearing a screen also releases its last-presented frame used by paint instrumentation.
-A settled native screen still has cheap seed polls, but no pixel copy or repaint.
+`SimulatorToolWindow` mounts `SimulatorView` through `ui/ComposeHost.kt`, which ties the composition to the
+controller's disposal. Compose owns the layout and whether buttons are enabled.
 
-## Compose Swing
+- **Two controls stay native:** `SimulatorScreen`, which paints the picture and turns mouse presses into
+  gestures, and the console's text area.
+- **Dialogs, menus and the clipboard are behind `SimulatorPrompts`,** which is injected, so the view opens
+  nothing itself and a test can answer for a person.
+- **A new frame repaints only the screen.** The device's body is cached as one image (`DeviceBodyCache`,
+  at most 16 MiB), so live frames don't redraw it.
 
-Compose Swing UI is pinned to 0.1.0-alpha06 from JetBrains' Compose Maven
-repository; the Compose compiler matches the Kotlin compiler. It is Compose
-Runtime driving Swing components, with no separate renderer. Because the
-library is an alpha, the plugin limits its platform range to the tested IDEA and Rider endpoints;
-builds between them are not individually verified. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
-`TitleButton`, `Pill`, `StatusLine`, `Native`, `NativeScrollPane`) and
-`ui/Controls.kt` the small painted controls behind them. `DeviceFrame` works out
-where the device and its screen sit in the view and draws the body around the
-picture; a pointer position is measured against the screen it reports.
+### Compose Swing
 
-## The service under load
+The UI uses Compose Swing UI: the Compose runtime driving Swing components, with no separate renderer. The
+library is an alpha, pinned in `build.gradle.kts`. That's why the plugin accepts only the range of IDE
+builds between the two it was tested on.
 
-Boot, shutdown and install can take two minutes. They run outside the session's lock, one at a
-time (a second is refused with `BUSY`), so status, the list, the log and pictures still answer.
-Screenshot capture and input acknowledgment also run outside the geometry lock.
-Input and stream startup are admitted under that lock; competing input and selection
-are refused until they complete. Status remains available while a helper starts. Stream publication continues during swipes. Native and
-scaled geometry share a generation, and stream failures invalidate that generation.
-Reading the list replaces what the session knows of the selected device, and the panel reads it
-every sixth poll: a device started or stopped elsewhere shows within about three seconds. A
-device that is not running is not asked for its picture.
+## How it's tested
 
-## Validation
-
-- `core` tests cover the protocol, geometry, device parsing, commands, the log
-  buffer, process timeouts, session cleanup and HTTP authentication.
-- Repository tests run `ApiSimulatorRepository` against a fake JSON transport.
-- Controller tests use `ManualBackgroundTasks`, a scheduler that separates
-  running work from delivering its result, to reproduce stale pictures, late
-  delivery after disposal and overlapping actions without sleeping.
-- `LocalSimulatorServiceTest` starts the real local service in a temporary
-  directory. It needs no Simulator.
-- `./gradlew verifyPlugin` checks the built plugin against the installed IDE.
-- The UI probe (`./gradlew runIde -PuiProbe`) is a second plugin that exists only
-  in the sandbox. It mounts the production view with a synthetic repository,
-  presses the real buttons, and renders the light and dark themes to pictures.
-  It proves layout and wiring, not behaviour against a real Simulator.
-- A run against a real Simulator goes through the standalone service and
-  `simulator.py`.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the Kotlin and Compose conventions.
-
-Native Unicode input uses shared string validation, copies unchanged UTF-8 through an
-injected guest pasteboard, then sends the native paste shortcut. A failed copy sends
-no shortcut. The command runner owns separate pipe workers for each child and joins
-them when that child ends; blocking pipe work never occupies the shared common pool.
-
-Language-server launch discovery and declaration refresh belong to `As3ProjectLanguageService`.
-Its disposable alarm drives one bounded refresh controller per project, instead of a sleeping worker
-for every opened file. Disposal cancels scheduled work; callbacks delivered after disposal do nothing.
-The missing-compiler warning is also project-owned. `DeclarationRefreshTest` checks scheduling,
-success, retry bounds and disposal with injected callbacks and no real threads.
-
-The local lexer carries expression/control/brace context in its restart state. Deep stacks use a
-prefix replay sentinel instead of keeping old document states. The UI probe checks auto-import and
-override additional edits through native completion acceptance and one Undo. Its plain-text-only mode
-(`KUMIKAE_COMPLETION_CONTROL_PROBE=1`) opens the same temporary projects without an AS3 session, to
-separate platform lifecycle warnings from completion activity.
-
-## Language-client adapters
-
-The base descriptor contains local typing, syntax and project tools. Optional descriptors load Rider's
-native integration only in Rider, and LSP4IJ's server, parameter help and outline only in IDEA. The
-IDEA condition is the outer dependency and LSP4IJ is nested inside it. Rider therefore has no LSP4IJ
-class-loader dependency, even when that plugin is installed. This keeps protocol classes and editor
-handlers isolated. No native LSP class is loaded on the IDEA path.
-
-`As3ServerLaunch` owns compiler launch arguments and initialization options. Both clients use the same
-project language service for compiler discovery and bounded declaration refresh. LSP4IJ owns its
-connection provider and process shutdown; there is no additional worker or response cache.
-`As3Lsp4ijCompletion` uses LSP4IJ's public completion feature extension to refresh suggestions after
-prefix changes. Its lookup data stores the request-time caret and server item. A public lookup listener
-selects Enter's insert range or Tab's replacement range before insertion and copies positions before the
-client adjusts them. The lookup owns that data and listener; there is no project or global item cache.
-All snippet insertion, additional edits, cancellation and Undo remain in the client. Initialization
-advertises the diagnostic-version filtering that LSP4IJ already implements, so the server can tag its
-publications and the client can reject mismatched versions.
-
-An IDEA project without enabled LSP4IJ receives one actionable notification when an AS3 file opens.
-That listener imports no optional client classes, so missing dependencies cannot break local typing.
+| What | How |
+|---|---|
+| The service: protocol, geometry, device parsing, commands, the log buffer, timeouts, cleanup, authentication | `core` tests |
+| The repository | `ApiSimulatorRepository` against a fake JSON transport |
+| The controller | `ManualBackgroundTasks`, a scheduler that separates running work from delivering its result. It reproduces stale pictures, late delivery and overlapping actions without sleeping |
+| The local service | `LocalSimulatorServiceTest` starts the real service in a temporary folder. It needs no Simulator |
+| The command-line client | `python3 -m unittest discover -s tests`, against a fake local service |
+| Compatibility with the IDE's API | `./gradlew verifyPlugin` |
+| Views and typing in a real IDE | The UI probe, in a sandbox. See [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide) |

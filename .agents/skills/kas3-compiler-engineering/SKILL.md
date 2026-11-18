@@ -1,12 +1,12 @@
 ---
 name: kas3-compiler-engineering
-description: Use when changing anything under compiler/ in kumikae-as3 (the AS3 front end, the IR and lowerer, the interpreter, the Godot extension, the language server, the API generator or their tests) — layering, C++17 rules, size limits, test-first workflow, what each change must run before it is done.
+description: Use when changing anything under compiler/ in kumikae-as3 (the AS3 front end, the IR and lowerer, the interpreter, the Godot extension, the language server, the API generator or their tests). Covers layering, C++17 rules, size limits, the test-first workflow, and what each change must run before it is done.
 ---
 
 # Changing the AS3 compiler
 
-Read `AGENTS.md`, `compiler/README.md` and the README of the folder you are changing first. The full rules
-are in `docs/cpp-guidelines.md`; this is what gets broken most.
+Read `AGENTS.md`, `compiler/README.md` and the README of the folder you're changing first. The full rules
+are in `docs/cpp-guidelines.md`. This page lists what gets broken most.
 
 ## The layers, and what each may include
 
@@ -21,16 +21,17 @@ src/ (front end)  ->  ir/ (typed IR, lowerer)  ->  vm/ (interpreter)  <-  godot_
 - `ir/` includes `src/`. It includes no Godot header. Godot's names reach it through the name table
   (`godot/godot_names.txt`), by `godot_name(...)`.
 - `vm/` includes `ir/ir.h`. It includes no Godot header and nothing of `src/`. It knows the engine only
-  through the three interfaces in `vm/host.h`: `Output`, `EngineHandles`, `EngineSource`.
+  through the four interfaces in `vm/host.h`: `Output`, `EngineHandles`, `EngineSource` and `Clock`.
 - `backend_cpp/` includes `ir/ir.h` only, like `vm/`. It writes C++ as text and includes no header of
   `vm/`, `runtime/` or Godot.
 - `runtime/` includes `vm/` and `ir/`: the headers generated code is written against, and the host with no
   engine. Generated code includes `runtime/kas3.h` and nothing else of ours.
+- `lsp/` includes `src/` only. It reports what the front end reports and nothing else.
 - `godot_ext/` is the only place that includes godot-cpp.
 - A rule the checker and the lowerer must agree on is written once, in `src/` (see `whole_numbers.h`).
 
-If a change needs an include that crosses these, the design is wrong: add an entry to the interface the
-lower layer owns.
+If a change needs an include that crosses these lines, the design is wrong. Add an entry to the interface
+the lower layer owns.
 
 ## Where a new thing goes
 
@@ -39,11 +40,11 @@ lower layer owns.
 | A syntax form | `src/parser_*.cpp` by kind, its node in `src/ast.h`, its walk in `ast_walk.h`, its print in `ast_printer.cpp` |
 | A type rule or a diagnostic | `src/typer_*.cpp` by what is typed; the message once, with `quoted()` |
 | An IR operation | One line in the table in `ir/ir_ops.h` (name and shape letters), its case in `vm/interpreter_run.cpp`, its lowering in the `ir/lower_*.cpp` that owns that kind of code |
-| An operation in native code | `backend_cpp/patterns.h` if it is one C++ statement, else the `function_*.cpp` that owns that kind; until then it runs by thunk. A fast path keeps the thunk for what it does not handle, and comes with a number from `tests/bench/run_native_bench.py` |
+| An operation in native code | `backend_cpp/patterns.h` if it is one C++ statement, else the `function_*.cpp` that owns that kind; until then it runs by thunk. A fast path keeps the thunk for what it doesn't handle, and comes with a number from `tests/bench/run_native_bench.py` |
 | Something asked of Godot | An entry on `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from); `NoEngine` answers it; the recorder in `tests/test_vm.cpp` records it; `godot_ext/godot_host*.cpp` does it |
 | Something about Godot's API as a whole | A rule in `godot/generate.py`, never a hand edit of `godot.as` or `godot_names.txt` |
 
-## C++ rules that reviews keep finding
+## C++ rules that get broken most
 
 - C++17, `-fno-exceptions -fno-rtti -Wall -Wextra -Werror` (the extension alone has RTTI).
 - A `.cpp` aims for 500 lines and fails the check above 800; a header 300 and 500; a function 60 and 120.
@@ -56,7 +57,7 @@ lower layer owns.
   `StringName` is made once and kept. No text is built on the path that succeeds.
 - A value arriving from Godot into a typed register is checked against the type. Every failure is an AS3
   error with a message and a line.
-- A change made for speed comes with numbers from `tests/bench/run_bench.py`, measured turn and turn about
+- A change made for speed comes with numbers from `tests/bench/run_bench.py`, measured in alternating runs
   (`--against <other build>`).
 
 ## Workflow
@@ -67,19 +68,22 @@ lower layer owns.
 3. Before saying done, all of these, with the output read:
 
 ```sh
-cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # 37 groups, `native` among them
-cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests
+cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # every group, `native` among them
+cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests compiler/build/kas3c
 cmake --build compiler/build-san -j8 && ctest --test-dir compiler/build-san -j4  # before a merge
 ```
 
 4. One kind of change per commit: a move with no edits, a rename, or a rewrite. A clean-up changes no test
    and no golden file.
-5. Fix every finding of a review, of any size, in the same branch with a test. The project keeps no list
-   of findings to fix later. Keep `docs/roadmap.md` true in the same branch.
+5. Fix every problem a review or a test finds, of any size, in the same branch, with a test. The project
+   keeps no list of problems to fix later.
+6. Update the docs in the same branch: the folder's README, `docs/language.md` or `docs/godot.md` if what
+   a script can do changed, and `docs/roadmap.md` if the state of the project changed.
 
 ## Do not
 
 - Edit `godot/godot.as` or `godot/godot_names.txt` by hand.
 - Add a dependency, or a second way of doing something the code already does one way.
-- Commit anything under `spike/`, any build folder, or anything about a games console.
-- Report a test as passing that you did not run.
+- Commit anything under `spike/`, any build folder, or anything about a games console's SDK, tools or
+  results.
+- Report a test as passing that you didn't run.

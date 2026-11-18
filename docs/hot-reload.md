@@ -34,13 +34,27 @@ Restart the scene to see the new code on those.
 New code alone doesn't change an object that already exists. Suppose a constant sets the size of a coin:
 
 ```actionscript
-public class Rules {
-    public static const COIN_WIDTH:Number = 24;
+// Rules.as
+package {
+    public class Rules {
+        public static const COIN_WIDTH:Number = 24;
+    }
 }
+```
 
-public class Coin extends Collider {
-    public function Coin(x:Number, y:Number) {
-        super(x, y, Rules.COIN_WIDTH, Rules.COIN_WIDTH);
+```actionscript
+// Coin.as
+package {
+    public class Coin {
+        public var x:Number;
+        public var y:Number;
+        public var width:Number;
+
+        public function Coin(x:Number, y:Number) {
+            this.x = x;
+            this.y = y;
+            width = Rules.COIN_WIDTH;
+        }
     }
 }
 ```
@@ -73,9 +87,10 @@ objects created afterward.
 
 ### Restarting when you want to
 
-A reload never restarts the scene on its own. When you want the new code on everything, call
-`restart_scene()` from a script. It starts the running scene again from its file and says what that doesn't
-rebuild, such as nodes outside the scene. A scene whose own `.tscn` file you edited does restart by itself.
+A reload never restarts the scene on its own. When you want the new code on everything, restart the scene.
+The AS3 script language object that the extension registers with Godot has a `restart_scene()` method for
+this, which a tool or a GDScript helper can call. It starts the running scene again from its file and says
+what that doesn't rebuild, such as nodes outside the scene. A scene whose own `.tscn` file you edited does restart by itself.
 
 ## What it costs
 
