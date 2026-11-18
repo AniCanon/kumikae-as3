@@ -103,15 +103,16 @@ code and Godot's output says so. If not, a warning says why and the interpreter 
 To build one by hand, run this from the project's folder:
 
 ```sh
-kas3c cpp --godot --unit $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+kas3c cpp --godot --unit $(find . -name '*.as' -not -path '*/.*' -not -path './tests/*' | sed 's|^\./||' | LC_ALL=C sort) -o native/
 c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
     -I <repository>/compiler/runtime -I <repository>/compiler/vm -I <repository>/compiler/ir \
     -I <repository>/compiler/src -shared native/*.cpp -o bin/libkas3_program.dylib
 ```
 
-Give the files in sorted order, as shown. The extension reads them in that order, and both must compile
-the same module. The flags for Linux and Windows are in `play_cache.h` and `shared_library.cpp`, and
-haven't been run on either system.
+Give the same files the extension reads, in sorted order: every `.as` file except those in folders whose
+name starts with a dot and in the project's test folders. Both must compile the same module.
+
+The flags for Linux are in `play_cache.h`. Neither Linux nor Windows has been built or run.
 
 With a program library loaded, everything else in this folder works as before. The runtime's host keeps an
 interpreter over the same module, in which each function's body is native code. A call from Godot runs the

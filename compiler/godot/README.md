@@ -74,7 +74,8 @@ A `-` stands for a part that's missing. Types are Godot's, as its description wr
 - **A change to what AS3 sees of Godot is a rule in the generator.** Write a test in `test_generate.py`
   first, then regenerate both files and commit them with the change.
 - **Hand-kept lists are checked.** An entry that matches nothing in Godot's description fails a test.
-- **Run Python that reads the description with `-I`.** It's a downloaded file.
+- **The description is a downloaded file.** Keep it out of the repository's source folders, and don't
+  commit it.
 
 ## Regenerate for a Godot version
 
@@ -87,10 +88,8 @@ A `-` stands for a part that's missing. Types are Godot's, as its description wr
 2. Run the generator on it:
 
    ```sh
-   python3 -I compiler/godot/generate.py extension_api.json compiler/godot/godot.as compiler/godot/godot_names.txt
+   python3 compiler/godot/generate.py extension_api.json compiler/godot/godot.as compiler/godot/godot_names.txt
    ```
-
-Don't commit `extension_api.json`.
 
 ## Tests
 

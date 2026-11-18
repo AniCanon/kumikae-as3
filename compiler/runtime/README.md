@@ -93,8 +93,8 @@ how the library, and Godot, call a function without knowing its body is native: 
 
 ### What a thunk costs
 
-- **A thunk is an entry into the interpreter:** 40 to 80 ns, tens of times what most operations take.
-  `fast.h` exists for that reason.
+- **A thunk is an entry into the interpreter:** a frame and a few instructions, many times what most
+  operations take inline. `fast.h` exists for that reason.
 - **An instruction that asks the engine through a thunk** goes by Godot's names and boxed values.
 - **A stack overflow found by the interpreter inside a thunk** leaves the generated functions in between
   without running their `finally` blocks.

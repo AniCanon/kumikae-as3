@@ -200,6 +200,19 @@ Memory is reference counted. A collector frees objects that refer to each other 
 - **A class value has only its own static members.** Static members aren't inherited: reach one through
   the class that declares it.
 - **`this` inside a function expression in a static method is an error.**
+- **Static code doesn't see instance members.** A name that matches only an instance member is an error. A
+  name that also matches something further out, such as a base class's static member, means that.
+- **A `protected` member is reachable through any object,** from code in the declaring class or a
+  subclass.
+- **A dotted name prefers the longest package.** If package `a` defines `b` and package `a.b` defines `C`,
+  then `a.b.C` is the class.
+- **A helper class outside the package block counts as part of the file's package** when the compiler
+  decides whether an `internal` class is visible. Adobe's compiler is stricter.
+- **A built-in name can't be told apart from an imported one with the same spelling.** A class named
+  `Object` in an imported package would make a bare `Object` ambiguous. That's why Godot's `Object` is
+  `GodotObject`.
+- **Inside a class whose base class is unknown, undefined names aren't reported,** because the missing
+  class could declare them.
 
 ### Values and collections
 

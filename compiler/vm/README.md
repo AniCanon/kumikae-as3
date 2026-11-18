@@ -61,7 +61,8 @@ host that keeps nothing gets the request by name instead.
 
 - **Nothing is allocated for each instruction, and no text is built on the path that succeeds.**
 - **Measure a change to the loop.** A change to `interpreter_run.cpp` comes with numbers from
-  `tests/bench/run_bench.py <build> --against <other build>`. A helper moved into a header has cost 3%.
+  `tests/bench/run_bench.py <build> --against <other build>`. Even moving a two-line helper into a header
+  has made the loop measurably slower.
 
 ### The engine
 
