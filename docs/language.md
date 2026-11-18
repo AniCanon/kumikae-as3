@@ -54,7 +54,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 |---|---|
 | Classes | Fields, constructors, methods, static members, getters and setters, inheritance with `override` and `super`, `final`, and the four access levels |
 | Interfaces | Methods, getters and setters. A class can implement several, and an interface can extend several |
-| Functions | Default parameters, `...rest`, `arguments`, function expressions that capture their variables, methods as values, `call` and `apply` |
+| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, `call` and `apply` |
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
@@ -76,8 +76,9 @@ The compiler reports each of these as an error with its own message.
 - E4X (XML literals and operators), namespaces, the `with` statement, and `include`.
 - `dynamic` classes. The built-in dynamic classes, such as `Object` and `Array`, still take new properties.
 - `prototype`. Classes are sealed, and a class has only its own static members.
-- `this` or `super` inside a function expression. In AS3, `this` there is the global object, not the
-  object of the surrounding method. Read the object into a variable first, or use a method.
+- `this` or `super` inside a function expression or a function declared inside a function. In AS3, `this`
+  there is the global object, not the object of the surrounding method. Read the object into a variable
+  first, or use a method.
 
 **Not built yet:**
 

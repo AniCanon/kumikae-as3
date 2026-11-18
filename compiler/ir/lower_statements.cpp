@@ -64,6 +64,9 @@ void Statements::declare_locals(Node *p_body) {
 	const std::unordered_set<const Symbol *> valued = valued_locals(p_body);
 	// A function's own locals: not those of a function written inside it, which are that one's.
 	walk(p_body, [&](Node *p_node) -> bool {
+		if (p_node->kind == NodeKind::FunctionStmt) {
+			Functions(l_).declare_function(static_cast<FunctionStmt *>(p_node)->function);
+		}
 		if (p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt) {
 			return false;
 		}
@@ -371,8 +374,7 @@ void Statements::by_kind(Stmt *p_statement) {
 			labeled(static_cast<Labeled *>(p_statement));
 			break;
 		case NodeKind::FunctionStmt:
-			l_.refuse(position, "a function inside a function");
-			break;
+			break; // Made as the function starts (Functions::nested_functions).
 		default:
 			l_.refuse(position, "this statement");
 			break;

@@ -1,0 +1,19 @@
+6
+120
+5 15
+0 6.5
+42 true 2,4,6
+1,2,3
+declared where the code never goes
+8 35
+true false
+1024
+3 ab
+undefined
+3
+function true 1
+1063
+Error: from a nested function
+	at nested_functions/fails/thrower()[nested_functions.as:77]
+	at nested_functions/fails()[nested_functions.as:78]
+	at nested_functions()[nested_functions.as:62]
