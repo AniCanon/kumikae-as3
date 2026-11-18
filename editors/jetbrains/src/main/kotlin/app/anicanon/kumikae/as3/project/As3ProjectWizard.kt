@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
 import app.anicanon.kumikae.as3.run.KumikaeRunType
+import app.anicanon.kumikae.as3.run.ensureDefaultTests
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -46,6 +47,7 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         private val chosen = mutableStateMapOf<Platform, Boolean>().apply {
             choices.forEach { put(it.platform, it.always) }
         }
+        private var version by mutableStateOf("")
         private var bundle by mutableStateOf("")
 
         override fun setupUI(builder: Panel) {
@@ -58,8 +60,11 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                                 "Application identifier",
                                 bundle,
                                 { bundle = it },
+                                placeholder = ProjectTemplate.defaultBundle(base.name),
                             )
-                            StatusLine("Leave blank to use the game name.")
+                            LabelledField("Version", version, {
+                                version = it
+                            }, placeholder = ProjectTemplate.DEFAULT_VERSION)
                             org.jetbrains.compose.swing.components.Label("Run targets")
                             for (choice in choices) {
                                 CheckBox(
@@ -78,7 +83,16 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                         }
                     },
                 ).align(AlignX.FILL).validationOnApply {
-                    if (bundle.isBlank() || chosen.filterValues { it }.keys.filter { it != Platform.DESKTOP }.all {
+                    if (version.isNotBlank() && !Regex("""\d+\.\d+\.\d+""").matches(version.trim())) {
+                        ValidationInfo("Enter a version such as 1.0.0.")
+                    } else if (bundle.isNotBlank() && (
+                            !bundle.trim().contains('.') ||
+                                !bundle.trim().replace('-', '_').split('.').all(As3Names::valid)
+                            )
+                    ) {
+                        ValidationInfo("Use a dot-separated ActionScript package name, such as com.studio.game.")
+                    } else if (bundle.isBlank() ||
+                        chosen.filterValues { it }.keys.filter { it != Platform.DESKTOP }.all {
                             app.anicanon.kumikae.as3.settings.GameTargets.validIdentifier(it.label, bundle.trim())
                         }
                     ) {
@@ -93,7 +107,15 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         override fun setupProject(project: Project) {
             val folder = Path.of(base.path, base.name)
             val platforms = chosen.filterValues { it }.keys
-            val template = ProjectTemplate(base.name, platforms, bundle)
+            val template =
+                ProjectTemplate(
+                    base.name,
+                    platforms,
+                    bundle,
+                    version.trim().ifEmpty {
+                        ProjectTemplate.DEFAULT_VERSION
+                    },
+                )
             val compiler = CompilerLocator.find(
                 folder,
                 PropertiesComponent.getInstance().getValue(COMPILER_PATH).orEmpty(),
@@ -108,6 +130,14 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             template.write(folder, built ?: carried, link = built != null)
             LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder)?.refresh(true, true)
             addRunTargets(project, platforms)
+            com.intellij.openapi.project.DumbService.getInstance(project).smartInvokeLater {
+                val game = LocalFileSystem.getInstance().findFileByNioFile(folder.resolve("project.godot"))
+                if (game !=
+                    null
+                ) {
+                    com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFile(game, true)
+                }
+            }
             contributions.filter { optional[it.setupAction] == true }.forEach { it.configure(project) }
         }
 
@@ -115,6 +145,7 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             val manager = RunManager.getInstance(project)
             val game = manager.createConfiguration("Game", KumikaeRunType.factory(KumikaeRunType.Kind.GAME))
             manager.addConfiguration(game)
+            ensureDefaultTests(manager)
             manager.selectedConfiguration = game
             if (Platform.ANDROID in platforms) GameTargetSetup.selectAndroid(project, "Android")
             if (Platform.IOS in platforms) GameTargetSetup.selectSimulator(project, "iOS")

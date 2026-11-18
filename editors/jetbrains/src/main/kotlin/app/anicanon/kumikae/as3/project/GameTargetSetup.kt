@@ -14,12 +14,22 @@ import com.intellij.openapi.vfs.VirtualFile
 internal class GameTargetSetup(private val project: Project, private val root: VirtualFile) {
     private val manager = FileDocumentManager.getInstance()
     private fun text(file: VirtualFile): String =
-        requireNotNull(manager.getDocument(file)) { "Cannot read ${file.name}." }.text
+        com.intellij.openapi.application.ReadAction.compute<String, RuntimeException> {
+            requireNotNull(manager.getDocument(file)) { "Cannot read ${file.name}." }.text
+        }
     private fun file() = root.findChild("export_presets.cfg")
     private fun exports() = file()?.let(::text).orEmpty()
     fun presets() = GameTargets.presets(GodotConfig(exports()))
     fun defaultIdentifier(): String {
         val config = GodotConfig(text(requireNotNull(root.findChild("project.godot"))))
+        val stored = config.string("application", "config/kumikae_package")
+        if (stored.isNotBlank()) return stored
+        val export = GodotConfig(exports())
+        for (preset in GameTargets.presets(export)) {
+            val key = preset.identifierKey ?: continue
+            val identifier = export.string("${preset.section}.options", key)
+            if (identifier.isNotBlank()) return identifier
+        }
         return ProjectTemplate.defaultBundle(config.string("application", "config/name", root.name))
     }
 

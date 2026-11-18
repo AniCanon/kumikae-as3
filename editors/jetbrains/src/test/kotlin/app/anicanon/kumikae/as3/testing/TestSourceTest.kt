@@ -47,13 +47,21 @@ class TestSourceTest {
 
     @Test fun failureFramesKeepPathsAndOneBasedLines() {
         val frames = As3FailureFrames.read(
-            "Error: fail\n\tat Assert/fail()[/lib/kumikae/testing/Assert.as:5]\n" +
+            "Error: fail\n\tat Assert/fail()[/lib/app/anicanon/kumikae/testing/Assert.as:5]\n" +
                 "\tat T/check()[/project with space/T.as:24]\n\tat T/run()[/project with space/T.as:10]",
         )
         assertEquals(3, frames.size)
         assertEquals("/project with space/T.as", frames.first { !it.framework }.path)
         assertEquals(24, frames.first { !it.framework }.line)
         assertEquals(emptyList<As3FailureFrame>(), As3FailureFrames.read("Error: [not a stack:4]"))
+    }
+
+    @Test fun suiteMembersResolveExplicitImportsAndLocalTypes() {
+        val suite = TestSource.read(
+            "package qa { import models.ScoreTest; [Suite] public class SmokeSuite { " +
+                "public var score:ScoreTest; public var motion:MotionTest; public var ui:views.InputTest; } }",
+        )
+        assertEquals(setOf("models.ScoreTest", "qa.MotionTest", "views.InputTest"), suite.suiteFixtures)
     }
 
     @Test fun accessorBodiesAreHelperContexts() {

@@ -32,8 +32,12 @@ internal object UiProbeGameSettings {
         await {
             if (file !in manager.selectedFiles) manager.openFile(file, true)
             val scene = children(panel).filterIsInstance<JComboBox<*>>().firstOrNull()
-            scene != null && scene.itemCount > 1 && panel.width > 0 && panel.isShowing &&
-                children(panel).filterIsInstance<JLabel>().none { it.text == "Preview unavailable" }
+            scene != null && scene.itemCount >= 1 &&
+                (0 until scene.itemCount).none { scene.getItemAt(it).toString().startsWith("res://tests/") } &&
+                panel.width > 0 && panel.isShowing &&
+                children(panel).filterIsInstance<ArtworkButton>().let { tiles ->
+                    tiles.count() == 2 && tiles.all { it.artwork != null }
+                }
         }
         app.invokeAndWait {
             check(

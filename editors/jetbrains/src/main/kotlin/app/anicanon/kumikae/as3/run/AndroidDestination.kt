@@ -33,7 +33,14 @@ internal fun androidDestination(line: String, supportedAbis: (String) -> String)
 
 class AndroidDestinations : ExecutionTargetProvider() {
     override fun getTargets(project: Project, configuration: RunConfiguration): List<ExecutionTarget> =
-        if (configuration is AndroidRunConfiguration) project.service<AndroidDevices>().targets() else emptyList()
+        when (configuration) {
+            is AndroidRunConfiguration -> project.service<AndroidDevices>().targets()
+
+            is app.anicanon.kumikae.as3.testing.As3TestsConfiguration, is GodotRunConfiguration ->
+                listOf(com.intellij.execution.DefaultExecutionTarget.INSTANCE)
+
+            else -> emptyList()
+        }
 }
 
 @Service(Service.Level.PROJECT)

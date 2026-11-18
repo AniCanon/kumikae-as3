@@ -21,6 +21,17 @@ import kotlin.math.roundToInt
 internal fun ViewportControls(value: ProjectSettings, controller: SettingsController) {
     val width = value.width.toIntOrNull() ?: 0
     val height = value.height.toIntOrNull() ?: 0
+    val sizes = listOf(960 to 540, 960 to 720, 720 to 720, 720 to 960, 540 to 960)
+    Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
+        for ((w, h) in sizes) {
+            val ratio = viewportRatio(w, h)
+            app.anicanon.kumikae.as3.ui.Tab(
+                ratio,
+                width > 0 && height > 0 && viewportRatio(width, height) == ratio,
+                { controller.edit { it.copy(width = w.toString(), height = h.toString()) } },
+            )
+        }
+    }
     SwingNode(factory = { ViewportDiagram() }, update = {
         set(width to height) {
             extent = it

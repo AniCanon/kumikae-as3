@@ -91,7 +91,12 @@ internal object UiProbeGameRun {
                 check(repository.status().device?.id == device)
                 check(source == Files.readString(folder.resolve("export_presets.cfg")))
                 await("Support Sprint's rendered home screen", 45) {
-                    val image = repository.screenshot(device).image
+                    val image = try {
+                        repository.screenshot(device).image
+                    } catch (retry: app.anicanon.kumikae.as3.simulator.SimulatorException) {
+                        if (retry.code == "STALE_FRAME") return@await false
+                        throw retry
+                    }
                     var cream = 0
                     var sage = 0
                     for (x in 0 until 48) {

@@ -56,6 +56,9 @@
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
     <actions>
+        <action id="KumikaeAS3.RunGameTests" class="app.anicanon.kumikae.as3.testing.RunGameTestsAction" text="Run Game Tests">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <action id="KumikaeAs3.AddTarget" class="app.anicanon.kumikae.as3.project.AddGameTargetAction" text="Add Game Target…" icon="AllIcons.General.Add">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
             <add-to-group group-id="RunMenu" anchor="last"/>
@@ -63,11 +66,17 @@
         <action id="KumikaeAs3.FindAttachedScenes" class="app.anicanon.kumikae.as3.scene.FindAttachedScenesAction" text="Find Attached Scene Nodes">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+        <action id="KumikaeAs3.ShowMembers" class="app.anicanon.kumikae.as3.project.ShowMembersAction" text="Show AS3 Members">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <action id="KumikaeAs3.CompactPackages" class="app.anicanon.kumikae.as3.project.CompactPackagesAction" text="Compact AS3 Packages">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
         <action id="KumikaeAs3.ShowGenerated" class="app.anicanon.kumikae.as3.project.ShowGeneratedAction" text="Show Generated Files">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.NewPackage" class="app.anicanon.kumikae.as3.project.NewPackageAction" text="ActionScript Package" icon="AllIcons.Nodes.Package">
+            <add-to-group group-id="NewGroup" anchor="first"/>
         </action>
         <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
             <add-to-group group-id="NewGroup" anchor="first"/>

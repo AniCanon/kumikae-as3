@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.2.2"
+version = "0.2.3"
 
 repositories {
     mavenCentral()
@@ -162,7 +162,7 @@ tasks.withType<PrepareSandboxTask>().configureEach {
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(rootDir.resolve("tools")) {
-        include("android_run.py", "build-ios-simulator.sh")
+        include("android_run.py", "game_export.py", "build-ios-simulator.sh")
         into("${intellijPlatform.projectName.get()}/native/tools")
     }
     val androidRuntime = "compiler/build-android-arm64/out/libkas3_godot.so"

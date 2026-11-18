@@ -1,0 +1,4 @@
+package${AS3_PACKAGE} {
+    public interface ${NAME} {
+    }
+}

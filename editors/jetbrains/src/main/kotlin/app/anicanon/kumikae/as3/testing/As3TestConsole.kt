@@ -37,8 +37,8 @@ internal class As3TestConsole(private val configuration: As3TestsConfiguration, 
             project: Project,
             scope: GlobalSearchScope,
         ): List<Location<*>> {
-            if (protocol != "file") return emptyList()
-            val uri = runCatching { URI("file://$path") }.getOrNull() ?: return emptyList()
+            if (protocol != "kumikae-as3") return emptyList()
+            val uri = runCatching { URI("$protocol://$path") }.getOrNull() ?: return emptyList()
             val decoded = uri.path
             val file = LocalFileSystem.getInstance().findFileByPath(decoded) ?: return emptyList()
             val psi = PsiManager.getInstance(project).findFile(file) ?: return emptyList()

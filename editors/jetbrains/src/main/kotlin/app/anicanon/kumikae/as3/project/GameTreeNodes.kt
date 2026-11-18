@@ -45,6 +45,7 @@ internal class GameConfigNode(
     override fun update(data: PresentationData) {
         super.update(data)
         data.presentableText = label
+        data.locationString = value?.name
         data.setIcon(icon)
     }
 }
@@ -74,9 +75,11 @@ internal fun organizeGameRoot(
         when {
             file?.virtualFile?.extension in setOf("tscn", "scn") -> scenes += node
 
+            file?.name in setOf(".gitignore", "kas3-tests.json") && !GameViewOptions.generated(project) -> Unit
+
             file?.name == "project.godot" ->
                 result +=
-                    GameConfigNode(project, file, settings, "Project Settings", AllIcons.General.Settings)
+                    GameConfigNode(project, file, settings, "Godot Project", AllIcons.General.Settings)
 
             file?.name == "export_presets.cfg" ->
                 result +=

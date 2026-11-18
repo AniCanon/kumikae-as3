@@ -50,6 +50,7 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
             } else {
                 "Export"
             },
+            export = { settings, presets -> exportGame(project, gameFile.parent, settings, presets) },
             addTarget = {
                 val setup = GameTargetSetup(project, gameFile.parent)
                 if (app.anicanon.kumikae.as3.project.AddGameTargetDialog(
@@ -70,7 +71,8 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
             VfsUtilCore.iterateChildrenRecursively(file.parent, { entry ->
                 !entry.isDirectory || entry == file.parent ||
                     (
-                        !entry.name.startsWith('.') && entry.findChild(".gdignore") == null &&
+                        !entry.name.equals("tests", ignoreCase = true) && !entry.name.startsWith('.') &&
+                            entry.findChild(".gdignore") == null &&
                             entry.findChild("project.godot") == null
                         )
             }) { entry ->

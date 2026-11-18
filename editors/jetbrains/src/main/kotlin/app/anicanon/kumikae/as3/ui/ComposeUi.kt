@@ -123,10 +123,26 @@ internal fun LabelledField(
     value: String,
     onChange: (String) -> Unit,
     modifier: SwingModifier = SwingModifier,
+    placeholder: String? = null,
 ) {
     Panel(PanelLayout.Border(0, JBUI.scale(2)), modifier = modifier.emptyBorder(JBUI.insets(0, 0, 8, 0))) {
         Label(label, SwingModifier.north())
-        TextField(value, onChange, modifier = SwingModifier.center(), columns = FIELD_COLUMNS)
+        if (placeholder == null) {
+            TextField(value, onChange, modifier = SwingModifier.center(), columns = FIELD_COLUMNS)
+        } else {
+            val changed = androidx.compose.runtime.rememberUpdatedState(onChange)
+            SwingNode(factory = {
+                com.intellij.ui.components.JBTextField(value, FIELD_COLUMNS).apply {
+                    accessibleContext.accessibleName = label
+                    document.addDocumentListener(object : com.intellij.ui.DocumentAdapter() {
+                        override fun textChanged(e: javax.swing.event.DocumentEvent) = changed.value(text)
+                    })
+                }
+            }, modifier = SwingModifier.center(), update = {
+                set(placeholder) { emptyText.text = it }
+                set(value) { if (text != it) text = it }
+            })
+        }
     }
 }
 

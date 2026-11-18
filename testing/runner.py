@@ -222,7 +222,7 @@ def main():
                     generated = _discovery.entry(Path(temporary), case, root)
                     command = command_case["command"]
                     files = list(dict.fromkeys(generated + command[2:]))
-                    if not any(Path(file).name == "TestCase.as" for file in files):
+                    if not any(Path(file).as_posix().endswith("/app/anicanon/kumikae/testing/TestCase.as") for file in files):
                         files.extend(str(path) for path in (Path(__file__).parent / "as3").rglob("*.as"))
                     command_case["command"] = command[:2] + files
                 if filters:
@@ -232,7 +232,7 @@ def main():
                         raise ValueError("Filtered suites require an AS3 CLI entryClass and compiler run command")
                     bootstrap = Path(temporary) / "Kas3TestSelection.as"
                     statements = "".join("Suite.only.push(" + json.dumps(value, ensure_ascii=True) + ");" for value in filters)
-                    bootstrap.write_text("package { import kumikae.testing.Suite; import " + entry + "; public class Kas3TestSelection { public function Kas3TestSelection() {" + statements + "new " + entry.rsplit(".", 1)[-1] + "(); } } }")
+                    bootstrap.write_text("package { import app.anicanon.kumikae.testing.Suite; import " + entry + "; public class Kas3TestSelection { public function Kas3TestSelection() {" + statements + "new " + entry.rsplit(".", 1)[-1] + "(); } } }")
                     command_case["command"] = command[:2] + [str(bootstrap)] + command[2:]
                 result = run_case(root, command_case)
             if structured:

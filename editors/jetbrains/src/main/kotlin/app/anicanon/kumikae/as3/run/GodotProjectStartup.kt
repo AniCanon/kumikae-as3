@@ -31,13 +31,7 @@ class GodotProjectStartup : ProjectActivity {
                 ProjectView.getInstance(project).changeView(GamePane.ID)
             }
             val manager = RunManager.getInstance(project)
-            if (java.nio.file.Files.isRegularFile(Path.of(base, "kas3-tests.json")) &&
-                manager.allSettings.none { it.configuration is app.anicanon.kumikae.as3.testing.As3TestsConfiguration }
-            ) {
-                manager.addConfiguration(
-                    manager.createConfiguration("Game tests", KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)),
-                )
-            }
+            if (java.nio.file.Files.isRegularFile(Path.of(base, "kas3-tests.json"))) ensureDefaultTests(manager)
             val factory = KumikaeRunType.factory(KumikaeRunType.Kind.GAME)
             if (manager.allSettings.any { it.configuration is GodotRunConfiguration }) return@withContext
             val settings = manager.createConfiguration("Game", factory)
@@ -48,5 +42,18 @@ class GodotProjectStartup : ProjectActivity {
 
     private companion object {
         const val VIEW_CHOSEN = "kumikae.as3.gameViewChosen"
+    }
+}
+
+internal fun ensureDefaultTests(manager: RunManager) {
+    val exists = manager.allSettings.any {
+        val config = it.configuration as? app.anicanon.kumikae.as3.testing.As3TestsConfiguration
+        config != null && config.options.cases.isBlank() && config.options.manifest == "kas3-tests.json"
+    }
+    if (!exists) {
+        val factory = KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)
+        manager.addConfiguration(
+            manager.createConfiguration(manager.suggestUniqueName("Game tests", factory.type), factory),
+        )
     }
 }

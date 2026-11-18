@@ -34,20 +34,44 @@ internal enum class Platform(val label: String) {
 }
 
 /** The files of a new AS3 game for Godot. Nothing here touches the IDE. */
-internal class ProjectTemplate(private val name: String, private val platforms: Set<Platform>, bundle: String = "") {
+internal class ProjectTemplate(
+    private val name: String,
+    private val platforms: Set<Platform>,
+    bundle: String = "",
+    private val version: String = DEFAULT_VERSION,
+) {
     /** The app's identifier on a phone or a console: the one given, or one made from the name to be changed. */
     val bundle: String = bundle.trim().ifEmpty { defaultBundle(name) }
 
     fun files(): Map<String, String> = buildMap {
-        put("project.godot", PROJECT.replace("{name}", name.replace("\"", "'")))
-        put("main.tscn", SCENE)
-        put("Main.as", SCRIPT)
-        put("Hello.as", HELLO)
-        put("kas3-tests.json", """{"version":1,"tests":[{"name":"Game tests","discover":"tests"}]}""" + "\n")
+        val source = "src/" + bundle.replace('.', '/').replace('-', '_') + "/view"
+        val namespace = bundle.replace('-', '_')
+        require(namespace.split('.').all(As3Names::valid)) { "Choose a valid ActionScript package name." }
+        require(Regex("""\d+\.\d+\.\d+""").matches(version)) { "Enter a version such as 1.0.0." }
+        val testRoot = "tests/" + namespace.replace('.', '/')
         put(
-            "tests/GameTest.as",
-            """package {
-    import kumikae.testing.Assert;
+            "project.godot",
+            PROJECT.replace(
+                "{version}",
+                version,
+            ).replace(
+                "{package}",
+                bundle,
+            ).replace("{name}", app.anicanon.kumikae.as3.settings.GodotConfig.quote(name).removeSurrounding("\"")),
+        )
+        put("scenes/main.tscn", SCENE.replace("{source}", source))
+        put("$source/Main.as", SCRIPT.replace("package {", "package $namespace.view {"))
+        put("$source/Hello.as", HELLO.replace("package {", "package $namespace.view {"))
+        put(
+            "kas3-tests.json",
+            """{"version":1,"tests":[{"name":"Game tests","discover":"tests",""" +
+                """"sources":["src/**/*.as","tests/**/*.as"],""" +
+                """"exclude":["src/**/view/**/*.as"]}]}""" + "\n",
+        )
+        put(
+            "$testRoot/GameTest.as",
+            """package $namespace {
+    import app.anicanon.kumikae.testing.Assert;
 
     public class GameTest {
         [Test]
@@ -60,7 +84,7 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
 """,
         )
         // Godot will not export for a phone without an icon.
-        put("icon.svg", icon())
+        put("assets/icon.svg", icon())
         // What Godot's editor writes on its first import: with it, the game runs before the editor ever opens.
         put(".godot/extension_list.cfg", "res://kas3.gdextension\n")
         put("kas3.gdextension", EXTENSION)
@@ -121,6 +145,7 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
     }
 
     companion object {
+        const val DEFAULT_VERSION = "1.0.0"
         private const val LIBRARY = "libkas3_godot"
 
         /** The project's icon: the Kumikae mark, to be replaced by the game's own. */
@@ -132,7 +157,7 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         fun defaultBundle(name: String): String = name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.let {
             "org.example." + when {
                 it.isEmpty() -> "game"
-                it.first().isDigit() -> "g$it"
+                !As3Names.valid(it) -> "g$it"
                 else -> it
             }
         }
@@ -153,8 +178,10 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
 [application]
 
 config/name="{name}"
-run/main_scene="res://main.tscn"
-config/icon="res://icon.svg"
+config/version="{version}"
+config/kumikae_package="{package}"
+run/main_scene="res://scenes/main.tscn"
+config/icon="res://assets/icon.svg"
 config/features=PackedStringArray("4.7")
 
 [display]
@@ -176,8 +203,8 @@ textures/vram_compression/import_etc2_astc=true
 
         private const val SCENE = """[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://Main.as" id="1"]
-[ext_resource type="Script" path="res://Hello.as" id="2"]
+[ext_resource type="Script" path="res://{source}/Main.as" id="1"]
+[ext_resource type="Script" path="res://{source}/Hello.as" id="2"]
 
 [node name="Main" type="Node2D"]
 

@@ -135,7 +135,9 @@ A landscape-only game's layout must still be adapted before using portrait.
 Unknown settings and comments are preserved. Invalid values and external source
 changes are reported. Reload discards the current draft and reads the source again.
 Preset-specific drafts survive switching presets. Signing settings remain in the
-export source. Create missing export presets in Godot, then reload.
+export source. Use **Add Game Target** to add a preset. Select **Export** or **Export All** and choose an output
+folder. Each export gets its own directory. Release signing uses the credentials configured in Godot.
+**Properties** displays additional Godot settings, including dictionaries and arrays entered in Source.
 
 Open a `.tscn` to use its **Scene** editor. The outline shows native node types and
 attached AS3 paths. Open Script navigates to the source; Attach/Detach changes the
@@ -148,18 +150,22 @@ back to scenes that attach the script.
 
 The **Game** tree compacts empty directory chains under `src` and `tests` into
 package names such as `com.supportsprint`. Its context menu has **Compact AS3
-Packages** and **Show Generated Files**. These options change presentation;
+Packages**, **Show AS3 Members** and **Show Generated Files**. These options change presentation;
 ordinary project views and physical directories remain available. Package rename
 refactoring is not implemented.
 
 ## AS3 tests
 
-The **AS3 Tests** run configuration reads `kas3-tests.json` in the game project.
-Registered source classes get a gutter Run action. The native Tests tree shows
-individual framework cases, failures, source navigation and rerun-failed actions.
-The bundled Python runner uses installed `kas3c` and Godot programs. It rejects
-missing completion, malformed reports, unknown selected tests, runtime failures
-and timeouts. Cancellation terminates only its owned process group.
+Click the gutter beside a method to run that test, or beside a class to run its fixture.
+Use **Run Game Tests** on the Tests folder for the default target. Context runs use the local test
+runner even while a mobile destination is selected. Double-click a failed result to open the
+assertion. To keep a named plan, create a **Kumikae AS3 → Tests** configuration, give it a name
+and select its groups. The same manifest drives the command-line runner and CI.
+
+New games keep model code in `src/<package>`, engine scripts in its `view` package, and fixtures in
+`tests/<package>`. **New → ActionScript** creates files, classes, interfaces, Godot node scripts,
+test cases and test suites. Use **New → ActionScript Package** for a namespace. An empty `[Suite]`
+collects its directory's fixtures in Rider. Give the suite typed fixture fields to select a subset.
 
 The [testing guide](../../testing/README.md) describes the AS3 assertion library,
 `TestCase` setup/teardown, typed parameter cases, manifest and CLI. This is a new

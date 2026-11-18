@@ -10,6 +10,8 @@ import com.intellij.openapi.project.Project
 internal object GameViewOptions {
     fun compact(project: Project) = PropertiesComponent.getInstance(project).getBoolean(COMPACT, true)
     fun generated(project: Project) = PropertiesComponent.getInstance(project).getBoolean(GENERATED, false)
+    fun members(project: Project) = PropertiesComponent.getInstance(project).getBoolean(MEMBERS, true)
+    const val MEMBERS = "kumikae.as3.showMembers"
     const val COMPACT = "kumikae.as3.compactPackages"
     const val GENERATED = "kumikae.as3.showGenerated"
 }
@@ -36,3 +38,5 @@ abstract class GameViewToggle(private val key: String, private val default: Bool
 
 class CompactPackagesAction : GameViewToggle(GameViewOptions.COMPACT, true)
 class ShowGeneratedAction : GameViewToggle(GameViewOptions.GENERATED, false)
+
+class ShowMembersAction : GameViewToggle(GameViewOptions.MEMBERS, true)

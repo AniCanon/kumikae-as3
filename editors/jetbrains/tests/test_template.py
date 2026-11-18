@@ -11,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 TEMPLATE = ROOT / "editors/jetbrains/src/main/kotlin/app/anicanon/kumikae/as3/project/ProjectTemplate.kt"
-LIBRARY = ROOT / "compiler/tests/godot_project/bin/libkas3_godot.dylib"
+LIBRARY = Path(os.environ.get("KAS3_ROOT", ROOT)) / "compiler/tests/godot_project/bin/libkas3_godot.dylib"
 
 DRIVER = """extends SceneTree
 var frames := 0
@@ -28,7 +28,7 @@ func moved() -> Vector2:
 	mark = disc.position
 	return by
 func _initialize() -> void:
-	change_scene_to_file("res://main.tscn")
+	change_scene_to_file("res://scenes/main.tscn")
 func _process(_delta: float) -> bool:
 	frames += 1
 	if frames == 3:
@@ -69,8 +69,15 @@ class TemplateRunsInGodot(unittest.TestCase):
         text = TEMPLATE.read_text()
         with tempfile.TemporaryDirectory() as folder:
             game = Path(folder)
-            for name, file in (("SCRIPT", "Main.as"), ("HELLO", "Hello.as"), ("SCENE", "main.tscn"), ("EXTENSION", "kas3.gdextension")):
-                (game / file).write_text(constant(text, name))
+            source = "src/org/example/game/view"
+            (game / source).mkdir(parents=True)
+            (game / "scenes").mkdir()
+            for name, file in (("SCRIPT", source + "/Main.as"), ("HELLO", source + "/Hello.as"),
+                               ("SCENE", "scenes/main.tscn"), ("EXTENSION", "kas3.gdextension")):
+                content = constant(text, name).replace("{source}", source)
+                if file.endswith(".as"):
+                    content = content.replace("package {", "package org.example.game.view {")
+                (game / file).write_text(content)
             (game / "project.godot").write_text(constant(text, "PROJECT").replace("{name}", "Template"))
             (game / ".godot").mkdir()
             (game / ".godot/extension_list.cfg").write_text("res://kas3.gdextension\n")

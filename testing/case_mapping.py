@@ -22,5 +22,6 @@ def validate(case):
 def location(root, case, suite, name):
     for entry in case.get('cases', []):
         if entry['suite'] == suite and entry['name'] == name:
-            return (root / entry['source']).as_uri() + '?' + urlencode({'method': entry['method']})
+            source = (root / entry['source']).as_uri().replace('file:', 'kumikae-as3:', 1)
+            return source + '?' + urlencode({'method': entry['method']})
     return (root / case.get('source', '')).as_uri()

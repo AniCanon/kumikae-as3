@@ -3,35 +3,52 @@ package app.anicanon.kumikae.as3.testing
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.LazyRunConfigurationProducer
-import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
 
-class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
+class As3TestProducer :
+    LazyRunConfigurationProducer<com.intellij.execution.configurations.RunConfiguration>(),
+    com.intellij.openapi.project.DumbAware {
     override fun getConfigurationFactory() = KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)
     override fun setupConfigurationFromContext(
-        configuration: As3TestsConfiguration,
+        configuration: com.intellij.execution.configurations.RunConfiguration,
         context: ConfigurationContext,
         sourceElement: Ref<PsiElement>,
     ): Boolean {
-        val file = context.psiLocation?.containingFile?.virtualFile ?: return false
-        val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
-        if (tests.isEmpty()) return false
-        configuration.options.manifest = tests.first().manifest.path
-        configuration.options.cases = tests.joinToString("\n") { it.name }
-        configuration.name = if (tests.size == 1) tests.single().name else "Tests in ${file.name}"
-        return true
+        if (configuration !is As3TestsConfiguration) return false
+        val element = context.psiLocation ?: return false
+        sourceElement.set(element)
+        return configureTestScope(configuration, element)
     }
     override fun isConfigurationFromContext(
-        configuration: As3TestsConfiguration,
+        configuration: com.intellij.execution.configurations.RunConfiguration,
         context: ConfigurationContext,
     ): Boolean {
+        if (configuration !is As3TestsConfiguration) return false
         val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
-        return tests.isNotEmpty() && configuration.options.manifest == tests.first().manifest.path &&
+        return tests.isNotEmpty() &&
+            java.nio.file.Path.of(
+                configuration.project.basePath.orEmpty(),
+            ).resolve(configuration.options.manifest).normalize() ==
+            tests.first().manifest.toNioPath() &&
             configuration.options.cases == tests.joinToString("\n") { it.name }
     }
+}
+
+internal fun configureTestScope(configuration: As3TestsConfiguration, element: PsiElement): Boolean {
+    val file =
+        (element as? com.intellij.psi.PsiDirectory)?.virtualFile ?: element.containingFile?.virtualFile
+            ?: return false
+    val tests = TestDiscovery.forElement(element)
+    if (tests.isEmpty()) return false
+    val manifest = tests.first().manifest
+    val root = configuration.project.basePath?.let(java.nio.file.Path::of)
+    configuration.options.manifest = root?.relativize(manifest.toNioPath())?.toString() ?: manifest.path
+    configuration.options.cases = tests.joinToString("\n") { it.name }
+    configuration.name = if (tests.size == 1) tests.single().name else "Tests in ${file.name}"
+    return true
 }
 
 class As3TestLineMarker : RunLineMarkerContributor() {
@@ -49,7 +66,17 @@ class As3TestLineMarker : RunLineMarkerContributor() {
         ) {
             return null
         }
-        return Info(AllIcons.RunConfigurations.TestState.Run, ExecutorAction.getActions(0)) {
+        val run = RunGameTestsAction(
+            element,
+            if (element.text ==
+                "class"
+            ) {
+                "Run tests in ${file.name}"
+            } else {
+                "Run ${source.methodAt(element.textOffset)?.name}"
+            },
+        )
+        return Info(AllIcons.RunConfigurations.TestState.Run, arrayOf(run)) {
             if (element.text ==
                 "class"
             ) {

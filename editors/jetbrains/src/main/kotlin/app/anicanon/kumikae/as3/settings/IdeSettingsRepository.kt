@@ -12,7 +12,11 @@ internal class IdeSettingsRepository(
     private val file: VirtualFile,
     private val owner: com.intellij.openapi.Disposable,
 ) : SettingsRepository {
-    private fun documents() = FileDocumentManager.getInstance().let { manager ->
+    private fun documents() = com.intellij.openapi.application.ReadAction.compute<
+        Pair<com.intellij.openapi.editor.Document, com.intellij.openapi.editor.Document?>,
+        RuntimeException,
+        > {
+        val manager = FileDocumentManager.getInstance()
         val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
         val exports = file.parent.findChild("export_presets.cfg")?.let(manager::getDocument)
         main to exports

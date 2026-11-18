@@ -30,12 +30,21 @@ internal fun ProjectSettingsView(
     modifier: SwingModifier = SwingModifier,
     initialPage: String = "General",
     addTarget: (() -> Unit)? = null,
+    export: ((ProjectSettings, List<ExportPreset>) -> Unit)? = null,
 ) {
     var page by remember { mutableStateOf(initialPage) }
-    Panel(PanelLayout.Border(24, 16), modifier = modifier.emptyBorder(JBUI.insets(24))) {
+    Panel(PanelLayout.Border(14, 10), modifier = modifier.emptyBorder(JBUI.insets(16))) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.west()) {
             Column(SwingModifier.north()) {
-                for (name in listOf("General", "Display", "Export")) {
+                org.jetbrains.compose.swing.node.SwingNode(factory = {
+                    javax.swing.JLabel(
+                        "Kumikae AS3",
+                        app.anicanon.kumikae.as3.PluginFiles.mark,
+                        javax.swing.JLabel.LEADING,
+                    )
+                        .apply { border = JBUI.Borders.emptyBottom(8) }
+                })
+                for (name in listOf("General", "Display", "Export", "Properties")) {
                     Tab(name, page == name, { page = name })
                 }
             }
@@ -51,6 +60,8 @@ internal fun ProjectSettingsView(
 
                             "Display" -> DisplaySettings(draft, controller)
 
+                            "Properties" -> GodotProperties(draft.projectText)
+
                             "Export" -> {
                                 if (addTarget !=
                                     null
@@ -58,6 +69,26 @@ internal fun ProjectSettingsView(
                                     Button("Add Game Target…", addTarget, SwingModifier.enabled(!controller.dirty))
                                 }
                                 ExportSettings(draft, controller, choose)
+                                if (export != null && draft.presets.isNotEmpty()) {
+                                    Panel(PanelLayout.Flow(FlowLayout.LEFT)) {
+                                        draft.presets.find { it.section == draft.preset }?.let { selected ->
+                                            Button(
+                                                "Export ${selected.name}…",
+                                                { export(draft, listOf(selected)) },
+                                                SwingModifier.enabled(!controller.dirty),
+                                            )
+                                        }
+                                        if (draft.presets.size >
+                                            1
+                                        ) {
+                                            Button(
+                                                "Export All…",
+                                                { export(draft, draft.presets) },
+                                                SwingModifier.enabled(!controller.dirty),
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -110,14 +141,18 @@ private fun GeneralSettings(
 private fun DisplaySettings(value: ProjectSettings, controller: SettingsController) {
     ViewportControls(value, controller)
     Label("Orientation", SwingModifier.emptyBorder(JBUI.insetsTop(8)))
-    ComboBox(
-        ProjectSettings.orientations,
-        ProjectSettings.orientations.getOrNull(value.orientation),
-        onSelectionChange = { selected ->
-            controller.edit { it.copy(orientation = ProjectSettings.orientations.indexOf(selected)) }
-        },
-    ) { Label(it) }
-    StatusLine("Applies to mobile exports. Rebuild the app after changing it.")
+    val orientationGroups = listOf(
+        listOf(0 to "Landscape", 2 to "Reversed", 4 to "Both landscapes"),
+        listOf(1 to "Portrait", 3 to "Upside down", 5 to "Both portraits"),
+        listOf(6 to "All orientations"),
+    )
+    for (row in orientationGroups) {
+        Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
+            for ((mode, label) in row) {
+                Tab(label, value.orientation == mode, { controller.edit { it.copy(orientation = mode) } })
+            }
+        }
+    }
 
     Label("Stretch mode", SwingModifier.emptyBorder(JBUI.insetsTop(16)))
     ComboBox(ProjectSettings.stretches, value.stretch, onSelectionChange = { selected ->
@@ -140,11 +175,10 @@ private fun ExportSettings(
 
         return
     }
-    Label("Export preset")
     val preset = value.presets.firstOrNull { it.section == value.preset }
-    ComboBox(value.presets, preset, onSelectionChange = { selected ->
-        controller.edit { it.select(selected?.section.orEmpty()) }
-    }) { Label(it.toString()) }
+    for (target in value.presets) {
+        Tab(target.toString(), target == preset, { controller.edit { it.select(target.section) } })
+    }
     if (preset?.identifierKey != null) {
         LabelledField(
             if (preset.platform == "iOS") "Bundle identifier" else "Package name",

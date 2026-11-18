@@ -1,0 +1,10 @@
+package${AS3_PACKAGE} {
+    import app.anicanon.kumikae.testing.Assert;
+
+    public class ${NAME} {
+        [Test]
+        public function example():void {
+            Assert.assertTrue(true);
+        }
+    }
+}

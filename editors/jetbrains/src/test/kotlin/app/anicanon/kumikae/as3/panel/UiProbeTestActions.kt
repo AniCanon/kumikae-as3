@@ -49,6 +49,17 @@ internal object UiProbeTestActions {
                 check(gutter.getInfo(nestedLeaf) == null) { "Nested helper has a test gutter" }
                 check(gutter.getInfo(helperLeaf) == null) { "Helper has a test gutter" }
                 val producer = As3TestProducer()
+                val android = app.anicanon.kumikae.as3.run.KumikaeRunType
+                    .factory(
+                        app.anicanon.kumikae.as3.run.KumikaeRunType.Kind.ANDROID,
+                    ).createTemplateConfiguration(project)
+                val context = ConfigurationContext.createEmptyContextForLocation(PsiLocation(methodLeaf))
+
+                @Suppress("UNCHECKED_CAST")
+                val platformProducer = producer as com.intellij.execution.actions.RunConfigurationProducer<
+                    com.intellij.execution.configurations.RunConfiguration,
+                    >
+                check(!platformProducer.isConfigurationFromContext(android, context))
                 fun configured(element: PsiElement): As3TestsConfiguration {
                     val context = ConfigurationContext.createEmptyContextForLocation(PsiLocation(element))
                     val config = checkNotNull(
@@ -60,20 +71,30 @@ internal object UiProbeTestActions {
                 check(configured(classLeaf).options.cases == "Models::Course::gapJump\nModels::Course::magnet")
                 check(configured(psi).options.cases == "Models::Course::gapJump\nModels::Course::magnet")
                 val config = configured(methodLeaf)
+                check(
+                    com.intellij.execution.ExecutionTargetManager.getInstance(project).getTargetsFor(config)
+                        .any { it == com.intellij.execution.DefaultExecutionTarget.INSTANCE },
+                ) {
+                    "Gutter tests need a local execution target."
+                }
+                val action = checkNotNull(gutter.getInfo(methodLeaf)).actions.single()
+                check(action is app.anicanon.kumikae.as3.testing.RunGameTestsAction)
                 check(config.options.cases == "Models::Course::gapJump")
                 val properties = As3TestConsole(config, DefaultRunExecutor.getRunExecutorInstance())
                 val location = properties.getTestLocator().getLocation(
-                    "file",
+                    "kumikae-as3",
                     source.toString() + "?method=gapJump",
                     project,
                     GlobalSearchScope.allScope(project),
                 ).single()
                 check(location.psiElement.textOffset == methodLeaf.textOffset) { "Result opens the wrong method" }
-                val failure = "Error: failed\n\tat Assert/assertTrue()[/framework/kumikae/testing/Assert.as:5]\n" +
-                    "\tat CaseActionProbe/gapJump()[" + source + ":1]"
+                val failure =
+                    "Error: failed\n\tat Assert/assertTrue()[/framework/app/anicanon/kumikae/testing/Assert.as:5]\n" +
+                        "\tat CaseActionProbe/gapJump()[" + source + ":1]"
                 val descriptor = properties.getErrorNavigatable(location, failure) as? OpenFileDescriptor
                 check(descriptor?.file == file && descriptor.line == 0) { "Failure does not open its source line" }
             }
+            UiProbeAuthoring.run(project, root)
             Files.writeString(
                 destination.resolve("test-actions.txt"),
                 "passed: file and method gutters, context selection, helper exclusion and method navigation\n",

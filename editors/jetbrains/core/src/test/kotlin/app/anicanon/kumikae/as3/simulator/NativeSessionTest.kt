@@ -52,6 +52,22 @@ class NativeSessionTest {
                 assertFailsWith<SimulatorException> {
                     session.touch("phone", stamp + 1, Geometry(120, 240), "down", Pixel(1, 1))
                 }
+                val app = Files.createDirectory(directory.resolve("Game.app"))
+                try {
+                    session.dispatch(
+                        "install",
+                        JsonObject().apply {
+                            addProperty("device", "phone")
+                            addProperty("path", app.toString())
+                        },
+                    )
+                    assertTrue(!closed, "Installing on the same device must preserve the live stream")
+                    assertFailsWith<SimulatorException> {
+                        session.touch("phone", stamp, Geometry(120, 240), "down", Pixel(1, 1))
+                    }
+                } finally {
+                    Files.delete(app)
+                }
                 session.dispatch(
                     "rotate",
                     JsonObject().apply {

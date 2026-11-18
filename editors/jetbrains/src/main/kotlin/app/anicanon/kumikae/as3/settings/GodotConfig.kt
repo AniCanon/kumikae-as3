@@ -11,8 +11,7 @@ internal class GodotConfig(private val source: String) {
 
     init {
         var section = ""
-        var offset = 0
-        for (line in source.splitToSequence('\n')) {
+        for ((offset, line) in records(source)) {
             val clean = line.trim()
             if (clean.startsWith("[")) {
                 require(clean.endsWith("]")) { "Malformed section: $clean" }
@@ -24,17 +23,18 @@ internal class GodotConfig(private val source: String) {
                 if (equals > 0) {
                     val name = line.substring(0, equals).trim()
                     val tail = line.substring(equals + 1)
-                    val value = withoutComment(tail).trim()
+                    val value = tail.trim()
                     val start = offset + equals + 1 + tail.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
                     val key = ConfigKey(section, name)
                     require(key !in entries) { "Duplicate setting: $section/$name" }
                     entries[key] = Entry(start, start + value.length, value)
                 }
             }
-            offset += line.length + 1
         }
         sectionEnds[section] = source.length
     }
+
+    fun properties(section: String): List<String> = entries.keys.filter { it.section == section }.map { it.name }
 
     fun raw(section: String, name: String): String? = entries[ConfigKey(section, name)]?.value
     fun string(section: String, name: String, default: String = ""): String =
@@ -102,21 +102,38 @@ internal class GodotConfig(private val source: String) {
             return result.toString()
         }
 
-        private fun withoutComment(value: String): String {
+        private fun records(source: String): Sequence<Pair<Int, String>> = sequence {
+            var start = 0
+            var end = 0
+            var depth = 0
             var quoted = false
             var escaped = false
-            for ((index, char) in value.withIndex()) {
-                if (escaped) {
-                    escaped = false
-                } else {
-                    when (char) {
-                        '\\' -> if (quoted) escaped = true
-                        '"' -> quoted = !quoted
-                        ';', '#' -> if (!quoted) return value.substring(0, index)
+            var comment = false
+            for ((offset, char) in source.withIndex()) {
+                if (char == '\n') {
+                    comment = false
+                    if (!quoted && depth == 0) {
+                        yield(start to source.substring(start, end))
+                        start = offset + 1
+                        end = start
                     }
+                    escaped = false
+                    continue
                 }
+                if (comment) continue
+                when {
+                    escaped -> escaped = false
+                    quoted && char == '\\' -> escaped = true
+                    char == '"' -> quoted = !quoted
+                    !quoted && (char == ';' || char == '#') -> comment = true
+                    !quoted && char in "[({" -> depth++
+                    !quoted && char in "])}" -> depth--
+                }
+                require(depth >= 0) { "Unexpected closing delimiter in a Godot setting." }
+                if (!comment) end = offset + 1
             }
-            return value
+            require(!quoted && depth == 0) { "Unterminated Godot setting. Check strings and brackets in Source." }
+            if (start < source.length) yield(start to source.substring(start, end))
         }
     }
 }

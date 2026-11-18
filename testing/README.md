@@ -20,8 +20,8 @@ and IDE presentation in the JetBrains plugin.
 
 ```actionscript
 package game.tests {
-    import kumikae.testing.Assert;
-    import kumikae.testing.TestCase;
+    import app.anicanon.kumikae.testing.Assert;
+    import app.anicanon.kumikae.testing.TestCase;
 
     public class ScoreCase extends TestCase {
         private var initial:int;
@@ -100,7 +100,7 @@ Put `kas3-tests.json` beside `project.godot`:
 }
 ```
 
-The project must include the library's `as3/kumikae/testing/*.as` sources in its
+The project must include the library's `as3/app/anicanon/kumikae/testing/*.as` sources in its
 test source list. The sample's `tools/sync_test_framework.py` copies that version
 locally for Godot imports and can verify it with `--check`. Exclude tests from
 production exports. `{library}` expands to this runner's library directory when
@@ -170,7 +170,7 @@ ordering, names, size limits and complete lifecycles before emitting escaped
 TeamCity service messages. Raw program output cannot inject test events into Rider.
 
 Run `python3 -m unittest discover -s testing/tests -v`. With a built compiler, also
-run `kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/kumikae/testing/*.as`.
+run `kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as`.
 The fixture intentionally records a failed case and verifies continuation and
 teardown; its final marker is `PASS framework lifecycle`. The JetBrains sandbox
 probe separately verifies that the native tree shows a pass and a failure.

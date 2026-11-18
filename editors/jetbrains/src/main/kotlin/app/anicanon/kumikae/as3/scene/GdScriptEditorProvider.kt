@@ -86,7 +86,7 @@ private class GdScriptOverview(private val project: Project, private val script:
     override fun selectNotify() {
         ReadAction.nonBlocking<ScriptOutline> {
             ScriptOutline(members(), sceneUsages(project, script))
-        }.inSmartMode(project).expireWith(this).coalesceBy(this)
+        }.inSmartMode(project).expireWith(this).coalesceBy(this, "script-outline")
             .finishOnUiThread(ModalityState.defaultModalityState()) {
                 outline = it
             }.submit(AppExecutorUtil.getAppExecutorService())

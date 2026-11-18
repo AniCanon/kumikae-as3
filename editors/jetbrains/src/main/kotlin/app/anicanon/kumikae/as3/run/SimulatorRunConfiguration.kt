@@ -116,10 +116,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
                 val console = TextConsoleBuilderFactory.getInstance().createBuilder(project).console
                 console.attachToProcess(handler)
                 // The app appears in the panel, so the panel comes forward with it.
-                ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW)?.let { window ->
-                    window.contentManager.findContent("iOS")?.let(window.contentManager::setSelectedContent)
-                    window.show()
-                }
+                app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory.showIos(project)
                 return DefaultExecutionResult(console, handler)
             }
         }

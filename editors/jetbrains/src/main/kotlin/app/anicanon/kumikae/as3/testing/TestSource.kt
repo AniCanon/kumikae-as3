@@ -4,6 +4,8 @@ import app.anicanon.kumikae.as3.language.As3Lexer
 import app.anicanon.kumikae.as3.language.As3Tokens
 import com.intellij.psi.TokenType
 
+internal data class TestField(val name: String, val offset: Int, val constant: Boolean)
+
 internal data class TestMethod(val name: String, val offset: Int, val end: Int, val annotated: Boolean = false)
 
 /** Declaration locations only. The manifest remains the authority for runnable cases. */
@@ -12,6 +14,10 @@ internal data class TestSource(
     val classOffset: Int,
     val methods: List<TestMethod>,
     val packageName: String = "",
+    val suite: Boolean = false,
+    val fields: List<TestField> = emptyList(),
+    val isInterface: Boolean = false,
+    val suiteFixtures: Set<String> = emptySet(),
 ) {
     fun methodAt(offset: Int) = methods.firstOrNull { offset in it.offset until it.end }
 
@@ -36,7 +42,7 @@ internal data class TestSource(
                 }
                 lexer.advance()
             }
-            val declaration = tokens.indexOfFirst { it.text == "class" }
+            val declaration = tokens.indexOfFirst { it.text in setOf("class", "interface") }
             if (declaration < 0) return TestSource("", -1, emptyList())
             val className = tokens.getOrNull(declaration + 1)?.text.orEmpty()
             var index = declaration + 2
@@ -44,8 +50,17 @@ internal data class TestSource(
             index++
             var depth = 1
             val methods = mutableListOf<TestMethod>()
+            val fields = mutableListOf<TestField>()
+            val fieldTypes = mutableListOf<String>()
             while (index < tokens.size && depth > 0) {
                 val token = tokens[index]
+                if (depth == 1 && token.text in setOf("var", "const")) {
+                    tokens.getOrNull(index + 1)?.let { fields += TestField(it.text, it.start, token.text == "const") }
+                    if (tokens.getOrNull(index + 2)?.text == ":") {
+                        fieldTypes += tokens.drop(index + 3).takeWhile { it.text !in setOf(";", "=", ",", "}") }
+                            .joinToString("") { it.text }
+                    }
+                }
                 val accessor = tokens.getOrNull(index + 1)?.text in listOf("get", "set") &&
                     tokens.getOrNull(index + 3)?.text == "("
                 val parametersAt = index + if (accessor) 3 else 2
@@ -93,7 +108,38 @@ internal data class TestSource(
             } else {
                 tokens.drop(pkg + 1).takeWhile { it.text != "{" }.joinToString("") { it.text }
             }
-            return TestSource(className, tokens[declaration].start, methods, prefix)
+            val suite = tokens.take(declaration).map { it.text }.windowed(3).any { it == listOf("[", "Suite", "]") }
+            val imports = tokens.take(declaration).mapIndexedNotNull { at, token ->
+                if (token.text ==
+                    "import"
+                ) {
+                    tokens.drop(at + 1).takeWhile { it.text != ";" }.joinToString("") { it.text }
+                } else {
+                    null
+                }
+            }
+            val fixtures = if (!suite) {
+                emptySet()
+            } else {
+                fieldTypes.map { name ->
+                    if ('.' in name) {
+                        name
+                    } else {
+                        imports.find { it.substringAfterLast('.') == name }
+                            ?: listOf(prefix, name).filter(String::isNotBlank).joinToString(".")
+                    }
+                }.toSet()
+            }
+            return TestSource(
+                className,
+                tokens[declaration].start,
+                methods,
+                prefix,
+                suite,
+                fields,
+                tokens[declaration].text == "interface",
+                fixtures,
+            )
         }
     }
 }

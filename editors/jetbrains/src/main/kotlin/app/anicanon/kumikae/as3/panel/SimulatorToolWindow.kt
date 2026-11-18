@@ -20,7 +20,22 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
         wrapStyleWord = true
         margin = JBUI.insets(4)
     }
-    private val timer = Timer(POLL_MILLIS) { controller.poll() }
+    private var requested: SimulatorDevice? = null
+    fun openDevice(device: SimulatorDevice) {
+        requested = device
+        state.listShown = false
+        openRequested()
+    }
+    private fun openRequested() {
+        val device = requested ?: return
+        if (controller.endpointFile.isEmpty() || controller.working || !component.isShowing) return
+        requested = null
+        controller.open(device)
+    }
+    private val timer = Timer(POLL_MILLIS) {
+        openRequested()
+        controller.poll()
+    }
     private val frames = Timer(8) { controller.frameTick() }
 
     init {

@@ -11,7 +11,7 @@ class CaseMappingTest(unittest.TestCase):
         case = {'source': 'tests/All.as', 'cases': [
             {'source': 'tests/Course Test.as', 'suite': 'CourseTest', 'name': 'gap jump', 'method': 'gapJump'}]}
         self.assertEqual(mapping.location(Path('/project'), case, 'CourseTest', 'gap jump'),
-                         'file:///project/tests/Course%20Test.as?method=gapJump')
+                         'kumikae-as3:///project/tests/Course%20Test.as?method=gapJump')
 
     def test_duplicate_or_invalid_mappings_fail(self):
         good = {'source':'tests/T.as', 'suite':'T', 'name':'one', 'method':'one'}

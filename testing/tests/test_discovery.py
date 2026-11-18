@@ -14,9 +14,9 @@ class DiscoveryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "tests").mkdir()
-            (root / "tests/Score.as").write_text('''package qa { public class Score {
+            (root / "tests/Score.as").write_text('''package qa { import app.anicanon.kumikae.testing.Assert; public class Score {
                 // [Test] public function ignored():void {}
-                [Test] public function scores():void { trace("called"); }
+                [Test] public function scores():void { Assert.assertEquals(1, 1); }
                 [Test] public function fails():void { throw new Error("Intentional failure"); }
             } }''')
             manifest = root / "kas3-tests.json"
@@ -30,6 +30,21 @@ class DiscoveryTest(unittest.TestCase):
                 self.assertEqual(code, result.returncode, result.stdout + result.stderr)
                 if name == "scores":
                     self.assertNotIn("Score::fails", result.stdout)
+
+    @unittest.skipUnless(os.environ.get("KAS3C"), "Requires the compiler")
+    def test_fixture_can_be_named_test_case(self):
+        runner = Path(__file__).resolve().parents[1] / "runner.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / "tests" / "qa"
+            folder.mkdir(parents=True)
+            (folder / "TestCase.as").write_text("package qa { public class TestCase {"
+                                                "[Test] public function works():void {} } }")
+            manifest = root / "kas3-tests.json"
+            manifest.write_text(json.dumps({"version": 1, "tests": [{"name": "Game", "discover": "tests"}]}))
+            result = subprocess.run([sys.executable, "-I", str(runner), str(manifest), "--compiler",
+                                     os.environ["KAS3C"]], capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_unrelated_target_does_not_require_a_compiler(self):
         runner = Path(__file__).resolve().parents[1] / "runner.py"

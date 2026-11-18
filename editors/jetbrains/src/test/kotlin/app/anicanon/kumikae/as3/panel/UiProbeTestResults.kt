@@ -33,8 +33,8 @@ internal object UiProbeTestResults {
             fixture,
             """
             package {
-                import kumikae.testing.TestCase;
-                import kumikae.testing.Assert;
+                import app.anicanon.kumikae.testing.TestCase;
+                import app.anicanon.kumikae.testing.Assert;
                 public class ProbeCase extends TestCase {
                     private var succeeds:Boolean;
                     public function ProbeCase(name:String, succeeds:Boolean) { super(name); this.succeeds = succeeds; }
@@ -50,7 +50,7 @@ internal object UiProbeTestResults {
             root.resolve("ProbeSuite.as"),
             """
             package {
-                import kumikae.testing.Suite;
+                import app.anicanon.kumikae.testing.Suite;
                 public class ProbeSuite {
                     public function ProbeSuite() {
                         var suite:Suite = new Suite("Probe");

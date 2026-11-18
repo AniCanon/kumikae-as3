@@ -1,4 +1,4 @@
-package kumikae.testing {
+package app.anicanon.kumikae.testing {
     // Override run and optionally cleanup; ordinary virtual dispatch works on every runtime.
     public class TestCase {
         public var name:String;

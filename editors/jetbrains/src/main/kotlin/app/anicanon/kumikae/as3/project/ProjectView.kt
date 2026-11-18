@@ -63,7 +63,11 @@ class GameProjectView : TreeStructureProvider {
         if (settings == null) return visible
         if (parent is GameScenesGroup) return visible
         val nodes = visible.mapTo(ArrayList()) { node ->
-            if (node !is PsiDirectoryNode) {
+            if (node is PsiFileNode && node !is As3MemberFileNode && node.virtualFile?.extension == "as" &&
+                node.value != null && GameViewOptions.members(project)
+            ) {
+                As3MemberFileNode(project, checkNotNull(node.value), settings)
+            } else if (node !is PsiDirectoryNode) {
                 node
             } else {
                 if (node.virtualFile?.path == project.basePath) return@mapTo GameRootNode(project, node)

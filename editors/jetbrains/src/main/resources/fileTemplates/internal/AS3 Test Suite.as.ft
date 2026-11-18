@@ -1,0 +1,7 @@
+package${AS3_PACKAGE} {
+    // An empty suite runs fixtures in this package directory and its subdirectories.
+    [Suite]
+    public class ${NAME} {
+        // To choose fixtures explicitly, add typed fields such as public var score:ScoreTest;
+    }
+}

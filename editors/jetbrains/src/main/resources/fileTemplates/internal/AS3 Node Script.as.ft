@@ -1,4 +1,4 @@
-package {
+package${AS3_PACKAGE} {
 	import godot.*;
 
 	public class ${NAME} extends Node2D {

@@ -1,4 +1,4 @@
-package kumikae.testing {
+package app.anicanon.kumikae.testing {
     // Explicit registration works in the CLI and Godot without reflection.
     public class Suite {
         public static var only:Vector.<String> = new Vector.<String>();

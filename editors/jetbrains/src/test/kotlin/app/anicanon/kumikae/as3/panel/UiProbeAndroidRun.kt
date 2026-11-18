@@ -89,21 +89,13 @@ internal object UiProbeAndroidRun {
                 val window = checkNotNull(ToolWindowManager.getInstance(project).getToolWindow("Game Devices"))
                 app.invokeAndWait {
                     window.show {
-                        window.contentManager.findContent("Android")?.let(window.contentManager::setSelectedContent)
+                        window.contentManager.findContent("Simulators")?.let(window.contentManager::setSelectedContent)
                     }
                 }
                 await("running emulator in Game Devices", 30) {
                     var clicked = false
                     app.invokeAndWait {
-                        val content = window.contentManager.findContent("Android")?.component
-                        if (content != null &&
-                            children(content).filterIsInstance<AndroidScreen>().any { it.picture != null }
-                        ) {
-                            children(content).filterIsInstance<javax.swing.JButton>().firstOrNull {
-                                it.text ==
-                                    "Emulators"
-                            }?.doClick()
-                        }
+                        val content = window.contentManager.findContent("Simulators")?.component
                         content?.let(::children)?.filterIsInstance<TitleButtonControl>()?.firstOrNull {
                             it.title == avd
                         }?.let {

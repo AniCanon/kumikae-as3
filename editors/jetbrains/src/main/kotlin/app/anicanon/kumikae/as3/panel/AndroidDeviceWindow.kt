@@ -24,6 +24,9 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
     private var status by mutableStateOf("")
     private var selected by mutableStateOf<AndroidAvd?>(null)
     private var requestedSerial: String? = null
+    fun openAvd(device: AndroidAvd) {
+        if (device.serial != null) openSerial(device.serial) else choose(device)
+    }
     fun openSerial(serial: String) {
         if (selected?.serial == serial) return
         closeView()
@@ -88,7 +91,9 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
                 }
             } else {
                 refresh.stop()
+                val resume = selected?.serial ?: requestedSerial
                 closeView()
+                requestedSerial = resume
             }
         }
     }
@@ -141,6 +146,7 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
             return
         }
         if (actions.isBusy) return
+        requestedSerial = serial
         val epoch = ++generation
         val edge = (component.width * 2).coerceIn(720, 1440)
         actions.submitOwned({ repository.open(serial, edge) }, { result ->
@@ -152,6 +158,7 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
                     feed = it
                     it.onUpdate = frames::request
                     frames.request()
+                    requestedSerial = null
                     selected = device
                     status = device.name
                     refresh()
