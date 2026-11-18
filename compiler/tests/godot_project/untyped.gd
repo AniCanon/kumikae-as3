@@ -105,6 +105,20 @@ func _physics_process(_delta: float) -> bool:
 	thrower.set_script(load("res://Thrower.as"))
 	show("a toString() that throws, caught where the text was asked for", ask("caughtText", [thrower]), "caught from toString")
 	thrower.free()
+	var kinds := []
+	var as_text := []
+	var as_wanted := []
+	for value in [Vector2(1, 2), Color(1, 0, 0), Vector2i(3, 4), [1], PackedInt32Array([1]), {"k": 1}, 5, "text", node, null]:
+		kinds.append([ask("isValue", [value]), [value is Vector2, value is Color, value is Vector2i, value is Array, value is PackedInt32Array]])
+		as_text.append(ask("asValue", [value]))
+		as_wanted.append("%s/%s/%s" % [str(value) if value is Vector2 else "null", str(value) if value is Color else "null", str(value) if value is Dictionary else "null"])
+	show("is with Godot's value types", kinds.map(func(pair): return pair[0]), kinds.map(func(pair): return pair[1]))
+	show("as with Godot's value types", as_text, as_wanted)
+	# GDScript has no cast that refuses: what AS3's gives is written out.
+	show("a cast to one of Godot's value types", [ask("castValue", [Vector2(5, 6)]), ask("castValue", [null]), ask("castValue", [Vector2i(1, 2)]), ask("castValue", ["text"])],
+			[Vector2(5, 6), null, null, null])
+	show("is, as and a cast on typed values", ask("typedValue", [Vector2(1, 2), Color(1, 0, 0)]),
+			"true/false/%s/null/false/null/false/false/%s/null/false" % [str(Color(1, 0, 0)), str(Vector2(1, 2))])
 	var refused := "refused: JSON.stringify can't write one of Godot's values or objects; convert it to an AS3 value first"
 	show("JSON refuses Godot's values", [ask("json", [Vector2(1, 2)]), ask("json", [node]), ask("json", [5]), ask("json", ["a"])],
 		[refused, refused, "{\"p\":[1,5]}", "{\"p\":[1,\"a\"]}"])

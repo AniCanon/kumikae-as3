@@ -123,7 +123,7 @@ inline bool is_held(Kind p_kind) {
 	   Godot's types (a Godot object: an engine name, E) when the third operand is not NONE; into an untyped register, \
 	   any third operand but NONE means an `Object`, where undefined is null. AnyText is String(x). \
 	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. AnyIsGodot: whether it holds an \
-	   object of that Godot class, or of one that extends it. */ \
+	   object of that Godot class, or of one that extends it, or a value of that Godot value type. */ \
 	X(AnyConst, "RI-") X(ToAny, "RR-") X(FromAny, "RRI") X(AnyText, "RR-") X(AnyTypeof, "RR-") \
 	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
 	X(AnyIs, "RRI") X(AnyIsGodot, "RRE") \

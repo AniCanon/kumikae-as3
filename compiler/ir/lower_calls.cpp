@@ -114,7 +114,7 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 			l_.error(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "' takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
 			return l_.default_value(p_want, position);
 		}
-		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref)) {
+		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref || kind == Kind::Val)) {
 			return l_.from_untyped(l_.any_value(p_call->arguments[0]), type, kind, position);
 		}
 	}

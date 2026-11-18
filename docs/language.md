@@ -86,8 +86,6 @@ The compiler reports each of these as an error with its own message.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.**
 - **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
   value works: `list.push`, `text.charAt`.
-- **`is`, `as` and a cast with one of Godot's value types:** `value as Vector2`, `Vector2(value)`. Store
-  the value in a variable of that type instead: a `*` value is checked as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
   class that extends `RegExp`.
 
@@ -142,8 +140,7 @@ A value of type A fits where B is expected when one of these holds:
 
 When B is a subclass of A, the error asks for a cast:
 `a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`. Where calling the type isn't a cast, as
-with `Array` or `Date`, the error says `use 'as'` alone, and for one of Godot's value types it gives no
-advice.
+with `Array` or `Date`, the error says `use 'as'` alone.
 
 ### How expressions are typed
 

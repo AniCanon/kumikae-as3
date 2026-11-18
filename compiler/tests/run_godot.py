@@ -411,7 +411,8 @@ output = compare("untyped.gd", [
     "untyped Godot values multiplied, subtracted, divided and negated", "untyped Godot values in order",
     "an untyped Godot value multiplied and subtracted in place", "a typed Godot value times an untyped one",
     "untyped numbers stay AS3's", "where Godot has no such operator the answer is AS3's",
-    "JSON refuses Godot's values",
+    "JSON refuses Godot's values", "is with Godot's value types", "as with Godot's value types", "a cast to one of Godot's value types",
+    "is, as and a cast on typed values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and
@@ -423,6 +424,8 @@ check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyp
 check("untyped.gd: a thrown Godot value nothing catches is reported as its text", "(3.0, 4.0)\n\tat Untyped/throwValue()" in output,
       output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
+check("untyped.gd: a cast to one of Godot's value types of a value that is not one is AS3's coercion error",
+      "Error #1034: Type Coercion failed: cannot convert text to Vector2." in output and output.count("\tat Untyped/castValue()") == 2, output[-2500:])
 
 # AS3's Objects and Dictionaries to Godot as its Dictionaries (keys as text), and a Dictionary of Godot's
 # copied where an AS3 Dictionary is wanted.

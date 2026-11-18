@@ -150,6 +150,10 @@ Godot's API description.
 - **A variable of a value type starts at zero,** not `null`, as in GDScript: `var start:Vector2;` is
   `(0, 0)`. You can still assign `null` to it.
 - **`trace(v)` and `"at " + v` give Godot's text for the value.**
+- **`is`, `as` and a cast work with Godot's value types.** `value is Color` asks what the value is now.
+  `value as Vector2` gives the value or `null`. `Vector2(value)` gives the value, `null` for `null`, and
+  TypeError #1034 for anything else. A cast doesn't convert: `Vector2(cell)` with a `Vector2i` is an error,
+  and `new Vector2(cell)` converts.
 
 ### Vectors of values
 
