@@ -134,6 +134,11 @@ the host does it another way (`time_limit.h`):
   the two.
 - **The program's own thread reads the clock** (`overdue()`, `stack_overflow()`). The call goes on unless
   its time is up.
+- **The thread ends with the host.** It reads and writes the context's alarm and floor and nothing else of
+  the program. The host stops it and waits for it before anything of its own is destroyed, so a reload
+  that drops the program, and the extension as it unloads, leave no thread behind. A limit changed while a
+  call runs starts another thread, and the call's time so far counts against the new limit
+  (`tests/test_time_limit.cpp`).
 
 A call that isn't stopped pays one byte read every `ROUNDS` rounds of a loop.
 
