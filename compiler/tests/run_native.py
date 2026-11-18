@@ -207,11 +207,12 @@ def stopped(name):
 # Programs that make objects in every way: with defaults and without, of classes that extend others, with
 # text, objects and untyped values for arguments, in loops that let them go, by the library and by name.
 REMEMBERED = ("classes", "class_setup_order", "class_statics", "class_values", "closures", "errors", "field_classes", "last_use",
-              "loops_counted", "object_calls", "rest_parameters", "static_const_still", "statics", "vector_of_object", "virtual_calls")
+              "loops_counted", "object_calls", "objects_recycled", "rest_parameters", "static_const_still", "statics", "vector_of_object",
+              "virtual_calls")
 
 
 # Those of them that make objects of a class whose constructors can be run again: the host must have been told.
-TELLING = ("remembered/class_values", "remembered/static_const_still", "remembered/virtual_calls")
+TELLING = ("remembered/class_values", "remembered/objects_recycled", "remembered/static_const_still", "remembered/virtual_calls")
 
 
 def remembered(name):

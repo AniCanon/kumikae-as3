@@ -57,7 +57,9 @@ std::string FunctionWriter::told() const {
 		values += (i ? ", " : "") + ("slot(" + register_name(i) + ")");
 	}
 	const std::string count = takes_count(function_) ? "n" : std::to_string(function_.parameters);
-	const std::string call = plain ? "const Slot t[] = { " + values + " }; constructing(c, " + std::to_string(index_) + ", t, " + count + ");"
+	// An object the host keeps only the arguments of is remembered here, where it is made (remembered_here).
+	const std::string call = plain ? "const Slot t[] = { " + values + " }; if (!remembered_here(c, " + register_name(0) + ", " + std::to_string(owner) + ", t, " +
+											 count + ")) { constructing(c, " + std::to_string(index_) + ", t, " + count + "); }"
 								   : "constructing(c, " + std::to_string(index_) + ", nullptr, 0);";
 	return "\tif (KAS3_UNLIKELY(c->remembers)) { " + call + " }\n";
 }

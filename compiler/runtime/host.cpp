@@ -44,9 +44,10 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	for (uint32_t i = 0; i < module.classes.size(); i++) {
 		const ir::Class &klass = module.classes[i];
 		// Where what objects are constructed with is remembered, an object has room for that after its
-		// fields (vm/constructions.h): the block kept is the whole of it, and is emptied whole as it is
-		// made again. Only where nothing remembered is counted: where an argument may be text, the heap
-		// frees the object, and gives the text up.
+		// fields (vm/constructions.h): the block kept is the whole of it, and as it is made again its
+		// fields are emptied, and the first slot of that room, which says nothing is remembered of the
+		// new object until its constructor tells. Only where nothing remembered is counted: where an
+		// argument may be text, the heap frees the object, and gives the text up.
 		vm::Constructions *const remembered = interpreter->heap().constructions;
 		const size_t slots = klass.fields.size() + (remembered ? remembered->room(i) : 0);
 		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in && slots + 1 < ObjectCache::SIZES &&
@@ -61,8 +62,12 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 			remembered->recycled(i);
 		}
 		class_numbers.push_back(numbers);
+		class_fields.push_back(plain ? static_cast<uint8_t>(klass.fields.size()) : 0);
 	}
 	context.class_numbers = class_numbers.data();
+	context.class_fields = class_fields.data();
+	class_tells.assign(module.classes.size(), 0);
+	context.class_tells = class_tells.data();
 	context.cache = &cache;
 	context.class_cached = class_cached.data();
 	if (std::getenv("KAS3_NATIVE_COUNTS")) {
@@ -162,9 +167,23 @@ Object *new_object(Context *c, uint32_t p_class) {
 	return object;
 }
 
+// A record as remembered_here() writes one is the record the interpreter's own code reads.
+static_assert(RECORD_NOTHING == vm::Constructions::NOTHING && RECORD_ARGUMENTS == vm::Constructions::ARGUMENTS &&
+				offsetof(vm::Constructions::Record, kept) == 0 && offsetof(vm::Constructions::Record, arguments) == sizeof(uint32_t) &&
+				offsetof(vm::Constructions::Record, values) == sizeof(Slot),
+		"generated code writes an object's record where it is made");
+
 void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count) {
-	c->host->told++;
-	c->host->interpreter->constructing(p_function, p_arguments, p_count);
+	Host &host = *c->host;
+	host.told++;
+	host.interpreter->constructing(p_function, p_arguments, p_count);
+	// A class whose objects are made again where they were, and of which only the arguments are kept, as
+	// they come: from here on generated code keeps them itself.
+	const uint32_t owner = host.module.functions[p_function].owner;
+	const vm::Constructions *const remembered = host.interpreter->heap().constructions;
+	if (remembered && owner != NONE && host.class_cached[owner] && remembered->copies_arguments(owner)) {
+		host.class_tells[owner] = 1;
+	}
 }
 
 void *copy_handle(Context *c, void *p_handle) {

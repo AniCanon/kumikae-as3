@@ -97,7 +97,20 @@ struct Context {
 	ObjectCache *cache = nullptr;
 	const uint8_t *class_cached = nullptr;
 	const uint32_t *class_numbers = nullptr; // For such a class: bit i says its field i is a Number, which starts NaN.
+	// For such a class: how many of its slots are its fields. Any after them are the room where the host
+	// remembers what the object was constructed with (vm/constructions.h), whose first slot says whether
+	// anything is remembered.
+	const uint8_t *class_fields = nullptr;
+	// For such a class: not 0 once the host has been told of one of its objects being constructed, and
+	// keeps of each its arguments as they come and nothing more. The next are remembered where they are
+	// made (remembered_here), with no word to the host.
+	const uint8_t *class_tells = nullptr;
 };
+
+// What the first slot of an object's record says (vm::Constructions::Record, whose numbers these are):
+// nothing is remembered of the object, or its constructor's arguments are.
+constexpr uint32_t RECORD_NOTHING = 0;
+constexpr uint32_t RECORD_ARGUMENTS = 1;
 
 // Whether the function this is written in has its frame below the context's floor: the C++ stack is nearly
 // used up, which is Error #1023 like calls nested too deep, never a crash. Always inline: it is the frame of

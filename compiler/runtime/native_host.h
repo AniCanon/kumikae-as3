@@ -89,6 +89,8 @@ struct Host final : vm::NativeCode {
 	ObjectCache cache;
 	std::vector<uint8_t> class_cached;
 	std::vector<uint32_t> class_numbers;
+	std::vector<uint8_t> class_fields;
+	std::vector<uint8_t> class_tells;
 	// The stack trace of the error on its way out, built as generated functions are left (as the
 	// interpreter builds its own: vm/interpreter_errors.cpp).
 	std::string trace;
@@ -145,7 +147,9 @@ struct Host final : vm::NativeCode {
 	std::vector<uint64_t> thunk_counts;
 	std::vector<uint32_t> unresolved;
 	uint64_t handle_copies = 0;
-	uint64_t told = 0; // Constructions generated code told of, where what objects are made with is remembered.
+	// Constructions generated code told the host of, where what objects are made with is remembered: not
+	// those it remembered itself, where the object was made (remembered_here).
+	uint64_t told = 0;
 	uint64_t (*object_lookups)() = nullptr;
 	void say_counts() const;
 	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,

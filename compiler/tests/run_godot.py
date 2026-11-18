@@ -576,7 +576,18 @@ compare("places.gd", [
 RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	private var token:Token = new Token(100);
-	override public function _ready():void { word = "%s"; token.y = 7; }
+	private var stamp:Stamp;
+	private var last:Pair;
+	private var spare:Number = 0;
+	override public function _ready():void { word = "%s"; token.y = 7; churn(); }
+	private function churn():void {
+		for (var i:int = 0; i < 64; i++) { var pair:Pair = new Pair(1000 + i, 2); spare += pair.b; }
+		last = pair;
+		pair = null;
+		stamp = new Stamp(3, 4);
+	}
+	public function stamped():String { return stamp.a + "/" + stamp.b; }
+	public function paired():String { return last.a + "/" + last.b; }
 	public function said():String { return word%s; }
 	public function limit():String { return LIMIT; }
 	public function firstNow():String { return first; }
@@ -587,6 +598,17 @@ class Token {
 	public var w:Number;
 	public var y:Number;
 	public function Token(p_y:Number) { w = Restart.WIDTH; y = p_y - Restart.WIDTH; }
+}
+class Pair {
+	public var a:Number;
+	public var b:Number;
+	public function Pair(p_a:Number, p_b:Number) { a = p_a; b = p_b * Restart.WIDTH; }
+}
+class Stamp {
+	private static var made:int = 0;
+	public var a:Number;
+	public var b:Number;
+	public function Stamp(p_a:Number, p_b:Number) { a = p_a; b = p_b + Restart.WIDTH - Restart.WIDTH;%s }
 }
 """
 
@@ -610,10 +632,13 @@ def restart_test(label, native=False):
         first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";\n\tpublic static const WIDTH:Number = %s;"
         made = "\n\tpublic var made:String = \"%s\";"
         early = 26 if native else 24  # The width as the first edit has it.
-        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a", early), "one", ' + "!"'),
-                           "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"'),
-                           "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made'),
-                           "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made')}.items():
+        # Stamp's constructor counts in a static variable as the game starts, so it can't be run again; every
+        # edit takes that away.
+        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", "", " made++;"),
+                           "restart_body.txt": RESTART % (unused + first % ("a", "a", early), "one", ' + "!"', ""),
+                           "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"', ""),
+                           "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made', ""),
+                           "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made', "")}.items():
             with open(os.path.join(copy, name), "w") as file:
                 file.write(text)
         environment = dict(os.environ)
@@ -625,14 +650,22 @@ def restart_test(label, native=False):
         run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 15, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 17, output[-1500:])
         check("%s: the game %s" % (label, "starts as native code" if native else "runs on the interpreter"), (play_godot.USED in output) == native, output[:900])
         for name, got, want in values:
             # The width after the first edit is the driver's to show and this test's to know: an object
             # native code made takes the constant that edit changed, and keeps what the game gave it.
             want = "%d.0" % early if name == "the first edit: the width of an object alive" else want
+            want = "1063/%d" % (2 * early) if name == "the first edit: an object made where another had been is made again from its own arguments" else want
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        told = "ActionScript: objects updated in place: Token. Not updated: Restart (it extends Godot's Node2D). Restart the scene to see the new code on those."
+        # Stamp was made by a constructor that could not be run again. The interpreter kept its first values,
+        # and makes it again once the edit lets its constructor run again; native code kept nothing of it, and
+        # no arguments of the object that was there before it are taken for its own.
+        told = ("ActionScript: objects updated in place: Pair, Token. Not updated: Restart (it extends Godot's Node2D), Stamp (an object of it was "
+                "made while the scripts ran as native code, by a constructor that could not be run again then). Restart the scene to see the new "
+                "code on those." if native else
+                "ActionScript: objects updated in place: Pair, Stamp, Token. Not updated: Restart (it extends Godot's Node2D). Restart the scene to "
+                "see the new code on those.")
         check("%s: Godot is told what was updated in place, and what was not and why" % label, output.count(told) >= (2 if native else 1), output[-1500:])
         if native:
             check("%s: the libraries built ahead end, and none fails" % label, play_godot.settled(copy) and

@@ -24,7 +24,9 @@ timings rest on, so that a change that undoes one fails here and not only in a b
     the counter and the end of a stretch, and the host's alarm is looked at where a stretch ends. A counter
     that goes up to a vector's own length is an index of the vector with nothing more asked;
   - a sum of whole numbers handed on untyped (pushed onto an Array) is the int it is by integer arithmetic,
-    whatever the C++ compiler makes of the loop it is in.
+    whatever the C++ compiler makes of the loop it is in;
+  - a constructor built to tell what its object is made with (--remember) keeps the arguments where the
+    object is, and tells the host only where that can't be done.
 """
 import os
 import re
@@ -117,7 +119,7 @@ with tempfile.TemporaryDirectory() as where:
 
 with tempfile.TemporaryDirectory() as where:
     sources = os.path.join(tests, "bench", "languages")
-    written = subprocess.run([kas3c, "cpp", "--godot", "frames/ArrayConversion.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    written = subprocess.run([kas3c, "cpp", "--godot", "--remember", "frames/ArrayConversion.as", "-o", where], capture_output=True, text=True, cwd=sources)
     check("ArrayConversion.as is written as C++", written.returncode == 0, written.stderr)
     if written.returncode == 0:
         process = functions(where, "frames_ArrayConversion.cpp").get("frames_ArrayConversion__process", "")
@@ -177,7 +179,7 @@ with tempfile.TemporaryDirectory() as where:
 
 with tempfile.TemporaryDirectory() as where:
     sources = os.path.join(tests, "bench", "languages")
-    written = subprocess.run([kas3c, "cpp", "--godot", "frames/ArrayConversion.as", "frames/Alloc.as", "-o", where], capture_output=True,
+    written = subprocess.run([kas3c, "cpp", "--godot", "--remember", "frames/ArrayConversion.as", "frames/Alloc.as", "-o", where], capture_output=True,
                              text=True, cwd=sources)
     check("the frame benchmarks' scripts are written as C++", written.returncode == 0, written.stderr)
     if written.returncode == 0:
@@ -187,6 +189,11 @@ with tempfile.TemporaryDirectory() as where:
         for loop in pushes:
             check("a sum of whole numbers handed on untyped is an int by integer arithmetic",
                   re.search(r"if \(const int64_t n = \(static_cast<int64_t>\(r\d+\) \+ static_cast<int64_t>\(r\d+\)\); KAS3_LIKELY\(n != 0 && ", loop), loop)
+
+        particle = open(os.path.join(where, "frames_Particle.cpp")).read()
+        check("a constructor built to tell keeps its arguments where the object is, and tells the host where it can't",
+              re.search(r"if \(KAS3_UNLIKELY\(c->remembers\)\) \{ const Slot t\[\] = \{[^}]*\}; if \(!remembered_here\(c, r0, \d+, t, 5\)\) "
+                        r"\{ constructing\(c, \d+, t, 5\); \} \}", particle), particle[-3000:])
 
 for failure in failures:
     print("FAIL " + failure[:2500])

@@ -70,6 +70,9 @@ public:
 	// Native code may then let go of such an object and make another in its place without a word
 	// (recycled()): its record is emptied with the object, and holds nothing to give up.
 	bool plain_arguments(uint32_t p_class) const { return plans_[p_class].room != 0 && plans_[p_class].plain_arguments; }
+	// Whether an object of the class is remembered by a copy of its arguments and nothing more: none is
+	// looked at, and its chain is known to be one that can be run again.
+	bool copies_arguments(uint32_t p_class) const { return plans_[p_class].quick; }
 	// Objects of the class are let go of and made again where they are, by native code that tells of
 	// neither: they are not among those counted (size()).
 	void recycled(uint32_t p_class) { plans_[p_class].recycled = true; }

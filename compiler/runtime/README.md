@@ -112,7 +112,12 @@ constructor called, so a program library written with `kas3c cpp --remember` tel
 - **The record is the interpreter's own,** in the same room after the object's fields. A reload onto the
   interpreter reads it as it reads the records it made itself.
 - **Recycled objects keep their room.** A class whose constructor takes only numbers and Booleans is still
-  recycled. A class that takes text is freed by the heap, which gives the text up.
+  recycled. A class that takes text is freed by the heap, which gives the text up. When a block is made
+  into a new object, `made_object()` empties the fields and the record's first slot, which says nothing is
+  remembered yet. The rest of the record is read only after a constructor has filled it.
+- **A recycled class's record is written where the object is made.** The host hears of the first object of
+  such a class and sets `Context::class_tells`. From then on `remembered_here()` copies the arguments into
+  the record inline, and `constructing` is called only where that can't be done.
 
 A host remembers only when its embedder asks (`Embedder::remember`). The extension asks in a debug build.
 
