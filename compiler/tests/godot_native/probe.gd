@@ -47,6 +47,7 @@ func _places() -> void:
 	print("PROBE refused=", places.call("refused"))
 	print("PROBE methods=", places.call("methods"))
 	print("PROBE ends=", places.call("ends"))
+	print("PROBE parts=", places.call("parts"))
 	var line := Line2D.new()
 	var keeper := Node.new()
 	print("PROBE given=", places.call("given", line, keeper), " ", line.points, " ", keeper.get_meta("points"), " ", keeper.get_meta("nested"), " ",
@@ -106,6 +107,7 @@ func _initialize() -> void:
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))
 	print("PROBE speaks=", probe.call("speaks"))
+	print("PROBE kinds=", probe.call("kinds", Vector2(1, 2)), " / ", probe.call("kinds", Color(1, 0, 0)), " / ", probe.call("kinds", 5), " / ", probe.call("kinds", null))
 	print("PROBE gone=", probe.call("gone"))
 	print("PROBE gone uncaught=", probe.call("goneUncaught"))
 	print("PROBE queued=", probe.call("queue"))
