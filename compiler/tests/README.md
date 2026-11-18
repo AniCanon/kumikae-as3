@@ -82,7 +82,9 @@ A golden file that records a bug is worse than no test. Read what `--update` wro
 
 ## Tests inside Godot
 
-These need the extension library and Godot 4.7. Without either, the group skips itself and says so.
+These need the extension library and Godot 4.7. Without either, the group skips itself and says so. To
+build the library, give CMake a godot-cpp checkout, as
+[the compiler's README](../README.md#build-and-test) shows.
 
 ```sh
 python3 compiler/tests/run_godot.py compiler/tests compiler/build/kas3c
