@@ -9,8 +9,8 @@ namespace kas3 {
 
 enum class ClassCall {
 	// AS3's cast: the value itself when it is a T, null for null and undefined, and TypeError #1034 for
-	// anything else. A class or an interface of the program's own, a class of Godot's objects, Function
-	// and Class.
+	// anything else. A class or an interface of the program's own, a class of Godot's objects, Function,
+	// Class and Dictionary.
 	Cast,
 	// A conversion that always gives a T: String, Number, int, uint, Boolean and Int64.
 	Conversion,
@@ -41,7 +41,7 @@ inline ClassCall class_call(const Symbol *p_class) {
 	}
 	const std::string_view name = p_class->name;
 	if (p_class->unit->is_builtin) {
-		if (name == "Function" || name == "Class") {
+		if (name == "Function" || name == "Class" || name == "Dictionary") {
 			return ClassCall::Cast;
 		}
 		const bool converts = name == "String" || name == "Number" || name == "int" || name == "uint" || name == "Boolean" || name == "Int64";

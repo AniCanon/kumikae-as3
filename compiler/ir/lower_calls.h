@@ -14,6 +14,8 @@ class Calls {
 
 	uint32_t super_call(Call *p_call);
 	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
+	// Error(x), RegExp(x), Date(x): what the library's class does when it is called. Nothing for any other.
+	std::optional<uint32_t> class_function(Call *p_call, Symbol *p_type);
 	uint32_t trace_call(Call *p_call);
 	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
 	uint32_t symbol_call(Call *p_call, Symbol *p_symbol, Kind p_want);

@@ -1,3 +1,0 @@
-class_call.as:7:19: error: a call of the class 'Date' is not supported by the interpreter yet
-class_call.as:8:19: error: a call of the class 'RegExp' is not supported by the interpreter yet
-class_call.as:9:19: error: a call of the class 'Error' is not supported by the interpreter yet

@@ -58,7 +58,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
-| Casts and conversions | `Enemy(value)` casts to a class or an interface: it gives the value when it is one, `null` for `null`, and TypeError #1034 for anything else. `int(x)`, `uint(x)`, `Number(x)`, `String(x)` and `Boolean(x)` convert. `Array(x)`, `Object(x)` and `Vector.<T>(x)` do what they do in Flash |
+| Casts and conversions | `Enemy(value)` casts to a class or an interface: it gives the value when it is one, `null` for `null`, and TypeError #1034 for anything else. `Dictionary(x)` is a cast too. `int(x)`, `uint(x)`, `Number(x)`, `String(x)` and `Boolean(x)` convert. The other library classes do what they do in Flash: `Array(x)`, `Object(x)` and `Vector.<T>(x)`; `Error(x)` and its subclasses create an error; `RegExp(x)` gives `x` itself when it's a `RegExp`, and a new one otherwise; `Date(x)` gives the current time as text |
 | Collections | `Array`, `Vector.<T>`, `flash.utils.Dictionary`, and object literals |
 | Untyped values | Properties, methods and library calls by name on a `*` or `Object` value. A name that isn't there is Flash's ReferenceError #1069 |
 | Standard library | `String`, `Number`, `Math`, `Date`, `RegExp`, `JSON`, `Error` and its subclasses, and the top-level functions such as `parseInt`, `isNaN` and `encodeURIComponent` |
@@ -86,9 +86,6 @@ The compiler reports each of these as an error with its own message.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.**
 - **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
   value works: `list.push`, `text.charAt`.
-- **`Date`, `RegExp`, `Error` or `Dictionary` called as a function:** `Date(value)`. In Flash none of
-  these is a cast: `Date(value)` gives the time as text, and `Error(value)` creates an error. Use
-  `value as Date`.
 - **`is`, `as` and a cast with one of Godot's value types:** `value as Vector2`, `Vector2(value)`. Store
   the value in a variable of that type instead: a `*` value is checked as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
