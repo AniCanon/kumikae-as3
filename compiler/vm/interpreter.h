@@ -378,9 +378,15 @@ public:
 	// From here on, what each object of the program's own classes is constructed with is remembered
 	// (vm/constructions.h), so that a reload can update the objects alive in place (Reload::update_in_place).
 	// For a host whose program can be reloaded; asked before the program makes anything. Asked once an
-	// object has been made, or of a program with native code, nothing is remembered.
-	void remember_constructions();
+	// object has been made, nothing is remembered; nor of a program with native code, unless that code
+	// tells what its objects are made with (p_native_tells: a program library built to, through
+	// constructing()).
+	void remember_constructions(bool p_native_tells = false);
+	bool remembers() const { return constructions_ != nullptr; }
 	size_t remembered() const { return constructions_ ? constructions_->size() : 0; } // How many objects are.
+	// Native code is running the constructor (by its number) of the object that is the first of these
+	// arguments, as it was called: what a frame of the interpreter's own would have remembered.
+	void constructing(uint32_t p_function, const Slot *p_arguments, size_t p_count);
 	void set_statement_hook(StatementHook p_hook, void *p_data) { hook_ = p_hook, hook_data_ = p_data; }
 	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
 	// with Flash's Error #1502, which no catch or finally stops: an endless loop ends. 0, as an interpreter

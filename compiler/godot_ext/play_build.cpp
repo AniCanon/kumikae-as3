@@ -211,6 +211,9 @@ void start(const Asked &p_asked) {
 bool write_sources(const ir::Module &p_module, const fs::path &p_folder, const std::string &p_key) {
 	backend_cpp::Options options;
 	options.one_unit = true; // One file for the compiler: a small one put inside what calls it, and one program started.
+	// What Play builds is for a game that is being edited: a reload onto the interpreter updates in place
+	// the objects native code made, by what their constructors told.
+	options.remembers = true;
 	const backend_cpp::Generated generated = backend_cpp::generate(p_module, options);
 	if (!generated.unsupported.empty()) {
 		write(p_folder / failed_name(p_key), "native code does not have this yet: " + generated.unsupported + "\n");

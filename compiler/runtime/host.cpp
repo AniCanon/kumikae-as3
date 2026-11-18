@@ -20,6 +20,11 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		output(p_embedder.output), handles(p_embedder.handles), limit(context, p_embedder.clock) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
+	// Before anything is made: an object is made with room for what it was constructed with.
+	if (p_embedder.remember && program.remembers) {
+		interpreter->remember_constructions(true);
+		context.remembers = interpreter->remembers();
+	}
 	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
@@ -38,14 +43,23 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	// does not look at and no one but the program holds.
 	for (uint32_t i = 0; i < module.classes.size(); i++) {
 		const ir::Class &klass = module.classes[i];
-		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in &&
-				klass.fields.size() + 1 < ObjectCache::SIZES && !interpreter->heap().list_for(i);
+		// Where what objects are constructed with is remembered, an object has room for that after its
+		// fields (vm/constructions.h): the block kept is the whole of it, and is emptied whole as it is
+		// made again. Only where nothing remembered is counted: where an argument may be text, the heap
+		// frees the object, and gives the text up.
+		vm::Constructions *const remembered = interpreter->heap().constructions;
+		const size_t slots = klass.fields.size() + (remembered ? remembered->room(i) : 0);
+		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in && slots + 1 < ObjectCache::SIZES &&
+				!interpreter->heap().list_for(i) && (!remembered || remembered->room(i) == 0 || remembered->plain_arguments(i));
 		uint32_t numbers = 0;
 		for (size_t at = 0; at < klass.fields.size() && plain; at++) {
 			plain = !ir::is_held(klass.fields[at].kind);
 			numbers |= klass.fields[at].kind == Kind::F64 ? uint32_t(1) << at : 0;
 		}
-		class_cached.push_back(plain ? static_cast<uint8_t>(klass.fields.size() + 1) : 0);
+		class_cached.push_back(plain ? static_cast<uint8_t>(slots + 1) : 0);
+		if (plain && remembered) {
+			remembered->recycled(i);
+		}
 		class_numbers.push_back(numbers);
 	}
 	context.class_numbers = class_numbers.data();
@@ -101,6 +115,9 @@ void Host::say_counts() const {
 			std::fprintf(stderr, "kas3:   %llu %s\n", static_cast<unsigned long long>(thunk_counts[i]), what.c_str());
 		}
 	}
+	if (context.remembers) {
+		std::fprintf(stderr, "kas3:   told of %llu constructions, %zu remembered now\n", static_cast<unsigned long long>(told), interpreter->remembered());
+	}
 	for (uint32_t use : unresolved) {
 		std::fprintf(stderr, "kas3:   unresolved %s\n", asked_of(module, module.functions[thunk_function(program.uses[use])].code[0]).c_str());
 	}
@@ -143,6 +160,11 @@ Object *new_object(Context *c, uint32_t p_class) {
 		vm::reset_fields(klass, object);
 	}
 	return object;
+}
+
+void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count) {
+	c->host->told++;
+	c->host->interpreter->constructing(p_function, p_arguments, p_count);
 }
 
 void *copy_handle(Context *c, void *p_handle) {

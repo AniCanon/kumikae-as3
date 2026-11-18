@@ -13,10 +13,17 @@ using ir::Kind;
 using Record = Constructions::Record;
 
 void Reload::carry_record(Object *p_old, Object *p_fresh) {
-	if (from_.native_ && to_.constructions_ && to_.constructions_->room(p_fresh->klass) != 0) {
-		to_.constructions_->made_natively(to_.module_.classes[p_fresh->klass].name);
-	}
 	const Record *kept = from_.constructions_ && to_.constructions_ ? from_.constructions_->of(p_old) : nullptr;
+	// Native code remembered nothing at all, or nothing of this class, whose chain could not be run again
+	// as it was built: why the object has no record is said by its class at this reload and those after.
+	if (!kept && from_.native_ && to_.constructions_ && to_.constructions_->room(p_fresh->klass) != 0) {
+		const std::string &name = to_.module_.classes[p_fresh->klass].name;
+		if (!from_.constructions_) {
+			to_.constructions_->made_natively(name);
+		} else if (!from_.constructions_->told_of(p_old->klass)) {
+			to_.constructions_->made_once_natively(name);
+		}
+	}
 	if (!kept) {
 		return;
 	}
@@ -246,7 +253,9 @@ InPlace Reload::update_in_place(const std::vector<std::string> &p_run_once) {
 			done.left.emplace_back(name, !to_.constructions_ ? "what its objects were made with is not remembered"
 					: unfit_.count(index)					 ? "its constructor's parameters changed"
 					: to_.constructions_->natively_made().count(name)
-							? "an object of it was made while the scripts ran as native code, which does not remember what objects are made with"
+							? "an object of it was made while the scripts ran as native code that does not remember what objects are made with"
+					: to_.constructions_->once_natively_made().count(name)
+							? "an object of it was made while the scripts ran as native code, by a constructor that could not be run again then"
 							: "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null");
 		}
 	}

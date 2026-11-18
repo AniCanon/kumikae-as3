@@ -36,7 +36,7 @@ Generated generate(const ir::Module &p_module, const Options &p_options) {
 	std::string of_no_class;
 	for (uint32_t i = 0; i < p_module.functions.size(); i++) {
 		const uint32_t owner = p_module.functions[i].owner;
-		(owner == ir::NONE ? of_no_class : by_class[owner]) += FunctionWriter(p_module, i, thunks, keeps_stack, &facts).write();
+		(owner == ir::NONE ? of_no_class : by_class[owner]) += FunctionWriter(p_module, i, thunks, keeps_stack, &facts, p_options.remembers).write();
 	}
 	out.files.push_back(File{ std::string(HEADER), write_header(p_module) });
 	// Two classes of one name in two packages, or one called `program`, still get a file each.
@@ -60,7 +60,7 @@ Generated generate(const ir::Module &p_module, const Options &p_options) {
 											std::string(PROGRAM_NAMESPACE) + "\n" });
 	}
 	out.files.push_back(File{ std::string(TABLE) + ".cpp",
-			generated_notice("the whole program") + opening() + of_classes + of_no_class + write_table(p_module, thunks, keeps_stack) });
+			generated_notice("the whole program") + opening() + of_classes + of_no_class + write_table(p_module, thunks, keeps_stack, p_options.remembers) });
 	return out;
 }
 

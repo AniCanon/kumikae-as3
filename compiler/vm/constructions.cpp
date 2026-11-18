@@ -70,8 +70,9 @@ Slot Constructions::held(Kind p_kind, Slot p_value) {
 // A record starts with its two numbers in the place of one slot, and its values follow as slots.
 static_assert(offsetof(Constructions::Record, values) == sizeof(Slot), "a record's values start one slot in");
 
-Constructions::Constructions(const ir::Module &p_module) :
-		module_(p_module), owner_(p_module.functions.size(), ir::NONE), plans_(p_module.classes.size()) {
+Constructions::Constructions(const ir::Module &p_module, bool p_told) :
+		module_(p_module), owner_(p_module.functions.size(), ir::NONE), plans_(p_module.classes.size()), told_(p_told),
+		told_of_(p_module.classes.size(), 0) {
 	const auto looked = [this](uint32_t p_value, Kind p_kind) {
 		if (p_kind == Kind::Str || p_kind == Kind::Obj || p_kind == Kind::Val || p_kind == Kind::Ref || p_kind == Kind::Any) {
 			looked_.push_back(Looked{ p_value, p_kind });
@@ -127,7 +128,7 @@ void Constructions::give_up(const Plan &p_plan, Record *p_record) {
 
 Constructions::Chain Constructions::chain_of(Plan &p_plan, uint32_t p_class) {
 	if (p_plan.chain == Chain::Unknown) {
-		p_plan.chain = ir::constructor_refusal(module_, p_class) ? Chain::Once : Chain::Again;
+		p_plan.chain = !told_ && ir::constructor_refusal(module_, p_class) ? Chain::Once : Chain::Again;
 		p_plan.quick = p_plan.chain == Chain::Again && p_plan.plain_arguments;
 	}
 	return p_plan.chain;
@@ -146,7 +147,7 @@ Constructions::Record *Constructions::add(Object *p_object, uint32_t p_function,
 	if (record->kept != NOTHING) {
 		give_up(plan, record);
 	} else {
-		used_++;
+		used_ += plan.recycled ? 0 : 1;
 	}
 	record->kept = ARGUMENTS;
 	record->arguments = p_arguments;
@@ -171,7 +172,7 @@ bool Constructions::keep_arguments(uint32_t p_class, const Slot *p_arguments, si
 	}
 	record->kept = ARGUMENTS;
 	record->arguments = given;
-	used_++;
+	used_ += plan.recycled ? 0 : 1;
 	return false;
 }
 
@@ -187,7 +188,7 @@ bool Constructions::keep_looked(Plan &p_plan, uint32_t p_class, Object *p_object
 	if (record->kept != NOTHING) {
 		give_up(p_plan, record);
 	} else {
-		used_++;
+		used_ += p_plan.recycled ? 0 : 1;
 	}
 	for (uint32_t i = 0; i < given; i++) {
 		record->values[i] = p_arguments[1 + i];

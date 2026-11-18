@@ -42,7 +42,8 @@ Three properties hold across the suites:
 - **Both back ends agree.** A program in `run/` runs on the interpreter and as native code, and must print
   the same output both ways.
 - **Nothing leaks.** Every program must leave no object or string alive when it ends. Each program also
-  runs a second time with hot reload's record of constructor arguments turned on, and must do the same.
+  runs a second time with hot reload's record of constructor arguments turned on, and must do the same. A
+  set of programs is built as native code with `--remember` and run that way too.
 - **Nothing crashes.** The parser test parses every byte-prefix of each corpus file. The query test runs
   each corpus file with one byte missing through every editor query.
 

@@ -100,6 +100,22 @@ how the library, and Godot, call a function without knowing its body is native: 
 - **A stack overflow found by the interpreter inside a thunk** leaves the generated functions in between
   without running their `finally` blocks.
 
+### What objects are constructed with
+
+Hot reload updates a live object in place by running its constructor again with the arguments the object
+was built with ([vm/constructions.h](../vm/constructions.h)). Under native code the interpreter sees no
+constructor called, so a program library written with `kas3c cpp --remember` tells the host:
+
+- **The constructor of a class whose chain can be run again calls `constructing`** as it begins, when
+  `c->remembers` is set. No other constructor does, and a library written without the option has no such
+  call: its C++ is the same to the byte.
+- **The record is the interpreter's own,** in the same room after the object's fields. A reload onto the
+  interpreter reads it as it reads the records it made itself.
+- **Recycled objects keep their room.** A class whose constructor takes only numbers and Booleans is still
+  recycled. A class that takes text is freed by the heap, which gives the text up.
+
+A host remembers only when its embedder asks (`Embedder::remember`). The extension asks in a debug build.
+
 ### The time limit
 
 A call from outside that runs too long is stopped with Flash's Error #1502, as under the interpreter: the

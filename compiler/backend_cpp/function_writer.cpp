@@ -33,10 +33,33 @@ Signature signature_of(const ir::Function &p_function) {
 	return signature;
 }
 
-FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts) :
+FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts,
+		bool p_remembers) :
 		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack),
-		facts_(p_facts) {
+		remembers_(p_remembers), facts_(p_facts) {
 	analyse();
+}
+
+// The constructor of a class whose chain can be run again says what its object is constructed with, as it
+// begins and before a default is given: the arguments as they came, and how many. Which classes' objects
+// are remembered, and that a base's constructor run by `super(...)` is not the object's own, is the
+// host's to say (vm/constructions.h). An argument held inline is no plain value: the object has no record,
+// and the host is told only that one of its class was made.
+std::string FunctionWriter::told() const {
+	const uint32_t owner = function_.owner;
+	if (!remembers_ || owner == NONE || module_.classes[owner].constructor != index_ || function_.parameters == 0 || ir::constructor_refusal(module_, owner)) {
+		return std::string();
+	}
+	std::string values;
+	bool plain = true;
+	for (uint32_t i = 0; i < function_.parameters; i++) {
+		plain = plain && parts(i).empty();
+		values += (i ? ", " : "") + ("slot(" + register_name(i) + ")");
+	}
+	const std::string count = takes_count(function_) ? "n" : std::to_string(function_.parameters);
+	const std::string call = plain ? "const Slot t[] = { " + values + " }; constructing(c, " + std::to_string(index_) + ", t, " + count + ");"
+								   : "constructing(c, " + std::to_string(index_) + ", nullptr, 0);";
+	return "\tif (KAS3_UNLIKELY(c->remembers)) { " + call + " }\n";
 }
 
 void FunctionWriter::analyse() {
@@ -365,7 +388,7 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
-	out += still_declared() + kept_declared() + twice_declared() + counted_declared();
+	out += told() + still_declared() + kept_declared() + twice_declared() + counted_declared();
 	if (has_owner_alias_) {
 		// The script's own Godot object: found once, and again only after the engine has freed a script's.
 		add("void *self = object_of(c, field<Ref>(r0, 0));");

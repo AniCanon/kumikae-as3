@@ -90,14 +90,18 @@ static uint32_t time_limit() {
 	return seconds > 0 ? (uint32_t)std::min(seconds * 1000.0, 4.0e9) : 0;
 }
 
+// Where the scripts can be reloaded (a debug build: the watch, the debugger, reload_scripts()), what
+// objects are constructed with is remembered, so that a reload can update them in place, whichever way the
+// scripts run. An exported game pays nothing for it.
+static bool remembers() {
+	return OS::get_singleton()->is_debug_build();
+}
+
 static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
 	p_host.new_program(); // What is worked out from here on is this program's.
 	auto made = std::make_unique<vm::Interpreter>(p_module, p_host);
 	made->set_time_limit(time_limit());
-	// Where the scripts can be reloaded (a debug build: the watch, the debugger, reload_scripts()), what
-	// objects are constructed with is remembered, so that a reload can update them in place. An exported
-	// game pays nothing for it.
-	if (OS::get_singleton()->is_debug_build()) {
+	if (remembers()) {
 		made->remember_constructions();
 	}
 	return made;
@@ -132,7 +136,7 @@ Project &Project::get() {
 	}
 	if (!library.empty()) {
 		std::string why;
-		program->native_ = NativeProgram::load(library, *program->module_, program->host_, time_limit(), &why);
+		program->native_ = NativeProgram::load(library, *program->module_, program->host_, time_limit(), remembers(), &why);
 		if (program->native_) {
 			UtilityFunctions::print("ActionScript: the scripts run as native code.");
 		} else {

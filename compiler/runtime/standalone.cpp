@@ -30,6 +30,8 @@ void run_here(void *p_run) {
 		const char *limit = std::getenv("KAS3_TIME_LIMIT_MS");
 		Embedder embedder{ output, vm::NoEngine::instance(), vm::NoEngine::instance(), clock };
 		embedder.time_limit = limit ? static_cast<uint32_t>(std::strtoul(limit, nullptr, 10)) : vm::Interpreter::FLASH_TIME_LIMIT;
+		// As for `kas3c run`: what a game being edited pays for a reload that updates its objects in place.
+		embedder.remember = std::getenv("KAS3_REMEMBER_CONSTRUCTIONS") != nullptr;
 		Host host(*r_run->program, embedder);
 		host.context.stack_floor.store(vm::stack_floor(), std::memory_order_relaxed);
 		ran = host.run();

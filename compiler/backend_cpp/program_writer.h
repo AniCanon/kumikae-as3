@@ -16,7 +16,7 @@ std::string generated_notice(std::string_view p_from);
 bool has_struct(const ir::Class &p_class);
 std::string write_header(const ir::Module &p_module);
 // The descriptors, in the program's namespace, and `kas3_program` after it.
-std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, bool p_keeps_stack);
+std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, bool p_keeps_stack, bool p_remembers);
 
 } // namespace backend_cpp
 } // namespace kas3

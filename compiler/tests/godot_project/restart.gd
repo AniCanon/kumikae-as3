@@ -73,6 +73,9 @@ func _process(_delta: float) -> bool:
 	elif stage == 1 and acted:
 		show("a method edited: the new code runs", said(), "one!")
 		show("a method edited and a field added: the scene is the same", current_scene.get_instance_id() == first_id, true)
+		# run_godot.py knows what this is: the edit changes the constant where the game started as native code.
+		show("the first edit: the width of an object alive", current_scene.call("width"), "?")
+		show("the first edit: a field the game changed keeps what it holds", current_scene.call("moved"), 7.0)
 		put("ready")
 		stage = 2
 	elif stage == 2 and acted:

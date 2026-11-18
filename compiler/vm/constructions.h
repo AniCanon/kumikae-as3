@@ -5,9 +5,14 @@
 //
 // Kept with the object, in room after its own slots that it is made with only while a host asks for this
 // (Interpreter::remember_constructions, Heap::object_slots): the object's header and its own slots are as
-// they are without it, nothing is looked up or allocated for an object made or freed, and native code keeps
-// none. How much room an object of a class has, and which of its values can be other than a number, is
-// worked out once for each class.
+// they are without it, and nothing is looked up or allocated for an object made or freed. How much room an
+// object of a class has, and which of its values can be other than a number, is worked out once for each
+// class.
+//
+// Where native code runs the program, the interpreter sees no constructor called: a program library built
+// to tell says what each object is made with as its constructor begins (begun(), through the runtime's
+// `constructing`), for the classes whose chain can be run again and for no other. The record is the same
+// one, in the same room, so that a reload onto the interpreter finds it as it finds its own.
 //
 // Of an object whose class's constructor chain can be run again (ir::constructor_refusal: it depends on
 // nothing but its arguments and constants), the arguments alone are kept: its first values are what the
@@ -50,7 +55,10 @@ public:
 	// what the chain of the program it came from gives; the reload settles each before it ends (reload.h).
 	static constexpr uint32_t NOTHING = 0, ARGUMENTS = 1, ALL = 2, CARRIED = 3;
 
-	explicit Constructions(const ir::Module &p_module);
+	// p_told: the program's code is native, and tells of a construction only where its class's chain can be
+	// run again (it was built by what ir::constructor_refusal said of the program's own code, which the
+	// module here no longer has): every class told of is one whose chain can.
+	explicit Constructions(const ir::Module &p_module, bool p_told = false);
 	Constructions(const Constructions &) = delete;
 	Constructions &operator=(const Constructions &) = delete;
 
@@ -58,13 +66,26 @@ public:
 	// class whose objects are not remembered (the library's, one with a Godot base, one whose constructor
 	// takes any number of arguments).
 	size_t room(uint32_t p_class) const { return plans_[p_class].room; }
+	// Whether nothing kept of an object of the class's arguments is counted: each is a number or a Boolean.
+	// Native code may then let go of such an object and make another in its place without a word
+	// (recycled()): its record is emptied with the object, and holds nothing to give up.
+	bool plain_arguments(uint32_t p_class) const { return plans_[p_class].room != 0 && plans_[p_class].plain_arguments; }
+	// Objects of the class are let go of and made again where they are, by native code that tells of
+	// neither: they are not among those counted (size()).
+	void recycled(uint32_t p_class) { plans_[p_class].recycled = true; }
 
 	// A call is being made: if it is the constructor of the class of the object it is called on (not a
 	// `super(...)` call), and that is a class whose objects are remembered, its arguments are kept.
 	// True if they were: constructed() is then owed when the call returns.
 	bool begun(uint32_t p_function, const Slot *p_arguments, size_t p_count) {
-		return owner_[p_function] != ir::NONE && keep_arguments(owner_[p_function], p_arguments, p_count);
+		if (owner_[p_function] == ir::NONE) {
+			return false;
+		}
+		told_of_[owner_[p_function]] = 1;
+		return keep_arguments(owner_[p_function], p_arguments, p_count);
 	}
+	// Whether a construction of an object of the class has ever been told of here.
+	bool told_of(uint32_t p_class) const { return told_of_[p_class] != 0; }
 	// That call returned: the object's fields are kept as its first values.
 	void constructed(Object *p_object);
 	// The object is being freed, or is not to be remembered after all.
@@ -79,7 +100,7 @@ public:
 				give_up(plan, record);
 			}
 			record->kept = NOTHING;
-			used_--;
+			used_ -= plan.recycled ? 0 : 1;
 		}
 	}
 	// The object's record, if what it was constructed with is known from it: all of it, or the arguments
@@ -101,12 +122,16 @@ public:
 	// What the n-th value of a record of an object of the class is: an argument as its parameter holds
 	// it, or a field's first value.
 	ir::Kind kind_of(uint32_t p_class, const Record &p_record, uint32_t p_value) const;
-	size_t size() const { return used_; } // How many objects have one.
-	// The classes, by name, of which an object came here from a program that ran as native code, which
-	// remembers nothing of what objects are made with (vm/reload.h): why such an object has no record.
+	size_t size() const { return used_; } // How many objects have one, but for those of classes that are recycled.
+	// The classes, by name, of which an object came here from a program that ran as native code built to
+	// remember nothing of what objects are made with (vm/reload.h): why such an object has no record.
 	// It is what a reload says, so it is kept for the reloads after, with the names it was given.
 	void made_natively(const std::string &p_class) { native_.insert(p_class); }
 	const std::unordered_set<std::string> &natively_made() const { return native_; }
+	// And those of which an object came from native code that does remember, made while its class's chain
+	// could not be run again: native code tells of no such construction, and keeps no first values.
+	void made_once_natively(const std::string &p_class) { native_once_.insert(p_class); }
+	const std::unordered_set<std::string> &once_natively_made() const { return native_once_; }
 
 	// Whether a value of the kind is one that is kept: a number, a Boolean, text, or nothing at all.
 	static bool plain(ir::Kind p_kind, Slot p_value);
@@ -137,6 +162,7 @@ private:
 		// Its chain can be run again and none of its arguments is looked at: an object's arguments are
 		// copied, and that is all.
 		bool quick = false;
+		bool recycled = false; // See recycled().
 		// In looked_: the arguments to look at, in order, then the fields.
 		uint32_t looked_arguments = 0;
 		uint32_t looked_fields = 0;
@@ -147,7 +173,10 @@ private:
 	std::vector<Plan> plans_; // By class.
 	std::vector<Looked> looked_;
 	size_t used_ = 0;
+	const bool told_;
+	std::vector<uint8_t> told_of_; // By class.
 	std::unordered_set<std::string> native_;
+	std::unordered_set<std::string> native_once_;
 
 	static Record *record_at(Object *p_object, const Plan &p_plan) {
 		return reinterpret_cast<Record *>(&slot_at(p_object, p_plan.at));

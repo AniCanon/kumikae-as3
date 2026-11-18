@@ -50,6 +50,7 @@
 	X(error_stack, Str *, (Context *c, Object *p_error), (c, p_error)) \
 	X(forget_kept, void, (Context *c), (c)) \
 	X(use_class, void, (Context *c, uint32_t p_class), (c, p_class)) \
+	X(constructing, void, (Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count), (c, p_function, p_arguments, p_count)) \
 	X(is_class, bool, (const Context *c, const Object *p_object, uint32_t p_class), (c, p_object, p_class)) \
 	X(thunk, Slot, (Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated), (c, p_thunk, p_given, r_updated)) \
 	X(trace, void, (Context *c, Str *const *p_texts, uint32_t p_count), (c, p_texts, p_count)) \

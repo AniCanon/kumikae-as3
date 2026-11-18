@@ -42,6 +42,8 @@ class FunctionWriter {
 	// The program reads the stack of an error nothing threw: each function keeps a StackFrame, and says
 	// which line it is on before anything that may run code.
 	const bool keeps_stack_;
+	const bool remembers_;
+	std::string told() const; // What tells the host of a construction, in a constructor that does.
 	const Facts *const facts_; // Null while the facts themselves are being found: nothing is known of any callee.
 	std::string body_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
@@ -315,7 +317,9 @@ class FunctionWriter {
 	std::string handlers() const;
 
 public:
-	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts);
+	// p_remembers: a constructor tells the host what its object is constructed with (generate.h, Options).
+	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts,
+			bool p_remembers = false);
 	// The function's definition, and after it its entry (the function called with slots).
 	std::string write();
 	// Once written: whether anything in it can raise an error.

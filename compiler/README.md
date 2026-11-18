@@ -109,6 +109,7 @@ errors, 1 if errors were found, and 2 for bad usage or a file that can't be read
 | `--dump-types` | `check` | Prints the type of each expression statement and initializer as `<line>:<col> <type>`. A type the compiler couldn't work out is `?`. |
 | `--godot` | `ir`, `cpp` | Treats the files as scripts for Godot: loads Godot's API and expects no class to start the program. |
 | `--unit` | `cpp` | Writes the whole program into `program.cpp`. |
+| `--remember` | `cpp` | Makes each constructor tell the host what its object was built with, so that hot reload can update objects created as native code. For a game that is being edited. Without it, the C++ is the same to the byte. |
 | `--stdio` | `lsp` | Accepted and ignored. Some editors add it. |
 
 ### Run a program
@@ -128,7 +129,7 @@ An error that nothing catches goes to standard error with an AS3 stack trace, an
 | `KAS3_TIME_LIMIT_MS` | The time after which a run is stopped with Error #1502. The default is 15 seconds, as in Flash. `0` means no limit. A program built as a plain executable reads it too. |
 | `KAS3_NOW` | Fixes the time `Date` reads, in milliseconds since 1970, so that a test prints the same text every run. `TZ` sets the time zone. |
 | `KAS3_REPORT_LEAKS` | Reports objects and strings still alive when the program ends, and exits with status 3. The test suite sets it. |
-| `KAS3_REMEMBER_CONSTRUCTIONS` | Turns on the record hot reload keeps of constructor arguments, to measure its cost. |
+| `KAS3_REMEMBER_CONSTRUCTIONS` | Turns on the record hot reload keeps of constructor arguments, to measure its cost. A program built as a plain executable reads it too, and keeps the record if it was written with `--remember`. |
 | `KAS3_STACK_KB` | The stack size of the thread a program runs on, in kilobytes. The default is 512 MB, so that the call-depth limit ends a runaway recursion before the stack does. |
 
 ### Write a program as C++

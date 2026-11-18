@@ -593,9 +593,10 @@ class Token {
 
 def restart_test(label, native=False):
     """Runs restart.gd in a copy of the project. With `native`, the game starts as native code, by the library
-    Play built in a run before: the first edit moves it onto the interpreter, and the one object that was
-    made before it (as native code, which remembers nothing of what objects are made with) is not updated
-    in place by the edit after: that is said, and a restart shows the new code on it as on the rest."""
+    Play built in a run before, which tells what its objects are made with: the first edit moves it onto the
+    interpreter, and the object that was made before it, as native code, is updated in place like any
+    other. There the first edit changes the constant too, so that the object's first values are what the
+    native constructor gives for its arguments, run again; the edit after changes it once more."""
     with tempfile.TemporaryDirectory() as edited:
         copy = os.path.join(edited, "project")
         shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
@@ -608,7 +609,8 @@ def restart_test(label, native=False):
         unused = "\n\tpublic var unused:int;"
         first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";\n\tpublic static const WIDTH:Number = %s;"
         made = "\n\tpublic var made:String = \"%s\";"
-        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a", 24), "one", ' + "!"'),
+        early = 26 if native else 24  # The width as the first edit has it.
+        for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a", early), "one", ' + "!"'),
                            "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"'),
                            "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made'),
                            "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made')}.items():
@@ -623,20 +625,15 @@ def restart_test(label, native=False):
         run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 13, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 15, output[-1500:])
         check("%s: the game %s" % (label, "starts as native code" if native else "runs on the interpreter"), (play_godot.USED in output) == native, output[:900])
-        # What native code made is not updated in place: it keeps the width it was made with.
-        in_place = "a constant edited: an object alive that was made from it is updated in place"
         for name, got, want in values:
-            if native and name == in_place:
-                check("%s: an object made as native code is not updated in place" % label, got == "24.0", "got %r" % got)
-            else:
-                check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told what was updated in place, and what was not and why" % label,
-              ("ActionScript: objects not updated in place: Restart (it extends Godot's Node2D), Token (an object of it was made while the scripts ran "
-               "as native code, which does not remember what objects are made with). Restart the scene to see the new code on those." if native else
-               "ActionScript: objects updated in place: Token. Not updated: Restart (it extends Godot's Node2D). "
-               "Restart the scene to see the new code on those.") in output, output[-1500:])
+            # The width after the first edit is the driver's to show and this test's to know: an object
+            # native code made takes the constant that edit changed, and keeps what the game gave it.
+            want = "%d.0" % early if name == "the first edit: the width of an object alive" else want
+            check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
+        told = "ActionScript: objects updated in place: Token. Not updated: Restart (it extends Godot's Node2D). Restart the scene to see the new code on those."
+        check("%s: Godot is told what was updated in place, and what was not and why" % label, output.count(told) >= (2 if native else 1), output[-1500:])
         if native:
             check("%s: the libraries built ahead end, and none fails" % label, play_godot.settled(copy) and
                   not glob.glob(os.path.join(play_godot.cache(copy), "*.failed")), str(play_godot.held(copy)))

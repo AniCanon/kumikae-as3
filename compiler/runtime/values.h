@@ -39,7 +39,8 @@ struct StackFrame {
 };
 
 // Objects let go of, kept to be the next ones made (rule 14: objects from free lists by size): for each
-// number of fields, a list of blocks through `gc_next`. Only objects of classes that hold nothing counted
+// number of slots (an object's fields, and the room after them where the host remembers what objects are
+// constructed with), a list of blocks through `gc_next`. Only objects of classes that hold nothing counted
 // and that the collector does not look at are kept (Context::class_cached), so one let go of has nothing
 // to give up; each block is the heap's own, and goes back to it when the host ends.
 struct ObjectCache {
@@ -57,6 +58,9 @@ struct Context {
 	// (runtime/time_limit.h): a function reads it once in ROUNDS times round its loops (alarmed), and asks
 	// overdue() when it is set.
 	std::atomic<bool> alarm{ false };
+	// The host remembers what objects are constructed with (vm/constructions.h): a program library built
+	// to tell says so as a constructor begins (constructing).
+	bool remembers = false;
 	Slot pending{}; // What was thrown, untyped, with a reference of its own.
 	uint32_t depth = 0; // Generated functions in progress.
 	// Where the thread's stack is nearly used up, as an address: a function whose frame is below it does
@@ -88,7 +92,7 @@ struct Context {
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;
 	Host *host = nullptr;
-	// The host's cache of objects, and for each class 0, or one more than its number of fields if its
+	// The host's cache of objects, and for each class 0, or one more than its number of slots if its
 	// objects are kept there.
 	ObjectCache *cache = nullptr;
 	const uint8_t *class_cached = nullptr;

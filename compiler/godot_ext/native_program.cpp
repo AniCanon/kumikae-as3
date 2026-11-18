@@ -315,7 +315,7 @@ std::string NativeProgram::path() {
 }
 
 std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, const ir::Module &p_module, GodotHost &p_engine, uint32_t p_time_limit,
-		std::string *r_why) {
+		bool p_remember, std::string *r_why) {
 	std::unique_ptr<NativeProgram> made(new NativeProgram(p_engine));
 	if (!made->library_.open(p_path, r_why)) {
 		return nullptr;
@@ -338,6 +338,7 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 	}
 	rt::Embedder embedder{ p_engine, p_engine, p_engine, p_engine, &p_module };
 	embedder.time_limit = p_time_limit;
+	embedder.remember = p_remember;
 	made->host_ = std::make_unique<rt::Host>(*program, embedder);
 	made->resolve(*program);
 	return made;

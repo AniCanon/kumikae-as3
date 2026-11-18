@@ -97,12 +97,20 @@ Interpreter::~Interpreter() {
 	}
 }
 
-void Interpreter::remember_constructions() {
+void Interpreter::remember_constructions(bool p_native_tells) {
 	// What is remembered is kept in room an object is made with: one made before has none. Native code
-	// keeps freed objects to use again, and tells nobody.
-	if (!constructions_ && !heap_.sized() && !native_) {
-		constructions_ = std::make_unique<Constructions>(module_);
+	// runs constructors the interpreter does not see: nothing is remembered of its objects unless it tells
+	// (constructing()), and then it keeps no freed object to use again.
+	if (!constructions_ && !heap_.sized() && (!native_ || p_native_tells)) {
+		constructions_ = std::make_unique<Constructions>(module_, native_ != nullptr);
 		heap_.constructions = constructions_.get();
+	}
+}
+
+void Interpreter::constructing(uint32_t p_function, const Slot *p_arguments, size_t p_count) {
+	if (constructions_ && p_function < module_.functions.size()) {
+		// What its first values are is the chain's to say again: native code tells of no other class.
+		(void)constructions_->begun(p_function, p_arguments, p_count);
 	}
 }
 
@@ -186,7 +194,8 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	if (rest) {
 		stack_[frame.base + fixed].p = rest; // Its one reference, the frame's.
 	}
-	if (constructions_) {
+	// (A frame whose body is native code is told of by that code, where it is built to tell.)
+	if (constructions_ && !native_) {
 		frame.constructs = constructions_->begun(p_function, source, p_count);
 	}
 	frames_.push_back(frame);

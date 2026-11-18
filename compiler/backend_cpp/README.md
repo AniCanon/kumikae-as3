@@ -22,6 +22,11 @@ With `--unit` (`Options::one_unit`), every class's code goes into `program.cpp`.
 form, because the C++ compiler then sees every function at once and can inline small ones. One file for
 each class suits development, where only what an edit changed is rebuilt.
 
+With `--remember` (`Options::remembers`), the constructor of a class whose constructors can be run again
+tells the host what its object is built with, so that hot reload can update objects created as native
+code. See [the runtime](../runtime/README.md#what-objects-are-constructed-with). Without the option the
+output is the same to the byte.
+
 ## Files
 
 | Files | Job |

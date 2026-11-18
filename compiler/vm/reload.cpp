@@ -31,6 +31,9 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 		for (const std::string &name : from_.constructions_->natively_made()) {
 			to_.constructions_->made_natively(name);
 		}
+		for (const std::string &name : from_.constructions_->once_natively_made()) {
+			to_.constructions_->made_once_natively(name);
+		}
 	}
 }
 

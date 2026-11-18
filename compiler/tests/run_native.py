@@ -27,6 +27,11 @@ The programs of run/stopped/ never end by themselves: each is built the same way
 second for a call (KAS3_TIME_LIMIT_MS=100). It must be stopped by Error #1502 as the interpreter stops it:
 status 1, X.out on standard output, and standard error that begins with X.err.
 
+A set of programs that make objects in every way is built once more with `kas3c cpp --remember`, as Play
+builds a game that is being edited, and run with KAS3_REMEMBER_CONSTRUCTIONS set: what each object is
+constructed with is then remembered, in room made with the object, and the program must print the same and
+leave nothing alive.
+
 deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
 (KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash. So is callbacks_nest, whose
 calls pass through the library's own.
@@ -124,11 +129,11 @@ def expected(path, missing=""):
     return open(path).read() if os.path.exists(path) else missing
 
 
-def build(files, sources_in, out):
+def build(files, sources_in, out, more=()):
     """The files as an executable in out: ("", what kas3c said), ("skipped", operation) or ("failed", why)."""
     shutil.rmtree(out, ignore_errors=True)
     name = os.path.basename(out)
-    written = step("%s: kas3c cpp" % name, [kas3c, "cpp", *given["--unit"], *files, "-o", out], 120, cwd=sources_in)
+    written = step("%s: kas3c cpp" % name, [kas3c, "cpp", *given["--unit"], *more, *files, "-o", out], 120, cwd=sources_in)
     if written is None:
         return "failed", "kas3c cpp took more than 120 seconds"
     lines = written.stderr.splitlines()
@@ -199,8 +204,49 @@ def stopped(name):
     return ("failed", "\n".join(problems)) if problems else ("passed", "")
 
 
+# Programs that make objects in every way: with defaults and without, of classes that extend others, with
+# text, objects and untyped values for arguments, in loops that let them go, by the library and by name.
+REMEMBERED = ("classes", "class_setup_order", "class_statics", "class_values", "closures", "errors", "field_classes", "last_use",
+              "loops_counted", "object_calls", "rest_parameters", "static_const_still", "statics", "vector_of_object", "virtual_calls")
+
+
+# Those of them that make objects of a class whose constructors can be run again: the host must have been told.
+TELLING = ("remembered/class_values", "remembered/static_const_still", "remembered/virtual_calls")
+
+
+def remembered(name):
+    """A program (named "remembered/X") built to tell what its objects are constructed with, and run with that
+    remembered: ("passed", "") if it does what it does without, or ("failed", why)."""
+    base = os.path.join(folder, name[len("remembered/"):])
+    out = os.path.join(work, name.replace("/", "_"))
+    what, said = build([os.path.basename(base) + ".as"], folder, out, ["--remember"])
+    if what:
+        return "failed", "%s: %s" % (what, said)
+    try:
+        ran = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, cwd=folder, timeout=120,
+                             env=dict(environment, KAS3_REMEMBER_CONSTRUCTIONS="1"))
+    except subprocess.TimeoutExpired:
+        return "failed", "it ran for more than 120 seconds"
+    problems = []
+    if ran.stdout != expected(base + ".out"):
+        problems.append("--- output expected\n%s--- output\n%s" % (expected(base + ".out"), ran.stdout))
+    if said + ran.stderr != expected(base + ".err"):
+        problems.append("--- errors expected\n%s--- errors\n%s" % (expected(base + ".err"), said + ran.stderr))
+    fails = any(": warning: " not in line for line in expected(base + ".err").splitlines())
+    if ran.returncode != (1 if fails else 0):
+        problems.append("exit %d" % ran.returncode)
+    # That it was remembered at all: the host says how many constructions it was told of.
+    counted = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, cwd=folder, timeout=120,
+                             env=dict(environment, KAS3_REMEMBER_CONSTRUCTIONS="1", KAS3_NATIVE_COUNTS="1"))
+    told = [line for line in counted.stderr.splitlines() if line.startswith("kas3:   told of ")]
+    if len(told) != 1 or (name in TELLING and told[0].startswith("kas3:   told of 0 ")):
+        problems.append("the host does not say what it was told: %s" % counted.stderr[-300:])
+    return ("failed", "\n".join(problems)) if problems else ("passed", "")
+
+
 names = sorted({os.path.splitext(os.path.basename(path))[0]
                 for path in glob.glob(os.path.join(folder, "*.as")) + glob.glob(os.path.join(folder, "*.args"))})
+names += ["remembered/" + name for name in REMEMBERED]
 names += sorted("stopped/" + os.path.splitext(os.path.basename(path))[0] for path in glob.glob(os.path.join(folder, "stopped", "*.as")))
 if given["--only"]:
     names = [name for name in names if name in given["--only"]]
@@ -208,7 +254,8 @@ includes = [flag for folder_ in given["--include"] for flag in ("-I", folder_)]
 headers = precompiled()
 jobs = int(given["--jobs"][0]) if given["--jobs"] else min(MOST_JOBS, os.cpu_count() or MOST_JOBS)
 with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-    outcomes = dict(zip(names, pool.map(lambda name: stopped(name) if name.startswith("stopped/") else one(name), names)))
+    run_one = lambda name: stopped(name) if name.startswith("stopped/") else remembered(name) if name.startswith("remembered/") else one(name)
+    outcomes = dict(zip(names, pool.map(run_one, names)))
 
 failures = ["%s\n%s" % (name, why) for name, (what, why) in outcomes.items() if what == "failed"]
 skipped = {name: why for name, (what, why) in outcomes.items() if what == "skipped"}

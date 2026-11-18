@@ -48,6 +48,9 @@ struct Embedder {
 	const ir::Module *module = nullptr;
 	// How long a call from outside may run before Error #1502 stops it, in milliseconds: 0 for no limit.
 	uint32_t time_limit = 0;
+	// What objects are constructed with is remembered, where the program library is built to tell
+	// (Program::remembers): for a game whose scripts can be reloaded (vm/constructions.h).
+	bool remember = false;
 };
 
 // The module the interpreter is given, made from the program's table: its classes, globals and strings by
@@ -142,6 +145,7 @@ struct Host final : vm::NativeCode {
 	std::vector<uint64_t> thunk_counts;
 	std::vector<uint32_t> unresolved;
 	uint64_t handle_copies = 0;
+	uint64_t told = 0; // Constructions generated code told of, where what objects are made with is remembered.
 	uint64_t (*object_lookups)() = nullptr;
 	void say_counts() const;
 	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,

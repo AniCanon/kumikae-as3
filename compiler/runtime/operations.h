@@ -45,6 +45,10 @@ namespace rt {
 // values.
 //     void use_class(Context *c, uint32_t p_class);
 //     bool is_class(const Context *c, const Object *p_object, uint32_t p_class);
+// A constructor begins (the function by its number), called with these arguments, the object first: asked
+// only where the host remembers what objects are constructed with (Context::remembers), by a program
+// library built to tell (Program::remembers), so that a reload can update the object in place.
+//     void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count);
 
 // An operation carried out by the library the interpreter has (runtime/thunks.cpp): p_given are the values
 // its ThunkInfo says are handed in, each a whole slot; they stay the caller's. What it hands back is the

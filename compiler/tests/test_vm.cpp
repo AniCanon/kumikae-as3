@@ -1860,6 +1860,9 @@ struct Edited {
 	bool godot = false; // The sources name Godot's classes.
 	bool remember = true;
 	vm::NativeCode *native = nullptr; // Stands for a program's native code, which this one does not run.
+	// That native code is built to tell what its objects are constructed with (a program library built with
+	// --remember): the test tells for it (told()), since the interpreter runs the constructors here.
+	bool native_tells = false;
 	// The old program's objects are let go of as soon as they are moved, as Godot's host lets go of each
 	// instance's: they are gone by the time the objects alive are updated.
 	bool let_go_early = false;
@@ -1886,7 +1889,7 @@ struct Edited {
 			program->set_native(native);
 		}
 		if (remember) {
-			program->remember_constructions();
+			program->remember_constructions(native_tells);
 		}
 		CHECK(program->start());
 		game = program->construct(class_named(*module, "Game"), nullptr);
@@ -1935,6 +1938,17 @@ struct Edited {
 	void call(const char *p_method) {
 		vm::Slot result;
 		CHECK(program->call_method(game, p_method, nullptr, 0, &result));
+	}
+	// What native code says as the constructor of the object a field of the game holds begins: the
+	// arguments it was called with, after the object itself.
+	void told(const char *p_field, std::vector<vm::Slot> p_arguments) {
+		vm::Object *made = static_cast<vm::Object *>(field(p_field).p);
+		CHECK(made != nullptr);
+		vm::Slot self;
+		self.bits = 0;
+		self.p = made;
+		p_arguments.insert(p_arguments.begin(), self);
+		program->constructing(module->classes[made->klass].constructor, p_arguments.data(), p_arguments.size());
 	}
 	// An object of the class, made by the host as Godot makes a script's, held by a field of the game.
 	void hold(const char *p_field, const char *p_class) {
@@ -2216,7 +2230,7 @@ static void test_reload_from_native() {
 	native.statics[global("Late.v")].i = 9;
 	native.used[class_named(*edited.module, "Game")] = 1;
 	native.used[class_named(*edited.module, "Late")] = 1;
-	const std::string natively = "an object of it was made while the scripts ran as native code, which does not remember what objects are made with";
+	const std::string natively = "an object of it was made while the scripts ran as native code that does not remember what objects are made with";
 	const std::string next = with(source, "N:Number = 1", "N:Number = 5");
 	CHECK_EQ(edited.edit(next), "updated:; Game: Game() makes an object; Shot: " + natively);
 	edited.call("look");
@@ -2232,6 +2246,101 @@ static void test_reload_from_native() {
 	CHECK_EQ(edited.edit(with(next, "N:Number = 5", "N:Number = 8")), std::string("updated: Shot; Game: Game() makes an object"));
 	CHECK_EQ(edited.number("kept.n"), 12.0);
 	edited.end();
+}
+
+// The same where the native code tells what its objects are constructed with, as a program library built
+// for a game that is being edited does: an object made as native code has its arguments remembered, in the
+// room every object is made with, and the reload onto the interpreter updates it in place as it does an
+// object the interpreter made. Its first values are what the old program's chain gives for the arguments,
+// run again by the old program. A class whose chain could not be run again as the library was built is
+// told of by nobody, and says so; an object made with an object for an argument says that.
+static void test_reload_from_native_that_tells() {
+	const std::string source =
+			"package { public class Game { public var kept:Shot = new Shot(2); public var moved:Shot = new Shot(3, \"m\");\n"
+			"  public var loud:Loud = new Loud(1); public var held:Holder = new Holder(kept);\n"
+			"  public function push():void { moved.n = 99; } public function more():void { kept = new Shot(4); } } }\n"
+			"class K { public static const N:Number = 1; public static const TAG:String = \"-\"; }\n"
+			"class Shot { public var n:Number; public var tag:String;\n"
+			"  public function Shot(p:Number, t:String = \"s\") { n = p + K.N; tag = t + K.TAG; } }\n"
+			"class Loud { public var n:Number; public function Loud(p:Number) { n = p + K.N; trace(\"loud\"); } }\n"
+			"class Holder { public var n:Number; public function Holder(of:Shot) { n = K.N; } }\n";
+	struct Native final : vm::NativeCode {
+		std::vector<vm::Slot> statics;
+		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+		void clear_globals() override {}
+		vm::Slot *global(uint32_t p_index) override { return &statics[p_index]; }
+		bool statics_given(uint32_t) const override { return true; }
+		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+	};
+	const auto number = [](double p_value) {
+		vm::Slot slot;
+		slot.bits = 0;
+		slot.d = p_value;
+		return slot;
+	};
+	for (const bool early : { false, true }) {
+		Native native;
+		Edited edited;
+		edited.native = &native;
+		edited.native_tells = true;
+		edited.host_remembers = true;
+		edited.let_go_early = early;
+		// The static fields are native code's: here, what the interpreter standing for it gave them.
+		edited.start(source);
+		const auto global = [&](const char *p_name) {
+			const auto found = std::find_if(edited.module->globals.begin(), edited.module->globals.end(), [&](const ir::Global &p_global) { return p_global.name == p_name; });
+			CHECK(found != edited.module->globals.end());
+			return static_cast<size_t>(found - edited.module->globals.begin());
+		};
+		native.statics.assign(edited.module->globals.size(), vm::Slot{});
+		vm::Str *const dash = vm::new_string("-");
+		native.statics[global("K.N")].d = 1;
+		native.statics[global("K.TAG")].p = dash;
+		// Nothing is remembered of a constructor the interpreter ran under native code: only what is told.
+		CHECK(edited.program->remembers());
+		CHECK_EQ(edited.program->remembered(), (size_t)0);
+		vm::Slot tag;
+		tag.bits = 0;
+		tag.p = vm::new_string("m");
+		edited.told("kept", { number(2) });
+		edited.told("moved", { number(3), tag });
+		edited.told("held", { edited.field("kept") }); // An object for an argument: told of, and not remembered.
+		if (vm::release(static_cast<vm::Str *>(tag.p))) {
+			vm::free_string(static_cast<vm::Str *>(tag.p));
+		}
+		CHECK_EQ(edited.program->remembered(), (size_t)2);
+		edited.call("push"); // The game changes a field of one.
+		const std::string once = "an object of it was made while the scripts ran as native code, by a constructor that could not be run again then";
+		const std::string not_plain = "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null";
+		const std::string next = with(with(source, "N:Number = 1", "N:Number = 5"), "TAG:String = \"-\"", "TAG:String = \"+\"");
+		CHECK_EQ(edited.edit(next), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: Loud() prints");
+		CHECK_EQ(edited.number("kept.n"), 7.0); // 2 and the constant's 5.
+		CHECK_EQ(edited.text("kept.tag"), std::string("s+")); // Its default, given again.
+		CHECK_EQ(edited.number("moved.n"), 99.0); // What the game gave it is kept.
+		CHECK_EQ(edited.text("moved.tag"), std::string("m+"));
+		CHECK_EQ(edited.number("loud.n"), 2.0);
+		CHECK_EQ(edited.number("held.n"), 1.0);
+		// A second edit starts from what the first gave; the field the game changed is still the game's.
+		const std::string third = with(next, "N:Number = 5", "N:Number = 6");
+		CHECK_EQ(edited.edit(third), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: Loud() prints");
+		CHECK_EQ(edited.number("kept.n"), 8.0);
+		CHECK_EQ(edited.number("moved.n"), 99.0);
+		// An edit that lets Loud's constructor be run again: the object made as native code has nothing
+		// remembered, since nobody told of it, and that is what is said.
+		const std::string quiet = with(with(third, " trace(\"loud\");", ""), "N:Number = 6", "N:Number = 7");
+		CHECK_EQ(edited.edit(quiet), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: " + once);
+		CHECK_EQ(edited.number("loud.n"), 2.0);
+		CHECK_EQ(edited.number("kept.n"), 9.0);
+		// One made since, by the interpreter, is remembered as any of its own.
+		edited.call("more");
+		CHECK_EQ(edited.number("kept.n"), 11.0);
+		CHECK_EQ(edited.edit(with(quiet, "N:Number = 7", "N:Number = 8")), "updated: Shot; Game: Game() makes an object; Holder: " + not_plain + "; Loud: " + once);
+		CHECK_EQ(edited.number("kept.n"), 12.0);
+		if (vm::release(dash)) {
+			vm::free_string(dash);
+		}
+		edited.end();
+	}
 }
 
 // Which objects are remembered at all, and that what is remembered of one goes with it however it ends: a
@@ -3941,6 +4050,7 @@ int main() {
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
 	test_reload_from_native();
+	test_reload_from_native_that_tells();
 	test_reload_in_place_kept();
 	test_reload_in_place_turns();
 	test_reload_in_place_early();
