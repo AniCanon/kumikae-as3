@@ -346,6 +346,8 @@ bool Host::run() {
 	if (entry == NONE) {
 		return true;
 	}
+	// The entry class set up, made and constructed: one call from outside, as the interpreter makes it.
+	interpreter->entered();
 	if (!class_used[entry]) {
 		use_class(entry, false);
 	}
@@ -360,10 +362,9 @@ bool Host::run() {
 		std::vector<Slot> arguments(constructor.parameters, empty());
 		arguments[0] = made;
 		Slot none = empty();
-		interpreter->entered();
 		constructor.entry(&context, arguments.data(), 1, &none);
-		interpreter->left();
 	}
+	interpreter->left();
 	const bool ran = !context.failing;
 	if (!ran) {
 		report();
