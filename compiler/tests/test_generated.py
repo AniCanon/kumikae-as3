@@ -22,7 +22,9 @@ timings rest on, so that a change that undoes one fails here and not only in a b
   - a loop can be stopped when a call has run too long (Error #1502), and a loop counted by a whole number
     against a bound that stays as it is pays nothing for that each round: its test is one comparison, of
     the counter and the end of a stretch, and the host's alarm is looked at where a stretch ends. A counter
-    that goes up to a vector's own length is an index of the vector with nothing more asked.
+    that goes up to a vector's own length is an index of the vector with nothing more asked;
+  - a sum of whole numbers handed on untyped (pushed onto an Array) is the int it is by integer arithmetic,
+    whatever the C++ compiler makes of the loop it is in.
 """
 import os
 import re
@@ -172,6 +174,19 @@ with tempfile.TemporaryDirectory() as where:
         check("a constant of the function's own class is read once, before its loops", re.search(r"^\tconst int32_t g\d+ = c->globals\[\d+\]\.i;$", both, re.M) and
               len(re.findall(r"^\tconst int32_t g\d+ = ", both, re.M)) == 1, both)
         check("a constant of a class the function sets up itself is read after it is set up", "use_class(c, " in inside and "c->globals[" in inside, both)
+
+with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/ArrayConversion.as", "frames/Alloc.as", "-o", where], capture_output=True,
+                             text=True, cwd=sources)
+    check("the frame benchmarks' scripts are written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        process = functions(where, "frames_ArrayConversion.cpp").get("frames_ArrayConversion__process", "")
+        pushes = [loop for loop in loops(process) if "number_any(" in loop]
+        check("the loop that pushes sums of two ints is found", len(pushes) >= 1, process)
+        for loop in pushes:
+            check("a sum of whole numbers handed on untyped is an int by integer arithmetic",
+                  re.search(r"if \(const int64_t n = \(static_cast<int64_t>\(r\d+\) \+ static_cast<int64_t>\(r\d+\)\); KAS3_LIKELY\(n != 0 && ", loop), loop)
 
 for failure in failures:
     print("FAIL " + failure[:2500])

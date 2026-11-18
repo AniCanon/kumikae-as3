@@ -80,7 +80,7 @@ to give a wrong answer if the proof were wrong.
 | Fields in locals | A number or Boolean field of `this` that a loop uses stays in a local. Memory is updated only around code that could see the field another way. | `tests/run/field_in_loop.as` |
 | Static fields in locals | A static number or Boolean that a function reads and never writes is read once. A constant of the function's own class is read once whatever the function runs. | `tests/run/static_still.as`, `tests/run/static_const_still.as` |
 | Counted loops | A loop counted by a whole number against a bound that stays the same (`for (i = 0; i < n; i++)`) is held to stretches of `ROUNDS` steps, worked out where a stretch begins. Each round costs one comparison, as before, and the alarm is looked at where a stretch ends. | `tests/run/loops_counted.as`, `tests/run/stopped/` |
-| Indexes held to a stretch | In a loop's copy with locals, a stretch ends no further on than the vectors the counter indexes. An element read or stored under the counter then needs no test of its own. | `tests/run/loops_counted.as` |
+| Indexes held to a stretch | In a loop's copy with locals, a stretch ends no further on than the vectors the counter indexes. An element read or stored under the counter then needs no test of its own. | `tests/run/loops_counted.as`, `tests/run/loops_vector_end.as` |
 | Fields through the class's struct | Tells the C++ compiler which field of which class a read or write touches. | `tests/run/field_classes.as` |
 | Loops over vectors | A loop that reads and writes vectors of numbers is written twice. The first copy keeps each vector's length and elements in locals. An index out of range jumps to the second copy, which is the loop as written. | `tests/run/vector_loops.as` |
 | Narrow vector elements | An element of a `Vector.<int>` is read and written as four bytes. | `tests/run/vector_narrow.as` |
@@ -89,6 +89,7 @@ to give a wrong answer if the proof were wrong.
 | Objects that end alone | Releasing an object that holds only numbers, Booleans and strings runs no other code. | `tests/run/last_use.as` |
 | Recycled objects | `new` of such a class takes a block the host kept when one was released. | [runtime](../runtime/README.md) |
 | 32-bit integer sums | A sum of `int`s stored back into an `int` is computed in 32 bits, which is exact. | |
+| Whole sums held untyped | A sum of `int`s and `uint`s stored where no type is declared (an element of an `Array`, a `*`) is the `int` it is, by integer arithmetic. | `tests/run/whole_untyped.as` |
 | Machine math | `Math.sqrt`, `abs`, `floor` and `ceil` are the processor's own instructions. | |
 
 ### Calls into Godot

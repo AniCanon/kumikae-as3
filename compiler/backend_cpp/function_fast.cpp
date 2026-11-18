@@ -197,6 +197,13 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");
 				return true;
 			}
+			// A sum of whole numbers is read as the integer it is (function_whole.cpp): an int, unless it is
+			// past an int's range. Nothing: a sum of nothing may be -0, which is the Number's to say.
+			if (const std::string &sum = whole_[p_in.b].exact; !sum.empty()) {
+				line("if (const int64_t n = " + sum + "; KAS3_LIKELY(n != 0 && n >= INT32_MIN && n <= INT32_MAX)) {");
+				put(p_in.a, "to_any(c, static_cast<int32_t>(n))");
+				line("} else");
+			}
 			line("if (Slot w = empty(); number_any(c, " + reg(p_in.b) + ", &w)) {");
 			put(p_in.a, "w");
 			break;
