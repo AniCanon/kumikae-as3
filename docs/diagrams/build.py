@@ -241,8 +241,76 @@ def roadmap():
     s.save("roadmap.svg")
 
 
+def layers():
+    s = Svg(1000, 470, "What each folder of the compiler may include")
+    s.text(40, 48, "What each folder of the compiler may include", size=20, weight="bold")
+    s.text(40, 72, "An arrow points from a folder to a folder it may include. Nothing else crosses.",
+           size=13, fill=MUTED)
+
+    s.box(40, 200, 160, 64, ["src/", "front end"])
+    s.box(40, 90, 160, 64, ["lsp/", "language server"])
+    s.box(290, 200, 160, 64, ["ir/", "typed IR and lowerer"])
+    s.box(540, 120, 160, 64, ["vm/", "interpreter and library"])
+    s.box(540, 280, 160, 64, ["backend_cpp/", "writes the IR as C++"])
+    s.box(790, 120, 170, 64, ["runtime/", "what generated C++", "is built against"])
+    s.box(790, 280, 170, 64, ["godot_ext/", "the Godot extension"])
+
+    s.arrow([(120, 154), (120, 198)])
+    s.arrow([(290, 232), (202, 232)])
+    s.arrow([(540, 152), (495, 152), (495, 220), (452, 220)])
+    s.arrow([(540, 312), (495, 312), (495, 244), (452, 244)])
+    s.arrow([(790, 152), (702, 152)])
+    s.arrow([(875, 280), (875, 186)])
+    s.arrow([(790, 312), (702, 312)])
+
+    s.box(790, 390, 170, 50, ["godot-cpp", "Godot's C++ bindings"])
+    s.arrow([(875, 344), (875, 388)])
+    s.text(40, 320, "Godot's API reaches src/ as AS3", size=12, fill=MUTED)
+    s.text(40, 337, "declarations, never as a header.", size=12, fill=MUTED)
+    s.text(540, 384, "Generated C++ includes", size=12, fill=MUTED)
+    s.text(540, 401, "runtime/kas3.h and nothing else.", size=12, fill=MUTED)
+    s.text(290, 300, "godot_ext/ may also include", size=12, fill=MUTED)
+    s.text(290, 317, "vm/, ir/ and src/.", size=12, fill=MUTED)
+    s.save("layers.svg")
+
+
+def plugin():
+    s = Svg(1100, 500, "The parts of the JetBrains plugin")
+    s.text(40, 48, "The parts of the JetBrains plugin", size=20, weight="bold")
+    s.text(40, 72, "The IDE shows things. The compiler, Godot and the Simulator stay separate programs.",
+           size=13, fill=MUTED)
+
+    s.frame(40, 100, 330, 360, "The plugin, inside Rider or IntelliJ IDEA")
+    s.box(70, 140, 270, 70, ["Language support", "LSP client, typing help, highlighting"])
+    s.box(70, 240, 270, 70, ["Project and run tools", "wizard, run configurations,", "test runner, settings and scene editors"])
+    s.box(70, 340, 270, 70, ["Simulator panel", "the device's screen, input, console"])
+
+    s.box(520, 140, 220, 70, ["kas3c lsp", "the compiler as a language server"])
+    s.arrow([(340, 175), (518, 175)])
+    s.text(430, 165, "LSP, standard I/O", size=12, anchor="middle", fill=MUTED)
+
+    s.box(520, 240, 220, 70, ["Godot and the test runner", "started as processes"])
+    s.arrow([(340, 275), (518, 275)])
+
+    s.box(520, 340, 220, 70, ["Simulator service", "core/: one session,", "local HTTP with a token"])
+    s.arrow([(340, 375), (518, 375)])
+    s.box(520, 432, 220, 44, ["simulator.py", "a command-line client"])
+    s.arrow([(630, 432), (630, 412)])
+
+    s.box(850, 290, 210, 64, ["xcrun simctl", "boot, install, launch, logs"])
+    s.box(850, 390, 210, 64, ["simulator-bridge", "Swift helper: live screen, input"])
+    s.arrow([(740, 360), (800, 360), (800, 322), (848, 322)])
+    s.arrow([(740, 390), (800, 390), (800, 422), (848, 422)])
+    s.box(850, 140, 210, 70, ["iOS Simulator", "the running device"])
+    s.arrow([(955, 290), (955, 212)])
+    s.arrow([(1060, 422), (1080, 422), (1080, 175), (1062, 175)])
+    s.save("plugin.svg")
+
+
 if __name__ == "__main__":
     pipeline()
     calls()
     hot_reload()
     roadmap()
+    layers()
+    plugin()
