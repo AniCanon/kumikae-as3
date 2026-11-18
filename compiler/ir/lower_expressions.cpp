@@ -446,6 +446,9 @@ uint32_t Expressions::unary(Unary *p_unary, Kind p_want) {
 			return l_.any_typeof(p_unary->operand, position);
 		case TokenKind::KwDelete:
 			return Dynamic(l_).remove(p_unary);
+		case TokenKind::KwVoid: // `void x` works x out and is undefined.
+			l_.effect(p_unary->operand);
+			return l_.empty_untyped(l_.compilation_.any_type(), position);
 		case TokenKind::Bang: {
 			uint32_t out = l_.reg(Kind::Bool);
 			l_.emit(Op::Not, position, out, l_.expression(p_unary->operand, Kind::Bool));

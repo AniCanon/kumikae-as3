@@ -9,6 +9,11 @@ package {
 			trace(text);
 			still();
 			trace([nothing(), 1].length, [nothing()][0] === undefined);
+			var count:int = 0;
+			trace(void 0, void count++, count, typeof void 0, (void 0) === undefined);
+			void count++;
+			var cleared:* = void count;
+			trace(count, cleared, "is " + void 0);
 		}
 
 		private function nothing():void {}
