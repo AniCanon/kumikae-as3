@@ -10,25 +10,24 @@ C#, run in a release export of Godot 4.7 on macOS (Apple silicon).
 
 | Benchmark | What it stresses | C# | AS3 native | AS3 / C# |
 |---|---|---|---|---|
-| `move_nodes` | One script moves 20,000 nodes | 907 | 999 | 1.10x |
-| `per_node_process` | A script on every node | 2,518 | 2,248 | 0.89x |
-| `signal_traffic` | 20,000 signals a frame | 1,608 | 1,536 | 0.96x |
-| `ray_queries` | Physics ray queries | 2,098 | 2,071 | 0.99x |
-| `array_conversion` | Arrays handed to Godot | 460 | 329 | 0.72x |
-| `nbody` | Floating-point math on objects | 96 | 90 | 0.94x |
-| `sieve` | Integer arrays | 585 | 568 | 0.97x |
-| `saxpy` | Number arrays | 439 | 309 | 0.70x |
-| `shapes` | Overridden methods | 168 | 94 | 0.56x |
-| `alloc` | 20,000 short-lived objects a frame | 111 | 109 | 0.98x |
+| `move_nodes` | One script moves 20,000 nodes | 891 | 889 | 1.00x |
+| `per_node_process` | A script on every node | 2,452 | 2,171 | 0.89x |
+| `signal_traffic` | 20,000 signals a frame | 1,593 | 1,531 | 0.96x |
+| `ray_queries` | Physics ray queries | 2,049 | 2,078 | 1.01x |
+| `array_conversion` | Arrays handed to Godot | 460 | 326 | 0.71x |
+| `nbody` | Floating-point math on objects | 95 | 90 | 0.95x |
+| `sieve` | Integer arrays | 574 | 532 | 0.93x |
+| `saxpy` | Number arrays | 438 | 314 | 0.72x |
+| `shapes` | Overridden methods | 166 | 90 | 0.54x |
+| `alloc` | 20,000 short-lived objects a frame | 111 | 110 | 0.99x |
 
 Read the table with these limits in mind:
 
-- **Measured on 2026-11-17 on a machine doing other work.** Run-to-run spread is larger than several of the
-  differences. Treat anything between 0.9x and 1.1x as level. `move_nodes` measured 1.04x on a quiet
-  machine.
-- **`array_conversion` comes from an earlier run** than the other rows.
-- **Medians hide C#'s collector.** On `alloc`, C#'s slowest frame in a hundred takes 627 µs, more than five
-  times its median. Native AS3's takes 123 µs.
+- **Measured on 2026-11-18 in one sitting, on a machine doing other work** (a load average of 4). Each
+  number is the median of five runs, C# and AS3 turn and turn about. Run-to-run spread is larger than
+  several of the differences. Treat anything between 0.9x and 1.1x as level.
+- **Medians hide C#'s collector.** On `alloc`, C#'s slowest frame in a hundred takes 588 µs, more than five
+  times its median. Native AS3's takes 131 µs.
 - **Only macOS on Apple silicon has been measured.**
 
 ### Measure it yourself
