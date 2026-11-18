@@ -379,13 +379,11 @@ public:
 	// (vm/constructions.h), so that a reload can update the objects alive in place (Reload::update_in_place).
 	// For a host whose program can be reloaded; asked before the program makes anything. Asked once an
 	// object has been made, nothing is remembered; nor of a program with native code, unless that code
-	// tells what its objects are made with (p_native_tells: a program library built to, through
-	// constructing()).
+	// tells what its objects are made with (p_native_tells), through constructing(): the constructor, by
+	// its number, and the arguments it was called with, the object first.
 	void remember_constructions(bool p_native_tells = false);
 	bool remembers() const { return constructions_ != nullptr; }
 	size_t remembered() const { return constructions_ ? constructions_->size() : 0; } // How many objects are.
-	// Native code is running the constructor (by its number) of the object that is the first of these
-	// arguments, as it was called: what a frame of the interpreter's own would have remembered.
 	void constructing(uint32_t p_function, const Slot *p_arguments, size_t p_count);
 	void set_statement_hook(StatementHook p_hook, void *p_data) { hook_ = p_hook, hook_data_ = p_data; }
 	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
@@ -455,9 +453,10 @@ public:
 	// For a host whose native code is the program (native_code.h says what each is for).
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
-	void entered() {
+	// p_timed: the host keeps the call's time itself, and knows it began (native code's, for the engine).
+	void entered(bool p_timed = false) {
 		// The clock is started by the first call from outside alone: one made inside another asks nothing.
-		if (entries_ == 0) {
+		if (entries_ == 0 && !p_timed) {
 			entering();
 		}
 		entries_++;

@@ -76,7 +76,12 @@ bool Host::enter(uint32_t p_function, const Slot *p_arguments, uint32_t p_count,
 	// other holder (its Godot object freed), and it borrows what it is given.
 	Object *const self = !info.is_static && given > 0 && static_cast<Kind>(info.kinds[0]) == Kind::Obj ? static_cast<Object *>(arguments[0].p) : nullptr;
 	retain(&context, self);
-	interpreter->entered();
+	// A call that no other is running inside is the one whose time is kept (Error #1502): begun here,
+	// with no call through the interpreter to say so.
+	if (!interpreter->in_call()) {
+		limit.began();
+	}
+	interpreter->entered(true);
 	// Only a class's static initializer is ever one the library sets up itself.
 	const bool initializer = info.owner != NONE && program.classes[info.owner].static_init == p_function;
 	if (!initializer || !set_up_by_library(p_function)) {
