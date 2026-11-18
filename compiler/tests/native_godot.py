@@ -3,7 +3,7 @@ extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
 
 These are held:
 
-  probe      tests/godot_native's scripts, and the test project's Places.as, Emits.as and EmitsChild.as with them, say, as
+  probe      tests/godot_native's scripts, and the test project's Places.as, Emits.as, EmitsChild.as and Loops.as with them, say, as
              native code, what they say interpreted, line for line. Built with another number for the runtime's layout
              in its table (runtime/layout.h), the library is refused and the interpreter runs them.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
@@ -123,7 +123,7 @@ class Runner:
         with tempfile.TemporaryDirectory() as where:
             # With the scripts places.gd and emits.gd hold to GDScript under the interpreter: here each is held to
             # itself as native code.
-            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd")]
+            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd", "Loops.as")]
             project = self.project(where, sources, sorted(os.listdir(sources)) + shared)
             scripts = sorted(name for name in os.listdir(project) if name.endswith(".as"))
             program = self.library("the probe", project, scripts, where)

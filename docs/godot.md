@@ -177,8 +177,8 @@ AS3 collections convert when you hand them to Godot:
 | `PackedVector2Array`, `PackedVector3Array`, `PackedVector4Array`, `PackedColorArray` | An `Array`, or a `Vector` of that type |
 | `GodotDictionary` | An `Object`, or a `flash.utils.Dictionary` |
 
-Godot receives a copy. On the way back, a Godot collection stays a `GodotArray` or `GodotDictionary`
-until you ask for the AS3 kind:
+Godot receives a copy. On the way back, a Godot collection stays a `GodotArray` or `GodotDictionary`, and
+you can loop over it as it is:
 
 ```actionscript
 package game {
@@ -187,8 +187,7 @@ package game {
     public class Roster extends Node {
         public function names():Array {
             var result:Array = [];
-            var children:Array = getChildren() as Array;
-            for each (var child:Node in children) {
+            for each (var child:Node in getChildren()) {
                 result.push(child.name);
             }
             return result;
@@ -197,8 +196,17 @@ package game {
 }
 ```
 
-A Godot dictionary converts to a `flash.utils.Dictionary` the same way. Its keys become what a
-`Dictionary` keeps, so the Godot keys `1` and `"1"` become one key.
+- **`for each` gives the elements of a `GodotArray` or a packed array, and the values of a
+  `GodotDictionary`.** `for in` gives the indices, or the keys.
+- **An element is checked as it's stored in the loop's variable.** One that doesn't fit is TypeError #1034.
+- **A loop over a `GodotArray` reaches an element added on the way.** A loop over a `GodotDictionary` visits
+  the keys it had when the loop began, in Godot's order, and skips a key erased on the way.
+- **`key in table` and `delete table[key]` work on a `GodotDictionary`.** `delete` gives `true` whether or
+  not the key was there, as it does on an `Object`.
+
+To get the AS3 kind, ask for it: `getChildren() as Array`. A Godot dictionary converts to a
+`flash.utils.Dictionary` the same way. Its keys become what a `Dictionary` keeps, so the Godot keys `1` and
+`"1"` become one key.
 
 ### Integers
 

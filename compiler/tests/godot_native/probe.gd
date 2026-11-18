@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Calls each method of Probe.as, of Entry.as and of the test project's Places.as and Emits.as and prints what
+# Calls each method of Probe.as, of Entry.as and of the test project's Places.as, Loops.as and Emits.as and prints what
 # it gives: run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two
 # outputs to each other.
 var killer: Node
@@ -59,6 +59,25 @@ func _places() -> void:
 	keeper.free()
 
 
+# Loops over Godot's collections (the test project's Loops.as, which loops.gd holds to what GDScript gives).
+func _loops() -> void:
+	var loops := Node2D.new()
+	loops.set_script(load("res://Loops.as"))
+	root.add_child(loops)
+	for child_name in ["first", "second"]:
+		var child := Node.new()
+		child.name = child_name
+		loops.add_child(child)
+	var table := {"a": 1, 2: "two", "c": Vector2(3, 4)}
+	var growing := [1, 2]
+	print("PROBE loops=", loops.call("childNames"), " ", loops.call("sum", [1, 2.5, 4]), " ", loops.call("untypedElements", [7, "s", true, Vector2(1, 2), null]),
+			" ", loops.call("indices", [4, 5]), " ", loops.call("keys", table), " ", loops.call("textKeys", {"x": 1}), " ", loops.call("values", table),
+			" ", loops.call("untilNegative", [3, 0, 4, -1, 5]), " ", loops.call("grown", growing), growing, " ", loops.call("erasedOnTheWay", {"a": 1, "b": 2, "c": 3}),
+			" ", loops.call("pairs", [1, 2, 3]), " ", loops.call("packedIndices", PackedInt32Array([5, 6])))
+	print("PROBE keyed=", loops.call("has", table, 2), loops.call("has", table, "2"), " ", loops.call("remove", table, 2), table, " ", loops.call("removeNamed", {"b": 1}),
+			" ", loops.call("wrongElement", [loops, 5]))
+
+
 # What signals carry between AS3 and Godot (the test project's Emits.as, by the rows emits.gd holds to what
 # GDScript gives): what AS3 gave for each.
 func _emits_said(from: int) -> void:
@@ -95,6 +114,7 @@ func _initialize() -> void:
 	print("PROBE after=", probe.call("script", 1))
 	_enter()
 	_places()
+	_loops()
 	emits = load("res://emits_cases.gd").new()
 	emits.begin(root)
 	_emits_said(0)

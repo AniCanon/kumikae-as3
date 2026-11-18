@@ -436,6 +436,16 @@ check("objects.gd: what Godot can't hold is an AS3 error that says why",
       "an Array with properties other than its indices" in output and "at Objects/plainInside()" in output and
       "'for in' and 'for each' over one of Godot's values held untyped" in output, output[-2000:])
 
+# Loops over Godot's own collections, and `in` and `delete` on its Dictionary, as GDScript goes through them.
+output = compare("loops.gd", [
+    "for each over what a method gives", "for each into a Number", "for each into an untyped variable", "for in gives an Array's indices",
+    "for in gives a Dictionary's keys", "for in into a variable declared above", "for each gives a Dictionary's values", "break and continue",
+    "an element added on the way is reached", "a key erased on the way is passed over, one added is not reached", "a loop inside a loop",
+    "for in over a packed array", "in on a Dictionary", "delete on a Dictionary", "delete by a name", "an element of another type",
+])
+check("loops.gd: an element that is not what the loop's variable is declared is AS3's coercion error",
+      "Error #1034: Type Coercion failed: cannot convert 5 to Node." in output and "at Loops/wrongElement()" in output, output[-1500:])
+
 # What GDScript reaches of a script by name: public fields to read and write, public methods, and the lists.
 compare("members.gd", [
     "fields set", "fields read back", "ratio is a float", "refused", "a whole float into an int", "an array is copied",

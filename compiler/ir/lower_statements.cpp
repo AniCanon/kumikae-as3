@@ -385,7 +385,7 @@ void Statements::by_kind(Stmt *p_statement) {
 void Statements::for_in_loop(ForIn *p_loop) {
 	if (l_.is_vector(p_loop->collection->type) && !(l_.array_ && p_loop->collection->type->symbol == l_.array_)) {
 		Vectors(l_).vector_loop(p_loop);
-	} else if (p_loop->element) {
+	} else if (p_loop->element || Engine(l_).is_dictionary(p_loop->collection->type) || Engine(l_).is_indexed(p_loop->collection->type)) {
 		Vectors(l_).engine_loop(p_loop);
 	} else {
 		Dynamic(l_).loop(p_loop); // An Array's properties too.

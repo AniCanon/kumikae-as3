@@ -1,3 +1,4 @@
+#include "lower_engine.h"
 #include "lower_statements.h"
 #include "lower_vectors.h"
 
@@ -231,44 +232,67 @@ void Vectors::vector_loop(ForIn *p_loop) {
 	Statements(l_).finish_loop(next_at);
 }
 
-// for each (x in packed): one of Godot's collections that says what it holds, by index, first to last. Its
-// size is asked again each time round, as a vector's length is read.
+// for each (x in list) and for (i in list) over one of Godot's collections. Its Array and its packed arrays
+// by index, first to last: the size is asked again each time round, as a vector's length is read, and
+// `for in` gives the indices. Its Dictionary by the keys it has as the loop begins, in Godot's order: a key
+// erased on the way is passed over and one added is not reached, as with an Object here.
 void Vectors::engine_loop(ForIn *p_loop) {
 	const uint32_t position = p_loop->offset;
-	Kind element = Kind::Void;
-	uint32_t size_name = 0;
 	const Type *whole = p_loop->collection->type;
-	const Symbol *klass = whole && whole->kind == Type::Instance ? whole->symbol : nullptr;
-	if (!l_.kind_of(p_loop->element, &element) || element == Kind::Void || !l_.engine_name(klass, "size", &size_name)) {
-		l_.refuse(position, "'for each' over a collection of '" + l_.compilation_.type_name(p_loop->element) + "'");
+	const bool keyed = Engine(l_).is_dictionary(whole);
+	Kind element = Kind::Any;
+	if ((p_loop->element && (!l_.kind_of(p_loop->element, &element) || element == Kind::Void)) || !(keyed || Engine(l_).is_indexed(whole))) {
+		l_.refuse(position, p_loop->element ? "'for each' over a collection of '" + l_.compilation_.type_name(p_loop->element) + "'" : p_loop->each ? "'for each'" : "'for in'");
 		return;
 	}
 	Place target;
+	const Type *declared = nullptr;
 	if (p_loop->declaration && p_loop->declaration->declarators.count == 1) {
 		target = l_.place_of_symbol(p_loop->declaration->declarators[0].symbol, 0, p_loop->declaration->declarators[0].offset);
+		declared = p_loop->declaration->declarators[0].type ? l_.compilation_.type_of(p_loop->declaration->declarators[0].type) : nullptr;
 	} else if (p_loop->target) {
 		target = l_.place_of(p_loop->target);
+		declared = p_loop->target->type;
 	} else {
 		l_.refuse(position, "this loop variable");
 		return;
 	}
 	const uint32_t collection = l_.engine_reg(Kind::Val, whole);
 	l_.emit(Op::Move, position, collection, l_.expression(p_loop->collection, Kind::Val));
+	const std::string_view counted = keyed ? std::string_view("GodotArray") : whole->symbol->name;
+	const uint32_t list = keyed ? Engine(l_).method_of("GodotDictionary", "keys", Kind::Val, "Array", { collection }, position).value_or(NONE) : collection;
+	if (list == NONE) {
+		l_.refuse(position, p_loop->each ? "'for each'" : "'for in'");
+		return;
+	}
 	const uint32_t at = l_.reg(Kind::I64);
 	l_.emit(Op::ConstI64, position, at, l_.wide(0));
 	const uint32_t top = l_.here();
 	l_.emit(Op::Stmt, position);
-	const uint32_t size = l_.reg(Kind::I64);
-	l_.emit(Op::HostCall, position, size, size_name, l_.arguments({ collection }));
+	const uint32_t size = Engine(l_).method_of(counted, "size", Kind::I64, std::string_view(), { list }, position).value_or(NONE);
 	const uint32_t more = l_.reg(Kind::Bool);
 	l_.emit(Op::LtI64, position, more, at, size);
 	const uint32_t out = l_.emit(Op::JumpIfNot, position, more, 0);
-	const uint32_t value = l_.engine_reg(element, p_loop->element);
-	l_.emit(Op::HostIndexGet, position, value, collection, at);
-	l_.store(target, l_.convert(value, target.kind, position), position);
+	uint32_t value = at, gone = NONE;
+	if (keyed) {
+		value = l_.reg(Kind::Any);
+		l_.emit(Op::HostIndexGet, position, value, list, at);
+		gone = l_.emit(Op::JumpIfNot, position, Engine(l_).method_of("GodotDictionary", "has", Kind::Bool, std::string_view(), { collection, value }, position).value_or(NONE), 0);
+	}
+	if (p_loop->each) {
+		const uint32_t key = value;
+		value = p_loop->element ? l_.engine_reg(element, p_loop->element) : l_.reg(Kind::Any);
+		l_.emit(Op::HostIndexGet, position, value, collection, key);
+	}
+	// An untyped element is stored as an assignment stores it: checked against what the variable is declared.
+	const bool checked = l_.kind_at(value) == Kind::Any && declared && target.kind != Kind::Any;
+	l_.store(target, checked ? l_.from_untyped(value, declared, target.kind, position) : l_.convert(value, target.kind, position), position);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();
+	if (gone != NONE) {
+		l_.patch(gone, next_at);
+	}
 	const uint32_t one = l_.reg(Kind::I64);
 	l_.emit(Op::ConstI64, position, one, l_.wide(1));
 	l_.emit(Op::AddI64, position, at, at, one);
