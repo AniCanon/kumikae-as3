@@ -26,8 +26,9 @@
 // test (a `<` or `<=` between the counter and the bound, either way round, worked out by what runs no
 // code and can be worked out again, and the jump out), whose
 // counter is written once in it, by adding to it or taking from it a step that stays as it is, on every
-// way round. The bound and the step are sums of constants, of registers the loop does not write, of
-// static fields the function keeps in locals and, where the loop's vectors are locals, of their lengths.
+// way round. The bound and the step are sums of constants (a Number, or a whole number written out, as in
+// `i += 2`), of registers the loop does not write, of static fields the function keeps in locals and, where
+// the loop's vectors are locals, of their lengths.
 #include "function_writer.h"
 
 #include "names.h"
@@ -254,6 +255,11 @@ std::optional<std::string> FunctionWriter::still_whole(const Counted &p_loop, ui
 	const Instruction &read = function_.code[writes[0]];
 	if (writes.size() != 1 || writes[0] < p_low || writes[0] >= made) {
 		return std::nullopt;
+	}
+	if (read.op == Op::ConstI32 || read.op == Op::ConstU32) {
+		// A whole number written out (`i += 2`): itself.
+		const int64_t value = read.op == Op::ConstI32 ? static_cast<int64_t>(static_cast<int32_t>(read.b)) : static_cast<int64_t>(read.b);
+		return "INT64_C(" + std::to_string(value) + ")";
 	}
 	if (read.op == Op::GetGlobal && std::binary_search(still_.begin(), still_.end(), read.b)) {
 		return "static_cast<int64_t>(static_cast<" + type + ">(g" + std::to_string(read.b) + "))";
