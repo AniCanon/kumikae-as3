@@ -105,6 +105,45 @@ def verify_play_bundle(path):
             raise ValueError("The bundle is missing the ARM64 AS3 runtime.")
 
 
+def stage_ios_runtime(stage, native):
+    framework = stage / "bin/ios/kas3_godot.xcframework"
+    source = native / "ios/kas3_godot.xcframework"
+    exporter = native / "libkas3_godot.dylib"
+    if source.is_dir() and exporter.is_file():
+        if framework.exists():
+            shutil.rmtree(framework)
+        shutil.copytree(source, framework)
+        shutil.copy2(exporter, stage / "bin" / exporter.name)
+    elif not framework.is_dir():
+        if not source.is_dir():
+            raise ValueError("The iOS AS3 runtime is missing from this plugin.")
+        shutil.copytree(source, framework)
+
+
+def run_export(command, env=None):
+    missing_runtime = False
+    native_error = ""
+    password = (env or {}).get("GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD")
+    with subprocess.Popen(command, env=env,
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace") as engine:
+        for line in engine.stdout:
+            if password:
+                line = line.replace(password, "••••")
+            print(line, end="", flush=True)
+            if "ERROR: ActionScript: the project's scripts have errors" in line:
+                native_error = "AS3 compilation failed. See the compiler diagnostics above."
+            if "ERROR: Native AS3: " in line:
+                native_error = line.split("ERROR: Native AS3: ", 1)[1].strip()
+            if "library found for GDExtension:" in line and "kas3.gdextension" in line:
+                missing_runtime = True
+    if native_error:
+        raise ValueError(native_error)
+    if missing_runtime:
+        raise ValueError("The export is missing the AS3 runtime.")
+    if engine.returncode:
+        raise ValueError(f"Godot exited with code {engine.returncode}.")
+
+
 def export(project, destination, godot, native, presets, keys=None, private_files=()):
     with tempfile.TemporaryDirectory(prefix="kumikae-export-") as temporary:
         stage = Path(temporary) / "game"
@@ -117,18 +156,7 @@ def export(project, destination, godot, native, presets, keys=None, private_file
                 if host.is_file() and (stage / "bin" / name).is_file():
                     shutil.copy2(host, stage / "bin" / name)
         if "iOS" in platforms:
-            framework = stage / "bin/ios/kas3_godot.xcframework"
-            source = native / "ios/kas3_godot.xcframework"
-            exporter = native / "libkas3_godot.dylib"
-            if source.is_dir() and exporter.is_file():
-                if framework.exists():
-                    shutil.rmtree(framework)
-                shutil.copytree(source, framework)
-                shutil.copy2(exporter, stage / "bin" / exporter.name)
-            elif not framework.is_dir():
-                if not source.is_dir():
-                    raise ValueError("The iOS AS3 runtime is missing from this plugin.")
-                shutil.copytree(source, framework)
+            stage_ios_runtime(stage, native)
         base = [godot, "--headless", "--path", str(stage)]
         subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
         output = Path(tempfile.mkdtemp(prefix="Game-exports-", dir=destination))
@@ -150,25 +178,14 @@ def export(project, destination, godot, native, presets, keys=None, private_file
             if key and preset["platform"] == "Android":
                 for field in ("path", "user", "password"):
                     env["GODOT_ANDROID_KEYSTORE_RELEASE_" + field.upper()] = key[field]
-            missing_runtime = False
-            native_error = ""
-            password = env.get("GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD")
-            with subprocess.Popen(base + ["--language", "en", *flags, "--export-release", label, str(artifact)], env=env,
-                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace") as engine:
-                for line in engine.stdout:
-                    if password:
-                        line = line.replace(password, "••••")
-                    print(line, end="", flush=True)
-                    if "ERROR: ActionScript: the project's scripts have errors" in line:
-                        native_error = "AS3 compilation failed. See the compiler diagnostics above."
-                    if "ERROR: Native AS3: " in line:
-                        native_error = line.split("ERROR: Native AS3: ", 1)[1].strip()
-                    if "library found for GDExtension:" in line and "kas3.gdextension" in line:
-                        missing_runtime = True
+            command = base + ["--language", "en", *flags, "--export-release", label, str(artifact)]
+            try:
+                run_export(command, env)
+            except ValueError as error:
+                failed.append(f"{label} ({error})")
+                continue
             produced = product(artifact, preset)
-            if native_error:
-                failed.append(f"{label} ({native_error})")
-            elif missing_runtime or engine.returncode or not produced:
+            if not produced:
                 failed.append(label)
             else:
                 if preset.get("store") and preset["platform"] == "Android":

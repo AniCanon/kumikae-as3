@@ -41,7 +41,7 @@ state of the project changes.
 - **`[Export]` and `[Signal]`.**
 - **Hot reload** that keeps state and updates live objects in place. See [Hot reload](hot-reload.md).
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
-- **iOS:** the interpreter runs in the Simulator and has run on a device.
+- **iOS:** the interpreter runs in the Simulator and on a device. Rider can sign, install and run a game on a paired iPhone or iPad.
 - **Android:** the interpreter runs on an ARM64 emulator through Rider.
 
 ### Native code

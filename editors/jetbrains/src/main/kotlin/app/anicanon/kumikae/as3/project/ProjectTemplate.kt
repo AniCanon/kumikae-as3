@@ -22,7 +22,7 @@ internal enum class Platform(val label: String) {
                 IOS,
                 available = true,
                 always = false,
-                note = "Adds iOS export settings and an iOS Simulator run target.",
+                note = "Adds iOS export settings and a run target for simulators and physical devices.",
             ),
             Choice(
                 ANDROID,
@@ -153,7 +153,7 @@ internal class ProjectTemplate(
         append("`bin` must hold the AS3 extension's library (`libkas3_godot`). ")
         append("The wizard links it to where the extension was built, when it finds it.\n")
         if (Platform.IOS in platforms) {
-            append("\n## iOS\n\nSelect the iOS Simulator run configuration and choose a device. ")
+            append("\n## iOS\n\nSelect the iOS run configuration and choose a simulator or paired device. ")
             append("Run builds the export preset and launches its bundle identifier.\n")
         }
     }
