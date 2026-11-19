@@ -19,10 +19,12 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
     private var groups by mutableStateOf(emptyList<String>())
     private var selection by mutableStateOf(emptySet<String>())
     private var all by mutableStateOf(true)
+    private var native by mutableStateOf(false)
     private var notice by mutableStateOf("")
     override fun resetEditorFrom(configuration: As3TestsConfiguration) {
         selection = configuration.options.cases.lineSequence().filter(String::isNotBlank).toSet()
         all = selection.isEmpty()
+        native = configuration.options.native
         groups = runCatching {
             val path = Path.of(requireNotNull(configuration.project.basePath)).resolve(configuration.options.manifest)
             val file =
@@ -39,11 +41,16 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
     override fun applyEditorTo(configuration: As3TestsConfiguration) {
         if (!all && selection.isEmpty()) throw ConfigurationException("Choose at least one test for this plan.")
         configuration.options.cases = if (all) "" else selection.joinToString("\n")
+        configuration.options.native = native
     }
     override fun createEditor(): JComponent = composePanel(this) {
         Column {
             CheckBox("All game tests", all, { checked: Boolean ->
                 all = checked
+                fireEditorStateChanged()
+            })
+            CheckBox("Run Godot tests with native code", native, { checked: Boolean ->
+                native = checked
                 fireEditorStateChanged()
             })
             for (group in groups) {

@@ -46,12 +46,16 @@ class As3TestsType :
 class As3TestsOptions : RunConfigurationOptions() {
     private val manifestProperty = string("kas3-tests.json").provideDelegate(this, "manifest")
     private val casesProperty = string("").provideDelegate(this, "cases")
+    private val nativeProperty = property(false).provideDelegate(this, "native")
     var manifest: String
         get() = manifestProperty.getValue(this).orEmpty()
         set(value) = manifestProperty.setValue(this, value)
     var cases: String
         get() = casesProperty.getValue(this).orEmpty()
         set(value) = casesProperty.setValue(this, value)
+    var native: Boolean
+        get() = nativeProperty.getValue(this)
+        set(value) = nativeProperty.setValue(this, value)
 }
 
 class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
@@ -111,6 +115,7 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                 GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())?.let {
                     command += listOf("--godot", it.toString())
                 }
+                if (options.native) command += "--native"
                 for (name in options.cases.lines().filter { it.isNotBlank() }) command += listOf("--case", name.trim())
                 return KillableColoredProcessHandler(
                     GeneralCommandLine(command).withWorkDirectory(projectRoot.toFile()),
