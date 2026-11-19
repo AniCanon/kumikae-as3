@@ -15,6 +15,7 @@ import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
+import org.jetbrains.compose.swing.components.button.CheckBox
 import org.jetbrains.compose.swing.components.layout.Panel
 import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.components.layout.ScrollPane
@@ -184,11 +185,24 @@ private fun ExportSettings(
             { text -> controller.edit { it.copy(identifier = text) } },
             SwingModifier.emptyBorder(JBUI.insetsTop(16)),
         )
+        if (preset.platform == "iOS") {
+            CheckBox("Compile AS3 to native code", value.nativeCode, { checked: Boolean ->
+                controller.edit { it.copy(nativeCode = checked) }
+            })
+            LabelledField(
+                "Apple team ID for device builds",
+                value.signingTeam,
+                { team -> controller.edit { it.copy(signingTeam = team) } },
+                SwingModifier.emptyBorder(JBUI.insetsTop(12)),
+            )
+            StatusLine("For a device, sign in under Xcode → Settings → Apple Accounts.")
+            StatusLine("Simulator runs work without an Apple account.")
+        }
         ArtworkField(GameResourceKind.ExportIcon, value.exportIcon, controller.exportPreview, choose) { path ->
             controller.edit { it.copy(exportIcon = path) }
         }
     } else {
         StatusLine("This preset has no mobile application identifier.")
     }
-    StatusLine("Signing credentials remain in the platform export configuration.")
+    if (preset?.platform != "iOS") StatusLine("Signing credentials remain in the platform export configuration.")
 }

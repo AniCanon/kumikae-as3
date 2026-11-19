@@ -21,6 +21,7 @@ import java.awt.image.BufferedImage
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import javax.swing.JButton
+import javax.swing.JCheckBox
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.JSpinner
@@ -70,8 +71,16 @@ internal object UiProbeProjectExperience {
             await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
-            await { descendants(panel).filterIsInstance<JTextField>().count() == 1 }
+            await { descendants(panel).filterIsInstance<JCheckBox>().any { it.text == "Compile AS3 to native code" } }
             render(panel, destination.resolve("$theme-project-export.png"))
+            edt {
+                descendants(panel).filterIsInstance<JCheckBox>().single {
+                    it.text == "Compile AS3 to native code"
+                }.doClick()
+            }
+            click(panel, "Apply")
+            await { !repository.value.nativeCode }
+
             edt {
                 frame.contentPane.remove(panel)
                 sceneController.reload()

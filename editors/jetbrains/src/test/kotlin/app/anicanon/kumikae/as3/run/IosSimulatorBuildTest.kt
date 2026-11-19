@@ -36,6 +36,15 @@ class IosSimulatorBuildTest {
         assertEquals(kept, IosSimulatorBuild.findTemplate("/nowhere.zip", home, null))
     }
 
+    @Test fun `a local desktop build can use the bundled iOS runtime`() {
+        val local = Files.createDirectories(root.resolve("compiler/bin"))
+        val plugin = root.resolve("plugin")
+        val bundled = Files.createDirectories(plugin.resolve("ios/kas3_godot.xcframework")).parent
+        assertEquals(bundled, IosSimulatorBuild.findLibrary(local, plugin))
+        val built = Files.createDirectories(local.resolve("ios/kas3_godot.xcframework")).parent
+        assertEquals(built, IosSimulatorBuild.findLibrary(local, plugin))
+    }
+
     @Test fun `a project can be built when it has an iOS export preset`() {
         val project = Files.createDirectories(root.resolve("game"))
         assertFalse(IosSimulatorBuild.canBuild(project))
@@ -57,6 +66,17 @@ class IosSimulatorBuildTest {
             "project=$project out=${project.resolve(".godot/ios-simulator")} godot=/tools/godot template=$template " +
                 "library=/plugin/native/ios\n",
             said.first(),
+        )
+    }
+
+    @Test fun `a native export error identifies the script even if Xcode fails afterwards`() {
+        val project = Files.createDirectories(root.resolve("bad-script"))
+        val build = IosSimulatorBuild(project, Path.of("/tools/godot"), file(root.resolve("sim.zip")), null) {
+            "echo 'ERROR: Native AS3: res://Player.as:7: error: unknown type'\necho 'Link failed.'\nexit 1\n"
+        }
+        assertEquals(
+            "res://Player.as:7: error: unknown type",
+            assertFailsWith<IllegalStateException> { build.build { _, _ -> } }.message,
         )
     }
 

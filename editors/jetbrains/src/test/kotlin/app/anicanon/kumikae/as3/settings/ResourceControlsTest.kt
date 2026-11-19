@@ -50,7 +50,7 @@ class ResourceControlsTest {
             .select("preset.1")
             .select("preset.0")
             .copy(exportIcon = "res://fixed.png")
-        assertEquals("res://fixed.png", updated.allExportDrafts()["preset.0"]?.second)
+        assertEquals("res://fixed.png", updated.allExportDrafts()["preset.0"]?.icon)
     }
 
     @Test fun `applying an identity edit preserves implicit defaults and other presets`() {

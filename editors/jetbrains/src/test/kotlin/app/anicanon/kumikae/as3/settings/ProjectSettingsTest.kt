@@ -19,6 +19,20 @@ class ProjectSettingsTest {
         )
     }
 
+    @Test fun `native compilation and signing team follow the selected iOS preset`() {
+        val exports = "[preset.0]\nname=\"Device\"\nplatform=\"iOS\"\n" +
+            "[preset.1]\nname=\"Simulator\"\nplatform=\"iOS\"\n"
+        val original = ProjectSettings.read("", exports)
+        assertEquals(true, original.nativeCode)
+        val edited = original.copy(nativeCode = false, signingTeam = "EXAMPLE123").select("preset.1")
+        assertEquals(true, edited.nativeCode)
+        assertEquals("", edited.signingTeam)
+        val saved = edited.write("", exports).second
+        assertEquals(false, ProjectSettings.read("", saved).nativeCode)
+        assertEquals("EXAMPLE123", GodotConfig(saved).string("preset.0.options", "application/app_store_team_id"))
+        assertEquals(null, GodotConfig(saved).raw("preset.1.options", "actionscript/native_code"))
+    }
+
     @Test fun `invalid fields cannot be written`() {
         val value = ProjectSettings.read("", "")
         assertFailsWith<IllegalArgumentException> { value.copy(width = "0").write("", "") }

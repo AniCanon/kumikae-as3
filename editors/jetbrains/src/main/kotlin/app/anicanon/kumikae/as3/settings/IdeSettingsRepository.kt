@@ -48,7 +48,7 @@ internal class IdeSettingsRepository(
         val (newMain, newExports) = draft.write(main.text, exports?.text.orEmpty())
         val folder = root()
         val resources = listOf(draft.mainScene, draft.icon, draft.splash) +
-            draft.allExportDrafts().values.map { it.second }
+            draft.allExportDrafts().values.map { it.icon }
         for (resource in resources) {
             if (resource.startsWith("res://")) {
                 require(resolveProjectResource(folder, resource) != null) {

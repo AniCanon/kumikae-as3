@@ -20,8 +20,12 @@ class PresetBuildTest(unittest.TestCase):
                       'application/bundle_identifier="org.example.qa"\napplication/app_store_team_id="KEEP123456"\napplication/export_project_only=false\n')
             config = config.replace("[preset.1.options]", "  [preset.1.options]  ")
             (game / "export_presets.cfg").write_bytes(config.replace("\n", "\r\n").encode())
-            lib = base / "libraries"
+            desktop = "libkas3_godot.dylib"
+            (game / "bin").mkdir()
+            (game / "bin" / desktop).write_bytes(b"old exporter")
+            lib = base / "native/ios"
             (lib / "kas3_godot.xcframework").mkdir(parents=True)
+            (lib.parent / desktop).write_bytes(b"matching exporter")
             template = base / "sim.zip"
             template.touch()
             godot = base / "godot"
@@ -32,6 +36,7 @@ while [ "$#" -gt 0 ]; do
     --export-debug)
       [ "$2" = "QA Phone" ] || exit 15
       [ "$stage" != "$GAME" ] || exit 16
+      [ "$(cat "$stage/bin/libkas3_godot.dylib")" = "matching exporter" ] || { echo "Staged exporter is stale"; exit 17; }
       cp "$stage/export_presets.cfg" "$STAGED"
       mkdir -p "${3%.ipa}.xcodeproj"
       exit;;
@@ -60,9 +65,10 @@ fi
             env = dict(os.environ, PATH=f"{base}:{os.environ['PATH']}", GAME=str(game), STAGED=str(staged))
             result = subprocess.run([script, game, game / ".godot/ios-simulator", godot, template, lib,
                                      "QA Phone", "preset.1", "org.example.qa"], env=env, capture_output=True, text=True)
+            self.assertEqual(b"old exporter", (game / "bin" / desktop).read_bytes())
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertEqual(config, (game / "export_presets.cfg").read_text())
-            self.assertFalse((game / "bin").exists())
+            self.assertFalse((game / "bin/ios").exists())
             first, second = staged.read_text().split("[preset.1]")
             self.assertIn('application/app_store_team_id=""', first)
             self.assertIn('custom_template/debug="other.zip"', first)

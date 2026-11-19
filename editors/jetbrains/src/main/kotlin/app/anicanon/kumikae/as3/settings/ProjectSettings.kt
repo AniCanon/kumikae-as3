@@ -14,6 +14,13 @@ internal data class ExportPreset(val section: String, val name: String, val plat
     override fun toString() = "$name · $platform"
 }
 
+internal data class ExportFields(
+    val identifier: String,
+    val icon: String,
+    val nativeCode: Boolean,
+    val signingTeam: String,
+)
+
 internal data class ProjectSettings(
     val projectText: String,
     val exportText: String,
@@ -31,10 +38,16 @@ internal data class ProjectSettings(
     val preset: String = "",
     val identifier: String = "",
     val exportIcon: String = "",
-    val exportDrafts: Map<String, Pair<String, String>> = emptyMap(),
+    val nativeCode: Boolean = true,
+    val signingTeam: String = "",
+    val exportDrafts: Map<String, ExportFields> = emptyMap(),
 ) {
-    fun allExportDrafts(): Map<String, Pair<String, String>> =
-        if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+    fun allExportDrafts(): Map<String, ExportFields> = if (preset.isEmpty()) {
+        exportDrafts
+    } else {
+        exportDrafts +
+            (preset to ExportFields(identifier, exportIcon, nativeCode, signingTeam))
+    }
 
     fun select(section: String): ProjectSettings {
         val selected = presets.firstOrNull { it.section == section }
@@ -43,11 +56,13 @@ internal data class ProjectSettings(
         val remembered = retained[section]
         return copy(
             exportDrafts = retained,
+            nativeCode = remembered?.nativeCode ?: (exports.raw("$section.options", NATIVE_CODE) != "false"),
+            signingTeam = remembered?.signingTeam ?: exports.string("$section.options", SIGNING_TEAM),
             preset = section,
             identifier =
-            remembered?.first ?: selected?.identifierKey?.let { exports.string("$section.options", it) }.orEmpty(),
+            remembered?.identifier ?: selected?.identifierKey?.let { exports.string("$section.options", it) }.orEmpty(),
             exportIcon =
-            remembered?.second ?: selected?.iconKey?.let { exports.string("$section.options", it) }.orEmpty(),
+            remembered?.icon ?: selected?.iconKey?.let { exports.string("$section.options", it) }.orEmpty(),
         )
     }
 
@@ -97,6 +112,15 @@ internal data class ProjectSettings(
         for ((section, fields) in allExportDrafts()) {
             val selected = presets.firstOrNull { it.section == section } ?: continue
             val (applicationId, image) = fields
+            if (selected.platform == "iOS") {
+                val options = "$section.options"
+                if (fields.nativeCode != (originalExports.raw(options, NATIVE_CODE) != "false")) {
+                    exportChanges[ConfigKey(options, NATIVE_CODE)] = fields.nativeCode.toString()
+                }
+                if (fields.signingTeam != originalExports.string(options, SIGNING_TEAM)) {
+                    exportChanges[ConfigKey(options, SIGNING_TEAM)] = GodotConfig.quote(fields.signingTeam.trim())
+                }
+            }
             validateResource(image)
             validateType(GameResourceKind.ExportIcon, image)
             selected.identifierKey?.takeIf {
@@ -115,6 +139,9 @@ internal data class ProjectSettings(
     }
 
     companion object {
+        private const val NATIVE_CODE = "actionscript/native_code"
+        private const val SIGNING_TEAM = "application/app_store_team_id"
+
         val orientations =
             listOf(
                 "Landscape",

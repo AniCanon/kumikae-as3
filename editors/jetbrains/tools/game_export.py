@@ -43,11 +43,16 @@ def export(project, destination, godot, native, presets):
         stage_game(project, stage, native / "android/arm64-v8a/libkas3_godot.so", "Android" in platforms)
         if "iOS" in platforms:
             framework = stage / "bin/ios/kas3_godot.xcframework"
-            if not framework.is_dir():
-                source = native / "ios/kas3_godot.xcframework"
+            source = native / "ios/kas3_godot.xcframework"
+            exporter = native / "libkas3_godot.dylib"
+            if source.is_dir() and exporter.is_file():
+                if framework.exists():
+                    shutil.rmtree(framework)
+                shutil.copytree(source, framework)
+                shutil.copy2(exporter, stage / "bin" / exporter.name)
+            elif not framework.is_dir():
                 if not source.is_dir():
                     raise ValueError("The iOS AS3 runtime is missing from this plugin.")
-                framework.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source, framework)
         base = [godot, "--headless", "--path", str(stage)]
         subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
@@ -64,16 +69,21 @@ def export(project, destination, godot, native, presets):
             artifact = subdir / filename
             print(f"Exporting {label} to {artifact}", flush=True)
             missing_runtime = False
+            native_error = ""
             with subprocess.Popen(base + ["--language", "en", "--export-release", label, str(artifact)],
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace") as engine:
                 for line in engine.stdout:
                     print(line, end="", flush=True)
+                    if "ERROR: Native AS3: " in line:
+                        native_error = line.split("ERROR: Native AS3: ", 1)[1].strip()
                     if "library found for GDExtension:" in line and "kas3.gdextension" in line:
                         missing_runtime = True
             produced = artifact.is_file() or artifact.is_dir() or (
                 preset["platform"] == "iOS" and artifact.with_suffix(".xcodeproj").is_dir()
             )
-            if missing_runtime or engine.returncode or not produced:
+            if native_error:
+                failed.append(f"{label} ({native_error})")
+            elif missing_runtime or engine.returncode or not produced:
                 failed.append(label)
         if failed:
             raise ValueError("Godot could not export: " + ", ".join(failed) + ". See the engine output above.")
