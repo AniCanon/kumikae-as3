@@ -1,9 +1,11 @@
 package app.anicanon.kumikae.as3.settings
 
+import androidx.compose.runtime.mutableStateMapOf
 import app.anicanon.kumikae.as3.panel.BackgroundWorker
 import app.anicanon.kumikae.as3.project.AddGameTargetDialog
 import app.anicanon.kumikae.as3.project.GameTargetSetup
 import app.anicanon.kumikae.as3.ui.composePanel
+import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditor
@@ -13,6 +15,7 @@ import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VFileProperty
@@ -21,6 +24,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.beans.PropertyChangeListener
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
 import javax.swing.JComponent
 
 class ProjectSettingsEditorProvider :
@@ -47,6 +52,37 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     private val controller = SettingsController(IdeSettingsRepository(project, gameFile, this, teamWorker)).also {
         it.reload()
     }
+    private val configuredKeys = mutableStateMapOf<String, Boolean>()
+    private fun keys(preset: ExportPreset) = AndroidUploadKeys(project, gameFile.parent.path, preset.name)
+
+    private val signingWorker = BackgroundWorker("Android signing setup").also { Disposer.register(this, it) }
+
+    private fun configureKey(preset: ExportPreset): Boolean {
+        val store = keys(preset)
+        if (!UploadKeyDialog(project, preset.name, store).showAndGet()) return false
+        configuredKeys[preset.name] = store.configured
+        return store.configured
+    }
+
+    private fun release(settings: ProjectSettings, preset: ExportPreset) {
+        fun build() = exportGame(project, gameFile.parent, settings, listOf(preset), store = true)
+        if (preset.platform != "Android" || keys(preset).configured) {
+            build()
+            return
+        }
+        val accepted = signingWorker.submit({
+            val file = Path.of(gameFile.parent.path, ".godot", "export_credentials.cfg")
+            val text = if (Files.isRegularFile(file)) Files.readString(file) else ""
+            hasGodotUploadKey(preset.section, settings.exportText, text, System.getenv())
+        }) { result ->
+            result.onSuccess { configured -> if (configured || configureKey(preset)) build() }
+                .onFailure {
+                    Messages.showErrorDialog(project, "Could not read Godot signing settings.", "Android Signing")
+                }
+        }
+        if (!accepted) Messages.showInfoMessage(project, "Checking this project’s signing settings.", "Android Signing")
+    }
+
     private val panel = composePanel(this) {
         ProjectSettingsView(
             controller,
@@ -59,6 +95,20 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
                 "Export"
             },
             export = { settings, presets -> exportGame(project, gameFile.parent, settings, presets) },
+            release = ::release,
+            configureKey = { configureKey(it) },
+            hasKey = { preset -> configuredKeys[preset.name] ?: keys(preset).configured },
+            openStore = { platform ->
+                BrowserUtil.browse(
+                    if (platform ==
+                        "iOS"
+                    ) {
+                        "https://appstoreconnect.apple.com/"
+                    } else {
+                        "https://play.google.com/console/"
+                    },
+                )
+            },
             addTarget = {
                 val setup = GameTargetSetup(project, gameFile.parent)
                 if (AddGameTargetDialog(project, setup).showAndGet()) controller.reload()

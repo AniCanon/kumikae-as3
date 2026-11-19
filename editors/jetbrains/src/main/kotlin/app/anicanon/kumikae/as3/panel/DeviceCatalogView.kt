@@ -8,13 +8,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.StatusLine
+import app.anicanon.kumikae.as3.ui.SurfaceGroup
 import com.intellij.icons.AllIcons
-import com.intellij.ui.JBColor
-import com.intellij.ui.RoundedLineBorder
-import com.intellij.ui.components.panels.BackgroundRoundedPanel
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.layout.Panel
@@ -24,9 +21,7 @@ import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import org.jetbrains.compose.swing.modifier.appearance.font
 import org.jetbrains.compose.swing.modifier.appearance.foreground
-import org.jetbrains.compose.swing.modifier.appearance.opaque
 import org.jetbrains.compose.swing.node.SwingNode
-import java.awt.BorderLayout
 import java.awt.Graphics
 import javax.swing.Icon
 import javax.swing.JButton
@@ -66,7 +61,7 @@ internal fun DeviceCatalogView(
                 Column(SwingModifier.north()) {
                     if (ios != null) {
                         CatalogSection("iOS simulators")
-                        CatalogGroup {
+                        SurfaceGroup {
                             for (device in ios.sortedByDescending { it.state == BOOTED }) {
                                 key(device.id) {
                                     val state = when (device.state) {
@@ -97,7 +92,7 @@ internal fun DeviceCatalogView(
                             })
                         }
                     }
-                    CatalogGroup {
+                    SurfaceGroup {
                         for (device in android.sortedByDescending { it.serial != null }) {
                             key(device.name, device.serial) {
                                 val running = device.serial != null
@@ -137,16 +132,6 @@ private fun CatalogSection(title: String, action: @Composable () -> Unit = {}) {
         )
         Panel(PanelLayout.Border(), modifier = SwingModifier.east()) { action() }
     }
-}
-
-@Composable
-private fun CatalogGroup(content: @Composable () -> Unit) {
-    SwingNode(factory = {
-        BackgroundRoundedPanel(JBUI.scale(10), BorderLayout()).apply {
-            background = UIUtil.getListBackground()
-            border = RoundedLineBorder(JBColor.border(), 10)
-        }
-    }, content = { Column(SwingModifier.opaque(false), content) })
 }
 
 @Composable

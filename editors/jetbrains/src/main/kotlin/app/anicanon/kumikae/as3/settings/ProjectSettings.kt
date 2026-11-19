@@ -19,6 +19,8 @@ internal data class ExportFields(
     val icon: String,
     val executionMode: IosExecutionMode,
     val signingTeam: String,
+    val buildNumber: String,
+    val releaseVersion: String,
 )
 
 internal data class ProjectSettings(
@@ -40,13 +42,15 @@ internal data class ProjectSettings(
     val exportIcon: String = "",
     val executionMode: IosExecutionMode = IosExecutionMode.Automatic,
     val signingTeam: String = "",
+    val buildNumber: String = "",
+    val releaseVersion: String = "",
     val exportDrafts: Map<String, ExportFields> = emptyMap(),
 ) {
     fun allExportDrafts(): Map<String, ExportFields> = if (preset.isEmpty()) {
         exportDrafts
     } else {
         exportDrafts +
-            (preset to ExportFields(identifier, exportIcon, executionMode, signingTeam))
+            (preset to ExportFields(identifier, exportIcon, executionMode, signingTeam, buildNumber, releaseVersion))
     }
 
     fun select(section: String): ProjectSettings {
@@ -59,6 +63,21 @@ internal data class ProjectSettings(
             executionMode =
             remembered?.executionMode ?: IosExecutionMode.read(exports.raw("$section.options", NATIVE_CODE)),
             signingTeam = remembered?.signingTeam ?: exports.string("$section.options", SIGNING_TEAM),
+            buildNumber = remembered?.buildNumber ?: if (selected?.platform == "Android") {
+                exports.raw("$section.options", "version/code") ?: "1"
+            } else {
+                exports.string("$section.options", "application/version")
+            },
+            releaseVersion = remembered?.releaseVersion ?: exports.string(
+                "$section.options",
+                if (selected?.platform ==
+                    "Android"
+                ) {
+                    "version/name"
+                } else {
+                    "application/short_version"
+                },
+            ),
             preset = section,
             identifier =
             remembered?.identifier ?: selected?.identifierKey?.let { exports.string("$section.options", it) }.orEmpty(),
@@ -126,6 +145,31 @@ internal data class ProjectSettings(
                     exportChanges[ConfigKey(options, SIGNING_TEAM)] = GodotConfig.quote(team)
                 }
             }
+            if (selected.identifierKey != null) {
+                val options = "$section.options"
+                val android = selected.platform == "Android"
+                val versionKey = if (android) "version/name" else "application/short_version"
+                if (fields.releaseVersion != originalExports.string(options, versionKey)) {
+                    require(
+                        android || fields.releaseVersion.isBlank() || APPLE_VERSION.matches(fields.releaseVersion),
+                    ) {
+                        "Enter an iOS version such as 1.2.0."
+                    }
+                    exportChanges[ConfigKey(options, versionKey)] = GodotConfig.quote(fields.releaseVersion.trim())
+                }
+                if (android && fields.buildNumber != (originalExports.raw(options, "version/code") ?: "1")) {
+                    require(fields.buildNumber.toIntOrNull() in 1..2100000000) {
+                        "Enter a positive Android version code up to 2100000000."
+                    }
+                    exportChanges[ConfigKey(options, "version/code")] = fields.buildNumber.toInt().toString()
+                } else if (!android && fields.buildNumber != originalExports.string(options, "application/version")) {
+                    require(fields.buildNumber.isBlank() || APPLE_VERSION.matches(fields.buildNumber)) {
+                        "Enter a numeric iOS build number such as 42."
+                    }
+                    exportChanges[ConfigKey(options, "application/version")] =
+                        GodotConfig.quote(fields.buildNumber.trim())
+                }
+            }
             validateResource(image)
             validateType(GameResourceKind.ExportIcon, image)
             selected.identifierKey?.takeIf {
@@ -144,6 +188,7 @@ internal data class ProjectSettings(
     }
 
     companion object {
+        private val APPLE_VERSION = Regex("""[0-9]+(\.[0-9]+){0,2}""")
         private const val NATIVE_CODE = "actionscript/native_code"
         private const val SIGNING_TEAM = "application/app_store_team_id"
 

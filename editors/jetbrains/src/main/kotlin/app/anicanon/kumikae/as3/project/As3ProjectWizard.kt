@@ -11,6 +11,7 @@ import app.anicanon.kumikae.as3.run.ensureDefaultTests
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.execution.RunManager
@@ -28,7 +29,6 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
-import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.CheckBox
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.interaction.enabled
@@ -62,29 +62,32 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                 cell(
                     composePanel(context.disposable) {
                         Column {
-                            LabelledField(
-                                "Application identifier",
-                                bundle,
-                                { bundle = it },
-                                placeholder = ProjectTemplate.defaultBundle(projectName),
-                            )
-                            LabelledField("Version", version, {
-                                version = it
-                            }, placeholder = ProjectTemplate.DEFAULT_VERSION)
-                            Label("Run targets")
-                            for (choice in choices) {
-                                CheckBox(
-                                    choice.platform.label,
-                                    chosen[choice.platform] == true,
-                                    { on: Boolean -> if (!choice.always) chosen[choice.platform] = on },
-                                    SwingModifier.enabled(choice.available && !choice.always),
+                            SettingsSection("Application") {
+                                LabelledField(
+                                    "Application identifier",
+                                    bundle,
+                                    { bundle = it },
+                                    placeholder = ProjectTemplate.defaultBundle(projectName),
                                 )
-                                StatusLine(choice.note)
+                                LabelledField("Version", version, {
+                                    version = it
+                                }, placeholder = ProjectTemplate.DEFAULT_VERSION)
                             }
-                            for (target in contributions) {
-                                CheckBox(target.label, optional[target.setupAction] == true, { selected: Boolean ->
-                                    optional[target.setupAction] = selected
-                                })
+                            SettingsSection("Run targets") {
+                                for (choice in choices) {
+                                    CheckBox(
+                                        choice.platform.label,
+                                        chosen[choice.platform] == true,
+                                        { on: Boolean -> if (!choice.always) chosen[choice.platform] = on },
+                                        SwingModifier.enabled(choice.available && !choice.always),
+                                    )
+                                    StatusLine(choice.note)
+                                }
+                                for (target in contributions) {
+                                    CheckBox(target.label, optional[target.setupAction] == true, { selected: Boolean ->
+                                        optional[target.setupAction] = selected
+                                    })
+                                }
                             }
                         }
                     },

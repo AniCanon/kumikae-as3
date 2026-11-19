@@ -5,6 +5,7 @@ import app.anicanon.kumikae.as3.scene.SceneDocument
 import app.anicanon.kumikae.as3.scene.SceneNode
 import app.anicanon.kumikae.as3.scene.SceneRepository
 import app.anicanon.kumikae.as3.scene.SceneView
+import app.anicanon.kumikae.as3.settings.AndroidUploadKeys
 import app.anicanon.kumikae.as3.settings.Artwork
 import app.anicanon.kumikae.as3.settings.IosExecutionMode
 import app.anicanon.kumikae.as3.settings.ProjectSettings
@@ -12,6 +13,7 @@ import app.anicanon.kumikae.as3.settings.ProjectSettingsView
 import app.anicanon.kumikae.as3.settings.SettingsController
 import app.anicanon.kumikae.as3.settings.SettingsRepository
 import app.anicanon.kumikae.as3.settings.SigningTeam
+import app.anicanon.kumikae.as3.settings.UploadKeyDialog
 import app.anicanon.kumikae.as3.ui.TabControl
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
@@ -32,10 +34,14 @@ import javax.swing.JTextField
 internal object UiProbeProjectExperience {
     fun run(destination: Path, theme: String) {
         checkCatalog(destination, theme)
+        checkUploadKeyDialog(destination, theme)
         val owner = Disposer.newDisposable()
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
         var chosenResource = ""
+        var released = ""
+        var portal = ""
+        var keyPreset = ""
         val scenes = UiProbeSceneRepository()
         val sceneController = SceneController(scenes)
         lateinit var frame: JFrame
@@ -45,10 +51,18 @@ internal object UiProbeProjectExperience {
             frame = JFrame()
             panel =
                 composePanel(owner) {
-                    ProjectSettingsView(controller, { kind, callback ->
-                        chosenResource = kind.title
-                        callback("res://new-icon.svg")
-                    })
+                    ProjectSettingsView(
+                        controller,
+                        { kind, callback ->
+                            chosenResource = kind.title
+                            callback("res://new-icon.svg")
+                        },
+                        release = { _, preset -> released = preset.platform },
+                        addTarget = {},
+                        export = { _, _ -> },
+                        openStore = { portal = it },
+                        configureKey = { keyPreset = it.name },
+                    )
                 }
             frame.contentPane.add(panel)
         }
@@ -79,6 +93,16 @@ internal object UiProbeProjectExperience {
             edt {
                 val team = combos().single { it.selectedItem.toString() == "Choose a team…" }
                 team.selectedIndex =
+                    (0 until team.itemCount).single { team.getItemAt(it).toString().contains("Personal") }
+            }
+            await {
+                descendants(panel).filterIsInstance<JButton>().any {
+                    it.text?.contains("prepare Xcode project", ignoreCase = true) == true && !it.isEnabled
+                }
+            }
+            edt {
+                val team = combos().single { it.selectedItem.toString().contains("Personal") }
+                team.selectedIndex =
                     (0 until team.itemCount).single { team.getItemAt(it).toString().contains("Studio") }
             }
             await { controller.draft?.signingTeam == "EXAMPLE123" && controller.dirty }
@@ -92,6 +116,19 @@ internal object UiProbeProjectExperience {
                 repository.value.executionMode == IosExecutionMode.Native &&
                     repository.value.signingTeam == "EXAMPLE123"
             }
+
+            click(panel, "Prepare Xcode project…")
+            click(panel, "App Store Connect")
+            check(released == "iOS" && portal == "iOS")
+            edt {
+                val target = combos().single { it.selectedItem is app.anicanon.kumikae.as3.settings.ExportPreset }
+                target.selectedIndex = 1
+            }
+            click(panel, "Configure upload key…")
+            click(panel, "Play Console")
+            click(panel, "Build Play bundle…")
+            check(keyPreset == "Google Play" && released == "Android" && portal == "Android")
+            render(panel, destination.resolve("$theme-project-android.png"))
 
             edt {
                 frame.contentPane.remove(panel)
@@ -112,6 +149,26 @@ internal object UiProbeProjectExperience {
                 Disposer.dispose(owner)
                 frame.dispose()
             }
+        }
+    }
+
+    private fun checkUploadKeyDialog(destination: Path, theme: String) {
+        lateinit var dialog: UploadKeyDialog
+        edt {
+            val project = com.intellij.openapi.project.ProjectManager.getInstance().defaultProject
+            val store = AndroidUploadKeys(project, destination.toString(), "UI fixture")
+            dialog = UploadKeyDialog(project, "Google Play", store)
+        }
+        try {
+            val panel = dialog.contentPanel
+            await { descendants(panel).filterIsInstance<JButton>().any { it.text == "Create new…" } }
+            edt {
+                val password = descendants(panel).filterIsInstance<javax.swing.JPasswordField>().single()
+                check(password.echoChar != '\u0000' && password.accessibleContext.accessibleName == "Keystore password")
+            }
+            render(panel, destination.resolve("$theme-upload-key.png"), 500, 420)
+        } finally {
+            edt { dialog.doCancelAction() }
         }
     }
 
@@ -205,12 +262,18 @@ internal object UiProbeProjectExperience {
 
 internal class UiProbeSettingsRepository : SettingsRepository {
     override val hasXcodeTeams = true
-    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) =
-        ready(Result.success(listOf(SigningTeam("EXAMPLE123", "Example Studio"))))
+    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) = ready(
+        Result.success(
+            listOf(SigningTeam("EXAMPLE123", "Example Studio"), SigningTeam("PERSONAL12", "Individual", true)),
+        ),
+    )
 
     var value = ProjectSettings.read(
         "[application]\nconfig/name=\"Example Game\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
-        "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n",
+        "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n" +
+            "[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n" +
+            "[preset.1]\nname=\"Google Play\"\nplatform=\"Android\"\n" +
+            "[preset.1.options]\npackage/unique_name=\"org.example.game\"\n",
     )
     override fun preview(path: String): Artwork = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
         val graphics = it.createGraphics()

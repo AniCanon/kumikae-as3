@@ -107,6 +107,28 @@ application identifier from the preset, exports and builds the game, installs it
 - **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
+## Release a mobile game
+
+Open **project.godot → Settings → Export** and select the target. Each preset has its own application
+identifier, release version and build number or version code.
+
+- **iOS.** Choose an Apple Developer Program team under **Device signing team**. To add an account,
+  click **Open Xcode**, sign in under **Xcode → Settings → Apple Accounts**, then refresh the team list
+  in Rider. Click **Prepare Xcode project…** and choose an output folder. Use **Open in Xcode** in the
+  completion notification, select a device build destination, then choose **Product → Archive**.
+  In Organizer, choose **Distribute App → App Store Connect**. After processing, manage testers in
+  TestFlight or select the build for App Review in App Store Connect.
+- **Android.** Running an emulator uses debug signing and requires no Play account. For distribution,
+  click **Configure upload key…** to choose your app's existing upload key or create one for a new app.
+  Keep a backup of the keystore and password outside the game. Rider saves the key reference and
+  password in its password store. Existing Godot signing settings and build-environment credentials
+  also work. If signing needs setup, the build opens the key dialog for you. Click **Build Play bundle…** to produce a signed `.aab` using the Godot Android Gradle
+  template. Open **Play Console**, sign in with your Google Play developer account, and upload the bundle
+  to the app's testing or production track. Play App Signing signs the builds delivered to users.
+
+**Export** and **Export All** build the formats configured in Godot. Preparing a store product applies
+its format to a temporary project copy so the same target remains available for local runs.
+
 ## The Devices panel
 
 Open **View > Tool Windows > Devices** to start and view simulators and Android emulators.

@@ -5,6 +5,36 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ProjectSettingsTest {
+    @Test fun `store setup recognizes only credentials usable by the selected preset`() {
+        val options = "[preset.1.options]\nkeystore/release=\"res://upload.jks\"\nkeystore/release_user=\"upload\"\n"
+        val env = mapOf("GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD" to "fixture")
+        assertEquals(true, hasGodotUploadKey("preset.1", "", options, env))
+        assertEquals(false, hasGodotUploadKey("preset.0", "", options, env))
+        assertEquals(false, hasGodotUploadKey("preset.1", options, "", emptyMap()))
+    }
+
+    @Test fun `dedicated distribution chooses the store product independently of the run preset`() {
+        val settings = ProjectSettings.read(
+            "",
+            "[preset.0]\nname=\"Phone\"\nplatform=\"Android\"\nexport_path=\"build/demo.apk\"\n",
+        )
+        assertEquals("demo.apk", exportJobs(settings, settings.presets, false).single()["filename"])
+        assertEquals("demo.aab", exportJobs(settings, settings.presets, true).single()["filename"])
+    }
+
+    @Test fun `a generated upload key can be reopened but never overwritten`(
+        @org.junit.jupiter.api.io.TempDir folder: java.nio.file.Path,
+    ) {
+        val file = folder.resolve("upload.p12")
+        val key = UploadKey(file.toString(), "upload", "sample-test-password")
+        key.create()
+        key.validate()
+        val bytes = java.nio.file.Files.readAllBytes(file)
+        assertFailsWith<IllegalArgumentException> { key.create() }
+        assertFailsWith<IllegalArgumentException> { UploadKey(file.toString(), "other", key.password).validate() }
+        kotlin.test.assertContentEquals(bytes, java.nio.file.Files.readAllBytes(file))
+    }
+
     @Test fun `orientation and platform identifiers have distinct storage`() {
         val original = ProjectSettings.read(
             "[application]\nconfig/name=\"Game\"\n",
@@ -46,6 +76,18 @@ class ProjectSettingsTest {
             val automatic = original.copy(executionMode = IosExecutionMode.Automatic).write("", exports).second
             assertEquals("2", GodotConfig(automatic).raw("preset.0.options", "actionscript/native_code"))
         }
+    }
+
+    @Test fun `mobile builds keep their versions in the selected preset`() {
+        val text = "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.1]\nname=\"Android\"\nplatform=\"Android\"\n"
+        val settings = ProjectSettings.read("", text).copy(buildNumber = "2.1", releaseVersion = "1.3")
+            .select("preset.1").copy(buildNumber = "12", releaseVersion = "1.4")
+        val saved = GodotConfig(settings.write("", text).second)
+        assertEquals("2.1", saved.string("preset.0.options", "application/version"))
+        assertEquals("1.3", saved.string("preset.0.options", "application/short_version"))
+        assertEquals("12", saved.raw("preset.1.options", "version/code"))
+        assertEquals("1.4", saved.string("preset.1.options", "version/name"))
+        assertFailsWith<IllegalArgumentException> { settings.copy(buildNumber = "0").write("", text) }
     }
 
     @Test fun `invalid fields cannot be written`() {

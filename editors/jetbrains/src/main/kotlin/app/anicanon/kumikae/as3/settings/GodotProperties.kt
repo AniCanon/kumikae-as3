@@ -5,8 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.StatusLine
+import app.anicanon.kumikae.as3.ui.SurfaceGroup
 import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
@@ -25,7 +25,7 @@ internal fun GodotProperties(source: String) {
             expanded = if (open) expanded - section else expanded + section
         })
         if (open) {
-            Column(SwingModifier.emptyBorder(JBUI.insets(4, 14, 8, 0))) {
+            SurfaceGroup(SwingModifier.emptyBorder(JBUI.insetsBottom(8)), padding = 10) {
                 for (key in keys) {
                     Label(key)
                     StatusLine(config.raw(section, key).orEmpty())

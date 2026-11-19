@@ -103,7 +103,7 @@ internal class SettingsController(private val repository: SettingsRepository) {
             draft = loaded
             previews(loaded)
             if (!requestedTeams && loaded.presets.any { it.platform == "iOS" }) refreshTeams()
-            status = "Settings are stored in project.godot and export_presets.cfg."
+            status = ""
         } catch (canceled: ProcessCanceledException) {
             throw canceled
         } catch (error: Exception) {
