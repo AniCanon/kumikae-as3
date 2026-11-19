@@ -99,7 +99,9 @@ code from comments, strings and regular expression literals.
 On the one Rider build the plugin was tested with (`RD-262.10968.170`), the `Rider*Lifetime` classes
 release objects of Rider's own that would otherwise outlive a closed project. They run only on that exact
 build, check the signatures of what they call before they call it, and change no IDE file. Each repair
-reports its failure independently.
+reports its failure independently. The project-open listener installs the adapters before Rider restores
+a visible Problems window. On this build a post-startup project activity can run after the panel is
+already created. The Rider startup probe checks panel ownership on a second project open.
 
 The plugin verifier can't check reflective calls. Before you change the supported build, run the sandbox
 probes described in [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide).

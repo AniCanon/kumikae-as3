@@ -51,8 +51,7 @@ private class As3LspClientDescriptor(project: Project, private val compiler: Pat
             override fun publishDiagnostics(params: PublishDiagnosticsParams) {
                 // Rider sends changes before the document write finishes. Keep validation and caching atomic.
                 // Native cache publication has side effects and must not be cancelled/retried midway.
-                @Suppress("DEPRECATION")
-                ReadAction.run<RuntimeException> {
+                ReadAction.runBlocking<RuntimeException> {
                     if (!project.isDisposed) handler.publishDiagnostics(params)
                 }
             }

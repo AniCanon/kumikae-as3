@@ -37,7 +37,10 @@ class UiProbeStarter : ApplicationStarter {
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
                 val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
-                if (System.getenv("KUMIKAE_LSP_DESCRIPTOR_PROBE") == "1") {
+                if (System.getenv("KUMIKAE_RIDER_STARTUP_PROBE") == "1") {
+                    UiProbeRiderReopen.run(destination)
+                    UiProbeRiderLifecycle.checkNativeUnload(destination)
+                } else if (System.getenv("KUMIKAE_LSP_DESCRIPTOR_PROBE") == "1") {
                     checkLanguageClientRegistration(destination)
                 } else if (System.getenv("KUMIKAE_GODOT_SETUP_PROBE") == "1") {
                     checkThemes(destination, godotSetupOnly = true)

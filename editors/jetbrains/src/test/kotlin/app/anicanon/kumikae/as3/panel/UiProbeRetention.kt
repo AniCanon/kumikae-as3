@@ -17,7 +17,8 @@ import javax.swing.JWindow
 /** Only weak references survive project closure; live histograms force collection in this test JVM. */
 internal object UiProbeRetention {
     fun enabled(): Boolean = System.getenv("KUMIKAE_COMPLETION_RETENTION_CHECK") == "1" ||
-        System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1"
+        System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1" ||
+        System.getenv("KUMIKAE_RIDER_STARTUP_PROBE") == "1"
 
     fun closeProject(project: Project, observations: MutableList<String>) {
         var focusRoot: Container? = null

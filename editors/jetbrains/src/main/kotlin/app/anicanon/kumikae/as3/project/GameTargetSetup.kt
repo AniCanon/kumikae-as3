@@ -15,7 +15,7 @@ import com.intellij.openapi.vfs.VirtualFile
 
 internal class GameTargetSetup(private val project: Project, private val root: VirtualFile) {
     private val manager = FileDocumentManager.getInstance()
-    private fun text(file: VirtualFile): String = ReadAction.compute<String, RuntimeException> {
+    private fun text(file: VirtualFile): String = ReadAction.computeBlocking<String, RuntimeException> {
         requireNotNull(manager.getDocument(file)) { "Cannot read ${file.name}." }.text
     }
     private fun file() = root.findChild("export_presets.cfg")

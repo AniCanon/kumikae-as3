@@ -165,6 +165,9 @@ After you change a language client, run all four combinations, one after another
 
 Save a run's reports before the next run overwrites them.
 
+Run `KUMIKAE_RIDER_STARTUP_PROBE=1 ./gradlew --offline runIde -PuiProbe` to check Rider’s startup
+adapters and close and reopen a sandbox project with the Problems window visible.
+
 ### Opt-in probes
 
 Each of these is switched on by an environment variable and never runs in an ordinary test run.

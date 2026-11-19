@@ -13,6 +13,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 
+@kotlin.jvm.JvmDefaultWithoutCompatibility
 class SimulatorToolWindowFactory :
     ToolWindowFactory,
     DumbAware {

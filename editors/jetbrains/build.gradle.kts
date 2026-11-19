@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.2.6"
+version = "0.2.7"
 
 repositories {
     mavenCentral()
@@ -116,7 +116,11 @@ if (providers.gradleProperty("uiProbe").isPresent) {
             },
         ).get().asFile
         args("kumikae-as3-ui-check", report.absolutePath)
-        if (listOf("KUMIKAE_COMPLETION_RETENTION_CHECK", "KUMIKAE_COMPLETION_RETENTION_PROBE")
+        if (listOf(
+                "KUMIKAE_COMPLETION_RETENTION_CHECK",
+                "KUMIKAE_COMPLETION_RETENTION_PROBE",
+                "KUMIKAE_RIDER_STARTUP_PROBE",
+            )
                 .any { providers.environmentVariable(it).orNull == "1" }
         ) {
             // Leak checks must collect soft caches too; this flag applies only to the probe JVM.
