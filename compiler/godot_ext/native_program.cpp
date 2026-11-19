@@ -16,6 +16,11 @@
 #include <cstring>
 #include <new>
 
+#if defined(__ANDROID__)
+#include <dlfcn.h>
+#include <unistd.h>
+#endif
+
 using namespace godot;
 
 namespace kas3 {
@@ -324,6 +329,19 @@ std::string NativeProgram::path() {
 	}
 #if defined(IOS_ENABLED)
 	// The watched project can be on the Mac. Its desktop library cannot run in the app.
+	return {};
+#elif defined(__ANDROID__)
+	Dl_info info{};
+	if (dladdr(reinterpret_cast<const void *>(&NativeProgram::path), &info) && info.dli_fname) {
+		const std::string self(info.dli_fname);
+		const size_t slash = self.rfind('/');
+		if (slash != std::string::npos) {
+			const std::string candidate = self.substr(0, slash + 1) + SharedLibrary::file_name("kas3_program");
+			if (access(candidate.c_str(), F_OK) == 0) {
+				return candidate;
+			}
+		}
+	}
 	return {};
 #else
 	const String beside = scripts_root().path_join(String::utf8(("bin/" + SharedLibrary::file_name("kas3_program")).c_str()));

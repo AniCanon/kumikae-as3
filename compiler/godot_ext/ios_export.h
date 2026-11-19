@@ -1,7 +1,8 @@
-// Godot and the IDE both use this plugin when exporting an iOS project on a Mac.
+// Godot and the IDE both use this plugin when exporting iOS or Android projects.
 #pragma once
 
-#if defined(MACOS_ENABLED)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_export_platform.hpp>
 #include <godot_cpp/classes/editor_export_plugin.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
@@ -15,6 +16,9 @@ class AS3IOSExport : public godot::EditorExportPlugin {
 	std::vector<std::string> scripts_;
 	bool enabled_ = false;
 	bool debug_ = false;
+	bool ios_ = false;
+	bool android_ = false;
+	godot::Ref<godot::DirAccess> android_temp_;
 
 protected:
 	static void _bind_methods() {}
