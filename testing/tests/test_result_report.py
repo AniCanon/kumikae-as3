@@ -56,3 +56,37 @@ class ResultReportTest(unittest.TestCase):
         self.assertIn("AS3 tests: 0 passed, 2 failed", result.stdout)
         self.assertIn("message='" + runtime_error + "'", result.stdout)
         self.assertIn("message='Missing completion marker: DONE'", result.stdout)
+
+    def test_streams_events_before_process_exits(self):
+        script = (
+            "import sys, time\n"
+            "def emit(kind, name):\n"
+            "    print(f'@kas3-test-v1 {kind} {len(name)} 0\\n{name}\\n', flush=True)\n"
+            "emit('suiteStarted', 'Live')\n"
+            "emit('testStarted', 'fast')\n"
+            "emit('testFinished', 'fast')\n"
+            "time.sleep(0.4)\n"
+            "emit('testStarted', 'slow')\n"
+            "emit('testFinished', 'slow')\n"
+            "emit('suiteFinished', 'Live')\n"
+            "print('DONE', flush=True)\n"
+        )
+        targets = [dict(name="LiveTarget", marker="DONE", events=True, command=[sys.executable, "-u", "-c", script])]
+        with tempfile.TemporaryDirectory() as folder:
+            manifest = Path(folder) / "kas3-tests.json"
+            manifest.write_text(json.dumps(dict(version=1, tests=targets)))
+            with subprocess.Popen(
+                [sys.executable, "-u", str(Path(__file__).resolve().parents[1] / "runner.py"), str(manifest)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            ) as proc:
+                saw_fast_while_running = False
+                lines = []
+                for line in proc.stdout:
+                    lines.append(line)
+                    if "testFinished name='fast'" in line and proc.poll() is None:
+                        saw_fast_while_running = True
+                proc.wait(timeout=5)
+                returncode = proc.returncode
+        self.assertEqual(returncode, 0)
+        self.assertTrue(saw_fast_while_running, "Expected 'fast' testFinished to stream before runner exited")
+        self.assertIn("AS3 tests: 2 passed, 0 failed", "".join(lines))

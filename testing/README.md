@@ -2,13 +2,12 @@
 
 Kumikae Testing lets you write tests for your game in ActionScript 3. It has three parts:
 
-- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing): `TestCase`, `Suite` and
-  `Assert`.
-- **A command-line runner,** `runner.py`, which runs the tests a project lists and reports each case.
+- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing) (`TestCase`, `Suite`, `Assert`, `AssertionError`) and [`godot/app/anicanon/kumikae/testing/`](godot/app/anicanon/kumikae/testing) (`TestScene`, `EngineTestRunner`).
+- **A command-line runner,** `runner.py`, which runs the tests a project lists and streams each case live.
 - **Rider integration,** in the [plugin](../editors/jetbrains/README.md#tests), which shows results in the
   IDE's Tests window.
 
-Tests run on the interpreter, with `kas3c run` or inside Godot. Nothing is downloaded.
+Tests run on the interpreter, with `kas3c run` or inside headless Godot. Nothing is downloaded.
 
 Mark public no-argument instance methods with `[Test]` and point a manifest target at the fixture directory:
 
@@ -16,9 +15,55 @@ Mark public no-argument instance methods with `[Test]` and point a manifest targ
 {"version":1,"tests":[{"name":"Models","discover":"tests"}]}
 ```
 
+Add `"runtime": "godot"` to run discovered fixtures inside a single headless Godot process so Godot types
+(`Vector2`, `Node`, `PackedScene`), scenes, and frame stepping work directly:
+
+```json
+{"version":1,"tests":[{"name":"Game tests","discover":"tests","runtime":"godot"}]}
+```
+
 The runner uses the compiler's syntax tree and creates a fresh fixture for each test. Case IDs use the
 qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
 Rider uses the same IDs for the gutter, test results, reruns and source navigation.
+
+### Metadata and lifecycle hooks
+
+| Metadata | Where | Meaning |
+|---|---|---|
+| `[Test]` | Public instance method | Runs as a test case. Accepts optional `timeout=<ms>`, `expects="<ErrorClass>"`, and `allowEngineErrors=true`. |
+| `[Before]`, `[After]` | Public instance method | Runs before and after each test on the same fixture instance. |
+| `[BeforeClass]`, `[AfterClass]` | Public static method | Runs once before and after all tests in the fixture class. |
+| `[Ignore]` / `[Ignore("reason")]` | Class or `[Test]` method | Skips the test(s) and reports them as ignored. |
+
+### Godot engine tests (`TestScene`)
+
+Inside a `"runtime": "godot"` target, tests run synchronously by default and can touch Godot APIs directly.
+To mount scenes or step frames across `_process` / `_physicsProcess`, use `TestScene`:
+
+```actionscript
+[Test]
+public function playerMoves():void {
+    var player:Mover = TestScene.instantiate("res://scenes/Mover.tscn") as Mover;
+    TestScene.afterFrames(2, function():void {
+        Assert.assertTrue(player.position.x > 0);
+    }).afterPhysicsFrames(2, function():void {
+        Assert.assertTrue(player.physicsTicks >= 2);
+    }).until(function():Boolean {
+        return player.position.x >= 40;
+    }, 3000, function():void {
+        Assert.assertTrue(player.position.x >= 40);
+    });
+}
+```
+
+- `TestScene.root`, `TestScene.add(node)`, and `TestScene.instantiate(path)` mount nodes under a per-test
+  sandbox that is freed after the test finishes.
+- `afterFrames(n, fn)`, `afterPhysicsFrames(n, fn)`, `afterSeconds(s, fn)`, and `until(pred, timeoutMs, fn)`
+  chain steps on the engine loop before `[After]` and sandbox cleanup run.
+- Any Godot `ERROR:` or `SCRIPT ERROR:` logged while a test is running fails that test unless it is marked
+  `[Test(allowEngineErrors=true)]`.
+- Set `"headless": false` on a Godot target when a test needs a window/GPU, or pass `--native` to `runner.py`
+  to run against compiled native code instead of the interpreter.
 
 ## Write a test case
 
@@ -84,7 +129,13 @@ package game.tests {
 | Assertion | Fails when |
 |---|---|
 | `Assert.assertTrue(value, message)` | `value` is false |
-| `Assert.assertEquals(expected, actual, message)` | The two differ |
+| `Assert.assertFalse(value, message)` | `value` is true |
+| `Assert.assertEquals(expected, actual, message)` | The two differ (`!==`); emits comparison diff values |
+| `Assert.assertNotEquals(unexpected, actual, message)` | The two are strictly equal (`===`) |
+| `Assert.assertNull(value, message)` | `value !== null` |
+| `Assert.assertNotNull(value, message)` | `value` is `null` or `undefined` |
+| `Assert.assertApprox(expected, actual, tolerance, message)` | Difference exceeds `tolerance` (or either is `NaN`) |
+| `Assert.assertThrows(block, expectedErrorName, message)` | `block()` doesn't throw, or throws a different error class |
 | `Assert.fail(message)` | Always |
 
 ## Collect cases into a suite
@@ -148,6 +199,8 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
 | `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
+| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`) or `"godot"` (headless Godot) |
+| `headless` | Optional (for `"runtime": "godot"`). `true` by default; set `false` when a test needs a window/GPU |
 | `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
 | `command` | The program to run, as an array of arguments (for manual targets). It's run without a shell |
 | `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
@@ -184,7 +237,8 @@ python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/k
     --case 'Scoring::Scoring::Starts empty'
 ```
 
-`--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`.
+`--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`. `--native`
+runs `"runtime": "godot"` targets with `KAS3_NATIVE_PLAY=1` instead of the interpreter.
 
 A test fails when its process exits with a nonzero status, prints a compiler or engine error, doesn't
 print its marker, runs past its timeout, or doesn't finish its suite. Asking for a case that doesn't exist
