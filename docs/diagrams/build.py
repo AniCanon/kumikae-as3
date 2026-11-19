@@ -7,7 +7,9 @@ To move the roadmap forward, change a status in ROADMAP below and run the script
 Statuses: "done", "now", "next", "planned", "later".
 """
 import html
+import math
 import os
+import textwrap
 
 FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
 INK = "#202124"
@@ -37,7 +39,7 @@ ROADMAP = [
      "Level with or ahead of Godot C# on macOS frame benchmarks.", "done"),
     ("6", "Play builds native code", "The extension builds and caches the program library by itself.",
      "Pressing Play runs native code with no manual step.", "done"),
-    ("7", "Native iOS & Android exports", "Godot and Rider build native AS3 into iOS and Android apps.",
+    ("7", "Mobile native exports", "Godot and Rider build native AS3 into iOS and Android apps.",
      "iOS Simulator & Android APK pass. Hardware runs next.", "now"),
     ("8", "Debugger", "Breakpoints and stepping from Rider.",
      "You can step through AS3 in the editor and on a device.", "planned"),
@@ -213,70 +215,186 @@ def hot_reload():
 
 
 def roadmap():
-    w, pad = 1080, 40
-    col_gap, row_gap = 20, 14
-    col_w = (w - 2 * pad - col_gap) // 2
-    card_h = 104
+    w, pad = 1160, 40
+    navy_bg = "#131C28"
+    card_bg = "#192434"
+    card_border = "#28374B"
+    ink_light = "#F1F5F9"
+    ink_body = "#CBD5E1"
+    ink_muted = "#7E90A6"
+    brand = "#F0447B"
+
+    # status -> (badge_bg, badge_stroke, accent_text, label)
+    theme = {
+        "done": ("#132E28", "#2B7A62", "#34D399", "BUILT"),
+        "now": ("#381628", brand, "#FF6B9A", "IN PROGRESS"),
+        "next": ("#2D2212", "#8F621B", "#FBBF24", "NEXT"),
+        "planned": ("#16263B", "#325888", "#60A5FA", "PLANNED"),
+        "later": ("#182230", "#334357", "#94A3B8", "LATER"),
+    }
+
+    def hex_points(cx, cy, r):
+        pts = []
+        for i in range(6):
+            ang = math.radians(60 * i - 90)
+            pts.append(f"{cx + r * math.cos(ang):.1f},{cy + r * math.sin(ang):.1f}")
+        return " ".join(pts)
 
     built = [item for item in ROADMAP if item[4] == "done"]
     upcoming = [item for item in ROADMAP if item[4] not in ("done", "later")]
     later = [item for item in ROADMAP if item[4] == "later"]
 
-    built_rows = (len(built) + 1) // 2
-    upcoming_rows = (len(upcoming) + 1) // 2
-    y_built_label = 112
-    y_built = y_built_label + 16
-    y_up_label = y_built + built_rows * (card_h + row_gap) + 22
-    y_up = y_up_label + 16
-    y_later = y_up + upcoming_rows * (card_h + row_gap) + 8
-    later_h = 68
-    h = y_later + (later_h + 32 if later else 20)
+    col_gap, row_gap = 16, 16
+    col_w3 = (w - 2 * pad - 2 * col_gap) // 3
+    built_h = 166
+    built_rows = (len(built) + 2) // 3
 
-    s = Svg(w, h, "Roadmap")
-    s.text(pad, 46, "Roadmap", size=22, weight="bold")
-    s.text(pad, 70, "Each milestone ends in something you can run.", size=13, fill=MUTED)
-    s.legend(w - pad - 375, 58, ["done", "now", "next", "planned"])
-    s.parts.append(f'<line x1="{pad}" y1="88" x2="{w - pad}" y2="88" stroke="#E8EAED" stroke-width="1"/>')
+    col_w4 = (w - 2 * pad - 3 * 14) // 4
+    up_h = 190
 
-    def draw_card(x, y, cw, ch, item):
+    y_head_line = 104
+    y_built_hdr = 132
+    y_built = y_built_hdr + 18
+    y_up_hdr = y_built + built_rows * (built_h + row_gap) + 18
+    y_up = y_up_hdr + 18
+    y_later = y_up + up_h + 22
+    later_h = 64
+    h = y_later + later_h + 34
+
+    s = Svg(w, h, "Kumikae AS3 Roadmap")
+    # Dark brand canvas overriding default white background
+    s.parts.append(
+        '<defs>'
+        '<linearGradient id="rm-bg" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0%" stop-color="#0F1621"/><stop offset="100%" stop-color="{navy_bg}"/>'
+        '</linearGradient>'
+        '<linearGradient id="rm-glow" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0%" stop-color="#34D399"/><stop offset="70%" stop-color="#34D399"/>'
+        f'<stop offset="100%" stop-color="{brand}"/>'
+        '</linearGradient>'
+        '</defs>'
+        f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="16" fill="url(#rm-bg)" stroke="{card_border}"/>'
+    )
+
+    # Subtle decorative hexagon motif in top-right corner
+    for gx, gy, gr, op in [(w - 92, 46, 54, "0.05"), (w - 34, 80, 32, "0.04")]:
+        s.parts.append(
+            f'<polygon points="{hex_points(gx, gy, gr)}" fill="none" stroke="#CED5DF" '
+            f'stroke-width="1.5" opacity="{op}"/>'
+        )
+
+    # Kumikae AS3 logo mark (from pluginIcon_dark.svg) in header
+    s.parts.append(
+        f'<g transform="translate({pad - 17}, 12) scale(0.088)">'
+        '<path fill="#CED5DF" fill-rule="evenodd" d="M504 249 730 375 730 404 648 448 686 403 587 431 535 498 537 505 '
+        '512 505 579 391 677 380 531 298 568 384 513 476 526 402 504 307 483 402 496 477 441 384 479 298 332 381 '
+        '430 391 498 505 364 505 309 419 311 570 309 601 364 517 498 517 430 629 332 638 486 727 441 636 496 543 '
+        '483 618 504 712 526 618 513 543 568 636 531 727 677 639 579 629 512 518 537 518 537 524 663 553 699 604 '
+        '699 520 730 483 730 644 504 775 279 644 279 375 Z M322 404 396 473 478 499 422 431 Z M322 616 422 589 '
+        '478 523 396 548 Z M535 527 587 589 686 615 613 553 Z"/>'
+        f'<path fill="{brand}" d="M563 514 591 489 718 432 746 443 664 540 Z"/>'
+        '</g>'
+    )
+
+    s.text(pad + 58, 52, "Kumikae AS3", size=21, weight="bold", fill=ink_light)
+    s.text(pad + 200, 52, "Roadmap", size=21, weight="normal", fill=ink_muted)
+    s.text(pad + 58, 74, "Every milestone ends in something you can run.", size=12.5, fill=ink_muted)
+
+    # Compact legend + progress meter on top right
+    lx = w - pad - 380
+    for key in ["done", "now", "next", "planned"]:
+        bg, stroke, fg, label = theme[key]
+        s.parts.append(f'<circle cx="{lx}" cy="46" r="4.5" fill="{fg}"/>')
+        s.text(lx + 11, 50, label, size=10.5, weight="bold", fill=ink_body)
+        lx += 24 + len(label) * 7.2
+
+    bar_x, bar_y, bar_w, bar_h = w - pad - 384, 66, 384, 6
+    s.parts.append(f'<rect x="{bar_x}" y="{bar_y}" width="{bar_w}" height="{bar_h}" rx="3" fill="#223044"/>')
+    s.parts.append(
+        f'<rect x="{bar_x}" y="{bar_y}" width="{int(bar_w * 0.68)}" height="{bar_h}" rx="3" fill="url(#rm-glow)"/>'
+    )
+    s.parts.append(f'<line x1="{pad}" y1="{y_head_line}" x2="{w - pad}" y2="{y_head_line}" stroke="{card_border}"/>')
+
+    def draw_card(x, y, cw, ch, item, wrap_w):
         number, name, what, exit_line, status = item
-        fill, stroke, _ = STATUS[status]
+        bg, stroke, fg, label = theme[status]
+        is_now = status == "now"
+        border = brand if is_now else card_border
+        bw = "1.6" if is_now else "1.1"
         s.parts.append(
-            f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="12" fill="#FFFFFF" stroke="#DADCE0" '
-            'stroke-width="1.2"/>')
+            f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="12" fill="{card_bg}" '
+            f'stroke="{border}" stroke-width="{bw}"/>'
+        )
+        # Hexagonal milestone badge
+        hx, hy = x + 28, y + 26
         s.parts.append(
-            f'<rect x="{x}" y="{y}" width="6" height="{ch}" rx="3" fill="{stroke}"/>')
-        s.parts.append(f'<circle cx="{x + 30}" cy="{y + 28}" r="14" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>')
-        s.text(x + 30, y + 32.5, number, size=12, anchor="middle", weight="bold", fill=stroke)
-        s.text(x + 54, y + 32, name, size=14.5, weight="bold")
-        s.pill(x + cw - 110, y + 15, 94, 22, status)
-        s.text(x + 22, y + 60, what, size=12, fill=INK)
+            f'<polygon points="{hex_points(hx, hy, 14)}" fill="{bg}" stroke="{stroke}" stroke-width="1.4"/>'
+        )
+        s.text(hx, hy + 4, number.zfill(2) if number.isdigit() else number, size=10.5, anchor="middle",
+               weight="bold", fill=fg)
+
+        # Status chip (top-right)
+        chip_w = max(58, len(label) * 6.8 + 18)
+        s.parts.append(
+            f'<rect x="{x + cw - chip_w - 14}" y="{y + 16}" width="{chip_w}" height="20" rx="10" '
+            f'fill="{bg}" stroke="{stroke}" stroke-width="1"/>'
+        )
+        s.text(x + cw - chip_w / 2 - 14, y + 29.5, label, size=9.5, anchor="middle", weight="bold", fill=fg)
+
+        s.text(x + 16, y + 58, name, size=14, weight="bold", fill=ink_light)
+
+        body_lines = textwrap.wrap(what, width=wrap_w)[:2]
+        for i, line in enumerate(body_lines):
+            s.text(x + 16, y + 80 + i * 16, line, size=11.5, fill=ink_body)
+
         if exit_line:
-            s.text(x + 22, y + 82, "Done when: " + exit_line, size=11.5, fill=MUTED)
+            s.parts.append(
+                f'<line x1="{x + 16}" y1="{y + ch - 46}" x2="{x + cw - 16}" y2="{y + ch - 46}" '
+                'stroke="#233144" stroke-width="1"/>'
+            )
+            done_lines = textwrap.wrap("Done: " + exit_line, width=wrap_w + 4)[:2]
+            for i, line in enumerate(done_lines):
+                s.text(x + 16, y + ch - 28 + i * 15, line, size=10.5, fill=ink_muted)
 
-    s.text(pad, y_built_label, "BUILT", size=11, weight="bold", fill="#1E8E3E")
+    # Section 1: 3x2 grid for Built
+    s.text(pad, y_built_hdr, "CORE & ENGINE  ·  BUILT", size=11, weight="bold", fill="#34D399")
     for idx, item in enumerate(built):
-        col, row = idx % 2, idx // 2
-        draw_card(pad + col * (col_w + col_gap), y_built + row * (card_h + row_gap), col_w, card_h, item)
+        col, row = idx % 3, idx // 3
+        cx = pad + col * (col_w3 + col_gap)
+        cy = y_built + row * (built_h + row_gap)
+        draw_card(cx, cy, col_w3, built_h, item, wrap_w=46)
 
-    s.text(pad, y_up_label, "IN PROGRESS & UPCOMING", size=11, weight="bold", fill="#C77700")
+    # Section 2: 4-stage connected track for In Progress & Upcoming
+    s.text(pad, y_up_hdr, "ACTIVE & UPCOMING", size=11, weight="bold", fill=brand)
+    track_y = y_up + up_h / 2
+    s.parts.append(
+        f'<line x1="{pad + 40}" y1="{track_y}" x2="{w - pad - 40}" y2="{track_y}" '
+        f'stroke="#2A394D" stroke-width="2" stroke-dasharray="5 4"/>'
+    )
     for idx, item in enumerate(upcoming):
-        col, row = idx % 2, idx // 2
-        draw_card(pad + col * (col_w + col_gap), y_up + row * (card_h + row_gap), col_w, card_h, item)
+        cx = pad + idx * (col_w4 + 14)
+        draw_card(cx, y_up, col_w4, up_h, item, wrap_w=32)
 
+    # Section 3: Later horizon bar
     for item in later:
         number, name, what, _, status = item
-        fill, stroke, _ = STATUS[status]
+        bg, stroke, fg, label = theme[status]
         s.parts.append(
-            f'<rect x="{pad}" y="{y_later}" width="{w - 2 * pad}" height="{later_h}" rx="12" fill="#F8F9FA" '
-            'stroke="#DADCE0" stroke-width="1.2"/>')
+            f'<rect x="{pad}" y="{y_later}" width="{w - 2 * pad}" height="{later_h}" rx="12" '
+            f'fill="#101722" stroke="{card_border}" stroke-width="1.1"/>'
+        )
+        hx, hy = pad + 28, y_later + later_h / 2
         s.parts.append(
-            f'<circle cx="{pad + 30}" cy="{y_later + later_h / 2}" r="14" fill="{fill}" stroke="{stroke}" '
-            'stroke-width="1.5"/>')
-        s.text(pad + 30, y_later + later_h / 2 + 4.5, number, size=12, anchor="middle", weight="bold", fill=stroke)
-        s.text(pad + 56, y_later + 27, name, size=14, weight="bold")
-        s.text(pad + 56, y_later + 48, what, size=12, fill=MUTED)
-        s.pill(w - pad - 110, y_later + 22, 94, 22, status)
+            f'<polygon points="{hex_points(hx, hy, 14)}" fill="{bg}" stroke="{stroke}" stroke-width="1.4"/>'
+        )
+        s.text(hx, hy + 4.5, number, size=13, anchor="middle", weight="bold", fill=fg)
+        s.text(pad + 54, y_later + 27, name, size=13, weight="bold", fill=ink_light)
+        s.text(pad + 54, y_later + 46, what, size=11.5, fill=ink_muted)
+        s.parts.append(
+            f'<rect x="{w - pad - 88}" y="{y_later + 22}" width="72" height="20" rx="10" '
+            f'fill="{bg}" stroke="{stroke}" stroke-width="1"/>'
+        )
+        s.text(w - pad - 52, y_later + 35.5, label, size=9.5, anchor="middle", weight="bold", fill=fg)
 
     s.save("roadmap.svg")
 

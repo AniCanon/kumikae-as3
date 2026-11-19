@@ -1,115 +1,142 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 864" width="1080" height="864" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="Roadmap">
-<title>Roadmap</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 860" width="1160" height="860" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="Kumikae AS3 Roadmap">
+<title>Kumikae AS3 Roadmap</title>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5F6368"/></marker></defs>
-<rect x="0.5" y="0.5" width="1079" height="863" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
-<text x="40" y="46" font-size="22" text-anchor="start" font-weight="bold" fill="#202124">Roadmap</text>
-<text x="40" y="70" font-size="13" text-anchor="start" font-weight="normal" fill="#5F6368">Each milestone ends in something you can run.</text>
-<rect x="665" y="46" width="18" height="14" rx="4" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="691" y="58" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Built</text>
-<rect x="744" y="46" width="18" height="14" rx="4" fill="#FFF1CC" stroke="#C77700" stroke-width="1.5"/>
-<text x="770" y="58" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">In progress</text>
-<rect x="865" y="46" width="18" height="14" rx="4" fill="#FFF8E6" stroke="#C77700" stroke-width="1.5"/>
-<text x="891" y="58" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Next</text>
-<rect x="937" y="46" width="18" height="14" rx="4" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
-<text x="963" y="58" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Planned</text>
-<line x1="40" y1="88" x2="1040" y2="88" stroke="#E8EAED" stroke-width="1"/>
-<text x="40" y="112" font-size="11" text-anchor="start" font-weight="bold" fill="#1E8E3E">BUILT</text>
-<rect x="40" y="128" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="40" y="128" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="70" cy="156" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="70" y="160.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">1</text>
-<text x="94" y="160" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Compiler front end</text>
-<rect x="420" y="143" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="467.0" y="158.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="62" y="188" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">kas3c parses and type-checks AS3 against Godot&#x27;s whole API.</text>
-<text x="62" y="210" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Every error has a file, a line and a column.</text>
-<rect x="550" y="128" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="550" y="128" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="580" cy="156" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="580" y="160.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">2</text>
-<text x="604" y="160" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Language server</text>
-<rect x="930" y="143" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="977.0" y="158.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="572" y="188" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Errors as you type, completion and navigation, in Rider and VS Code.</text>
-<text x="572" y="210" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: A typing mistake shows up in the editor at once.</text>
-<rect x="40" y="246" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="40" y="246" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="70" cy="274" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="70" y="278.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">3</text>
-<text x="94" y="278" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Interpreter in Godot</text>
-<rect x="420" y="261" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="467.0" y="276.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="62" y="306" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">The AS3 language on nodes: [Export], [Signal], signals, Godot&#x27;s values.</text>
-<text x="62" y="328" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: An AS3 script on a CharacterBody2D moves a character.</text>
-<rect x="550" y="246" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="550" y="246" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="580" cy="274" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="580" y="278.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">4</text>
-<text x="604" y="278" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Hot reload</text>
-<rect x="930" y="261" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="977.0" y="276.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="572" y="306" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Save a script and the running game changes, keeping its state.</text>
-<text x="572" y="328" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: A constant edited during play changes the objects on screen.</text>
-<rect x="40" y="364" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="40" y="364" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="70" cy="392" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="70" y="396.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">5</text>
-<text x="94" y="396" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Native code</text>
-<rect x="420" y="379" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="467.0" y="394.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="62" y="424" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">kas3c cpp compiles the same scripts to native code through C++.</text>
-<text x="62" y="446" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Level with or ahead of Godot C# on macOS frame benchmarks.</text>
-<rect x="550" y="364" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="550" y="364" width="6" height="104" rx="3" fill="#1E8E3E"/>
-<circle cx="580" cy="392" r="14" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
-<text x="580" y="396.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#1E8E3E">6</text>
-<text x="604" y="396" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Play builds native code</text>
-<rect x="930" y="379" width="94" height="22" rx="11.0" fill="#1E8E3E"/>
-<text x="977.0" y="394.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<text x="572" y="424" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">The extension builds and caches the program library by itself.</text>
-<text x="572" y="446" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Pressing Play runs native code with no manual step.</text>
-<text x="40" y="504" font-size="11" text-anchor="start" font-weight="bold" fill="#C77700">IN PROGRESS &amp; UPCOMING</text>
-<rect x="40" y="520" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="40" y="520" width="6" height="104" rx="3" fill="#C77700"/>
-<circle cx="70" cy="548" r="14" fill="#FFF1CC" stroke="#C77700" stroke-width="1.5"/>
-<text x="70" y="552.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#C77700">7</text>
-<text x="94" y="552" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Native iOS &amp; Android exports</text>
-<rect x="420" y="535" width="94" height="22" rx="11.0" fill="#C77700"/>
-<text x="467.0" y="550.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">In progress</text>
-<text x="62" y="580" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Godot and Rider build native AS3 into iOS and Android apps.</text>
-<text x="62" y="602" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: iOS Simulator &amp; Android APK pass. Hardware runs next.</text>
-<rect x="550" y="520" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="550" y="520" width="6" height="104" rx="3" fill="#3D6FB6"/>
-<circle cx="580" cy="548" r="14" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
-<text x="580" y="552.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#3D6FB6">8</text>
-<text x="604" y="552" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Debugger</text>
-<rect x="930" y="535" width="94" height="22" rx="11.0" fill="#3D6FB6"/>
-<text x="977.0" y="550.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
-<text x="572" y="580" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Breakpoints and stepping from Rider.</text>
-<text x="572" y="602" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: You can step through AS3 in the editor and on a device.</text>
-<rect x="40" y="638" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="40" y="638" width="6" height="104" rx="3" fill="#C77700"/>
-<circle cx="70" cy="666" r="14" fill="#FFF8E6" stroke="#C77700" stroke-width="1.5"/>
-<text x="70" y="670.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#C77700">9</text>
-<text x="94" y="670" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Windows and Linux</text>
-<rect x="420" y="653" width="94" height="22" rx="11.0" fill="#C77700"/>
-<text x="467.0" y="668.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Next</text>
-<text x="62" y="698" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Desktop builds beyond macOS are not yet built or tested.</text>
-<text x="62" y="720" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The test suite passes on each platform.</text>
-<rect x="550" y="638" width="490" height="104" rx="12" fill="#FFFFFF" stroke="#DADCE0" stroke-width="1.2"/>
-<rect x="550" y="638" width="6" height="104" rx="3" fill="#3D6FB6"/>
-<circle cx="580" cy="666" r="14" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
-<text x="580" y="670.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#3D6FB6">10</text>
-<text x="604" y="670" font-size="14.5" text-anchor="start" font-weight="bold" fill="#202124">Consoles</text>
-<rect x="930" y="653" width="94" height="22" rx="11.0" fill="#3D6FB6"/>
-<text x="977.0" y="668.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
-<text x="572" y="698" font-size="12" text-anchor="start" font-weight="normal" fill="#202124">Console builds, kept in a separate repository.</text>
-<text x="572" y="720" font-size="11.5" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on console hardware.</text>
-<rect x="40" y="764" width="1000" height="68" rx="12" fill="#F8F9FA" stroke="#DADCE0" stroke-width="1.2"/>
-<circle cx="70" cy="798.0" r="14" fill="#F1F3F4" stroke="#80868B" stroke-width="1.5"/>
-<text x="70" y="802.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#80868B">+</text>
-<text x="96" y="791" font-size="14" text-anchor="start" font-weight="bold" fill="#202124">Later, designed separately</text>
-<text x="96" y="812" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">async/await, Royale&#x27;s language additions, the Flash API, SWF loading, web export.</text>
-<rect x="930" y="786" width="94" height="22" rx="11.0" fill="#80868B"/>
-<text x="977.0" y="801.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Later</text>
+<rect x="0.5" y="0.5" width="1159" height="859" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
+<defs><linearGradient id="rm-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0F1621"/><stop offset="100%" stop-color="#131C28"/></linearGradient><linearGradient id="rm-glow" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#34D399"/><stop offset="70%" stop-color="#34D399"/><stop offset="100%" stop-color="#F0447B"/></linearGradient></defs><rect x="0.5" y="0.5" width="1159" height="859" rx="16" fill="url(#rm-bg)" stroke="#28374B"/>
+<polygon points="1068.0,-8.0 1114.8,19.0 1114.8,73.0 1068.0,100.0 1021.2,73.0 1021.2,19.0" fill="none" stroke="#CED5DF" stroke-width="1.5" opacity="0.05"/>
+<polygon points="1126.0,48.0 1153.7,64.0 1153.7,96.0 1126.0,112.0 1098.3,96.0 1098.3,64.0" fill="none" stroke="#CED5DF" stroke-width="1.5" opacity="0.04"/>
+<g transform="translate(23, 12) scale(0.088)"><path fill="#CED5DF" fill-rule="evenodd" d="M504 249 730 375 730 404 648 448 686 403 587 431 535 498 537 505 512 505 579 391 677 380 531 298 568 384 513 476 526 402 504 307 483 402 496 477 441 384 479 298 332 381 430 391 498 505 364 505 309 419 311 570 309 601 364 517 498 517 430 629 332 638 486 727 441 636 496 543 483 618 504 712 526 618 513 543 568 636 531 727 677 639 579 629 512 518 537 518 537 524 663 553 699 604 699 520 730 483 730 644 504 775 279 644 279 375 Z M322 404 396 473 478 499 422 431 Z M322 616 422 589 478 523 396 548 Z M535 527 587 589 686 615 613 553 Z"/><path fill="#F0447B" d="M563 514 591 489 718 432 746 443 664 540 Z"/></g>
+<text x="98" y="52" font-size="21" text-anchor="start" font-weight="bold" fill="#F1F5F9">Kumikae AS3</text>
+<text x="240" y="52" font-size="21" text-anchor="start" font-weight="normal" fill="#7E90A6">Roadmap</text>
+<text x="98" y="74" font-size="12.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Every milestone ends in something you can run.</text>
+<circle cx="740" cy="46" r="4.5" fill="#34D399"/>
+<text x="751" y="50" font-size="10.5" text-anchor="start" font-weight="bold" fill="#CBD5E1">BUILT</text>
+<circle cx="800.0" cy="46" r="4.5" fill="#FF6B9A"/>
+<text x="811.0" y="50" font-size="10.5" text-anchor="start" font-weight="bold" fill="#CBD5E1">IN PROGRESS</text>
+<circle cx="903.2" cy="46" r="4.5" fill="#FBBF24"/>
+<text x="914.2" y="50" font-size="10.5" text-anchor="start" font-weight="bold" fill="#CBD5E1">NEXT</text>
+<circle cx="956.0" cy="46" r="4.5" fill="#60A5FA"/>
+<text x="967.0" y="50" font-size="10.5" text-anchor="start" font-weight="bold" fill="#CBD5E1">PLANNED</text>
+<rect x="736" y="66" width="384" height="6" rx="3" fill="#223044"/>
+<rect x="736" y="66" width="261" height="6" rx="3" fill="url(#rm-glow)"/>
+<line x1="40" y1="104" x2="1120" y2="104" stroke="#28374B"/>
+<text x="40" y="132" font-size="11" text-anchor="start" font-weight="bold" fill="#34D399">CORE &amp; ENGINE  ·  BUILT</text>
+<rect x="40" y="150" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="68.0,162.0 80.1,169.0 80.1,183.0 68.0,190.0 55.9,183.0 55.9,169.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="68" y="180" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">01</text>
+<rect x="317" y="166" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="346.0" y="179.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="56" y="208" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Compiler front end</text>
+<text x="56" y="230" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">kas3c parses and type-checks AS3 against</text>
+<text x="56" y="246" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Godot&#x27;s whole API.</text>
+<line x1="56" y1="270" x2="373" y2="270" stroke="#233144" stroke-width="1"/>
+<text x="56" y="288" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: Every error has a file, a line and a column.</text>
+<rect x="405" y="150" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="433.0,162.0 445.1,169.0 445.1,183.0 433.0,190.0 420.9,183.0 420.9,169.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="433" y="180" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">02</text>
+<rect x="682" y="166" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="711.0" y="179.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="421" y="208" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Language server</text>
+<text x="421" y="230" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Errors as you type, completion and navigation,</text>
+<text x="421" y="246" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">in Rider and VS Code.</text>
+<line x1="421" y1="270" x2="738" y2="270" stroke="#233144" stroke-width="1"/>
+<text x="421" y="288" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: A typing mistake shows up in the editor at</text>
+<text x="421" y="303" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">once.</text>
+<rect x="770" y="150" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="798.0,162.0 810.1,169.0 810.1,183.0 798.0,190.0 785.9,183.0 785.9,169.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="798" y="180" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">03</text>
+<rect x="1047" y="166" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="1076.0" y="179.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="786" y="208" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Interpreter in Godot</text>
+<text x="786" y="230" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">The AS3 language on nodes: [Export], [Signal],</text>
+<text x="786" y="246" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">signals, Godot&#x27;s values.</text>
+<line x1="786" y1="270" x2="1103" y2="270" stroke="#233144" stroke-width="1"/>
+<text x="786" y="288" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: An AS3 script on a CharacterBody2D moves a</text>
+<text x="786" y="303" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">character.</text>
+<rect x="40" y="332" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="68.0,344.0 80.1,351.0 80.1,365.0 68.0,372.0 55.9,365.0 55.9,351.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="68" y="362" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">04</text>
+<rect x="317" y="348" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="346.0" y="361.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="56" y="390" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Hot reload</text>
+<text x="56" y="412" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Save a script and the running game changes,</text>
+<text x="56" y="428" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">keeping its state.</text>
+<line x1="56" y1="452" x2="373" y2="452" stroke="#233144" stroke-width="1"/>
+<text x="56" y="470" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: A constant edited during play changes the</text>
+<text x="56" y="485" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">objects on screen.</text>
+<rect x="405" y="332" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="433.0,344.0 445.1,351.0 445.1,365.0 433.0,372.0 420.9,365.0 420.9,351.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="433" y="362" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">05</text>
+<rect x="682" y="348" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="711.0" y="361.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="421" y="390" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Native code</text>
+<text x="421" y="412" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">kas3c cpp compiles the same scripts to native</text>
+<text x="421" y="428" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">code through C++.</text>
+<line x1="421" y1="452" x2="738" y2="452" stroke="#233144" stroke-width="1"/>
+<text x="421" y="470" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: Level with or ahead of Godot C# on macOS</text>
+<text x="421" y="485" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">frame benchmarks.</text>
+<rect x="770" y="332" width="349" height="166" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="798.0,344.0 810.1,351.0 810.1,365.0 798.0,372.0 785.9,365.0 785.9,351.0" fill="#132E28" stroke="#2B7A62" stroke-width="1.4"/>
+<text x="798" y="362" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#34D399">06</text>
+<rect x="1047" y="348" width="58" height="20" rx="10" fill="#132E28" stroke="#2B7A62" stroke-width="1"/>
+<text x="1076.0" y="361.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#34D399">BUILT</text>
+<text x="786" y="390" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Play builds native code</text>
+<text x="786" y="412" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">The extension builds and caches the program</text>
+<text x="786" y="428" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">library by itself.</text>
+<line x1="786" y1="452" x2="1103" y2="452" stroke="#233144" stroke-width="1"/>
+<text x="786" y="470" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: Pressing Play runs native code with no</text>
+<text x="786" y="485" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">manual step.</text>
+<text x="40" y="532" font-size="11" text-anchor="start" font-weight="bold" fill="#F0447B">ACTIVE &amp; UPCOMING</text>
+<line x1="80" y1="645.0" x2="1080" y2="645.0" stroke="#2A394D" stroke-width="2" stroke-dasharray="5 4"/>
+<rect x="40" y="550" width="259" height="190" rx="12" fill="#192434" stroke="#F0447B" stroke-width="1.6"/>
+<polygon points="68.0,562.0 80.1,569.0 80.1,583.0 68.0,590.0 55.9,583.0 55.9,569.0" fill="#381628" stroke="#F0447B" stroke-width="1.4"/>
+<text x="68" y="580" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#FF6B9A">07</text>
+<rect x="192.2" y="566" width="92.8" height="20" rx="10" fill="#381628" stroke="#F0447B" stroke-width="1"/>
+<text x="238.6" y="579.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#FF6B9A">IN PROGRESS</text>
+<text x="56" y="608" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Mobile native exports</text>
+<text x="56" y="630" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Godot and Rider build native AS3</text>
+<text x="56" y="646" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">into iOS and Android apps.</text>
+<line x1="56" y1="694" x2="283" y2="694" stroke="#233144" stroke-width="1"/>
+<text x="56" y="712" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: iOS Simulator &amp; Android APK</text>
+<text x="56" y="727" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">pass. Hardware runs next.</text>
+<rect x="313" y="550" width="259" height="190" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="341.0,562.0 353.1,569.0 353.1,583.0 341.0,590.0 328.9,583.0 328.9,569.0" fill="#16263B" stroke="#325888" stroke-width="1.4"/>
+<text x="341" y="580" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#60A5FA">08</text>
+<rect x="492.4" y="566" width="65.6" height="20" rx="10" fill="#16263B" stroke="#325888" stroke-width="1"/>
+<text x="525.2" y="579.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#60A5FA">PLANNED</text>
+<text x="329" y="608" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Debugger</text>
+<text x="329" y="630" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Breakpoints and stepping from</text>
+<text x="329" y="646" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Rider.</text>
+<line x1="329" y1="694" x2="556" y2="694" stroke="#233144" stroke-width="1"/>
+<text x="329" y="712" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: You can step through AS3 in</text>
+<text x="329" y="727" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">the editor and on a device.</text>
+<rect x="586" y="550" width="259" height="190" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="614.0,562.0 626.1,569.0 626.1,583.0 614.0,590.0 601.9,583.0 601.9,569.0" fill="#2D2212" stroke="#8F621B" stroke-width="1.4"/>
+<text x="614" y="580" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#FBBF24">09</text>
+<rect x="773" y="566" width="58" height="20" rx="10" fill="#2D2212" stroke="#8F621B" stroke-width="1"/>
+<text x="802.0" y="579.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#FBBF24">NEXT</text>
+<text x="602" y="608" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Windows and Linux</text>
+<text x="602" y="630" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Desktop builds beyond macOS are</text>
+<text x="602" y="646" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">not yet built or tested.</text>
+<line x1="602" y1="694" x2="829" y2="694" stroke="#233144" stroke-width="1"/>
+<text x="602" y="712" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: The test suite passes on each</text>
+<text x="602" y="727" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">platform.</text>
+<rect x="859" y="550" width="259" height="190" rx="12" fill="#192434" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="887.0,562.0 899.1,569.0 899.1,583.0 887.0,590.0 874.9,583.0 874.9,569.0" fill="#16263B" stroke="#325888" stroke-width="1.4"/>
+<text x="887" y="580" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#60A5FA">10</text>
+<rect x="1038.4" y="566" width="65.6" height="20" rx="10" fill="#16263B" stroke="#325888" stroke-width="1"/>
+<text x="1071.2" y="579.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#60A5FA">PLANNED</text>
+<text x="875" y="608" font-size="14" text-anchor="start" font-weight="bold" fill="#F1F5F9">Consoles</text>
+<text x="875" y="630" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">Console builds, kept in a</text>
+<text x="875" y="646" font-size="11.5" text-anchor="start" font-weight="normal" fill="#CBD5E1">separate repository.</text>
+<line x1="875" y1="694" x2="1102" y2="694" stroke="#233144" stroke-width="1"/>
+<text x="875" y="712" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">Done: The same game runs on console</text>
+<text x="875" y="727" font-size="10.5" text-anchor="start" font-weight="normal" fill="#7E90A6">hardware.</text>
+<rect x="40" y="762" width="1080" height="64" rx="12" fill="#101722" stroke="#28374B" stroke-width="1.1"/>
+<polygon points="68.0,780.0 80.1,787.0 80.1,801.0 68.0,808.0 55.9,801.0 55.9,787.0" fill="#182230" stroke="#334357" stroke-width="1.4"/>
+<text x="68" y="798.5" font-size="13" text-anchor="middle" font-weight="bold" fill="#94A3B8">+</text>
+<text x="94" y="789" font-size="13" text-anchor="start" font-weight="bold" fill="#F1F5F9">Later, designed separately</text>
+<text x="94" y="808" font-size="11.5" text-anchor="start" font-weight="normal" fill="#7E90A6">async/await, Royale&#x27;s language additions, the Flash API, SWF loading, web export.</text>
+<rect x="1032" y="784" width="72" height="20" rx="10" fill="#182230" stroke="#334357" stroke-width="1"/>
+<text x="1068" y="797.5" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#94A3B8">LATER</text>
 </svg>
