@@ -16,7 +16,7 @@ Mark public no-argument instance methods with `[Test]` and point a manifest targ
 {"version":1,"tests":[{"name":"Models","discover":"tests"}]}
 ```
 
-The runner uses the compiler’s syntax tree and creates a fresh fixture for each test. Case IDs use the
+The runner uses the compiler's syntax tree and creates a fresh fixture for each test. Case IDs use the
 qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
 Rider uses the same IDs for the gutter, test results, reruns and source navigation.
 
@@ -110,8 +110,8 @@ package game.tests {
 }
 ```
 
-A suite carries on after a failure, so one run reports every failing case. Registration is explicit:
-adding a method or a `[Test]` tag doesn't register a case. Cases run one after another.
+A manual suite carries on after a failure, so one run reports every failing case. Cases added to a `Suite`
+run in the order they were registered.
 
 To run the suite directly, pass the entry file first, then the rest of the program and the library:
 
@@ -147,12 +147,14 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 | Field | Meaning |
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
-| `command` | The program to run, as an array of arguments. It's run without a shell |
+| `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
+| `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
+| `command` | The program to run, as an array of arguments (for manual targets). It's run without a shell |
 | `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
 | `exclude` | Optional. Patterns for files to leave out of `sources` |
 | `marker` | A line the program must print when it has finished. Without it, the test fails |
 | `timeout` | Optional. Seconds before the test is stopped. The default is 120 |
-| `events`, `entryClass` | For a suite: report each case separately, and the class that runs the suite |
+| `events`, `entryClass` | For a manual suite: report each case separately, and the class that runs the suite |
 | `source` | The file the test's result links to |
 
 In a command, `{compiler}` is `kas3c`, `{godot}` is Godot, `{project}` is the manifest's folder, and
@@ -189,10 +191,10 @@ fails too. Stopping the runner stops the processes it started.
 
 ## Run tests in Rider
 
-Choose the **AS3 Tests** run configuration and select the manifest. See
-[the plugin's README](../editors/jetbrains/README.md#tests).
+Choose the **Kumikae AS3 > Tests** run configuration and select the manifest, or click the gutter icon
+beside a `[Test]` method or fixture class. See [the plugin's README](../editors/jetbrains/README.md#tests).
 
-To get a Run icon beside a test method, map the suite's cases to methods in the manifest:
+For manual `Suite` targets, map the suite's cases to methods in the manifest to get gutter icons:
 
 ```json
 "cases": [

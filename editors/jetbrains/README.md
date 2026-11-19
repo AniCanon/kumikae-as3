@@ -75,14 +75,15 @@ Choose **File > New Project > AS3 Godot Game**. The wizard creates a small game 
 
 - **Package name.** The app's identifier, such as `com.studio.game`. Left empty, it's made from the
   project's name.
-- **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and an
-  Simulator run configuration. Android adds its own export preset. Companion plugins can contribute additional targets.
+- **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and a
+  Simulator run configuration. Choosing Android adds an Android export preset and run configuration.
+  Companion plugins can contribute additional targets.
 
 ## Run the game
 
 Opening a project that has a `project.godot` and at least one `.as` file adds a run configuration named
-**Game**, of the type **Kumikae AS3 → Game**. Press Run. The game starts in Godot, and what it prints appears in
-the Run window.
+**Game**, of the type **Kumikae AS3 > Game**. Press Run. The game starts in Godot, and what it prints
+appears in the Run window.
 
 | Field | Left empty |
 |---|---|
@@ -95,20 +96,23 @@ Edit a script while the game runs and save. The game takes the new code and keep
 
 ## Run on iOS or Android
 
-Open **Run → Add Game Target…** and choose a Godot export preset. In **Game Devices → Simulators**,
-start a simulator or Android virtual device. Select the destination in the run toolbar and press **Run**.
-Rider reads the application identifier from the preset, builds the game, installs it and launches it.
-iOS requires Xcode and a Simulator runtime. Android requires the Android SDK, matching Godot export
-templates and an ARM64 destination. The macOS distribution bundles the AS3 runtimes and Simulator template.
+Open **Run > Add Game Target…** and choose a Godot export preset. In **Game Devices > Simulators**, start
+an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
+application identifier from the preset, exports and builds the game, installs it, and launches it.
 
-## The iOS Simulator panel
+- **iOS** requires Xcode and a Simulator runtime. Hot reload works in the Simulator.
+- **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
+- On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
-Open **View → Tool Windows → Game Devices** and select an iOS simulator. The iOS tab displays its
-screen, input controls and console. Android devices open in the Android tab. For stopped Android
-devices, **Graphics for next emulator start** offers **Device default**, **Host GPU** and **Software**.
-This applies when Rider next starts an emulator and leaves the AVD configuration intact.
-See [embedded device performance](../../docs/embedded-device-performance.md) for frame rates, latency
-and how to repeat the measurements.
+## The Game Devices panel
+
+Open **View > Tool Windows > Game Devices** to start and view simulators and Android emulators.
+
+- **Simulators** lists iOS simulators (macOS only) and Android emulators. For stopped Android emulators,
+  **Graphics for next emulator start** selects **Device default**, **Host GPU** or **Software** for the
+  next launch without modifying the AVD configuration.
+- **iOS** shows the selected simulator's screen, input controls and console.
+- **Android** shows the selected emulator's screen and forwards pointer input.
 
 ### Live picture and input
 
@@ -136,33 +140,34 @@ app it launched. The Simulator stays booted.
 
 ## Tests
 
-Click the gutter beside a method to run that test, or beside a class to run its fixture.
-Use **Run Game Tests** on the Tests folder for the default target. Context runs use the local test
-runner even while a mobile destination is selected. Double-click a failed result to open the
-assertion. To keep a named plan, create a **Kumikae AS3 → Tests** configuration, give it a name
-and select its groups. The same manifest drives the command-line runner and CI.
+Click the gutter icon beside a `[Test]` method to run that test, or beside a class to run its fixture. Use
+**Run Game Tests** on the `tests` folder to run the project's test target. Context runs always use the local
+test runner even when a mobile destination is selected. Double-click a failed result to jump to the failing
+assertion.
 
-New games keep model code in `src/<package>`, engine scripts in its `view` package, and fixtures in
-`tests/<package>`. **New → ActionScript** creates files, classes, interfaces, Godot node scripts,
-test cases and test suites. Use **New → ActionScript Package** for a namespace. An empty `[Suite]`
-collects its directory's fixtures in Rider. Give the suite typed fixture fields to select a subset.
+To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups. The
+same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
+
+New projects place model code under `src/<package>`, engine scripts under `view`, and tests under
+`tests/<package>`. **New > ActionScript** creates files, classes, interfaces, Godot node scripts, test cases
+and test suites; **New > ActionScript Package** creates a package folder. An empty `[Suite]` class runs the
+fixtures in its directory; add typed fixture fields to select a subset.
 
 [Testing](../../testing/README.md) describes the library, the manifest and the command-line runner.
 
 ## Project settings and scenes
 
 **`project.godot`.** Open the file to use the **Settings** editor beside its source. It edits the
-application's name, main scene and icon, the viewport size, stretch mode and orientation, and the
-identifier and icon of an existing iOS or Android export preset. Settings and comments it doesn't know are
-kept. **Apply** changes the file in one undoable step.
+application's name, main scene, icon and boot splash, the viewport size, stretch mode and orientation, and
+the identifier and icon of an existing iOS or Android export preset. Settings and comments it doesn't know
+are kept. **Apply** writes the changes in one undoable step.
 
-Click the icon or splash in **General** to open the artwork gallery. Search by filename or folder,
-select a thumbnail and inspect its preview before choosing **Use Icon** or **Use Splash**.
-**Browse…** also accepts local images. **Import and Use** copies the selected file into the game's
-`assets/` folder, giving it a unique name when needed. **Apply** saves the assignment.
-The splash preview uses the project's launch window size, background, filtering and boot stretch mode.
+Click the icon or splash in **General** to open the artwork gallery, filter project images, or import a
+local image into `assets/` with **Browse…** and **Import and Use**. The splash preview reflects the
+project's launch window size, background, filtering and boot stretch mode.
 
-Choose **Add Game Target** for a new preset, or **Export** or **Export All** to build existing targets. **Properties** shows additional Godot settings entered in Source.
+Use **Add Game Target** to create an export preset, **Export** or **Export All** to build existing targets,
+and **Properties** to inspect additional settings entered in Source.
 
 **Scenes.** Open a `.tscn` file to use the **Scene** editor. Its outline shows each node's type and the AS3
 script attached to it. You can open a script, and attach or detach one. Attaching accepts a script that
@@ -172,8 +177,9 @@ directly extends the node's type. Edit inherited and instanced scenes in Godot.
 editor's menu, show the scene nodes that use the script.
 
 **The Game view.** The project view has a **Game** pane that shows empty folder chains under `src` and
-`tests` as package names, such as `com.studio.game`. Its menu has **Compact AS3 Packages**, **Show AS3 Members** and **Show Generated Files**.
-Double-click an AS3 file to open it. Click its disclosure arrow to show or hide its declarations.
+`tests` as package names, such as `com.studio.game`. Its menu has **Compact AS3 Packages**, **Show AS3
+Members** and **Show Generated Files**. Double-click an AS3 file to open it, or expand its arrow to browse
+its declarations.
 
 ## Use the Simulator from the command line
 

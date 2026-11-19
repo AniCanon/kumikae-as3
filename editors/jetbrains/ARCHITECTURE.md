@@ -6,7 +6,7 @@ read the [README](README.md).
 
 ![The parts of the JetBrains plugin](../../docs/diagrams/plugin.svg)
 
-The plugin has three parts: language support, project and run tools, and the iOS Simulator panel. Two
+The plugin has three parts: language support, project and run tools, and the Game Devices panel. Two
 rules hold across all three:
 
 - **The compiler owns the language.** What a name means, what completes, and what is an error come from
@@ -19,17 +19,17 @@ rules hold across all three:
 | Path | Holds |
 |---|---|
 | `src/main/kotlin/.../language/` | The language clients, the local lexer, and typing help |
-| `src/main/kotlin/.../project/` | The project wizard, file templates, and the Game view |
-| `src/main/kotlin/.../run/` | The Godot and iOS Simulator run configurations |
-| `src/main/kotlin/.../testing/` | The AS3 Tests run configuration and its result tree |
-| `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot` and scene editors |
-| `src/main/kotlin/.../panel/` | The Simulator tool window: repository, controller, view |
+| `src/main/kotlin/.../project/` | The project wizard, file templates, game targets, and the Game view |
+| `src/main/kotlin/.../run/` | Run configurations and destinations for Godot desktop, iOS and Android |
+| `src/main/kotlin/.../testing/` | The AS3 Tests run configuration, gutter actions and result tree |
+| `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot`, artwork gallery, GDScript overview and scene editors |
+| `src/main/kotlin/.../panel/` | The Game Devices tool window (Simulators catalog, iOS and Android views) |
 | `src/main/kotlin/.../ui/` | The Compose host and the shared composables |
 | `src/main/resources/META-INF/` | `plugin.xml` and the optional descriptors for Rider and IntelliJ IDEA |
 | `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
-| `native/SimulatorBridge/` | The Swift helper that reads the Simulator's screen and sends input |
+| `native/SimulatorBridge/` | The Swift helper that reads Simulator and Android emulator displays and sends iOS input |
 | `simulator.py`, `tests/` | The command-line client and its tests |
-| `tools/build-ios-simulator.sh` | Builds a game for the iOS Simulator. The plugin carries it |
+| `tools/` | Bundled build, export and Android run scripts (`build-ios-simulator.sh`, `android_run.py`, `game_export.py`) |
 | `src/test/kotlin/`, `src/uiProbe/` | Tests, and a test-only plugin that drives the real views in a sandbox IDE |
 
 ## Language support
@@ -104,10 +104,10 @@ probes described in [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide).
   inheritance it doesn't understand.
 - **`testing/`** connects the IDE's test runner to the repository's Python runner
   ([testing/](../../testing/README.md)). It adds no AS3 reflection and no compiler syntax.
-- **`run/`** starts Godot for the desktop configuration. For the Simulator it builds the game with
-  `tools/build-ios-simulator.sh` and installs and launches it through the Simulator service.
+- **`run/`** starts Godot for desktop, builds and runs iOS Simulator targets through `tools/build-ios-simulator.sh`
+  and the Simulator service, and builds and runs Android targets through `tools/android_run.py`.
 
-## The Simulator panel
+## The Game Devices panel
 
 ```text
 SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
@@ -144,11 +144,11 @@ With the input switch on, `LocalSession` starts the Swift helper in `native/Simu
 
 - `NativeBridgeConnection` checks that the helper is ready and sends small control messages.
 - The helper writes each frame into a memory-mapped slot. `NativeFrameReader` copies a new frame out under
-  a shared file lock, and `NativeFrameFeed` does that work off the UI thread and keeps only the newest
-  frame. The reader acquires an unused image before locking to copy. An unread, superseded frame
-  or an image detached on the UI thread can return to the pool. Clipboard snapshots own their pixels.
-- Both platform readers signal the UI thread on publication. Each view coalesces notices and takes
-  the newest available frame. Stream startup and retries use the status timer.
+  a shared file lock into a pooled `BufferedImage` (`FrameImagePool`), and `NativeFrameFeed` does that work
+  off the UI thread while keeping only the newest frame. Superseded or detached images return to the pool;
+  clipboard snapshots own their pixels.
+- Both iOS and Android frame feeds signal the UI thread on publication through `FrameDispatch`, which
+  coalesces notices and paints only the latest frame. Stream startup and retries use the status timer.
 - A failure to start reaches the panel, which retries with a bounded backoff. There's no other backend to
   fall back to.
 
