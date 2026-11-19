@@ -28,7 +28,7 @@ internal object IosDeviceLaunch {
             arguments += listOf("--app", folder.resolve(signedApp).toString())
         } else {
             val preset = target ?: GameTargets.ios(Files.readString(folder.resolve("export_presets.cfg")), "")
-            val godot = GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+            val godot = IdeGodot.find()
                 ?: throw ExecutionException("Install Godot to export the game.")
             val template = preset.template.takeIf(String::isNotBlank)?.let { folder.resolve(it.removePrefix("res://")) }
             arguments += listOf(

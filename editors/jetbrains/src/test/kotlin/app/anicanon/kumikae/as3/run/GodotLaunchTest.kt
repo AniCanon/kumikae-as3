@@ -20,8 +20,12 @@ class GodotLaunchTest {
         )
     }
 
-    private fun find(configured: String, searchPath: String, applications: Path) =
-        GodotLaunch.findGodot(configured, searchPath, applications, installed = emptyList())
+    private fun find(configured: String, searchPath: String, applications: Path) = GodotLaunch.candidates(
+        listOf(configured),
+        searchPath,
+        listOf(applications),
+        installed = emptyList(),
+    ).firstOrNull()
 
     @Test fun `the Godot that was set comes first, then the search path, then the usual application`() {
         val applications = root.resolve("Applications")

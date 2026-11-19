@@ -2,7 +2,7 @@ package app.anicanon.kumikae.as3.scene
 
 import app.anicanon.kumikae.as3.language.As3Lexer
 import app.anicanon.kumikae.as3.language.As3Tokens
-import app.anicanon.kumikae.as3.run.GodotLaunch
+import app.anicanon.kumikae.as3.run.IdeGodot
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -31,7 +31,7 @@ internal class IdeSceneRepository(private val project: Project, private val file
         ?: error("Resource not found: $path")
 
     override fun openInGodot() {
-        val godot = GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+        val godot = IdeGodot.find()
             ?: error("Install Godot to open its scene editor.")
         FileDocumentManager.getInstance().saveDocument(document())
         val folder = root()

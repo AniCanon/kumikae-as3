@@ -32,7 +32,9 @@ class UiProbeStarter : ApplicationStarter {
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
                 val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
-                if (System.getenv("KUMIKAE_IOS_TARGET_PROBE_ONLY") == "1") {
+                if (System.getenv("KUMIKAE_GODOT_SETUP_PROBE") == "1") {
+                    checkThemes(destination, godotSetupOnly = true)
+                } else if (System.getenv("KUMIKAE_IOS_TARGET_PROBE_ONLY") == "1") {
                     UiProbeIosTargets.run(destination)
                 } else if (System.getenv("KUMIKAE_DEVICE_PERF_PROBE") == "1") {
                     UiProbeLive.run(destination)
@@ -62,7 +64,7 @@ class UiProbeStarter : ApplicationStarter {
         application.invokeLater { (application as ApplicationEx).exit(true, true, if (failure == null) 0 else 1) }
     }
 
-    private fun checkThemes(destination: Path, deviceSettingsOnly: Boolean = false) {
+    private fun checkThemes(destination: Path, deviceSettingsOnly: Boolean = false, godotSetupOnly: Boolean = false) {
         val manager = LafManager.getInstance()
         val original = manager.currentUIThemeLookAndFeel
         val available = manager.installedThemes.toList()
@@ -74,6 +76,10 @@ class UiProbeStarter : ApplicationStarter {
                 onEdt {
                     manager.setCurrentUIThemeLookAndFeel(theme)
                     manager.updateUI()
+                }
+                if (godotSetupOnly) {
+                    UiProbeProjectExperience.godotSetup(destination, requested.lowercase())
+                    continue
                 }
                 if (!deviceSettingsOnly) checkWindow(destination, requested.lowercase())
                 UiProbeProjectExperience.run(destination, requested.lowercase())

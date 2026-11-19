@@ -3,7 +3,7 @@ package app.anicanon.kumikae.as3.testing
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
 import app.anicanon.kumikae.as3.run.AndroidDevices
-import app.anicanon.kumikae.as3.run.GodotLaunch
+import app.anicanon.kumikae.as3.run.IdeGodot
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.CommandLineState
@@ -117,7 +117,7 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                     "--compiler",
                     compiler.toString(),
                 )
-                GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())?.let {
+                IdeGodot.find()?.let {
                     command += listOf("--godot", it.toString())
                 }
                 if (options.native) command += "--native"

@@ -63,7 +63,7 @@ class GodotRunConfiguration(project: Project, factory: ConfigurationFactory, nam
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> = GodotRunEditor()
 
-    private fun godot(): Path? = GodotLaunch.findGodot(options.godot, System.getenv("PATH").orEmpty())
+    private fun godot(): Path? = IdeGodot.find(options.godot)
 
     /** The folder that was set, or the project's own. */
     private fun folder(): Path? = options.projectFolder.trim().ifEmpty { project.basePath.orEmpty() }

@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
+import app.anicanon.kumikae.as3.panel.BackgroundWorker
+import app.anicanon.kumikae.as3.run.IdeGodot
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.run.ensureDefaultTests
 import app.anicanon.kumikae.as3.settings.GameTargets
@@ -22,10 +24,14 @@ import com.intellij.ide.wizard.GeneratorNewProjectWizard
 import com.intellij.ide.wizard.NewProjectWizardBaseStep
 import com.intellij.ide.wizard.NewProjectWizardStep
 import com.intellij.ide.wizard.RootNewProjectWizardStep
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
@@ -55,13 +61,25 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         private var bundle by mutableStateOf("")
         private var projectName by mutableStateOf(base.name)
 
+        private val canInstall = SystemInfo.isMac && System.getProperty("os.arch") in setOf("aarch64", "arm64")
+        private val engine = GodotSetupController(
+            LocalGodotSetup({ IdeGodot.candidates() }, IdeGodot.installDirectory),
+            BackgroundWorker("Godot wizard setup").also { Disposer.register(context.disposable, it) },
+        )
+
         override fun setupUI(builder: Panel) {
             base.setupUI(builder)
+            engine.detect()
             base.nameProperty.afterChange(context.disposable) { projectName = it }
             builder.row {
                 cell(
                     composePanel(context.disposable) {
                         Column {
+                            GodotSetupSection(engine, canInstall) {
+                                val chooser = FileChooserDescriptor(true, true, false, false, false, false)
+                                    .withTitle("Choose Godot App or Executable")
+                                FileChooser.chooseFile(chooser, context.project, null) { engine.choose(it.toNioPath()) }
+                            }
                             SettingsSection("Application") {
                                 LabelledField(
                                     "Application identifier",
@@ -93,7 +111,9 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                     },
                 ).align(AlignX.FILL).validationOnApply {
                     val trimmedBundle = bundle.trim()
-                    if (version.isNotBlank() && !ProjectTemplate.VERSION_PATTERN.matches(version.trim())) {
+                    if (engine.busy) {
+                        ValidationInfo("Wait for Godot setup to finish.")
+                    } else if (version.isNotBlank() && !ProjectTemplate.VERSION_PATTERN.matches(version.trim())) {
                         ValidationInfo("Enter a version such as 1.0.0.")
                     } else if (trimmedBundle.isNotEmpty() && (
                             !trimmedBundle.contains('.') ||
@@ -122,6 +142,7 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         }
 
         override fun setupProject(project: Project) {
+            engine.installation?.let { IdeGodot.remember(it.executable) }
             val folder = Path.of(base.path, base.name)
             val platforms = chosen.filterValues { it }.keys
             val template =

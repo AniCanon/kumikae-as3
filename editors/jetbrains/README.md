@@ -74,7 +74,12 @@ from the compiler's language server. Bracket pairing and indentation are the plu
 
 ## Create a project
 
-Choose **File > New Project > AS3 Godot Game**. The wizard creates a small game that runs: a
+Choose **File > New Project > Kumikae AS3 Game**. On an Apple silicon Mac the wizard checks for a stable
+Godot 4.7 installation. If it cannot find one, choose **Install Godot 4.7.2** to download and verify
+the official Mac app, or **Choose existing…** to select an app or executable. Installation is per user
+and needs no administrator password. Click **Create** to use that engine for runs, tests and exports.
+
+The wizard creates a small game that runs: a
 `project.godot`, a scene, two scripts, and the extension's files.
 
 - **Package name.** The app's identifier, such as `com.studio.game`. Left empty, it's made from the
