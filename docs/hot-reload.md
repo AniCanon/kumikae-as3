@@ -95,8 +95,7 @@ what that doesn't rebuild, such as nodes outside the scene. A scene whose own `.
 ## What it costs
 
 To rerun a constructor, the game remembers the arguments each object was built with. It does that only in
-a debug build inside Godot, on the interpreter and in the native code that Play builds. An exported game
-remembers nothing and pays nothing, and neither does native code built without `--remember`.
+a debug build inside Godot, including a native iOS debug export. Release builds omit this bookkeeping.
 
 | Creating and dropping objects, and nothing else | Cost of remembering |
 |---|---|

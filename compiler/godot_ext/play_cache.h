@@ -26,12 +26,14 @@ namespace play {
 
 // What generated code is built with (the native backend's design): as the tests and the benchmarks build
 // it, without their -Werror, since a warning in generated code is not the person's to answer.
+inline constexpr const char *COMPILE_FLAGS = "-std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden";
+inline std::string library_flags() {
 #if defined(__APPLE__)
-inline constexpr const char *FLAGS = "-std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden -shared";
+	return std::string(COMPILE_FLAGS) + " -shared";
 #else
-inline constexpr const char *FLAGS = "-std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden -shared "
-									 "-fPIC -Wl,-z,defs -fno-math-errno";
+	return std::string(COMPILE_FLAGS) + " -shared -fPIC -Wl,-z,defs -fno-math-errno";
 #endif
+}
 // How many builds are kept besides those in use: a game and its tests are two programs, and a person
 // goes back and forth between two versions of a script.
 inline constexpr size_t KEPT_BUILDS = 3;

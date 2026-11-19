@@ -53,6 +53,10 @@ static const std::vector<std::string> &left_out() {
 	return folders;
 }
 
+bool excluded_script(std::string_view p_path) {
+	return in_test_folder(p_path, left_out());
+}
+
 // Whether a folder under the scripts' root is not part of this run's program: its name starts with a dot,
 // or it holds the project's tests and the game is what runs.
 static bool skipped(const String &p_folder, const String &p_name) {
@@ -60,7 +64,7 @@ static bool skipped(const String &p_folder, const String &p_name) {
 		return true;
 	}
 	const std::string place = p_folder.path_join(p_name).utf8().get_data();
-	return in_test_folder(std::string_view(place).substr((size_t)scripts_root().utf8().length()), left_out());
+	return excluded_script(std::string_view(place).substr((size_t)scripts_root().utf8().length()));
 }
 
 // A script by its place in the project ("res://game/Player.as"), wherever it is read from.

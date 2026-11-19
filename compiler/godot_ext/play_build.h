@@ -8,6 +8,7 @@
 #include "ir.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <string>
 
 namespace kas3 {
@@ -23,6 +24,9 @@ struct RuntimeHeader {
 extern const RuntimeHeader RUNTIME_HEADERS[];
 extern const size_t RUNTIME_HEADER_COUNT;
 extern const char *const BUILD_IDENTITY;
+
+// Write the program and its matching runtime headers. An empty result means success.
+std::string write_sources(const ir::Module &p_module, const std::filesystem::path &p_folder, bool p_remember);
 
 // The library Play built for these scripts, by its path, if it is there. Empty otherwise, and then, where
 // Play builds (below), a build of it has been started and said, or why there is none has been said: once.

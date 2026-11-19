@@ -57,10 +57,14 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	const String root = scripts_root();
 	std::vector<std::string> files;
 	collect_scripts(root, files);
-	std::sort(files.begin(), files.end());
 	if (r_count) {
 		*r_count = files.size();
 	}
+	return compile_scripts(std::move(files), root, r_module, r_errors);
+}
+
+bool compile_scripts(std::vector<std::string> files, const String &root, ir::Module *r_module, std::string *r_errors) {
+	std::sort(files.begin(), files.end());
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	for (const std::string &path : files) {
@@ -131,16 +135,16 @@ Project &Project::get() {
 	}
 	// A program library the project was given (named, or in its `bin`) before the one Play builds.
 	std::string library = NativeProgram::path();
-	if (library.empty()) {
+	if (library.empty() && !NativeProgram::linked()) {
 		library = play::library_for(*program->module_);
 	}
-	if (!library.empty()) {
+	if (!library.empty() || NativeProgram::linked()) {
 		std::string why;
 		program->native_ = NativeProgram::load(library, *program->module_, program->host_, time_limit(), remembers(), &why);
 		if (program->native_) {
 			UtilityFunctions::print("ActionScript: the scripts run as native code.");
 		} else {
-			UtilityFunctions::push_warning(String("ActionScript: the program library ") + String::utf8(library.c_str()) + " is not used (" +
+			UtilityFunctions::push_warning(String("ActionScript: the program library ") + String::utf8(library.empty() ? "linked into the app" : library.c_str()) + " is not used (" +
 					String::utf8(why.c_str()) + "): the interpreter runs the scripts.");
 		}
 	}
@@ -314,10 +318,13 @@ void Project::reload() {
 				String::num_int64((int64_t)used) + " of them the running program's");
 	}
 	AS3Script::refresh_all();
-	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts." +
-			(was_native ? " They ran as native code, which is not reloaded in a running game: the interpreter runs them from here on, and "
-						  "the next run is native again."
-						: ""));
+	String message = String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.";
+	if (was_native) {
+		message += NativeProgram::linked() ? " The interpreter runs the edits. Rebuild the app to run them as native code."
+										   : " They ran as native code, which is not reloaded in a running game: the interpreter runs them from here on, and "
+											 "the next run is native again.";
+	}
+	UtilityFunctions::print(message);
 	say_moved(moved);
 	play::build_ahead(*program->module_); // What the scripts are now, as native code for the next run.
 	for (const auto &[name, why] : moved.in_place.left) {

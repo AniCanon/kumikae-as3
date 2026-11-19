@@ -351,13 +351,23 @@ Your scripts run on the interpreter, which needs no build step, or as native cod
 
 ## iOS
 
-The interpreter runs in the iOS Simulator and has run on a device. Native code on iOS isn't built yet.
+On macOS, exporting an iOS preset compiles the AS3 scripts in the export into the app. In Rider, select
+the simulator in the run toolbar and press **Run**. The console prints `ActionScript: the scripts run as
+native code.` after the app loads them. Edits in a debug session move execution onto the interpreter.
+Run again to build those edits as native code.
+
+Native compilation is on by default. To use the interpreter, open the iOS preset in Godot and clear
+**ActionScript > Native Code**, or use **Compile AS3 to native code** in Rider's Export settings.
+
+The simulator needs no Apple account. For a physical device, sign in to **Xcode > Settings > Apple
+Accounts**, set the team's ID and the bundle identifier in the iOS preset, and use the team's signing
+configuration. The generated code is part of the app executable. [Apple's device signing guide](https://developer.apple.com/documentation/xcode/building-and-running-an-app).
 
 - `compiler/tests/build_ios.sh <path to godot-cpp>` builds the extension for iOS as an `.xcframework`. It
   needs Xcode.
 - Godot's published iOS export template has no Simulator library for Apple silicon.
   `compiler/tests/build_ios_simulator_template.sh` builds one from Godot's source.
-- The Rider plugin's [iOS Simulator run configuration](../editors/jetbrains/README.md#run-on-the-ios-simulator)
+- The Rider plugin's [iOS Simulator run configuration](../editors/jetbrains/README.md#run-on-ios-or-android)
   installs and launches the app, and passes `KAS3_SOURCE_DIR` so that hot reload works in the Simulator.
 
 ## Limits

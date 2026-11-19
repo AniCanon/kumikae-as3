@@ -47,6 +47,8 @@ state of the project changes.
 ### Native code
 
 - **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
+- **Native iOS exports.** Godot and Rider build the exported AS3 scripts into the app by default. The
+  Simulator runs the native integration suite. The ARM64 device build has been linked and awaits a run on hardware.
 - **Every test program gives the same output** on the interpreter and as native code.
 - **Level with or ahead of Godot C#** on all ten frame benchmarks. See [Performance](performance.md).
 - **Native code when you press Play,** on by default on macOS. The extension builds the program library
@@ -65,7 +67,7 @@ state of the project changes.
 
 ## Next
 
-1. **Native code on iOS and in exported games.**
+1. **Run a signed native build on iOS hardware and extend native export to other platforms.**
 2. **Hot reload for native code.**
 3. **Godot's larger values inline:** `Vector3`, `Color` and the rest in vectors, fields and parameters.
 4. **Threads.**

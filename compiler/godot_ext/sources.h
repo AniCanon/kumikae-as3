@@ -9,6 +9,12 @@
 #include <vector>
 
 namespace kas3 {
+namespace ir { struct Module; }
+
+// Lower a set of project scripts in the same order in a game and during export.
+bool compile_scripts(std::vector<std::string> files, const godot::String &root, ir::Module *r_module, std::string *r_errors);
+// Whether this run leaves the project-relative path out as part of a test folder.
+bool excluded_script(std::string_view p_path);
 
 // The folder the project's scripts are read from: "res://", or the one the game was told of.
 godot::String scripts_root();

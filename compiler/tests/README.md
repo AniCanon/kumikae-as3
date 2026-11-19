@@ -230,4 +230,5 @@ The tests also hold the benchmarks to the number of times native code falls back
 | Script | What it does |
 |---|---|
 | `build_ios.sh <path to godot-cpp>` | Builds the extension for iOS, for a device and the Simulator, as an `.xcframework` beside the test project. It needs Xcode, and signs nothing |
+| `test_ios_native.py <booted test simulator UDID> <exported test .app>` | Installs and launches the test game, checks the execution mode in a fresh log and requires every scene check to pass. Use a disposable simulator. `--source-dir <project>` exercises Rider's hot reload setup and `--interpreted` checks an opted-out export |
 | `build_ios_simulator_template.sh <godot source> <out.zip>` | Builds a Godot iOS export template whose Simulator library runs on Apple silicon. Godot's published template has a Simulator library for Intel only |

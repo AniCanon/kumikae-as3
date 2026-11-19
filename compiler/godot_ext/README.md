@@ -87,6 +87,17 @@ nothing differently for the editor, so one library serves both.
   that generated code reads directly, to learn when the object is freed. The bindings last as long as the
   library does.
 
+## Native iOS exports
+
+On macOS, `ios_export` registers an editor export plugin. It collects the AS3 paths selected by the iOS
+preset and uses the same test-folder rules and source ordering as the game. Once Godot writes the Xcode
+project, the plugin compiles one object for the device and one for the Simulator. Xcode links the object
+for its destination into the app. At startup the app passes the program table to the extension, which
+checks the runtime layout and source fingerprint just as it does for a program library.
+
+Debug exports record constructor arguments for hot reload. Release exports omit that bookkeeping.
+Clear `actionscript/native_code` in the iOS preset to export an interpreter build.
+
 ## The program library
 
 A project's scripts, written as C++ by `kas3c cpp --godot` and built into one shared library, are the
