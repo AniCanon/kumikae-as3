@@ -17,6 +17,16 @@ class TestSourceTest {
         }
     """.trimIndent()
 
+    @Test fun discoversOnlyAnnotatedMethodsWithinTheConfiguredFolder() {
+        val manifest = """{"version":1,"tests":[{"name":"Models","discover":"tests"}]}"""
+        val source = TestSource.read(text)
+        assertEquals(
+            listOf("Models::game.CourseTest::gapJump", "Models::game.CourseTest::magnetCollects"),
+            TestCaseMappings.forFile(manifest, "tests/CourseTest.as", source).map { it.identity },
+        )
+        assertEquals(emptyList<TestSelection>(), TestCaseMappings.forFile(manifest, "src/CourseTest.as", source))
+    }
+
     @Test fun selectsOnlyTheActualMethodOrClass() {
         val source = TestSource.read(text)
         assertEquals(listOf("gapJump", "helper", "magnetCollects"), source.methods.map { it.name })
@@ -37,7 +47,7 @@ class TestSourceTest {
 
     @Test fun failureFramesKeepPathsAndOneBasedLines() {
         val frames = As3FailureFrames.read(
-            "Error: fail\n\tat Assert/fail()[/lib/kumikae/testing/Assert.as:5]\n" +
+            "Error: fail\n\tat Assert/fail()[/lib/app/anicanon/kumikae/testing/Assert.as:5]\n" +
                 "\tat T/check()[/project with space/T.as:24]\n\tat T/run()[/project with space/T.as:10]",
         )
         assertEquals(3, frames.size)
@@ -46,10 +56,32 @@ class TestSourceTest {
         assertEquals(emptyList<As3FailureFrame>(), As3FailureFrames.read("Error: [not a stack:4]"))
     }
 
+    @Test fun suiteMembersResolveExplicitImportsAndLocalTypes() {
+        val suite = TestSource.read(
+            "package qa { import models.ScoreTest; [Suite] public class SmokeSuite { " +
+                "public var score:ScoreTest; public var motion:MotionTest; public var ui:views.InputTest; } }",
+        )
+        assertEquals(setOf("models.ScoreTest", "qa.MotionTest", "views.InputTest"), suite.suiteFixtures)
+    }
+
     @Test fun accessorBodiesAreHelperContexts() {
         val text = "class T { function get helper():int { return 1; } function set helper(v:int):void { check(v); } }"
         val source = TestSource.read(text)
         assertEquals("get helper", source.methodAt(text.indexOf("return 1"))?.name)
         assertEquals("set helper", source.methodAt(text.indexOf("check(v)"))?.name)
+    }
+
+    @Test fun annotatedTestsHandleExtraModifiersAndIgnoreStaticOrAccessors() {
+        val text = """
+            package game {
+                public class ModifierTest {
+                    [Test] override public function overridden():void {}
+                    [Test] public static function notInstance():void {}
+                    [Test] public function get value():int { return 1; }
+                }
+            }
+        """.trimIndent()
+        val source = TestSource.read(text)
+        assertEquals(listOf("overridden"), source.methods.filter { it.annotated }.map { it.name })
     }
 }

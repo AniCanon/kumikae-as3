@@ -2,11 +2,23 @@ package app.anicanon.kumikae.as3.scene
 
 import app.anicanon.kumikae.as3.language.As3Lexer
 import app.anicanon.kumikae.as3.language.As3Tokens
+import app.anicanon.kumikae.as3.run.GodotLaunch
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+
+internal fun resolveProjectResource(root: VirtualFile, path: String): VirtualFile? {
+    if (!path.startsWith("res://")) return null
+    val relative = path.removePrefix("res://")
+    if (relative.isEmpty() || '\\' in relative || relative.split('/').any { it.isEmpty() || it == "." || it == ".." }) {
+        return null
+    }
+    val found = root.findFileByRelativePath(relative) ?: return null
+    return found.takeIf { VfsUtilCore.isAncestor(root, it, true) }
+}
 
 internal class IdeSceneRepository(private val project: Project, private val file: VirtualFile) : SceneRepository {
     private fun document() = requireNotNull(FileDocumentManager.getInstance().getDocument(file)) {
@@ -15,9 +27,18 @@ internal class IdeSceneRepository(private val project: Project, private val file
     private fun root() =
         generateSequence(file.parent) { it.parent }.firstOrNull { it.findChild("project.godot") != null }
             ?: error("Scene must belong to a Godot project.")
-    private fun resource(path: String) = root().findFileByRelativePath(path.removePrefix("res://"))
+    private fun resource(path: String) = resolveProjectResource(root(), path)
         ?: error("Resource not found: $path")
 
+    override fun openInGodot() {
+        val godot = GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+            ?: error("Install Godot to open its scene editor.")
+        FileDocumentManager.getInstance().saveDocument(document())
+        val folder = root()
+        val relative = requireNotNull(VfsUtilCore.getRelativePath(file, folder))
+        ProcessBuilder(godot.toString(), "--editor", "--path", folder.path, "res://$relative")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+    }
     override fun read() = document().text
     override fun open(path: String) {
         FileEditorManager.getInstance(project).openFile(resource(path), true)
@@ -36,18 +57,12 @@ internal class IdeSceneRepository(private val project: Project, private val file
             lexer.start(script.text)
             val code = StringBuilder()
             while (lexer.tokenType != null) {
-                if (lexer.tokenType !in
-                    setOf(As3Tokens.LINE_COMMENT, As3Tokens.BLOCK_COMMENT, As3Tokens.STRING, As3Tokens.REGEX)
-                ) {
-                    code.append(lexer.tokenText)
-                } else {
-                    code.append(' ')
-                }
+                if (lexer.tokenType !in IGNORED_TOKENS) code.append(lexer.tokenText) else code.append(' ')
                 lexer.advance()
             }
-            val declaration = Regex("\\bclass\\s+\\w+\\s+extends\\s+([\\w.]+)").find(code)
+            val declaration = CLASS_EXTENDS.find(code)
             val base = declaration?.groupValues?.get(1)
-            val imports = Regex("\\bimport\\s+([\\w.]+)\\s*;").findAll(code).map { it.groupValues[1] }.toList()
+            val imports = IMPORT_STMT.findAll(code).map { it.groupValues[1] }.distinct().toList()
             val explicitNative =
                 imports.filter { it.substringAfterLast('.') == node.type } == listOf("godot.${node.type}")
             require(base == "godot.${node.type}" || (base == node.type && explicitNative)) {
@@ -66,5 +81,16 @@ internal class IdeSceneRepository(private val project: Project, private val file
             },
         )
         return updated
+    }
+
+    private companion object {
+        val IGNORED_TOKENS = setOf(
+            As3Tokens.LINE_COMMENT,
+            As3Tokens.BLOCK_COMMENT,
+            As3Tokens.STRING,
+            As3Tokens.REGEX,
+        )
+        val CLASS_EXTENDS = Regex("\\bclass\\s+\\w+\\s+extends\\s+([\\w.]+)")
+        val IMPORT_STMT = Regex("\\bimport\\s+([\\w.]+)\\s*;?")
     }
 }

@@ -15,6 +15,7 @@ internal class SimulatorRun(
     private val output: (text: String, error: Boolean) -> Unit,
     // The folder the game's scripts are edited in: the game reads them there, and takes a save while it runs.
     private val sources: String = "",
+    private val destination: String? = null,
     // Whether an app that is named is there to install.
     private val exists: (String) -> Boolean = { Files.isDirectory(Path.of(it)) },
     // Builds the game for the Simulator and returns the .app, saying what it does as it goes. Null where
@@ -23,17 +24,32 @@ internal class SimulatorRun(
 ) {
     private val bundle = bundle.trim()
     private val appPath = appPath.trim()
-    private var device: String? = null
+
+    @Volatile private var device: String? = null
+
+    @Volatile private var cancelled = false
+
+    @Volatile private var launched = false
     private var cursor = 0L
     private var explained = false
 
     fun start() {
         check(bundle.isNotEmpty()) { "Set the app's bundle identifier in the run configuration." }
+        if (cancelled) return
         repository.connect()
-        val chosen = repository.status().device?.takeIf { it.state == BOOTED }
-            ?: repository.devices().firstOrNull { it.state == BOOTED }?.also { repository.select(it.id) }
-            ?: error("No simulator is running. Boot one in the iOS Simulator panel, then run again.")
+        if (cancelled) return
+        val chosen = if (destination != null) {
+            val selected =
+                requireNotNull(repository.select(destination).device) { "The selected simulator is unavailable." }
+            if (selected.state != BOOTED) repository.boot(selected.id)
+            selected
+        } else {
+            repository.status().device?.takeIf { it.state == BOOTED }
+                ?: repository.devices().firstOrNull { it.state == BOOTED }?.also { repository.select(it.id) }
+                ?: error("No simulator is running. Boot one in the iOS Simulator panel, then run again.")
+        }
         device = chosen.id
+        if (cancelled) return
         // An app that is named is installed as it is. With none named, or with one named that is not there
         // (its build folder was cleared), the game is built now: Run means "what I have just written", as it
         // does everywhere else.
@@ -48,10 +64,15 @@ internal class SimulatorRun(
                 builder(output)
             }
         }
+        if (cancelled) return
         if (app.isNotEmpty()) repository.install(chosen.id, app)
         // Output from before this launch belongs to another run.
         cursor = repository.consolePage(0).nextCursor
-        repository.launch(chosen.id, bundle, sources)
+        synchronized(this) {
+            if (cancelled) return
+            repository.launch(chosen.id, bundle, sources)
+            launched = true
+        }
     }
 
     /** Reads what was printed since the last call. Returns the app's exit code once it has ended. */
@@ -69,7 +90,10 @@ internal class SimulatorRun(
         return if (page.running) null else page.exitCode ?: 0
     }
 
-    fun stop() {
+    @Synchronized fun stop() {
+        cancelled = true
+        if (!launched) return
+        launched = false
         device?.let { repository.terminate(it, bundle) }
     }
 

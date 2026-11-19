@@ -2,13 +2,23 @@
 
 Kumikae Testing lets you write tests for your game in ActionScript 3. It has three parts:
 
-- **A small AS3 library,** in [`as3/kumikae/testing/`](as3/kumikae/testing): `TestCase`, `Suite` and
+- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing): `TestCase`, `Suite` and
   `Assert`.
 - **A command-line runner,** `runner.py`, which runs the tests a project lists and reports each case.
 - **Rider integration,** in the [plugin](../editors/jetbrains/README.md#tests), which shows results in the
   IDE's Tests window.
 
 Tests run on the interpreter, with `kas3c run` or inside Godot. Nothing is downloaded.
+
+Mark public no-argument instance methods with `[Test]` and point a manifest target at the fixture directory:
+
+```json
+{"version":1,"tests":[{"name":"Models","discover":"tests"}]}
+```
+
+The runner uses the compiler's syntax tree and creates a fresh fixture for each test. Case IDs use the
+qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
+Rider uses the same IDs for the gutter, test results, reruns and source navigation.
 
 ## Write a test case
 
@@ -36,8 +46,8 @@ The test case, in `tests/ScoreCase.as`:
 ```actionscript
 package game.tests {
     import game.Score;
-    import kumikae.testing.Assert;
-    import kumikae.testing.TestCase;
+    import app.anicanon.kumikae.testing.Assert;
+    import app.anicanon.kumikae.testing.TestCase;
 
     public class ScoreCase extends TestCase {
         private var initial:int;
@@ -84,7 +94,7 @@ suite. This one is `tests/ScoringSuite.as`:
 
 ```actionscript
 package game.tests {
-    import kumikae.testing.Suite;
+    import app.anicanon.kumikae.testing.Suite;
 
     public class ScoringSuite {
         public function ScoringSuite() {
@@ -100,13 +110,13 @@ package game.tests {
 }
 ```
 
-A suite carries on after a failure, so one run reports every failing case. Registration is explicit:
-adding a method or a `[Test]` tag doesn't register a case. Cases run one after another.
+A manual suite carries on after a failure, so one run reports every failing case. Cases added to a `Suite`
+run in the order they were registered.
 
 To run the suite directly, pass the entry file first, then the rest of the program and the library:
 
 ```sh
-kas3c run tests/ScoringSuite.as tests/ScoreCase.as src/Score.as <repository>/testing/as3/kumikae/testing/*.as
+kas3c run tests/ScoringSuite.as tests/ScoreCase.as src/Score.as <repository>/testing/as3/app/anicanon/kumikae/testing/*.as
 ```
 
 ## List the tests of a project
@@ -123,9 +133,9 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
     "events": true,
     "command": [
       "{compiler}", "run", "tests/ScoringSuite.as", "{sources}",
-      "{library}/kumikae/testing/Assert.as",
-      "{library}/kumikae/testing/Suite.as",
-      "{library}/kumikae/testing/TestCase.as"
+      "{library}/app/anicanon/kumikae/testing/Assert.as",
+      "{library}/app/anicanon/kumikae/testing/Suite.as",
+      "{library}/app/anicanon/kumikae/testing/TestCase.as"
     ],
     "sources": ["src/**/*.as", "tests/**/*.as"],
     "marker": "PASS scoring suite",
@@ -137,12 +147,14 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 | Field | Meaning |
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
-| `command` | The program to run, as an array of arguments. It's run without a shell |
+| `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
+| `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
+| `command` | The program to run, as an array of arguments (for manual targets). It's run without a shell |
 | `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
 | `exclude` | Optional. Patterns for files to leave out of `sources` |
 | `marker` | A line the program must print when it has finished. Without it, the test fails |
 | `timeout` | Optional. Seconds before the test is stopped. The default is 120 |
-| `events`, `entryClass` | For a suite: report each case separately, and the class that runs the suite |
+| `events`, `entryClass` | For a manual suite: report each case separately, and the class that runs the suite |
 | `source` | The file the test's result links to |
 
 In a command, `{compiler}` is `kas3c`, `{godot}` is Godot, `{project}` is the manifest's folder, and
@@ -179,10 +191,10 @@ fails too. Stopping the runner stops the processes it started.
 
 ## Run tests in Rider
 
-Choose the **AS3 Tests** run configuration and select the manifest. See
-[the plugin's README](../editors/jetbrains/README.md#tests).
+Choose the **Kumikae AS3 > Tests** run configuration and select the manifest, or click the gutter icon
+beside a `[Test]` method or fixture class. See [the plugin's README](../editors/jetbrains/README.md#tests).
 
-To get a Run icon beside a test method, map the suite's cases to methods in the manifest:
+For manual `Suite` targets, map the suite's cases to methods in the manifest to get gutter icons:
 
 ```json
 "cases": [
@@ -196,8 +208,7 @@ the method runs that case alone, and the icon beside the class runs every case m
 
 ## What isn't there
 
-- **No discovery by metadata.** `[Test]` and `[Before]` tags aren't read. This isn't a FlexUnit
-  compatibility layer.
+- **Metadata.** Discovery supports public no-argument instance methods marked with `[Test]`. Use the bundled library for setup and teardown.
 - **No parallel runs.**
 - **No asynchronous cases.** A test that needs frames to pass runs as a Godot scene, as one result.
 
@@ -219,7 +230,7 @@ the lengths before it reports anything, so a program's ordinary output can't inj
 
 ```sh
 python3 -m unittest discover -s testing/tests -v
-compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/kumikae/testing/*.as
+compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as
 ```
 
 The second command runs a fixture that records a failing case on purpose and checks that the suite carries

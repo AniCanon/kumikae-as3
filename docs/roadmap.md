@@ -42,6 +42,7 @@ state of the project changes.
 - **Hot reload** that keeps state and updates live objects in place. See [Hot reload](hot-reload.md).
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
 - **iOS:** the interpreter runs in the Simulator and has run on a device.
+- **Android:** the interpreter runs on an ARM64 emulator through Rider.
 
 ### Native code
 
@@ -57,8 +58,8 @@ state of the project changes.
 
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
   hover and outline. A change to a million-line project is checked in milliseconds.
-- **Rider plugin:** language support, a project wizard, a `project.godot` settings editor, run
-  configurations for desktop and the iOS Simulator, a live Simulator panel, and a test runner.
+- **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
+  for desktop, iOS and Android, a Game Devices panel, and a test runner.
 - **VS Code client** for the language server.
 - **A testing library** written in AS3.
 
@@ -70,8 +71,8 @@ state of the project changes.
 4. **Threads.**
 5. **A restart action in the IDE,** to go with hot reload.
 6. **Debugger:** breakpoints and stepping from Rider, in the editor and on a device.
-7. **Android, Windows and Linux.** The code is written to be portable, and none of the three has been built
-   or run.
+7. **Android native code, Windows and Linux.** Android ARM64 runs the interpreter on an emulator; Windows and
+   Linux haven't been built or run.
 8. **Consoles.** Console support lives in a separate repository, because console SDKs are confidential.
 
 ## Later

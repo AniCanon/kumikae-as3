@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.awt.Color
 import kotlin.test.assertEquals
 
 class LiveControllerTest {
@@ -20,6 +21,40 @@ class LiveControllerTest {
         controller.selectDevice(repository.phone)
         actions.finish()
         controller.frameTick()
+    }
+
+    @Test fun `frame publication wakes the consumer without a timer and stops on hide`() {
+        var signals = 0
+        controller.onFramesReady = { signals++ }
+        connected()
+        streams.finish()
+        val feed = repository.feeds.single()
+        feed.next = repository.screenshot("A")
+        checkNotNull(feed.listener).invoke()
+        assertTrue(signals > 0)
+        controller.frameTick()
+        assertEquals("Native · 4×8", controller.capture)
+        controller.hidden()
+        assertEquals(null, feed.listener)
+    }
+
+    @Test fun `a replacement retires the old image only after detaching it from the screen`() {
+        connected()
+        streams.finish()
+        var detached = false
+        var retired = false
+        val first = SimulatorFrame("A", 1, repository.screenshot("A").image, 0, retire = {
+            assertTrue(detached)
+            retired = true
+        })
+        repository.feeds.single().next = first
+        controller.frameTick()
+        val snapshot = first.snapshot()
+        first.image.setRGB(0, 0, Color.RED.rgb)
+        assertFalse(snapshot.getRGB(0, 0) == first.image.getRGB(0, 0))
+        controller.onFrame = { detached = it !== first }
+        controller.hidden()
+        assertTrue(retired)
     }
 
     @Test fun `live capture identifies native resolution`() {

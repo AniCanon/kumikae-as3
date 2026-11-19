@@ -59,7 +59,7 @@ private class As3Lsp4ijConnection(private val project: Project) : OSProcessStrea
             service.warnMissingCompiler()
             throw CannotStartProcessException("The ActionScript 3 compiler, kas3c, was not found")
         }
-        commandLine = serverCommandLine(compiler)
+        commandLine = serverCommandLine(compiler, project)
         super.start()
         service.refreshDeclarations()
     }

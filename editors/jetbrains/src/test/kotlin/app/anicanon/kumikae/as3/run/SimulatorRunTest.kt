@@ -19,6 +19,23 @@ class SimulatorRunTest {
     private fun run(bundle: String = "org.example.game", app: String = "") =
         SimulatorRun(repository, bundle, app, { text, error -> said += text to error }, exists = { true })
 
+    @Test fun `stopping while building never installs or launches the app`() {
+        lateinit var session: SimulatorRun
+        session = SimulatorRun(repository, "org.example.game", "", { _, _ -> }) {
+            session.stop()
+            "/products/Game.app"
+        }
+        session.start()
+        assertTrue(asked.none { it.startsWith("install") || it.startsWith("launch") || it.startsWith("terminate") })
+    }
+
+    @Test fun `an explicit shutdown destination boots and runs even when another phone is already booted`() {
+        val id = repository.tablet.id
+        SimulatorRun(repository, "org.example.game", "", { _, _ -> }, destination = id).start()
+        assertTrue("boot $id" in asked)
+        assertTrue("launch $id org.example.game" in asked)
+    }
+
     @Test fun `the app is launched on the device the panel shows`() {
         repository.select("A")
         repository.calls.clear()

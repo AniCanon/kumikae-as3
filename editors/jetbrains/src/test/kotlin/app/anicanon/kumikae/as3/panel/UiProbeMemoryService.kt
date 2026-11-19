@@ -13,6 +13,7 @@ internal class UiProbeMemoryService : SimulatorService {
     private val gson = Gson()
     private val device =
         mapOf("id" to "synthetic", "name" to "Synthetic phone", "runtime" to "iOS", "state" to "Booted")
+    private var listener: (() -> Unit)? = null
     private val slot = LatestValue<LiveFrame>()
     private val images = mutableListOf<WeakReference<BufferedImage>>()
     private var selected = false
@@ -29,6 +30,7 @@ internal class UiProbeMemoryService : SimulatorService {
         produced++
         images += WeakReference(image)
         slot.put(LiveFrame("synthetic", 1, image, System.nanoTime(), System.nanoTime()))
+        listener?.invoke()
     }
 
     override fun start() = "/synthetic/session.json"
@@ -56,6 +58,9 @@ internal class UiProbeMemoryService : SimulatorService {
     override fun openFrames(device: String): FrameFeed {
         check(device == "synthetic")
         return object : FrameFeed {
+            override fun setFrameListener(listener: (() -> Unit)?) {
+                this@UiProbeMemoryService.listener = listener
+            }
             override val failure: Throwable? = null
             override val ended: Boolean get() = closed
             override fun poll(): LiveFrame? = slot.poll()

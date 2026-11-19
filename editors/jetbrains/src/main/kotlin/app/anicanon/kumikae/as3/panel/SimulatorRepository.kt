@@ -40,6 +40,7 @@ internal interface SimulatorRepository : AutoCloseable {
 
 /** Polling this slot never performs I/O or decodes; the service workers own that work. */
 internal interface SimulatorFrames : AutoCloseable {
+    fun setFrameListener(listener: (() -> Unit)?)
     fun poll(): SimulatorFrame?
     val failure: Throwable?
     val ended: Boolean

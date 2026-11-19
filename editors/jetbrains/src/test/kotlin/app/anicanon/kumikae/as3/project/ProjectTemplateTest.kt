@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -9,27 +10,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ProjectTemplateTest {
-    private val root = Files.createTempDirectory("template")
+    @TempDir lateinit var root: Path
 
     @Test fun `the disc of a new game goes the way it is swiped, by a finger or the mouse`() {
         val files = ProjectTemplate("Star Hopper", emptySet()).files()
-        val script = files.getValue("Main.as")
+        val script = files.getValue("src/org/example/starhopper/view/Main.as")
         assertTrue(script.contains("override public function _unhandledInput(event:InputEvent):void"))
         assertTrue(script.contains("event as InputEventScreenTouch"))
         // A mouse is turned into touches on a computer, so the same swipe works there.
         assertTrue(files.getValue("project.godot").contains("pointing/emulate_touch_from_mouse=true"))
-        assertTrue(files.getValue("Hello.as").contains("Swipe"))
+        assertTrue(files.getValue("src/org/example/starhopper/view/Hello.as").contains("Swipe"))
     }
 
     @Test fun `a new game has a project file, a scene, a script and the extension's description`() {
         val files = ProjectTemplate("Star Hopper", emptySet()).files()
+        assertTrue(files.getValue("project.godot").contains("config/version=\"1.0.0\""))
+        assertTrue(
+            files.getValue(
+                "src/org/example/starhopper/view/Main.as",
+            ).startsWith("package org.example.starhopper.view {"),
+        )
+        assertTrue(
+            files.getValue("tests/org/example/starhopper/GameTest.as").contains("app.anicanon.kumikae.testing.Assert"),
+        )
         assertEquals(
             setOf(
                 "project.godot",
-                "main.tscn",
-                "Main.as",
-                "Hello.as",
-                "icon.svg",
+                "scenes/main.tscn",
+                "src/org/example/starhopper/view/Main.as",
+                "src/org/example/starhopper/view/Hello.as",
+                "tests/org/example/starhopper/GameTest.as",
+                "kas3-tests.json",
+                "assets/icon.svg",
                 "kas3.gdextension",
                 ".gitignore",
                 "README.md",
@@ -38,17 +50,25 @@ class ProjectTemplateTest {
             files.keys,
         )
         assertTrue(files.getValue("project.godot").contains("config/name=\"Star Hopper\""))
-        assertTrue(files.getValue("project.godot").contains("run/main_scene=\"res://main.tscn\""))
-        assertTrue(files.getValue("main.tscn").contains("path=\"res://Main.as\""))
-        assertTrue(files.getValue("Main.as").contains("public class Main extends Node2D"))
+        assertTrue(files.getValue("project.godot").contains("run/main_scene=\"res://scenes/main.tscn\""))
+        assertTrue(
+            files.getValue("scenes/main.tscn").contains("path=\"res://src/org/example/starhopper/view/Main.as\""),
+        )
+        assertTrue(
+            files.getValue("src/org/example/starhopper/view/Main.as").contains("public class Main extends Node2D"),
+        )
         assertTrue(files.getValue("kas3.gdextension").contains("entry_symbol = \"kas3_godot_init\""))
-        assertTrue(files.getValue("main.tscn").contains("path=\"res://Hello.as\""))
-        assertTrue(files.getValue("Hello.as").contains("text = \"Hello from ActionScript 3"))
+        assertTrue(
+            files.getValue("scenes/main.tscn").contains("path=\"res://src/org/example/starhopper/view/Hello.as\""),
+        )
+        assertTrue(
+            files.getValue("src/org/example/starhopper/view/Hello.as").contains("text = \"Hello from ActionScript 3"),
+        )
         // Godot loads the extension from this list: without it the scripts have no loader until an import.
         assertEquals("res://kas3.gdextension\n", files.getValue(".godot/extension_list.cfg"))
         // Godot refuses to export for a phone without an icon.
-        assertTrue(files.getValue("project.godot").contains("config/icon=\"res://icon.svg\""))
-        assertTrue(files.getValue("icon.svg").startsWith("<svg"))
+        assertTrue(files.getValue("project.godot").contains("config/icon=\"res://assets/icon.svg\""))
+        assertTrue(files.getValue("assets/icon.svg").startsWith("<svg"))
         assertFalse(files.getValue("README.md").contains("iOS"))
     }
 
@@ -60,13 +80,15 @@ class ProjectTemplateTest {
         assertTrue(presets.contains("application/bundle_identifier=\"org.example.starhopper2\""))
         assertTrue(presets.contains("include_filter=\"*.as\""))
         // Godot will not write the Xcode project without a team: a stand-in is enough for the Simulator.
-        assertTrue(presets.contains("application/app_store_team_id=\"ABCDE12345\""))
+        assertTrue(presets.contains("application/app_store_team_id=\"\""))
         assertTrue(template.files().getValue("README.md").contains("## iOS"))
     }
 
     @Test fun `a name with nothing usable in it still gives a bundle identifier`() {
         assertEquals("org.example.game", ProjectTemplate("!!!", emptySet()).bundle)
         assertEquals("org.example.game", ProjectTemplate.defaultBundle("---"))
+        assertEquals("org.example.gclass", ProjectTemplate.defaultBundle("Class"))
+        assertTrue(ProjectTemplate("Class", emptySet()).files().getValue("kas3-tests.json").contains("src/**/*.as"))
         assertEquals("org.example.g2048", ProjectTemplate("2048", emptySet()).bundle)
     }
 
@@ -95,18 +117,13 @@ class ProjectTemplateTest {
     }
 
     @Test fun `what can be chosen says why when it can't`() {
-        val without = Platform.choices(consolePlugin = false)
-        assertEquals(
-            listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID, Platform.CONSOLE),
-            without.map {
-                it.platform
-            },
-        )
-        assertTrue(without.first { it.platform == Platform.DESKTOP }.let { it.available && it.always })
-        assertTrue(without.first { it.platform == Platform.IOS }.available)
-        assertFalse(without.first { it.platform == Platform.ANDROID }.available)
-        assertFalse(without.first { it.platform == Platform.CONSOLE }.available)
-        assertTrue(Platform.choices(consolePlugin = true).first { it.platform == Platform.CONSOLE }.available)
+        val choices = Platform.choices()
+        assertEquals(listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID), choices.map { it.platform })
+        assertTrue(choices.first().always)
+        val game = ProjectTemplate("Game", setOf(Platform.ANDROID, Platform.IOS))
+        val config = game.files().getValue("export_presets.cfg")
+        assertTrue(config.contains("package/unique_name="))
+        assertTrue(config.contains("application/bundle_identifier="))
     }
 
     @Test fun `a package name that is given is the app's identifier, and its shape is checked`() {

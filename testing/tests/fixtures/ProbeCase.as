@@ -1,6 +1,6 @@
 package {
-    import kumikae.testing.TestCase;
-    import kumikae.testing.Assert;
+    import app.anicanon.kumikae.testing.TestCase;
+    import app.anicanon.kumikae.testing.Assert;
     public class ProbeCase extends TestCase {
         public static var runs:int = 0;
         private var fail:Boolean;

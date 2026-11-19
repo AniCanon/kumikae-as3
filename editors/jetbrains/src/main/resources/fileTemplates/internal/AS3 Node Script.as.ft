@@ -1,11 +1,11 @@
-package {
-	import godot.*;
+package${AS3_PACKAGE} {
+    import godot.*;
 
-	public class ${NAME} extends Node2D {
-		override public function _ready():void {
-		}
+    public class ${NAME} extends Node2D {
+        override public function _ready():void {
+        }
 
-		override public function _process(delta:Number):void {
-		}
-	}
+        override public function _process(delta:Number):void {
+        }
+    }
 }

@@ -104,7 +104,7 @@ class SimulatorSession(
                 settle(device, "Shutdown")
             }
 
-            "install" -> slowly(params) { device -> install(device, params["path"].asString) }
+            "install" -> slowly(params, keepStream = true) { device -> install(device, params["path"].asString) }
 
             "tap", "swipe", "text", "button", "rotate" -> sendInput(method, params)
 
@@ -124,7 +124,7 @@ class SimulatorSession(
         val device = chosen(params)
         return when (method) {
             "launch" -> {
-                invalidate()
+                geometry.invalidate()
                 launchLog.launch(device, bundle(params), sources(params))
             }
 
@@ -147,7 +147,7 @@ class SimulatorSession(
         return device
     }
 
-    private fun slowly(params: JsonObject, work: (String) -> Any): Any {
+    private fun slowly(params: JsonObject, keepStream: Boolean = false, work: (String) -> Any): Any {
         val device = synchronized(this) {
             ensureOpen()
             requireInputIdle()
@@ -155,7 +155,7 @@ class SimulatorSession(
             if (!slow.compareAndSet(false, true)) {
                 throw SimulatorException("BUSY", "Another boot, shutdown or install is still running")
             }
-            invalidate()
+            if (keepStream) geometry.invalidate() else invalidate()
             chosen
         }
         try {

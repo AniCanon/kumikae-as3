@@ -21,6 +21,10 @@ _mapping_spec = importlib.util.spec_from_file_location("kas3_mapping", Path(__fi
 _mapping = importlib.util.module_from_spec(_mapping_spec)
 _mapping_spec.loader.exec_module(_mapping)
 
+_discovery_spec = importlib.util.spec_from_file_location("kas3_discovery", Path(__file__).with_name("discovery.py"))
+_discovery = importlib.util.module_from_spec(_discovery_spec)
+_discovery_spec.loader.exec_module(_discovery)
+
 Result = namedtuple("Result", "passed output duration")
 
 
@@ -54,15 +58,19 @@ def validate(manifest):
         if "::" in name or "\n" in name or "\r" in name:
             raise ValueError("Test names must be single-line and cannot contain ::")
         names.add(name)
+        timeout = case.get("timeout", 120)
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 3600:
+            raise ValueError("Test timeout must be between 0 and 3600 seconds")
+        if "discover" in case:
+            if not isinstance(case["discover"], str) or not case["discover"]:
+                raise ValueError("Choose a fixture directory inside the project.")
+            continue
         _mapping.validate(case)
         command = case.get("command")
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError("Each test needs a command argument array")
         if not isinstance(case.get("marker"), str) or not case["marker"]:
             raise ValueError("Each test needs a completion marker")
-        timeout = case.get("timeout", 120)
-        if not isinstance(timeout, (int, float)) or not 0 < timeout <= 3600:
-            raise ValueError("Test timeout must be between 0 and 3600 seconds")
     return tests
 
 
@@ -102,7 +110,10 @@ def stop(process):
     except (ProcessLookupError, PermissionError):
         if process.poll() is None:
             raise
-    process.wait(timeout=2)
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def run_case(root, case):
@@ -117,7 +128,10 @@ def run_case(root, case):
         except subprocess.TimeoutExpired:
             stop(process)
             stopped = True
-            output, _ = process.communicate(timeout=2)
+            try:
+                output, _ = process.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                output = ""
             return Result(False, output + "\nTest timed out", time.monotonic() - start)
         complete = case["marker"] in output.splitlines()
         failed = process.returncode != 0 or not complete
@@ -188,7 +202,16 @@ def main():
     args = parser.parse_args()
     root = args.manifest.resolve().parent
     try:
-        tests = select(validate(json.loads(args.manifest.read_text())), args.case)
+        manifest = json.loads(args.manifest.read_text())
+        registered = validate(manifest)
+        selected_names = {value.partition("::")[0] for value in args.case}
+        for index, target in enumerate(registered):
+            if selected_names and target["name"] not in selected_names:
+                continue
+            if "discover" in target:
+                manifest["tests"][index] = _discovery.expand_target(root, target, args.compiler)
+                _mapping.validate(manifest["tests"][index])
+        tests = select(registered, args.case)
         if args.list:
             print(json.dumps(tests))
             return 0
@@ -201,6 +224,13 @@ def main():
             command_case = expand(root, case, args.compiler, args.godot)
             with tempfile.TemporaryDirectory(prefix="kas3-tests-") as temporary:
                 filters = case.get("_filters", [])
+                if "discover" in case:
+                    generated = _discovery.entry(Path(temporary), case, root)
+                    command = command_case["command"]
+                    files = list(dict.fromkeys(generated + command[2:]))
+                    if not any(Path(file).as_posix().endswith("/app/anicanon/kumikae/testing/TestCase.as") for file in files):
+                        files.extend(sorted(str(path) for path in (Path(__file__).resolve().parent / "as3").rglob("*.as")))
+                    command_case["command"] = command[:2] + files
                 if filters:
                     command = command_case["command"]
                     entry = case["entryClass"]
@@ -208,7 +238,7 @@ def main():
                         raise ValueError("Filtered suites require an AS3 CLI entryClass and compiler run command")
                     bootstrap = Path(temporary) / "Kas3TestSelection.as"
                     statements = "".join("Suite.only.push(" + json.dumps(value, ensure_ascii=True) + ");" for value in filters)
-                    bootstrap.write_text("package { import kumikae.testing.Suite; import " + entry + "; public class Kas3TestSelection { public function Kas3TestSelection() {" + statements + "new " + entry.rsplit(".", 1)[-1] + "(); } } }")
+                    bootstrap.write_text("package { import app.anicanon.kumikae.testing.Suite; import " + entry + "; public class Kas3TestSelection { public function Kas3TestSelection() {" + statements + "new " + entry.rsplit(".", 1)[-1] + "(); } } }")
                     command_case["command"] = command[:2] + [str(bootstrap)] + command[2:]
                 result = run_case(root, command_case)
             if structured:
@@ -242,7 +272,7 @@ def main():
         message("testSuiteFinished", name="AS3 Tests")
         print(f"AS3 tests: {len(tests) - failures} passed, {failures} failed", flush=True)
         return int(failures != 0)
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         print("AS3 test runner error: " + str(error), file=sys.stderr)
         return 1
 

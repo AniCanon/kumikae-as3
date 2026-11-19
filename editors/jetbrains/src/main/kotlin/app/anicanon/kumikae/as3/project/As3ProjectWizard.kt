@@ -6,16 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
-import app.anicanon.kumikae.as3.run.GodotConfigurationType
-import app.anicanon.kumikae.as3.run.SimulatorConfigurationType
-import app.anicanon.kumikae.as3.run.SimulatorRunConfiguration
+import app.anicanon.kumikae.as3.run.KumikaeRunType
+import app.anicanon.kumikae.as3.run.ensureDefaultTests
+import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.execution.RunManager
-import com.intellij.execution.configurations.ConfigurationType
-import com.intellij.ide.plugins.cl.PluginAwareClassLoader
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.ide.wizard.AbstractNewProjectWizardStep
@@ -23,21 +21,23 @@ import com.intellij.ide.wizard.GeneratorNewProjectWizard
 import com.intellij.ide.wizard.NewProjectWizardBaseStep
 import com.intellij.ide.wizard.NewProjectWizardStep
 import com.intellij.ide.wizard.RootNewProjectWizardStep
-import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
+import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.CheckBox
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.interaction.enabled
 import java.nio.file.Path
 
-/** File > New Project > "AS3 Godot Game": a small game that runs, with a run target for each platform chosen. */
+/** File > New Project > "Kumikae AS3 Game": a small game that runs, with a run target for each platform chosen. */
 class As3ProjectWizard : GeneratorNewProjectWizard {
     override val id = "kumikae.as3.game"
-    override val name = "AS3 Godot Game"
+    override val name = "Kumikae AS3 Game"
     override val icon = PluginFiles.mark
     override val description = "A Godot game written in ActionScript 3"
 
@@ -45,24 +45,33 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         PlatformStep(NewProjectWizardBaseStep(RootNewProjectWizardStep(context)))
 
     private class PlatformStep(private val base: NewProjectWizardBaseStep) : AbstractNewProjectWizardStep(base) {
-        private val choices = Platform.choices(consolePlugin = consoleType() != null)
+        private val choices = Platform.choices()
+        private val contributions = GameTargetContribution.EP.extensionList
+        private val optional = mutableStateMapOf<String, Boolean>()
         private val chosen = mutableStateMapOf<Platform, Boolean>().apply {
             choices.forEach { put(it.platform, it.always) }
         }
+        private var version by mutableStateOf("")
         private var bundle by mutableStateOf("")
+        private var projectName by mutableStateOf(base.name)
 
         override fun setupUI(builder: Panel) {
             base.setupUI(builder)
+            base.nameProperty.afterChange(context.disposable) { projectName = it }
             builder.row {
                 cell(
                     composePanel(context.disposable) {
                         Column {
                             LabelledField(
-                                "Package name (the app's identifier, like com.studio.game; empty: made from the name)",
+                                "Application identifier",
                                 bundle,
                                 { bundle = it },
+                                placeholder = ProjectTemplate.defaultBundle(projectName),
                             )
-                            StatusLine("Where the game should run. Each choice adds its run target.")
+                            LabelledField("Version", version, {
+                                version = it
+                            }, placeholder = ProjectTemplate.DEFAULT_VERSION)
+                            Label("Run targets")
                             for (choice in choices) {
                                 CheckBox(
                                     choice.platform.label,
@@ -72,13 +81,38 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                                 )
                                 StatusLine(choice.note)
                             }
+                            for (target in contributions) {
+                                CheckBox(target.label, optional[target.setupAction] == true, { selected: Boolean ->
+                                    optional[target.setupAction] = selected
+                                })
+                            }
                         }
                     },
                 ).align(AlignX.FILL).validationOnApply {
-                    if (bundle.isBlank() || ProjectTemplate.isBundle(bundle.trim())) {
-                        null
+                    val trimmedBundle = bundle.trim()
+                    if (version.isNotBlank() && !ProjectTemplate.VERSION_PATTERN.matches(version.trim())) {
+                        ValidationInfo("Enter a version such as 1.0.0.")
+                    } else if (trimmedBundle.isNotEmpty() && (
+                            !trimmedBundle.contains('.') ||
+                                !trimmedBundle.replace('-', '_').split('.').all(As3Names::valid)
+                            )
+                    ) {
+                        ValidationInfo("Use a dot-separated ActionScript package name, such as com.studio.game.")
                     } else {
-                        ValidationInfo("A package name is words joined by dots, like com.studio.game.")
+                        val invalidPlatform = trimmedBundle.takeIf { it.isNotEmpty() }?.let { id ->
+                            chosen.filterValues { it }.keys.firstOrNull {
+                                it != Platform.DESKTOP && !GameTargets.validIdentifier(it.label, id)
+                            }
+                        }
+                        when (invalidPlatform) {
+                            null -> null
+
+                            Platform.ANDROID -> ValidationInfo(
+                                "Android application identifiers cannot contain hyphens; use letters, digits and dots.",
+                            )
+
+                            else -> ValidationInfo("A package name is words joined by dots, like com.studio.game.")
+                        }
                     }
                 }
             }
@@ -87,7 +121,15 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         override fun setupProject(project: Project) {
             val folder = Path.of(base.path, base.name)
             val platforms = chosen.filterValues { it }.keys
-            val template = ProjectTemplate(base.name, platforms, bundle)
+            val template =
+                ProjectTemplate(
+                    base.name,
+                    platforms,
+                    bundle,
+                    version.trim().ifEmpty {
+                        ProjectTemplate.DEFAULT_VERSION
+                    },
+                )
             val compiler = CompilerLocator.find(
                 folder,
                 PropertiesComponent.getInstance().getValue(COMPILER_PATH).orEmpty(),
@@ -101,37 +143,26 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             val carried = PluginFiles.native().takeIf(ProjectTemplate::hasLibrary)
             template.write(folder, built ?: carried, link = built != null)
             LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder)?.refresh(true, true)
-            addRunTargets(project, platforms, template.bundle)
+            addRunTargets(project, platforms)
+            DumbService.getInstance(project).smartInvokeLater {
+                val game = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder.resolve("project.godot"))
+                if (game != null) FileEditorManager.getInstance(project).openFile(game, true)
+            }
+            contributions.filter { optional[it.setupAction] == true }.forEach { it.configure(project) }
         }
 
-        private fun addRunTargets(project: Project, platforms: Set<Platform>, bundle: String) {
+        private fun addRunTargets(project: Project, platforms: Set<Platform>) {
             val manager = RunManager.getInstance(project)
-            val game = manager.createConfiguration("Game", GodotConfigurationType().configurationFactories.first())
+            val game = manager.createConfiguration("Game", KumikaeRunType.factory(KumikaeRunType.Kind.GAME))
             manager.addConfiguration(game)
+            ensureDefaultTests(manager)
             manager.selectedConfiguration = game
-            if (Platform.IOS in platforms) {
-                val simulator = manager.createConfiguration(
-                    "iOS Simulator",
-                    SimulatorConfigurationType().configurationFactories.first(),
-                )
-                (simulator.configuration as SimulatorRunConfiguration).options.bundle = bundle
-                manager.addConfiguration(simulator)
-            }
-            if (Platform.CONSOLE in platforms) {
-                consoleType()?.configurationFactories?.firstOrNull()?.let { factory ->
-                    manager.addConfiguration(manager.createConfiguration("Nintendo Switch", factory))
-                }
-            }
+            if (Platform.ANDROID in platforms) GameTargetSetup.selectAndroid(project, "Android")
+            if (Platform.IOS in platforms) GameTargetSetup.selectSimulator(project, "iOS")
         }
     }
 
     private companion object {
         const val COMPILER_PATH = "kumikae.as3.compilerPath"
-        const val CONSOLE_PLUGIN = "app.anicanon.kumikae"
-
-        /** The run configuration type the console plugin brings, when that plugin is installed and on. */
-        fun consoleType(): ConfigurationType? = ConfigurationType.CONFIGURATION_TYPE_EP.extensionList.firstOrNull {
-            (it.javaClass.classLoader as? PluginAwareClassLoader)?.pluginId == PluginId.getId(CONSOLE_PLUGIN)
-        }
     }
 }

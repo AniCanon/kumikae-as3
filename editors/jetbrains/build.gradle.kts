@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import java.time.Duration
 
 plugins {
@@ -10,7 +11,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.1.0"
+version = "0.2.4"
 
 repositories {
     mavenCentral()
@@ -47,7 +48,7 @@ dependencies {
 
 allprojects {
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
-    extensions.configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> { version.set("1.8.0") }
+    extensions.configure<KtlintExtension> { version.set("1.8.0") }
 }
 
 kotlin { jvmToolchain(25) }
@@ -103,6 +104,7 @@ if (providers.gradleProperty("uiProbe").isPresent) {
     tasks.withType<PrepareSandboxTask>().configureEach {
         if (name.startsWith("prepareSandbox_run")) {
             from(uiProbeJar) { into("kumikae-as3-ui-probe/lib") }
+            providers.gradleProperty("gameTargetPlugin").orNull?.let { from(zipTree(it)) }
         }
     }
     tasks.withType<RunIdeTask>().configureEach {
@@ -122,8 +124,8 @@ if (providers.gradleProperty("uiProbe").isPresent) {
         }
         timeout =
             Duration.ofMinutes(
-                if (providers.environmentVariable("KUMIKAE_COMPLETION_RETENTION_PROBE").orNull ==
-                    "1"
+                if (providers.environmentVariable("KUMIKAE_GAME_RUN_PROBE").isPresent ||
+                    providers.environmentVariable("KUMIKAE_COMPLETION_RETENTION_PROBE").orNull == "1"
                 ) {
                     15
                 } else {
@@ -156,6 +158,20 @@ tasks.withType<PrepareSandboxTask>().configureEach {
     from(root.resolve("compiler/tests/godot_project/bin")) {
         include("libkas3_godot.*")
         into("${intellijPlatform.projectName.get()}/native")
+    }
+    from(root.resolve("spike/third_party/godot-ios-template/ios-with-arm64-simulator.zip")) {
+        into("${intellijPlatform.projectName.get()}/native")
+    }
+    from(rootDir.resolve("tools")) {
+        include("android_run.py", "game_export.py", "build-ios-simulator.sh")
+        into("${intellijPlatform.projectName.get()}/native/tools")
+    }
+    val androidRuntime = "compiler/build-android-arm64/out/libkas3_godot.so"
+    from(
+        listOf(rootDir.resolve("../.."), root).map { it.resolve(androidRuntime) }.firstOrNull { it.isFile }
+            ?: root.resolve(androidRuntime),
+    ) {
+        into("${intellijPlatform.projectName.get()}/native/android/arm64-v8a")
     }
     // The extension for iOS, when it has been built (compiler/tests/build_ios.sh).
     from(root.resolve("compiler/tests/godot_project/bin/ios")) {

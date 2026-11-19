@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3
 
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
@@ -38,14 +39,35 @@ internal class ShippedScript(
                 environment()["HOMEBREW_NO_AUTO_UPDATE"] = "1"
             }.start()
             process.outputStream.close()
-            val output = StringBuilder()
-            process.inputStream.bufferedReader().forEachLine { line ->
-                output.append(line).append('\n')
-                onLine(line)
+            val output = StringBuffer()
+            val reader = Thread {
+                try {
+                    process.inputStream.bufferedReader().use { input ->
+                        input.forEachLine { line ->
+                            output.append(line).append('\n')
+                            onLine(line)
+                        }
+                    }
+                } catch (_: IOException) {
+                    // Process teardown closes the stream.
+                }
+            }.apply {
+                isDaemon = true
+                start()
             }
-            if (!process.waitFor(limitMinutes, TimeUnit.MINUTES)) {
-                process.destroyForcibly()
-                throw ScriptFailed("It did not finish in $limitMinutes minutes.", output.toString())
+            try {
+                if (!process.waitFor(limitMinutes, TimeUnit.MINUTES)) {
+                    throw ScriptFailed("It did not finish in $limitMinutes minutes.", output.toString())
+                }
+                reader.join(READER_JOIN_MILLIS)
+            } finally {
+                if (process.isAlive) {
+                    process.descendants().use { children -> children.forEach { it.destroyForcibly() } }
+                    process.destroy()
+                    if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly().waitFor()
+                }
+                runCatching { process.inputStream.close() }
+                reader.join(READER_JOIN_MILLIS)
             }
             if (process.exitValue() != 0) {
                 throw ScriptFailed("It stopped with status ${process.exitValue()}.", output.toString())
@@ -61,6 +83,7 @@ internal class ShippedScript(
 
     companion object {
         private const val DEFAULT_LIMIT_MINUTES = 15L
+        private const val READER_JOIN_MILLIS = 5_000L
 
         fun read(resource: String): String = checkNotNull(ShippedScript::class.java.getResourceAsStream(resource)) {
             "The plugin was built without $resource."

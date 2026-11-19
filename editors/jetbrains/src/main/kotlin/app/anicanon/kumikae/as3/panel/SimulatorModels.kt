@@ -22,7 +22,9 @@ internal class SimulatorFrame(
     val image: BufferedImage,
     val captureMs: Long,
     val receivedNanos: Long = 0,
+    val retire: () -> Unit = {},
 ) {
+    fun snapshot() = BufferedImage(image.colorModel, image.copyData(null), image.isAlphaPremultiplied, null)
     val geometry = Geometry(image.width, image.height)
 }
 

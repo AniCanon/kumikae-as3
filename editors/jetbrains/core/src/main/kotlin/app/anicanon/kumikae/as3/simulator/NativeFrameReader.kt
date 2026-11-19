@@ -7,10 +7,11 @@ import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
-internal data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage)
+data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage)
 
-internal class NativeFrameReader(
+class NativeFrameReader(
     path: Path,
+    private val discard: (BufferedImage) -> Unit = {},
     private val allocate: (Int, Int) -> BufferedImage = { width, height ->
         BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
     },
@@ -30,14 +31,31 @@ internal class NativeFrameReader(
         val initial = initialLock.use { readHeader() } ?: return null
         // Allocation can collect the JVM heap. Never make the native writer wait for that pause.
         val image = allocate(initial.width, initial.height)
+        var delivered = false
+        try {
+            val picture = copyNewest(image)
+            delivered = picture != null
+            return picture
+        } finally {
+            if (!delivered) discard(image)
+        }
+    }
+
+    private fun copyNewest(image: BufferedImage): NativePicture? {
         val pixels = (image.raster.dataBuffer as DataBufferInt).data
         val lock = channel.tryLock(0, Long.MAX_VALUE, true) ?: return null
         lock.use {
             val header = readHeader() ?: return null
             if (header.width != image.width || header.height != image.height) return null
-            for (row in 0 until header.height) {
-                memory.position(NativeFrameLayout.headerBytes + row * header.stride)
-                memory.asIntBuffer().get(pixels, row * header.width, header.width)
+            memory.position(NativeFrameLayout.headerBytes)
+            val source = memory.asIntBuffer()
+            if (header.stride == header.width * 4) {
+                source.get(pixels, 0, header.width * header.height)
+            } else {
+                for (row in 0 until header.height) {
+                    source.position(row * (header.stride / 4))
+                    source.get(pixels, row * header.width, header.width)
+                }
             }
             sequence = header.sequence
             return NativePicture(header, image)

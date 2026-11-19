@@ -10,6 +10,7 @@ internal class PictureStreamController(
     private val show: (SimulatorFrame?) -> Unit,
     private val say: (String) -> Unit,
 ) {
+    var onFramesReady: () -> Unit = {}
     private var feed: SimulatorFrames? = null
     private var epoch = 0L
     private var device: String? = null
@@ -44,6 +45,8 @@ internal class PictureStreamController(
             }
             result.fold({
                 feed = it
+                it.setFrameListener(onFramesReady)
+                onFramesReady() // A frame can arrive before subscription.
                 say("Live picture connected.")
             }, ::failed)
         }, { it.close() })
@@ -51,6 +54,7 @@ internal class PictureStreamController(
 
     fun stop() {
         epoch++
+        feed?.setFrameListener(null)
         feed?.close()
         feed = null
         device = null
@@ -66,6 +70,7 @@ internal class PictureStreamController(
 
     private fun failed(error: Throwable) {
         show(null)
+        feed?.setFrameListener(null)
         feed?.close()
         feed = null
         // Keep the failure visible while retrying; never disguise a missing native picture as live.

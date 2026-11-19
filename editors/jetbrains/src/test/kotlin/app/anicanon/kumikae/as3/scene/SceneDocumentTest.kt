@@ -18,6 +18,7 @@ class SceneDocumentTest {
     @Test fun `attachments describe their actual nodes`() {
         val nodes = SceneDocument(scene).nodes
         assertEquals("res://App.as", nodes[0].script)
+        assertEquals("Vector2(1, 2)", nodes.first().properties["position"])
         assertEquals("Sound", nodes[1].path)
         assertEquals("AudioStreamPlayer", nodes[1].type)
     }

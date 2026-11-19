@@ -18,6 +18,8 @@ import javax.swing.JFrame
 /** Explicit opt-in measurement only: uses the already booted demo device, Home and Settings. */
 internal object UiProbeLive {
     fun run(destination: Path) {
+        val ownedDevice =
+            requireNotNull(System.getenv("KUMIKAE_SIMULATOR_PROBE_DEVICE")) { "Supply the probe-owned booted device." }
         val directory = Files.createTempDirectory("kumikae-live-probe")
         val service =
             LocalSimulatorService(
@@ -65,10 +67,10 @@ internal object UiProbeLive {
             }
         }
         try {
-            await { controller.devices.any { it.name == "Glass Dock Demo" && it.state == BOOTED } }
+            await { controller.devices.any { it.id == ownedDevice && it.state == BOOTED } }
             onEdt {
                 window.state.listShown = false
-                controller.open(controller.devices.single { it.name == "Glass Dock Demo" && it.state == BOOTED })
+                controller.open(controller.devices.single { it.id == ownedDevice && it.state == BOOTED })
             }
             await { window.screen.frame != null && controller.inputEnabled }
             check(onEdtValue { controller.continuousTouch }) {
@@ -122,6 +124,7 @@ internal object UiProbeLive {
             val threads = ManagementFactory.getThreadMXBean()
             val edt = onEdtValue { Thread.currentThread().threadId() }
             val cpuStart = threads.getThreadCpuTime(edt)
+            val reader = UiProbeReaderAllocation("kumikae-native-frames")
             repeat(16) { index ->
                 val frame = onEdtValue { checkNotNull(controller.frame) }
                 val size = frame.geometry
@@ -131,11 +134,11 @@ internal object UiProbeLive {
                     SimulatorInput.Swipe(
                         frame.generation,
                         size,
-                        app.anicanon.kumikae.as3.simulator.Pixel(
+                        Pixel(
                             size.width / 2,
                             (size.height * if (up) .8 else .3).toInt(),
                         ),
-                        app.anicanon.kumikae.as3.simulator.Pixel(
+                        Pixel(
                             size.width / 2,
                             (size.height * if (up) .3 else .8).toInt(),
                         ),
@@ -145,6 +148,7 @@ internal object UiProbeLive {
                 Thread.sleep(100)
             }
             val seconds = (System.nanoTime() - start) / 1e9
+            val allocated = reader.bytes()
             val edtCpuSeconds = (threads.getThreadCpuTime(edt) - cpuStart) / 1e9
             val resolution = onEdtValue { checkNotNull(controller.frame).geometry }
             val fps = paints.size / seconds
@@ -173,6 +177,7 @@ internal object UiProbeLive {
                 "painted_fps=$fps\nobserved_to_paint_p50_ms=${percentile(delays, .5)}\n" +
                     "observed_to_paint_p95_ms=${percentile(delays, .95)}\n" +
                     "mouse_press_to_up_ack_ms=${taps.joinToString()}\n" +
+                    "reader_allocated_bytes=$allocated\n" +
                     "resolution=$resolution\nedt_cpu_seconds=$edtCpuSeconds\nmeasurement_seconds=$seconds\n" +
                     "drag_frames_before_release=$dragPaints\n" +
                     "launch_request_to_next_paint_ms=$launchDelay\n" +
@@ -187,7 +192,7 @@ internal object UiProbeLive {
                 Disposer.dispose(controller)
                 host.dispose()
             }
-            Files.delete(directory)
+            directory.toFile().deleteRecursively()
         }
     }
 

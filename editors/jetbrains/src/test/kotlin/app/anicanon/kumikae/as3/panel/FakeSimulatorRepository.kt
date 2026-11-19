@@ -21,6 +21,10 @@ internal class FakeSimulatorRepository : SimulatorRepository {
         var closed = false
         override val ended: Boolean get() = closed
         override var failure: Throwable? = null
+        var listener: (() -> Unit)? = null
+        override fun setFrameListener(listener: (() -> Unit)?) {
+            this.listener = listener
+        }
         var next: SimulatorFrame? = null
         override fun poll(): SimulatorFrame? = next.also { next = null }
         override fun close() {

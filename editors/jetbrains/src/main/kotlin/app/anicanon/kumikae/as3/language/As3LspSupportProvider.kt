@@ -44,7 +44,7 @@ private class As3LspClientDescriptor(project: Project, private val compiler: Pat
 
     override fun createInitializationOptions(): Any = serverOptions()
 
-    override fun createCommandLine(): GeneralCommandLine = serverCommandLine(compiler)
+    override fun createCommandLine(): GeneralCommandLine = serverCommandLine(compiler, project)
 
     override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
         super.createLsp4jClient(object : LspServerNotificationsHandler by handler {

@@ -57,6 +57,7 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
     override fun openFrames(device: String): SimulatorFrames {
         val feed = service.openFrames(device)
         return object : SimulatorFrames {
+            override fun setFrameListener(listener: (() -> Unit)?) = feed.setFrameListener(listener)
             override val failure: Throwable? get() = feed.failure
             override val ended: Boolean get() = feed.ended
             override fun poll(): SimulatorFrame? = feed.poll()?.let {
@@ -66,6 +67,7 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
                     it.image,
                     (it.decodedNanos - it.receivedNanos) / 1_000_000,
                     it.receivedNanos,
+                    it::retire,
                 )
             }
             override fun close() = feed.close()

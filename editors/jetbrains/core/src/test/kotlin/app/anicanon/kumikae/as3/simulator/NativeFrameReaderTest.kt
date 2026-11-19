@@ -1,13 +1,38 @@
 package app.anicanon.kumikae.as3.simulator
 
 import org.junit.Test
+import java.awt.image.BufferedImage
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class NativeFrameReaderTest {
+    @Test fun returnsAnUnusedImageWhenDimensionsChangeDuringAllocation() {
+        val file = Files.createTempFile("native-resize", ".slot")
+        try {
+            RandomAccessFile(file.toFile(), "rw").use { writer ->
+                writer.setLength(NativeFrameLayout.fileBytes)
+                val header = NativeFrameHeader(1, 1, 1, 4, 1, 2, 1, 1, 1000)
+                writer.write(header.encode())
+                val expected = BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB)
+                var discarded: BufferedImage? = null
+                NativeFrameReader(file, discard = { discarded = it }) { _, _ ->
+                    writer.seek(0)
+                    writer.write(header.copy(sequence = 2, width = 2, stride = 8).encode())
+                    expected
+                }.use { reader ->
+                    assertNull(reader.poll())
+                    assertSame(expected, discarded)
+                }
+            }
+        } finally {
+            Files.delete(file)
+        }
+    }
+
     @Test fun allocationAllowsPublicationAndThenReadsTheNewestHeader() {
         val file = Files.createTempFile("native-allocation", ".slot")
         try {
@@ -23,7 +48,7 @@ class NativeFrameReaderTest {
                         writer.write(header.copy(sequence = 2).encode())
                         writer.write(byteArrayOf(-1, 0, 0, -1))
                     }
-                    java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE)
+                    BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
                 }.use { reader ->
                     val newest = assertNotNull(reader.poll())
                     assertEquals(2, newest.header.sequence)

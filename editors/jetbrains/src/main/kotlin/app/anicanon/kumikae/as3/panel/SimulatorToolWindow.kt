@@ -4,6 +4,7 @@ import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
+import java.awt.EventQueue
 import javax.swing.JPanel
 import javax.swing.Timer
 
@@ -20,24 +21,44 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
         wrapStyleWord = true
         margin = JBUI.insets(4)
     }
-    private val timer = Timer(POLL_MILLIS) { controller.poll() }
-    private val frames = Timer(8) { controller.frameTick() }
+    private var requested: SimulatorDevice? = null
+    fun openDevice(device: SimulatorDevice) {
+        requested = device
+        state.listShown = false
+        openRequested()
+    }
+    private fun openRequested() {
+        val device = requested ?: return
+        if (controller.endpointFile.isEmpty() || controller.working || !component.isShowing) return
+        requested = null
+        controller.open(device)
+    }
+    private val timer = Timer(POLL_MILLIS) {
+        openRequested()
+        controller.poll()
+        controller.frameTick() // Startup, disconnect and retry use the status cadence.
+    }
+    private val frames = FrameDispatch({ EventQueue.invokeLater(it) }, controller::frameTick)
 
     init {
+        controller.onFramesReady = frames::request
+        controller.onFrame = { screen.frame = it }
         component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }
         Disposer.register(controller) {
+            screen.frame = null
+            controller.onFrame = {}
             timer.stop()
-            frames.stop()
+            controller.onFramesReady = {}
         }
         component.addHierarchyListener {
             if (component.isShowing) {
                 controller.shown()
                 timer.start()
-                frames.start()
+                controller.frameTick()
             } else {
+                requested = null
                 controller.hidden()
                 timer.stop()
-                frames.stop()
             }
         }
     }

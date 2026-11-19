@@ -1,40 +1,38 @@
 package app.anicanon.kumikae.as3.settings
 
+import app.anicanon.kumikae.as3.scene.resolveProjectResource
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.vfs.ReadonlyStatusHandler
 import com.intellij.openapi.vfs.VirtualFile
-import java.awt.image.BufferedImage
+import com.intellij.util.concurrency.AppExecutorUtil
 
 /** Uses IDE documents so Apply participates in undo and sees unsaved source edits. */
-internal class IdeSettingsRepository(private val project: Project, private val file: VirtualFile) : SettingsRepository {
-    private fun documents() = FileDocumentManager.getInstance().let { manager ->
-        val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
-        val exports = file.parent.findChild("export_presets.cfg")?.let(manager::getDocument)
-        main to exports
-    }
+internal class IdeSettingsRepository(
+    private val project: Project,
+    private val file: VirtualFile,
+    private val owner: Disposable,
+) : SettingsRepository {
+    private fun root(): VirtualFile = requireNotNull(file.parent) { "Project file has no parent directory." }
 
-    override fun preview(path: String): BufferedImage? {
-        if (!path.startsWith("res://")) return null
-        val imageFile = file.parent.findFileByRelativePath(path.removePrefix("res://")) ?: return null
-        if (imageFile.extension !in setOf("png", "svg", "jpg", "jpeg", "webp")) return null
-        return runCatching {
-            val icon = IconLoader.findIcon(imageFile.toNioPath().toUri().toURL()) ?: return null
-            val image = IconLoader.toImage(icon) ?: return null
-            val preview = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB)
-            val graphics = preview.createGraphics()
-            try {
-                val scale = 80.0 / maxOf(icon.iconWidth, icon.iconHeight).coerceAtLeast(1)
-                val width = (icon.iconWidth * scale).toInt()
-                val height = (icon.iconHeight * scale).toInt()
-                graphics.drawImage(image, (80 - width) / 2, (80 - height) / 2, width, height, null)
-            } finally {
-                graphics.dispose()
-            }
-            preview
-        }.getOrNull()
+    private fun documents(): Pair<Document, Document?> =
+        ReadAction.compute<Pair<Document, Document?>, RuntimeException> {
+            val manager = FileDocumentManager.getInstance()
+            val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
+            val exports = root().findChild("export_presets.cfg")?.let(manager::getDocument)
+            main to exports
+        }
+
+    override fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) {
+        ReadAction.nonBlocking<Artwork?> {
+            file.parent?.let { GameArtwork.preview(it, path, filter) }
+        }.expireWith(owner).finishOnUiThread(ModalityState.any(), ready)
+            .submit(AppExecutorUtil.getAppExecutorService())
     }
 
     override fun load(): ProjectSettings {
@@ -48,15 +46,17 @@ internal class IdeSettingsRepository(private val project: Project, private val f
             "Project files changed. Reload before applying your changes."
         }
         val (newMain, newExports) = draft.write(main.text, exports?.text.orEmpty())
-        for (resource in listOf(draft.mainScene, draft.icon, draft.exportIcon) +
-            draft.exportDrafts.values.map { it.second }) {
+        val folder = root()
+        val resources = listOf(draft.mainScene, draft.icon, draft.splash) +
+            draft.allExportDrafts().values.map { it.second }
+        for (resource in resources) {
             if (resource.startsWith("res://")) {
-                require(file.parent.findFileByRelativePath(resource.removePrefix("res://")) != null) {
+                require(resolveProjectResource(folder, resource) != null) {
                     "Resource does not exist: $resource"
                 }
             }
         }
-        val files = listOfNotNull(file, file.parent.findChild("export_presets.cfg"))
+        val files = listOfNotNull(file, folder.findChild("export_presets.cfg"))
         check(!ReadonlyStatusHandler.getInstance(project).ensureFilesWritable(files).hasReadonlyFiles()) {
             "Project settings are read-only."
         }
@@ -72,8 +72,8 @@ internal class IdeSettingsRepository(private val project: Project, private val f
                     main.setText(newMain)
                     exports?.setText(newExports)
                 } catch (error: Exception) {
-                    main.setText(expected.projectText)
-                    exports?.setText(expected.exportText)
+                    runCatching { main.setText(expected.projectText) }.onFailure(error::addSuppressed)
+                    runCatching { exports?.setText(expected.exportText) }.onFailure(error::addSuppressed)
                     throw error
                 }
             },

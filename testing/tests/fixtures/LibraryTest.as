@@ -1,7 +1,7 @@
 package {
-    import kumikae.testing.Assert;
-    import kumikae.testing.TestCase;
-    import kumikae.testing.Suite;
+    import app.anicanon.kumikae.testing.Assert;
+    import app.anicanon.kumikae.testing.TestCase;
+    import app.anicanon.kumikae.testing.Suite;
 
     public class LibraryTest {
         public static var cleaned:int = 0;

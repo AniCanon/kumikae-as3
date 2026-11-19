@@ -31,12 +31,20 @@ class UiProbeStarter : ApplicationStarter {
         Files.createDirectories(destination)
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
-                if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
+                val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
+                if (System.getenv("KUMIKAE_DEVICE_PERF_PROBE") == "1") {
+                    UiProbeLive.run(destination)
+                } else if (game != null && System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL") != null) {
+                    UiProbeAndroidRun.run(destination, Path.of(game), System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL"))
+                } else if (game != null) {
+                    UiProbeGameRun.run(destination, Path.of(game))
+                } else if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
                     UiProbeLanguage.run(destination)
                     UiProbeCompletion.run(destination, missingClient = true)
                 } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
                     UiProbeCompletion.run(destination, plainText = true)
                 } else {
+                    UiProbeGameTree.run()
                     UiProbeLanguage.run(destination)
                     UiProbeCompletion.run(destination)
                     checkThemes(destination)
@@ -135,7 +143,7 @@ class UiProbeStarter : ApplicationStarter {
                 "Provide a valid path to the desired application bundle and try again."
             onEdt { menu(moreEntries(controller, prompts), "Install app") }
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
-            check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
+            await("the error in the visible console") { console.text.contains("[Error] An application bundle") }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
             checkConsoleWraps(console)
             onEdt {
@@ -188,10 +196,6 @@ class UiProbeStarter : ApplicationStarter {
             descendants(view.component).filterIsInstance<IconButtonControl>().any { it.name == name }
         }
         onEdt { icon(view, name).doClick() }
-    }
-
-    private fun click(view: SimulatorToolWindow, text: String) = onEdt {
-        descendants(view.component).filterIsInstance<JButton>().single { it.text == text }.doClick()
     }
 
     private fun menu(entries: List<MenuEntry>, text: String) {

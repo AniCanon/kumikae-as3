@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import java.nio.file.Path
 
 internal data class As3FailureFrame(val path: String, val line: Int, val start: Int, val end: Int) {
-    val framework get() = path.replace('\\', '/').contains("/kumikae/testing/")
+    val framework get() = path.replace('\\', '/').contains("/app/anicanon/kumikae/testing/")
 
     fun descriptor(project: Project, root: Path): OpenFileDescriptor? {
         val local = path.removePrefix("res://")

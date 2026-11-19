@@ -1,63 +1,83 @@
 package app.anicanon.kumikae.as3.testing
 
+import app.anicanon.kumikae.as3.run.KumikaeRunType
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.LazyRunConfigurationProducer
-import com.intellij.execution.configurations.ConfigurationTypeUtil
-import com.intellij.execution.lineMarker.ExecutorAction
+import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.util.Ref
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
+import java.nio.file.Path
 
-class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
-    override fun getConfigurationFactory() =
-        ConfigurationTypeUtil.findConfigurationType(As3TestsType::class.java).configurationFactories.single()
+class As3TestProducer :
+    LazyRunConfigurationProducer<RunConfiguration>(),
+    DumbAware {
+    override fun getConfigurationFactory() = KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)
     override fun setupConfigurationFromContext(
-        configuration: As3TestsConfiguration,
+        configuration: RunConfiguration,
         context: ConfigurationContext,
         sourceElement: Ref<PsiElement>,
     ): Boolean {
-        val file = context.psiLocation?.containingFile?.virtualFile ?: return false
+        if (configuration !is As3TestsConfiguration) return false
+        val element = context.psiLocation ?: return false
+        sourceElement.set(element)
+        return configureTestScope(configuration, element)
+    }
+    override fun isConfigurationFromContext(configuration: RunConfiguration, context: ConfigurationContext): Boolean {
+        if (configuration !is As3TestsConfiguration) return false
         val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
         if (tests.isEmpty()) return false
-        configuration.options.manifest = tests.first().manifest.path
-        configuration.options.cases = tests.joinToString("\n") { it.name }
-        configuration.name = if (tests.size == 1) tests.single().name else "Tests in ${file.name}"
-        return true
-    }
-    override fun isConfigurationFromContext(
-        configuration: As3TestsConfiguration,
-        context: ConfigurationContext,
-    ): Boolean {
-        val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
-        return tests.isNotEmpty() && configuration.options.manifest == tests.first().manifest.path &&
+        val configuredManifest = Path.of(configuration.project.basePath.orEmpty())
+            .resolve(configuration.options.manifest)
+            .toAbsolutePath()
+            .normalize()
+        val discoveredManifest = tests.first().manifest.toNioPath().toAbsolutePath().normalize()
+        return configuredManifest == discoveredManifest &&
             configuration.options.cases == tests.joinToString("\n") { it.name }
     }
 }
 
+internal fun configureTestScope(configuration: As3TestsConfiguration, element: PsiElement): Boolean {
+    val file = (element as? PsiDirectory)?.virtualFile ?: element.containingFile?.virtualFile ?: return false
+    val tests = TestDiscovery.forElement(element)
+    if (tests.isEmpty()) return false
+    val manifest = tests.first().manifest
+    val root = configuration.project.basePath?.let(Path::of)?.toAbsolutePath()?.normalize()
+    val manifestPath = manifest.toNioPath().toAbsolutePath().normalize()
+    configuration.options.manifest = if (root != null && manifestPath.startsWith(root)) {
+        root.relativize(manifestPath).toString()
+    } else {
+        manifest.path
+    }
+    configuration.options.cases = tests.joinToString("\n") { it.name }
+    configuration.name = if (tests.size == 1) tests.single().name else "Tests in ${file.name}"
+    return true
+}
+
 class As3TestLineMarker : RunLineMarkerContributor() {
     override fun getInfo(element: PsiElement): Info? {
-        if (element.firstChild != null || element.text !in listOf("class", "function")) return null
+        if (element.firstChild != null) return null
+        val keyword = element.text
+        if (keyword != "class" && keyword != "function") return null
         val file = element.containingFile?.virtualFile ?: return null
         if (file.extension != "as") return null
         val known = TestDiscovery.of(element.containingFile)
         val source = known.source
-        val tests = known.at(element.textOffset)
+        val offset = element.textOffset
+        val tests = known.at(offset)
         if (tests.isEmpty()) return null
-        if (element.text == "class" && element.textOffset != source.classOffset) return null
-        if (element.text == "function" &&
-            (tests.none { it.method != null } || source.methodAt(element.textOffset)?.offset != element.textOffset)
-        ) {
-            return null
-        }
-        return Info(AllIcons.RunConfigurations.TestState.Run, ExecutorAction.getActions(0)) {
-            if (element.text ==
-                "class"
-            ) {
-                "Run all tests in ${file.name}"
-            } else {
-                "Run ${source.methodAt(element.textOffset)?.name}"
-            }
-        }
+        val isClass = keyword == "class"
+        if (isClass && offset != source.classOffset) return null
+        val method = if (isClass) null else source.methodAt(offset)
+        if (!isClass && (tests.none { it.method != null } || method?.offset != offset)) return null
+        val fileName = file.name
+        val methodName = method?.name.orEmpty()
+        val actionLabel = if (isClass) "Run tests in $fileName" else "Run $methodName"
+        val tooltip = if (isClass) "Run all tests in $fileName" else "Run $methodName"
+        val run = RunGameTestsAction(element, actionLabel)
+        return Info(AllIcons.RunConfigurations.TestState.Run, arrayOf(run)) { tooltip }
     }
 }

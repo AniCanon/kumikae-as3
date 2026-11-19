@@ -13,7 +13,7 @@ import java.nio.file.Path
 
 /** What a person writing a game does not open: what Godot and the IDE keep for themselves. */
 internal object Clutter {
-    private val folders = setOf(".godot", ".idea", "bin", ".build", "build")
+    private val folders = setOf(".godot", ".idea", ".run", "bin", ".build", "build")
     private val endings = listOf(".uid", ".import", ".gdextension")
 
     fun hideFolder(name: String, projectRoot: Boolean): Boolean = projectRoot && isClutter(name, isFolder = true)
@@ -26,7 +26,7 @@ internal object Clutter {
      * libraries and their logs, written again at each save.
      */
     fun unindexed(root: String): List<String> =
-        (folders - setOf(".idea", ".godot")).map { "$root/$it" } + "$root/$PLAY_BUILDS"
+        (folders - setOf(".idea", ".godot", ".run")).map { "$root/$it" } + "$root/$PLAY_BUILDS"
 
     private const val PLAY_BUILDS = ".godot/kas3"
 
@@ -64,17 +64,34 @@ class GameProjectView : TreeStructureProvider {
                 }
             }
         }
-        if (!GameViewOptions.compact(project) || settings == null) return visible
-        return visible.mapTo(ArrayList()) { node ->
-            if (node is PsiDirectoryNode) packageNode(node, project, settings) else node
+        if (settings == null) return visible
+        if (parent is GameScenesGroup) return visible
+        val nodes = visible.mapTo(ArrayList()) { node ->
+            val psiFile = (node as? PsiFileNode)?.value
+            if (node is PsiFileNode && node !is As3MemberFileNode && node.virtualFile?.extension == "as" &&
+                psiFile != null && GameViewOptions.members(project)
+            ) {
+                As3MemberFileNode(project, psiFile, settings)
+            } else if (node !is PsiDirectoryNode) {
+                node
+            } else {
+                if (node.virtualFile?.path == project.basePath) return@mapTo GameRootNode(project, node)
+                gameFolder(node, project, settings)
+                    ?: if (GameViewOptions.compact(project)) packageNode(node, project, settings) else node
+            }
+        }
+        return if ((parent as? PsiDirectoryNode)?.virtualFile?.path == project.basePath) {
+            organizeGameRoot(project, settings, nodes)
+        } else {
+            nodes
         }
     }
 
     private fun isGame(project: Project): Boolean {
-        project.getUserData(GAME)?.let { return it }
+        if (project.getUserData(GAME) == true) return true
         val game =
             project.basePath?.let { runCatching { GodotLaunch.isAs3Game(Path.of(it)) }.getOrDefault(false) } ?: false
-        project.putUserData(GAME, game)
+        if (game) project.putUserData(GAME, true)
         return game
     }
 

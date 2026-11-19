@@ -1,7 +1,11 @@
 package app.anicanon.kumikae.as3.run
 
+import java.io.IOException
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 /** What running a Godot game needs to know, worked out without the IDE. */
 internal object GodotLaunch {
@@ -29,9 +33,35 @@ internal object GodotLaunch {
     /** A folder with a Godot project file and at least one AS3 script, not counting what Godot keeps for itself. */
     fun isAs3Game(project: Path): Boolean {
         if (!Files.isRegularFile(project.resolve("project.godot"))) return false
-        return Files.walk(project, DEPTH).use { found ->
-            found.filter { path -> project.relativize(path).none { it.toString().startsWith(".") } }
-                .anyMatch { it.toString().endsWith(SCRIPT) && Files.isRegularFile(it) }
+        if (Files.isRegularFile(project.resolve("kas3.gdextension"))) return true
+        var found = false
+        try {
+            Files.walkFileTree(
+                project,
+                emptySet(),
+                DEPTH,
+                object : SimpleFileVisitor<Path>() {
+                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
+                        if (dir != project && dir.fileName.toString().startsWith(".")) {
+                            FileVisitResult.SKIP_SUBTREE
+                        } else {
+                            FileVisitResult.CONTINUE
+                        }
+
+                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        if (attrs.isRegularFile && file.fileName.toString().endsWith(SCRIPT)) {
+                            found = true
+                            return FileVisitResult.TERMINATE
+                        }
+                        return FileVisitResult.CONTINUE
+                    }
+
+                    override fun visitFileFailed(file: Path, exc: IOException) = FileVisitResult.CONTINUE
+                },
+            )
+        } catch (_: IOException) {
+            return false
         }
+        return found
     }
 }

@@ -18,11 +18,14 @@ internal data class ProjectSettings(
     val projectText: String,
     val exportText: String,
     val name: String = "",
+    val version: String = "",
+    val splash: String = "",
     val mainScene: String = "",
     val icon: String = "",
     val width: String = "1152",
     val height: String = "648",
     val orientation: Int = 0,
+    val aspect: String = "keep",
     val stretch: String = "disabled",
     val presets: List<ExportPreset> = emptyList(),
     val preset: String = "",
@@ -30,10 +33,13 @@ internal data class ProjectSettings(
     val exportIcon: String = "",
     val exportDrafts: Map<String, Pair<String, String>> = emptyMap(),
 ) {
+    fun allExportDrafts(): Map<String, Pair<String, String>> =
+        if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+
     fun select(section: String): ProjectSettings {
         val selected = presets.firstOrNull { it.section == section }
         val exports = GodotConfig(exportText)
-        val retained = if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+        val retained = allExportDrafts()
         val remembered = retained[section]
         return copy(
             exportDrafts = retained,
@@ -46,34 +52,64 @@ internal data class ProjectSettings(
     }
 
     fun write(project: String, exports: String): Pair<String, String> {
-        require(width.toIntOrNull() in 1..16384 && height.toIntOrNull() in 1..16384) {
+        val parsedWidth = width.trim().toIntOrNull()
+        val parsedHeight = height.trim().toIntOrNull()
+        require(parsedWidth in 1..16384 && parsedHeight in 1..16384) {
             "Viewport dimensions must be between 1 and 16384 pixels."
         }
+        val normalizedWidth = parsedWidth.toString()
+        val normalizedHeight = parsedHeight.toString()
         require(orientation in orientations.indices) { "Choose a supported orientation." }
         require(stretch in stretches) { "Unsupported stretch mode; edit it in Source." }
-        for (path in listOf(mainScene, icon, exportIcon)) validateResource(path)
-        val changes = linkedMapOf(
-            ConfigKey("application", "config/name") to GodotConfig.quote(name),
-            ConfigKey("application", "run/main_scene") to GodotConfig.quote(mainScene),
-            ConfigKey("application", "config/icon") to GodotConfig.quote(icon),
-            ConfigKey("display", "window/size/viewport_width") to width,
-            ConfigKey("display", "window/size/viewport_height") to height,
-            ConfigKey("display", "window/handheld/orientation") to orientation.toString(),
-            ConfigKey("display", "window/stretch/mode") to GodotConfig.quote(stretch),
-        )
+        require(aspect in aspects) { "Choose a supported stretch aspect." }
+        for (path in listOf(mainScene, icon, splash, exportIcon)) validateResource(path)
+        fun validateType(kind: GameResourceKind, path: String) {
+            if (path.startsWith("res://")) {
+                require(kind.accepts(path)) {
+                    "Choose a supported resource for ${kind.title}."
+                }
+            }
+        }
+        validateType(GameResourceKind.Scene, mainScene)
+        validateType(GameResourceKind.Icon, icon)
+        validateType(GameResourceKind.Splash, splash)
+        val base = read(projectText, exportText)
+        val changes = linkedMapOf<ConfigKey, String>()
+        fun string(section: String, key: String, before: String, after: String) {
+            if (before != after) changes[ConfigKey(section, key)] = GodotConfig.quote(after)
+        }
+        string("application", "config/name", base.name, name)
+        string("application", "config/version", base.version, version)
+        string("application", "run/main_scene", base.mainScene, mainScene)
+        string("application", "config/icon", base.icon, icon)
+        string("application", "boot_splash/image", base.splash, splash)
+        string("display", "window/stretch/mode", base.stretch, stretch)
+        string("display", "window/stretch/aspect", base.aspect, aspect)
+        if (normalizedWidth != base.width) changes[ConfigKey("display", "window/size/viewport_width")] = normalizedWidth
+        if (normalizedHeight != base.height) {
+            changes[ConfigKey("display", "window/size/viewport_height")] = normalizedHeight
+        }
+        if (orientation != base.orientation) {
+            changes[ConfigKey("display", "window/handheld/orientation")] = orientation.toString()
+        }
+        val originalExports = GodotConfig(exportText)
         val exportChanges = linkedMapOf<ConfigKey, String>()
-        val drafts = if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
-        for ((section, fields) in drafts) {
+        for ((section, fields) in allExportDrafts()) {
             val selected = presets.firstOrNull { it.section == section } ?: continue
             val (applicationId, image) = fields
             validateResource(image)
-            selected.identifierKey?.let { key ->
-                require(applicationId.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+"))) {
+            validateType(GameResourceKind.ExportIcon, image)
+            selected.identifierKey?.takeIf {
+                originalExports.string("$section.options", it) != applicationId
+            }?.let { key ->
+                require(GameTargets.validIdentifier(selected.platform, applicationId)) {
                     "${selected.name}: identifier must contain dot-separated names, such as org.example.game."
                 }
                 exportChanges[ConfigKey("$section.options", key)] = GodotConfig.quote(applicationId)
             }
-            selected.iconKey?.let { exportChanges[ConfigKey("$section.options", it)] = GodotConfig.quote(image) }
+            selected.iconKey?.takeIf { originalExports.string("$section.options", it) != image }?.let {
+                exportChanges[ConfigKey("$section.options", it)] = GodotConfig.quote(image)
+            }
         }
         return GodotConfig(project).update(changes) to GodotConfig(exports).update(exportChanges)
     }
@@ -89,14 +125,18 @@ internal data class ProjectSettings(
                 "Sensor portrait",
                 "Sensor",
             )
+        val aspects = listOf("keep", "keep_width", "keep_height", "expand", "ignore")
         val stretches = listOf("disabled", "canvas_items", "viewport")
 
         fun validateResource(value: String) {
+            val relative = value.removePrefix("res://")
             require(
-                value.isEmpty() || value.startsWith("uid://") ||
+                value.isEmpty() ||
+                    (value.startsWith("uid://") && value.length > 6 && value.none(Char::isISOControl)) ||
                     (
-                        value.startsWith("res://") && value.removePrefix("res://").split('/').none { it == ".." } &&
-                            !value.contains('\\')
+                        value.startsWith("res://") && relative.isNotEmpty() && !relative.contains('\\') &&
+                            relative.none(Char::isISOControl) &&
+                            relative.split('/').none { it == ".." || it == "." }
                         ),
             ) {
                 "Choose a resource inside this project (res://…)."
@@ -106,9 +146,7 @@ internal data class ProjectSettings(
         fun read(project: String, exports: String): ProjectSettings {
             val config = GodotConfig(project)
             val export = GodotConfig(exports)
-            val presets = export.sections.filter { it.matches(Regex("preset\\.\\d+")) }.map {
-                ExportPreset(it, export.string(it, "name"), export.string(it, "platform"))
-            }
+            val presets = GameTargets.presets(export)
             val orientationValue = config.raw("display", "window/handheld/orientation")
             val orientation = if (orientationValue == null) {
                 0
@@ -120,12 +158,15 @@ internal data class ProjectSettings(
             require(orientation in orientations.indices) { "Unsupported orientation: $orientation" }
             return ProjectSettings(
                 project, exports,
+                version = config.string("application", "config/version"),
+                splash = config.string("application", "boot_splash/image"),
                 name = config.string("application", "config/name"),
                 mainScene = config.string("application", "run/main_scene"),
                 icon = config.string("application", "config/icon"),
                 width = config.raw("display", "window/size/viewport_width") ?: "1152",
                 height = config.raw("display", "window/size/viewport_height") ?: "648",
                 orientation = orientation,
+                aspect = config.string("display", "window/stretch/aspect", "keep"),
                 stretch = config.string("display", "window/stretch/mode", "disabled"),
                 presets = presets,
             ).select(presets.firstOrNull()?.section.orEmpty())

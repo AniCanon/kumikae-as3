@@ -3,6 +3,8 @@ package app.anicanon.kumikae.as3.run
 import app.anicanon.kumikae.as3.panel.SimulatorRepository
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessOutputTypes
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -13,6 +15,7 @@ internal class SimulatorProcessHandler(
     appPath: String,
     build: (((String, Boolean) -> Unit) -> String)? = null,
     sources: String = "",
+    destination: String? = null,
 ) : ProcessHandler() {
     private val stopping = AtomicBoolean()
     private val run = SimulatorRun(
@@ -24,6 +27,7 @@ internal class SimulatorProcessHandler(
         },
         sources,
         build = build,
+        destination = destination,
     )
     private val worker = Thread(::follow, "Kumikae AS3 Simulator run").apply { isDaemon = true }
 
@@ -41,7 +45,6 @@ internal class SimulatorProcessHandler(
                 ended = run.pump()
                 if (ended == null) Thread.sleep(POLL_MILLIS)
             }
-            if (stopping.get()) run.stop()
             ended ?: 0
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -50,16 +53,23 @@ internal class SimulatorProcessHandler(
             notifyTextAvailable("${failure.message ?: failure.javaClass.simpleName}\n", ProcessOutputTypes.STDERR)
             1
         }
-        notifyProcessTerminated(code)
+        if (!isProcessTerminated) notifyProcessTerminated(code)
     }
 
     override fun destroyProcessImpl() {
         stopping.set(true)
+        worker.interrupt()
+        AppExecutorUtil.getAppExecutorService().execute {
+            runCatching(run::stop).onFailure {
+                Logger.getInstance(SimulatorProcessHandler::class.java).warn("Stopping Simulator app $bundle", it)
+            }
+        }
     }
 
     override fun detachProcessImpl() {
         // Detached, the app keeps running on the Simulator; only the Run window stops following it.
         stopping.set(true)
+        worker.interrupt()
         notifyProcessDetached()
     }
 

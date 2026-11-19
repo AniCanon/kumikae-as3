@@ -225,7 +225,7 @@ of 1,000 to 10,000.
 **Writing.** The helper takes a nonblocking lock on the whole file, clears the header, copies the pixels,
 and writes the complete header last. If the lock is held, it drops that frame.
 
-**Reading.** The service reads the header under a shared lock, allocates the image after releasing the
+**Reading.** The service reads the header under a shared lock, acquires a recycled or new image after releasing the
 lock, then locks again and checks the header before it copies. It copies only a new sequence, off the UI
 thread, into a slot that holds the newest frame. A zero header is skipped. There's no queue.
 

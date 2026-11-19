@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -20,19 +21,29 @@ import org.jetbrains.compose.swing.components.layout.ScrollPane
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import org.jetbrains.compose.swing.modifier.appearance.font
+import org.jetbrains.compose.swing.modifier.interaction.enabled
+import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.FlowLayout
+import javax.swing.JLabel
 
 @Composable
 internal fun ProjectSettingsView(
     controller: SettingsController,
-    choose: (String, (String) -> Unit) -> Unit,
+    choose: (GameResourceKind, (String) -> Unit) -> Unit,
     modifier: SwingModifier = SwingModifier,
+    initialPage: String = "General",
+    addTarget: (() -> Unit)? = null,
+    export: ((ProjectSettings, List<ExportPreset>) -> Unit)? = null,
 ) {
-    var page by remember { mutableStateOf("General") }
-    Panel(PanelLayout.Border(24, 16), modifier = modifier.emptyBorder(JBUI.insets(24))) {
+    var page by remember { mutableStateOf(initialPage) }
+    Panel(PanelLayout.Border(14, 10), modifier = modifier.emptyBorder(JBUI.insets(16))) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.west()) {
             Column(SwingModifier.north()) {
-                for (name in listOf("General", "Display", "Export")) {
+                SwingNode(factory = {
+                    JLabel("Kumikae AS3", PluginFiles.mark, JLabel.LEADING)
+                        .apply { border = JBUI.Borders.emptyBottom(8) }
+                })
+                for (name in listOf("General", "Display", "Export", "Properties")) {
                     Tab(name, page == name, { page = name })
                 }
             }
@@ -45,8 +56,39 @@ internal fun ProjectSettingsView(
                     if (draft != null) {
                         when (page) {
                             "General" -> GeneralSettings(draft, controller, choose)
+
                             "Display" -> DisplaySettings(draft, controller)
-                            "Export" -> ExportSettings(draft, controller, choose)
+
+                            "Properties" -> GodotProperties(draft.projectText)
+
+                            "Export" -> {
+                                if (addTarget !=
+                                    null
+                                ) {
+                                    Button("Add Game Target…", addTarget, SwingModifier.enabled(!controller.dirty))
+                                }
+                                ExportSettings(draft, controller, choose)
+                                if (export != null && draft.presets.isNotEmpty()) {
+                                    Panel(PanelLayout.Flow(FlowLayout.LEFT)) {
+                                        draft.presets.find { it.section == draft.preset }?.let { selected ->
+                                            Button(
+                                                "Export ${selected.name}…",
+                                                { export(draft, listOf(selected)) },
+                                                SwingModifier.enabled(!controller.dirty),
+                                            )
+                                        }
+                                        if (draft.presets.size >
+                                            1
+                                        ) {
+                                            Button(
+                                                "Export All…",
+                                                { export(draft, draft.presets) },
+                                                SwingModifier.enabled(!controller.dirty),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -56,7 +98,7 @@ internal fun ProjectSettingsView(
             StatusLine(controller.status)
             Panel(PanelLayout.Flow(FlowLayout.RIGHT, 8, 8)) {
                 Button("Reload", { controller.reload() })
-                Button("Apply", { controller.apply() })
+                Button("Apply", { controller.apply() }, SwingModifier.enabled(controller.dirty))
             }
         }
     }
@@ -66,54 +108,75 @@ internal fun ProjectSettingsView(
 private fun GeneralSettings(
     value: ProjectSettings,
     controller: SettingsController,
-    choose: (String, (String) -> Unit) -> Unit,
+    choose: (GameResourceKind, (String) -> Unit) -> Unit,
 ) {
-    ProjectIconPreview(controller.preview)
-    if (value.icon.isNotEmpty() && controller.preview == null) {
-        StatusLine("Preview unavailable · choose a valid image in this project.")
-    }
     LabelledField("Application name", value.name, { text -> controller.edit { it.copy(name = text) } })
-    ResourceField("Main scene", value.mainScene, { text -> controller.edit { it.copy(mainScene = text) } }, choose)
-    ResourceField("Application icon", value.icon, { text -> controller.edit { it.copy(icon = text) } }, choose)
-    StatusLine("The scene creates the nodes. Attached AS3 scripts supply their behavior.")
+    LabelledField("Version", value.version, { text -> controller.edit { it.copy(version = text) } })
+    Label("Main scene", SwingModifier.emptyBorder(JBUI.insetsTop(12)))
+    val choices = controller.sceneLabels
+    val scenes = (
+        listOf(value.mainScene) +
+            choices.keys.filter { it.startsWith("res://") && choices[it] != choices[value.mainScene] }.sorted()
+        ).distinct()
+    ComboBox(scenes, value.mainScene, onSelectionChange = { selected ->
+        if (selected != null) controller.edit { it.copy(mainScene = selected) }
+    }) { Label(choices[it] ?: it.removePrefix("res://").ifEmpty { "Choose a scene" }) }
+    Panel(PanelLayout.Border(20, 0), modifier = SwingModifier.emptyBorder(JBUI.insetsTop(16))) {
+        Column(SwingModifier.west()) {
+            ArtworkField(GameResourceKind.Icon, value.icon, controller.preview, choose) { path ->
+                controller.edit { it.copy(icon = path) }
+            }
+        }
+        Column(SwingModifier.center()) {
+            val layout = remember(value.projectText, value.width, value.height) { SplashLayout.read(value) }
+            ArtworkField(GameResourceKind.Splash, value.splash, controller.splashPreview, choose, layout) { path ->
+                controller.edit { it.copy(splash = path) }
+            }
+        }
+    }
 }
 
 @Composable
 private fun DisplaySettings(value: ProjectSettings, controller: SettingsController) {
-    LabelledField("Viewport width (px)", value.width, { text -> controller.edit { it.copy(width = text) } })
-    LabelledField("Viewport height (px)", value.height, { text -> controller.edit { it.copy(height = text) } })
+    ViewportControls(value, controller)
     Label("Orientation", SwingModifier.emptyBorder(JBUI.insetsTop(8)))
-    ComboBox(
-        ProjectSettings.orientations,
-        ProjectSettings.orientations.getOrNull(value.orientation),
-        onSelectionChange = { selected ->
-            controller.edit { it.copy(orientation = ProjectSettings.orientations.indexOf(selected)) }
-        },
-    ) { Label(it) }
-    StatusLine("Applies to mobile exports. Rebuild the app after changing it.")
-    StatusLine("The game must provide a layout for each supported orientation.")
+    val orientationGroups = listOf(
+        listOf(0 to "Landscape", 2 to "Reversed", 4 to "Both landscapes"),
+        listOf(1 to "Portrait", 3 to "Upside down", 5 to "Both portraits"),
+        listOf(6 to "All orientations"),
+    )
+    for (row in orientationGroups) {
+        Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
+            for ((mode, label) in row) {
+                Tab(label, value.orientation == mode, { controller.edit { it.copy(orientation = mode) } })
+            }
+        }
+    }
+
     Label("Stretch mode", SwingModifier.emptyBorder(JBUI.insetsTop(16)))
     ComboBox(ProjectSettings.stretches, value.stretch, onSelectionChange = { selected ->
         controller.edit { it.copy(stretch = selected ?: "disabled") }
-    }) { Label(it) }
+    }) { Label(it.replace('_', ' ').replaceFirstChar(Char::uppercase)) }
+    Label("Stretch aspect", SwingModifier.emptyBorder(JBUI.insetsTop(12)))
+    ComboBox(ProjectSettings.aspects, value.aspect, onSelectionChange = { choice ->
+        if (choice != null) controller.edit { it.copy(aspect = choice) }
+    }) { Label(it.replace('_', ' ').replaceFirstChar(Char::uppercase)) }
 }
 
 @Composable
 private fun ExportSettings(
     value: ProjectSettings,
     controller: SettingsController,
-    choose: (String, (String) -> Unit) -> Unit,
+    choose: (GameResourceKind, (String) -> Unit) -> Unit,
 ) {
     if (value.presets.isEmpty()) {
         Label("No export presets")
-        StatusLine("Create a platform preset in Godot, then reload these settings.")
         return
     }
-    Label("Export preset")
     val preset = value.presets.firstOrNull { it.section == value.preset }
-    ComboBox(value.presets, preset, onSelectionChange = { selected ->
-        controller.edit { it.select(selected?.section.orEmpty()) }
-    }) { Label(it.toString()) }
+    for (target in value.presets) {
+        Tab(target.toString(), target == preset, { controller.edit { it.select(target.section) } })
+    }
     if (preset?.identifierKey != null) {
         LabelledField(
             if (preset.platform == "iOS") "Bundle identifier" else "Package name",
@@ -121,24 +184,11 @@ private fun ExportSettings(
             { text -> controller.edit { it.copy(identifier = text) } },
             SwingModifier.emptyBorder(JBUI.insetsTop(16)),
         )
-        ResourceField("Platform icon override", value.exportIcon, { text ->
-            controller.edit { it.copy(exportIcon = text) }
-        }, choose)
+        ArtworkField(GameResourceKind.ExportIcon, value.exportIcon, controller.exportPreview, choose) { path ->
+            controller.edit { it.copy(exportIcon = path) }
+        }
     } else {
         StatusLine("This preset has no mobile application identifier.")
     }
     StatusLine("Signing credentials remain in the platform export configuration.")
-}
-
-@Composable
-private fun ResourceField(
-    label: String,
-    value: String,
-    change: (String) -> Unit,
-    choose: (String, (String) -> Unit) -> Unit,
-) {
-    LabelledField(label, value, change)
-    Panel(PanelLayout.Flow(FlowLayout.LEFT, 0, 0), modifier = SwingModifier.emptyBorder(JBUI.insetsBottom(16))) {
-        Button("Choose $label…", { choose(label, change) })
-    }
 }

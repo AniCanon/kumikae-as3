@@ -3,10 +3,12 @@ package app.anicanon.kumikae.as3.scene
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.intellij.openapi.progress.ProcessCanceledException
 
 internal interface SceneRepository {
     fun read(): String
     fun attach(expected: String, node: SceneNode, path: String?): String
+    fun openInGodot() = Unit
     fun open(path: String)
 }
 
@@ -33,9 +35,16 @@ internal class SceneController(private val repository: SceneRepository) {
         status = if (path == null) "Script detached." else "Script attached."
     }
 
+    fun openInGodot() = attempt { repository.openInGodot() }
     fun open() = attempt { selected?.script?.let(repository::open) }
 
     private fun attempt(action: () -> Unit) {
-        runCatching(action).onFailure { status = it.message ?: "Scene operation failed." }
+        try {
+            action()
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (error: Exception) {
+            status = error.message ?: "Scene operation failed."
+        }
     }
 }

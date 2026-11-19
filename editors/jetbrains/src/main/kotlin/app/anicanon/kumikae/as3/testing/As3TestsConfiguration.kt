@@ -2,6 +2,9 @@ package app.anicanon.kumikae.as3.testing
 
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
+import app.anicanon.kumikae.as3.run.GodotLaunch
+import app.anicanon.kumikae.as3.run.KumikaeRunType
+import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.ConfigurationFactory
@@ -31,6 +34,8 @@ class As3TestsType :
             PluginFiles.mark
         },
     ) {
+    override fun isApplicable(project: Project) = false
+
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
         As3TestsConfiguration(project, this, "AS3 Tests")
     companion object {
@@ -78,27 +83,37 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
             )
 
             override fun startProcess(): KillableColoredProcessHandler {
-                val compiler =
-                    CompilerLocator.find(
-                        root(),
-                        "",
-                        System.getenv("PATH").orEmpty(),
-                        Path.of(System.getProperty("user.home")),
-                        PluginFiles.native(),
-                    )
-                        ?: throw RuntimeConfigurationError("Build kas3c or place it on the search path.")
-                val command =
-                    mutableListOf(
-                        "python3",
-                        "-u",
-                        runner().toString(),
-                        root().resolve(options.manifest).toString(),
-                        "--compiler",
-                        compiler.toString(),
-                    )
+                val projectRoot = try {
+                    root()
+                } catch (error: RuntimeConfigurationError) {
+                    throw ExecutionException(error.message)
+                }
+                val runnerScript = try {
+                    runner()
+                } catch (error: RuntimeConfigurationError) {
+                    throw ExecutionException(error.message)
+                }
+                val compiler = CompilerLocator.find(
+                    projectRoot,
+                    "",
+                    System.getenv("PATH").orEmpty(),
+                    Path.of(System.getProperty("user.home")),
+                    PluginFiles.native(),
+                ) ?: throw ExecutionException("Build kas3c or place it on the search path.")
+                val command = mutableListOf(
+                    "python3",
+                    "-u",
+                    runnerScript.toString(),
+                    projectRoot.resolve(options.manifest).toString(),
+                    "--compiler",
+                    compiler.toString(),
+                )
+                GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())?.let {
+                    command += listOf("--godot", it.toString())
+                }
                 for (name in options.cases.lines().filter { it.isNotBlank() }) command += listOf("--case", name.trim())
                 return KillableColoredProcessHandler(
-                    GeneralCommandLine(command).withWorkDirectory(root().toFile()),
+                    GeneralCommandLine(command).withWorkDirectory(projectRoot.toFile()),
                 ).also(ProcessTerminatedListener::attach)
             }
         }

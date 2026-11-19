@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kumikae-logo-dark.svg">
-    <img src="docs/assets/kumikae-logo.svg" alt="Kumikae logo" width="96" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="editors/jetbrains/src/main/resources/META-INF/pluginIcon_dark.svg">
+    <img src="editors/jetbrains/src/main/resources/META-INF/pluginIcon.svg" alt="Kumikae AS3" width="96" height="96">
   </picture>
 </p>
 
@@ -15,8 +15,9 @@ scripts compile to native code through C++.
 
 > **Status: alpha.** Scripts run in Godot 4.7 on macOS and in the iOS Simulator, with hot reload and editor
 > support in Rider and VS Code. Native code matches or beats Godot C# on the project's frame benchmarks, and
-> Godot builds it when you press Play on macOS. There is no debugger yet. Windows, Linux and Android are
-> untested. See the [roadmap](docs/roadmap.md) for what is built and what comes next.
+> Godot builds it when you press Play on macOS. Android ARM64 runs on an emulator through Rider. There is no
+> debugger yet. Windows and Linux are untested. See the [roadmap](docs/roadmap.md) for what is built and what
+> comes next.
 
 ## What a script looks like
 
@@ -69,7 +70,7 @@ package game {
 | **The AS3 language** | Classes, interfaces, closures, `Array`, `Vector.<T>`, `Dictionary`, `try`/`catch`, `RegExp`, `Date`, `JSON`, and AS3's runtime errors with stack traces. |
 | **Hot reload** | Save a script while the game runs and the game takes the new code and keeps its state. On desktop and in the iOS Simulator. [How it works](docs/hot-reload.md). |
 | **Native speed** | The same scripts compile to native code, level with or ahead of Godot C# on every frame benchmark the project runs. [The numbers and the techniques](docs/performance.md). |
-| **Editor support** | Errors as you type, completion, navigation and hover through a language server. A [Rider plugin](editors/jetbrains/README.md) adds run configurations, a test runner and an iOS Simulator panel; a [VS Code client](editors/vscode/README.md) covers editing. |
+| **Editor support** | Errors as you type, completion, navigation and hover through a language server. A [Rider plugin](editors/jetbrains/README.md) adds run configurations, a test runner, settings and scene editors, and embedded iOS and Android device panels; a [VS Code client](editors/vscode/README.md) covers editing. |
 | **Tests in AS3** | A small [testing library](testing/README.md) with results shown in Rider. |
 
 ## Get started
@@ -130,7 +131,8 @@ difference is a failing test. Read more in [How it works](docs/how-it-works.md).
 | iOS | Interpreter runs in the Simulator and on a device; native code on iOS is next |
 | Rider plugin and VS Code client | Built; no debugger yet |
 | Debugger | Planned |
-| Android, Windows, Linux | Planned |
+| Android ARM64 | Interpreter runs on an emulator through Rider |
+| Windows, Linux | Planned |
 | Consoles | Planned, in a separate repository |
 
 The [roadmap](docs/roadmap.md) has the detail and the known limits.

@@ -2,15 +2,22 @@
     <id>app.anicanon.kumikae.as3</id>
     <name>Kumikae AS3</name>
     <vendor>AniCanon</vendor>
-    <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
+    <description>Build Godot games in ActionScript 3. Edit game settings and scenes, run individual tests, and launch Godot export presets on iOS simulators and Android devices directly from Rider.</description>
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
     <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>
     <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
+    <extensionPoints>
+        <extensionPoint name="gameTarget" beanClass="app.anicanon.kumikae.as3.project.GameTargetContribution" dynamic="true"/>
+    </extensionPoints>
     <extensions defaultExtensionNs="com.intellij">
         <codeInsight.lineMarkerProvider language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.scene.AttachedScenesLineMarker"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.run.KumikaeRunType"/>
+        <executionTargetProvider implementation="app.anicanon.kumikae.as3.run.AndroidDestinations"/>
+        <executionTargetProvider implementation="app.anicanon.kumikae.as3.run.SimulatorDestinations"/>
         <runConfigurationProducer implementation="app.anicanon.kumikae.as3.testing.As3TestProducer"/>
         <runLineMarkerContributor language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.testing.As3TestLineMarker"/>
+        <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.GdScriptEditorProvider"/>
         <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.SceneEditorProvider"/>
         <configurationType implementation="app.anicanon.kumikae.as3.testing.As3TestsType"/>
         <fileEditorProvider implementation="app.anicanon.kumikae.as3.settings.ProjectSettingsEditorProvider"/>
@@ -38,10 +45,14 @@
         <treeStructureProvider implementation="app.anicanon.kumikae.as3.project.GameProjectView"/>
         <directoryIndexExcludePolicy implementation="app.anicanon.kumikae.as3.project.BuildFoldersExcluded"/>
         <projectViewPane implementation="app.anicanon.kumikae.as3.project.GamePane"/>
-        <internalFileTemplate name="AS3 Node Script"/>
+        <internalFileTemplate name="AS3 File"/>
         <internalFileTemplate name="AS3 Class"/>
+        <internalFileTemplate name="AS3 Interface"/>
+        <internalFileTemplate name="AS3 Node Script"/>
+        <internalFileTemplate name="AS3 Test Case"/>
+        <internalFileTemplate name="AS3 Test Suite"/>
         <newProjectWizard.generator implementation="app.anicanon.kumikae.as3.project.As3ProjectWizard"/>
-        <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
+        <toolWindow id="Game Devices" anchor="right" icon="/META-INF/brandMark.svg"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
     <projectListeners>
@@ -49,14 +60,27 @@
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
     <actions>
+        <action id="KumikaeAS3.RunGameTests" class="app.anicanon.kumikae.as3.testing.RunGameTestsAction" text="Run Game Tests">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.AddTarget" class="app.anicanon.kumikae.as3.project.AddGameTargetAction" text="Add Game Target…" icon="AllIcons.General.Add">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+            <add-to-group group-id="RunMenu" anchor="last"/>
+        </action>
         <action id="KumikaeAs3.FindAttachedScenes" class="app.anicanon.kumikae.as3.scene.FindAttachedScenesAction" text="Find Attached Scene Nodes">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.ShowMembers" class="app.anicanon.kumikae.as3.project.ShowMembersAction" text="Show AS3 Members">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
         <action id="KumikaeAs3.CompactPackages" class="app.anicanon.kumikae.as3.project.CompactPackagesAction" text="Compact AS3 Packages">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
         <action id="KumikaeAs3.ShowGenerated" class="app.anicanon.kumikae.as3.project.ShowGeneratedAction" text="Show Generated Files">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.NewPackage" class="app.anicanon.kumikae.as3.project.NewPackageAction" text="ActionScript Package" icon="AllIcons.Nodes.Package">
+            <add-to-group group-id="NewGroup" anchor="first"/>
         </action>
         <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
             <add-to-group group-id="NewGroup" anchor="first"/>

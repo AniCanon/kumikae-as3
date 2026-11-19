@@ -5,6 +5,7 @@ import app.anicanon.kumikae.as3.scene.SceneDocument
 import app.anicanon.kumikae.as3.scene.SceneNode
 import app.anicanon.kumikae.as3.scene.SceneRepository
 import app.anicanon.kumikae.as3.scene.SceneView
+import app.anicanon.kumikae.as3.settings.Artwork
 import app.anicanon.kumikae.as3.settings.ProjectSettings
 import app.anicanon.kumikae.as3.settings.ProjectSettingsView
 import app.anicanon.kumikae.as3.settings.SettingsController
@@ -13,6 +14,7 @@ import app.anicanon.kumikae.as3.ui.TabControl
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
+import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
@@ -21,6 +23,7 @@ import javax.imageio.ImageIO
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JSpinner
 import javax.swing.JTextField
 
 internal object UiProbeProjectExperience {
@@ -28,6 +31,7 @@ internal object UiProbeProjectExperience {
         val owner = Disposer.newDisposable()
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
+        var chosenResource = ""
         val scenes = UiProbeSceneRepository()
         val sceneController = SceneController(scenes)
         lateinit var frame: JFrame
@@ -36,11 +40,21 @@ internal object UiProbeProjectExperience {
             controller.reload()
             frame = JFrame()
             panel =
-                composePanel(owner) { ProjectSettingsView(controller, { _, callback -> callback("res://icon.svg") }) }
+                composePanel(owner) {
+                    ProjectSettingsView(controller, { kind, callback ->
+                        chosenResource = kind.title
+                        callback("res://new-icon.svg")
+                    })
+                }
             frame.contentPane.add(panel)
         }
         try {
-            await { descendants(panel).filterIsInstance<JTextField>().count() == 3 }
+            await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
+            edt {
+                descendants(panel).filterIsInstance<JButton>()
+                    .single { it.accessibleContext.accessibleName == "Choose application icon" }.doClick()
+            }
+            await { chosenResource == "Application icon" && controller.draft?.icon == "res://new-icon.svg" }
             render(panel, destination.resolve("$theme-project-general.png"))
             edt { descendants(panel).filterIsInstance<JTextField>().first().text = "Edited game" }
             click(panel, "Apply")
@@ -48,14 +62,15 @@ internal object UiProbeProjectExperience {
             tab(panel, "Display")
             await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
             render(panel, destination.resolve("$theme-project-display.png"))
-            edt { descendants(panel).filterIsInstance<JTextField>().first().text = "0" }
+            edt {
+                descendants(panel).filterIsInstance<JSpinner>()
+                    .single { it.accessibleContext.accessibleName == "Viewport width" }.value = 1280
+            }
             click(panel, "Apply")
-            await { controller.status.contains("between 1") }
-            check(repository.value.width == "1152")
-            render(panel, destination.resolve("$theme-project-invalid.png"))
+            await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
-            await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
+            await { descendants(panel).filterIsInstance<JTextField>().count() == 1 }
             render(panel, destination.resolve("$theme-project-export.png"))
             edt {
                 frame.contentPane.remove(panel)
@@ -82,8 +97,10 @@ internal object UiProbeProjectExperience {
     private fun tab(panel: JComponent, name: String) = edt {
         descendants(panel).filterIsInstance<TabControl>().single { it.name == name }.doClick()
     }
-    private fun click(panel: JComponent, text: String) = edt {
-        descendants(panel).filterIsInstance<JButton>().single { it.text == text }.doClick()
+    private fun click(panel: JComponent, text: String) {
+        fun button() = descendants(panel).filterIsInstance<JButton>().singleOrNull { it.text == text }
+        await { button()?.isEnabled == true }
+        edt { checkNotNull(button()).doClick() }
     }
     private fun descendants(component: Component): Sequence<Component> = sequence {
         yield(component)
@@ -120,22 +137,22 @@ internal object UiProbeProjectExperience {
 
 internal class UiProbeSettingsRepository : SettingsRepository {
     var value = ProjectSettings.read(
-        "[application]\nconfig/name=\"Support Sprint\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
+        "[application]\nconfig/name=\"Example Game\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
         "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n",
     )
-    override fun preview(path: String): BufferedImage = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
+    override fun preview(path: String): Artwork = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
         val graphics = it.createGraphics()
         try {
-            graphics.color = java.awt.Color(245, 196, 65)
+            graphics.color = Color(245, 196, 65)
             graphics.fillRoundRect(0, 0, 80, 80, 16, 16)
-            graphics.color = java.awt.Color(46, 67, 57)
+            graphics.color = Color(46, 67, 57)
             graphics.fillRect(20, 20, 16, 40)
             graphics.fillRect(36, 20, 24, 12)
             graphics.fillRect(36, 36, 18, 12)
         } finally {
             graphics.dispose()
         }
-    }
+    }.let(::Artwork)
     override fun load() = value
     override fun save(expected: ProjectSettings, draft: ProjectSettings): ProjectSettings {
         check(expected.projectText == value.projectText)

@@ -1,4 +1,4 @@
-package kumikae.testing {
+package app.anicanon.kumikae.testing {
     public class Assert {
         public static function assertTrue(value:Boolean, message:String = "Expected true"):void {
             if (!value) {

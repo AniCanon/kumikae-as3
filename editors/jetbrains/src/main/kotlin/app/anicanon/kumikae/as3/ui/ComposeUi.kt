@@ -2,9 +2,12 @@ package app.anicanon.kumikae.as3.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -24,6 +27,7 @@ import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.SwingConstants
+import javax.swing.event.DocumentEvent
 
 /** Interop for controls that paint themselves or keep IDE behaviour; the caller owns the component. */
 @Composable
@@ -123,10 +127,22 @@ internal fun LabelledField(
     value: String,
     onChange: (String) -> Unit,
     modifier: SwingModifier = SwingModifier,
+    placeholder: String? = null,
 ) {
     Panel(PanelLayout.Border(0, JBUI.scale(2)), modifier = modifier.emptyBorder(JBUI.insets(0, 0, 8, 0))) {
         Label(label, SwingModifier.north())
-        TextField(value, onChange, modifier = SwingModifier.center(), columns = FIELD_COLUMNS)
+        if (placeholder == null) {
+            TextField(value, onChange, modifier = SwingModifier.center(), columns = FIELD_COLUMNS)
+        } else {
+            val changed = rememberUpdatedState(onChange)
+            SwingNode(factory = {
+                PlaceholderTextField(value, FIELD_COLUMNS) { changed.value(it) }
+            }, modifier = SwingModifier.center(), update = {
+                set(label) { accessibleContext.accessibleName = it }
+                set(placeholder) { emptyText.text = it }
+                set(value) { syncText(it) }
+            })
+        }
     }
 }
 
@@ -220,6 +236,31 @@ internal fun NativeScrollPane(component: JComponent, modifier: SwingModifier = S
             set(height) { preferredSize = it?.let { rows -> Dimension(0, rows) } }
         },
     )
+}
+
+private class PlaceholderTextField(initial: String, columns: Int, private val onChange: (String) -> Unit) :
+    JBTextField(initial, columns) {
+    private var syncing = false
+
+    init {
+        document.addDocumentListener(
+            object : DocumentAdapter() {
+                override fun textChanged(e: DocumentEvent) {
+                    if (!syncing) onChange(text)
+                }
+            },
+        )
+    }
+
+    fun syncText(value: String) {
+        if (text == value) return
+        syncing = true
+        try {
+            text = value
+        } finally {
+            syncing = false
+        }
+    }
 }
 
 private const val FIELD_COLUMNS = 30

@@ -10,12 +10,13 @@ internal data class SceneNode(
     val script: String?,
     val editable: Boolean,
     val offset: Int,
+    val properties: Map<String, String> = emptyMap(),
 )
 
 /** Reads node/resource headers without normalizing any unrelated scene text. */
 internal class SceneDocument(private val source: String) {
     private val headers = Regex(
-        "(?m)^\\[(gd_scene|ext_resource|sub_resource|node|connection)\\b([^\\r\\n]*)]\\r?$",
+        "(?m)^\\[(gd_scene|ext_resource|sub_resource|node|connection|editable)\\b([^\\r\\n]*)]\\r?$",
     ).findAll(source).toList()
     private val resources = linkedMapOf<String, String>()
     val nodes: List<SceneNode>
@@ -51,6 +52,9 @@ internal class SceneDocument(private val source: String) {
                 binding?.let { resources[it] ?: "Missing resource: $it" },
                 !inherited && attrs["type"] != null,
                 header.range.first,
+                body.lineSequence().filter { '=' in it && !it.startsWith(';') }.associate {
+                    it.substringBefore('=').trim() to it.substringAfter('=').trim()
+                }.filterKeys { it.isNotBlank() && it != "script" },
             )
         }
         require(nodes.map { it.path }.distinct().size == nodes.size) { "Duplicate node paths." }
@@ -83,7 +87,7 @@ internal class SceneDocument(private val source: String) {
         }
         val assignment = if (script == null) "" else "script = ExtResource(\"$id\")$newline"
         val changedBody = if (existing.containsMatchIn(body)) {
-            existing.replace(body, assignment)
+            existing.replace(body) { assignment }
         } else {
             body + (if (body.endsWith('\n')) "" else newline) + assignment
         }

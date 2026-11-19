@@ -31,6 +31,10 @@ public actor MappedFrameSink: FrameSink {
   }
 
   public func publish(_ frame: CapturedFrame) throws {
+    _ = try tryPublish(frame)
+  }
+
+  public func tryPublish(_ frame: CapturedFrame) throws -> Bool {
     guard let memory, descriptor >= 0 else {
       throw BridgeError.invalid("The frame slot is closed")
     }
@@ -43,7 +47,7 @@ public actor MappedFrameSink: FrameSink {
     if fcntl(descriptor, F_SETLK, &lock) < 0 {
       if errno == EACCES || errno == EAGAIN {
         metrics?.record("publishBusy")
-        return
+        return false
       }
       throw BridgeError.system("Locking the frame slot", errno)
     }
@@ -73,6 +77,7 @@ public actor MappedFrameSink: FrameSink {
       throw BridgeError.system("Unlocking the frame slot", errno)
     }
     metrics?.record("published")
+    return true
   }
 
   public func close() throws {

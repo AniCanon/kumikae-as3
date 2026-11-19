@@ -23,18 +23,19 @@ import java.nio.file.Path
 
 internal object UiProbeTestResults {
     fun run(project: Project, destination: Path) {
-        lateinit var properties: As3TestConsole
-        lateinit var console: SMTRunnerConsoleView
-        lateinit var handler: KillableColoredProcessHandler
+        var properties: As3TestConsole? = null
+        var console: SMTRunnerConsoleView? = null
+        var handler: KillableColoredProcessHandler? = null
         val root = Files.createTempDirectory(Path.of(checkNotNull(project.basePath)), "case-results-")
-        val native = checkNotNull(PluginFiles.native())
-        val fixture = root.resolve("ProbeCase.as")
-        Files.writeString(
-            fixture,
-            """
+        try {
+            val native = checkNotNull(PluginFiles.native())
+            val fixture = root.resolve("ProbeCase.as")
+            Files.writeString(
+                fixture,
+                """
             package {
-                import kumikae.testing.TestCase;
-                import kumikae.testing.Assert;
+                import app.anicanon.kumikae.testing.TestCase;
+                import app.anicanon.kumikae.testing.Assert;
                 public class ProbeCase extends TestCase {
                     private var succeeds:Boolean;
                     public function ProbeCase(name:String, succeeds:Boolean) { super(name); this.succeeds = succeeds; }
@@ -43,14 +44,14 @@ internal object UiProbeTestResults {
                     }
                 }
             }
-            """.trimIndent(),
-        )
-        val failureLine = Files.readAllLines(fixture).indexOfFirst { it.contains("Assert.assertTrue") }
-        Files.writeString(
-            root.resolve("ProbeSuite.as"),
-            """
+                """.trimIndent(),
+            )
+            val failureLine = Files.readAllLines(fixture).indexOfFirst { it.contains("Assert.assertTrue") }
+            Files.writeString(
+                root.resolve("ProbeSuite.as"),
+                """
             package {
-                import kumikae.testing.Suite;
+                import app.anicanon.kumikae.testing.Suite;
                 public class ProbeSuite {
                     public function ProbeSuite() {
                         var suite:Suite = new Suite("Probe");
@@ -61,60 +62,63 @@ internal object UiProbeTestResults {
                     }
                 }
             }
-            """.trimIndent(),
-        )
-        val manifest = root.resolve("kas3-tests.json")
-        Files.writeString(
-            manifest,
-            Gson().toJson(
-                mapOf(
-                    "version" to 1,
-                    "tests" to listOf(
-                        mapOf(
-                            "name" to "Probe",
-                            "source" to "ProbeCase.as",
-                            "events" to true,
-                            "marker" to "DONE",
-                            "command" to listOf("{compiler}", "run", "ProbeSuite.as", "ProbeCase.as", "{sources}"),
-                            "sources" to listOf("**/*.as"),
+                """.trimIndent(),
+            )
+            val manifest = root.resolve("kas3-tests.json")
+            Files.writeString(
+                manifest,
+                Gson().toJson(
+                    mapOf(
+                        "version" to 1,
+                        "tests" to listOf(
+                            mapOf(
+                                "name" to "Probe",
+                                "source" to "ProbeCase.as",
+                                "events" to true,
+                                "marker" to "DONE",
+                                "command" to listOf("{compiler}", "run", "ProbeSuite.as", "ProbeCase.as", "{sources}"),
+                                "sources" to listOf("**/*.as"),
+                            ),
                         ),
                     ),
                 ),
-            ),
-        )
-        // The fixture uses exactly the library bundled with this plugin.
-        Files.walk(native.resolve("testing/as3")).use { paths ->
-            paths.filter { it.toString().endsWith(".as") }.forEach {
-                val target = root.resolve("framework").resolve(native.resolve("testing/as3").relativize(it))
-                Files.createDirectories(target.parent)
-                Files.copy(it, target)
-            }
-        }
-        LocalFileSystem.getInstance().refreshAndFindFileByNioFile(fixture)
-        ApplicationManager.getApplication().invokeAndWait {
-            val type = As3TestsType()
-            val configuration = As3TestsConfiguration(project, type.configurationFactories.single(), "Probe tests")
-            configuration.options.manifest = manifest.toString()
-            properties = As3TestConsole(configuration, DefaultRunExecutor.getRunExecutorInstance())
-            console = SMTestRunnerConnectionUtil.createConsole("AS3", properties) as SMTRunnerConsoleView
-            val command = GeneralCommandLine(
-                "python3",
-                native.resolve("testing/runner.py").toString(),
-                manifest.toString(),
-                "--compiler",
-                native.resolve("kas3c").toString(),
             )
-            handler = KillableColoredProcessHandler(command)
-            console.attachToProcess(handler)
-            handler.startNotify()
-        }
-        try {
-            check(handler.waitFor(10_000)) { "Test-result probe process did not finish" }
+            // The fixture uses exactly the library bundled with this plugin.
+            Files.walk(native.resolve("testing/as3")).use { paths ->
+                paths.filter { it.toString().endsWith(".as") }.forEach {
+                    val target = root.resolve("framework").resolve(native.resolve("testing/as3").relativize(it))
+                    Files.createDirectories(target.parent)
+                    Files.copy(it, target)
+                }
+            }
+            LocalFileSystem.getInstance().refreshAndFindFileByNioFile(fixture)
+            ApplicationManager.getApplication().invokeAndWait {
+                val type = As3TestsType()
+                val configuration = As3TestsConfiguration(project, type.configurationFactories.single(), "Probe tests")
+                configuration.options.manifest = manifest.toString()
+                properties = As3TestConsole(configuration, DefaultRunExecutor.getRunExecutorInstance())
+                console = SMTestRunnerConnectionUtil.createConsole("AS3", properties) as SMTRunnerConsoleView
+                val command = GeneralCommandLine(
+                    "python3",
+                    native.resolve("testing/runner.py").toString(),
+                    manifest.toString(),
+                    "--compiler",
+                    native.resolve("kas3c").toString(),
+                )
+                val activeHandler = KillableColoredProcessHandler(command)
+                handler = activeHandler
+                checkNotNull(console).attachToProcess(activeHandler)
+                activeHandler.startNotify()
+            }
+            val activeConsole = checkNotNull(console)
+            val activeProperties = checkNotNull(properties)
+            val activeHandler = checkNotNull(handler)
+            check(activeHandler.waitFor(10_000)) { "Test-result probe process did not finish" }
             var verified = false
             val deadline = System.nanoTime() + 10_000_000_000
             while (!verified && System.nanoTime() < deadline) {
                 ApplicationManager.getApplication().invokeAndWait {
-                    val leaves = console.resultsViewer.testsRootNode.allTests.filter { !it.isSuite }
+                    val leaves = activeConsole.resultsViewer.testsRootNode.allTests.filter { !it.isSuite }
                     verified = leaves.size == 2 && leaves.any { it.name.endsWith("::passing case") && it.isPassed } &&
                         leaves.any { it.name.endsWith("::failing case") && it.isDefect }
                 }
@@ -123,17 +127,20 @@ internal object UiProbeTestResults {
             ApplicationManager.getApplication().invokeAndWait {
                 Files.writeString(
                     destination.resolve("test-tree.txt"),
-                    console.resultsViewer.testsRootNode.allTests.joinToString("\n") {
+                    activeConsole.resultsViewer.testsRootNode.allTests.joinToString("\n") {
                         "${it.name}: suite=${it.isSuite} passed=${it.isPassed} defect=${it.isDefect} final=${it.isFinal}"
                     },
                 )
             }
+            check(verified) { "Native Rider test tree did not show one pass and one failure" }
             val descriptor = ReadAction.compute<OpenFileDescriptor?, RuntimeException> {
-                val failed = console.resultsViewer.testsRootNode.allTests.single { it.name.endsWith("::failing case") }
+                val failed = activeConsole.resultsViewer.testsRootNode.allTests.single {
+                    it.name.endsWith("::failing case")
+                }
                 check(failed.stacktrace.orEmpty().contains("ProbeCase.as:" + (failureLine + 1)))
                 failed.getDescriptor(
                     failed.getLocation(project, GlobalSearchScope.allScope(project)),
-                    properties,
+                    activeProperties,
                 ) as? OpenFileDescriptor
             }
             ApplicationManager.getApplication().invokeAndWait {
@@ -147,15 +154,14 @@ internal object UiProbeTestResults {
                 }
                 FileEditorManager.getInstance(project).closeFile(descriptor.file)
             }
-            UiProbeTestLinks.run(project, properties, fixture, failureLine)
-            check(verified) { "Native Rider test tree did not show one pass and one failure" }
+            UiProbeTestLinks.run(project, activeProperties, fixture, failureLine)
             Files.writeString(
                 destination.resolve("test-results.txt"),
                 "passed: bundled runner and compiler show one pass, one failure and assertion-line navigation\n",
             )
         } finally {
-            if (!handler.isProcessTerminated) handler.destroyProcess()
-            ApplicationManager.getApplication().invokeAndWait { Disposer.dispose(console) }
+            handler?.let { if (!it.isProcessTerminated) it.destroyProcess() }
+            console?.let { ApplicationManager.getApplication().invokeAndWait { Disposer.dispose(it) } }
             root.toFile().deleteRecursively()
         }
     }

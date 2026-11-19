@@ -29,8 +29,10 @@ class GodotConfigurationType :
         "Run the project's game with Godot",
         NotNullLazyValue.createValue { PluginFiles.mark },
     ) {
+    override fun isApplicable(project: Project) = false
+
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
-        GodotRunConfiguration(project, this, "Game")
+        GodotRunConfiguration(project, this, "Godot")
 
     companion object {
         const val ID = "KumikaeAs3Godot"

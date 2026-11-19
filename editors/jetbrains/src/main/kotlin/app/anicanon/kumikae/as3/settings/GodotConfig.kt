@@ -11,8 +11,7 @@ internal class GodotConfig(private val source: String) {
 
     init {
         var section = ""
-        var offset = 0
-        for (line in source.splitToSequence('\n')) {
+        for ((offset, line) in records(source)) {
             val clean = line.trim()
             if (clean.startsWith("[")) {
                 require(clean.endsWith("]")) { "Malformed section: $clean" }
@@ -24,17 +23,18 @@ internal class GodotConfig(private val source: String) {
                 if (equals > 0) {
                     val name = line.substring(0, equals).trim()
                     val tail = line.substring(equals + 1)
-                    val value = withoutComment(tail).trim()
+                    val value = tail.trim()
                     val start = offset + equals + 1 + tail.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
                     val key = ConfigKey(section, name)
                     require(key !in entries) { "Duplicate setting: $section/$name" }
                     entries[key] = Entry(start, start + value.length, value)
                 }
             }
-            offset += line.length + 1
         }
         sectionEnds[section] = source.length
     }
+
+    fun properties(section: String): List<String> = entries.keys.filter { it.section == section }.map { it.name }
 
     fun raw(section: String, name: String): String? = entries[ConfigKey(section, name)]?.value
     fun string(section: String, name: String, default: String = ""): String =
@@ -77,46 +77,78 @@ internal class GodotConfig(private val source: String) {
             require(value.length >= 2 && value.first() == '"' && value.last() == '"') {
                 "Unsupported value; edit it in Source: $value"
             }
-            val result = StringBuilder()
-            var escaped = false
-            for (char in value.substring(1, value.length - 1)) {
-                if (escaped) {
-                    result.append(
-                        when (char) {
-                            'n' -> '\n'
-                            'r' -> '\r'
-                            't' -> '\t'
-                            '\\', '"' -> char
-                            else -> error("Unsupported string escape: \\$char")
-                        },
-                    )
-                    escaped = false
-                } else if (char == '\\') {
-                    escaped = true
+            val body = value.substring(1, value.length - 1)
+            val result = StringBuilder(body.length)
+            var index = 0
+            while (index < body.length) {
+                val char = body[index++]
+                if (char == '\\') {
+                    require(index < body.length) { "Unterminated string escape" }
+                    when (val escaped = body[index++]) {
+                        'n' -> result.append('\n')
+
+                        'r' -> result.append('\r')
+
+                        't' -> result.append('\t')
+
+                        'b' -> result.append('\b')
+
+                        'f' -> result.append('\u000C')
+
+                        '\\', '"', '\'' -> result.append(escaped)
+
+                        'u', 'U' -> {
+                            val digits = if (escaped == 'u') 4 else 8
+                            require(index + digits <= body.length) { "Unterminated unicode escape" }
+                            val codePoint = body.substring(index, index + digits).toIntOrNull(16)
+                                ?: error("Invalid unicode escape")
+                            require(Character.isValidCodePoint(codePoint)) { "Invalid unicode code point" }
+                            result.appendCodePoint(codePoint)
+                            index += digits
+                        }
+
+                        else -> error("Unsupported string escape: \\$escaped")
+                    }
                 } else {
                     require(char != '"') { "Malformed quoted value" }
                     result.append(char)
                 }
             }
-            require(!escaped) { "Unterminated string escape" }
             return result.toString()
         }
 
-        private fun withoutComment(value: String): String {
+        private fun records(source: String): Sequence<Pair<Int, String>> = sequence {
+            var start = 0
+            var end = 0
+            var depth = 0
             var quoted = false
             var escaped = false
-            for ((index, char) in value.withIndex()) {
-                if (escaped) {
-                    escaped = false
-                } else {
-                    when (char) {
-                        '\\' -> if (quoted) escaped = true
-                        '"' -> quoted = !quoted
-                        ';', '#' -> if (!quoted) return value.substring(0, index)
+            var comment = false
+            for ((offset, char) in source.withIndex()) {
+                if (char == '\n') {
+                    comment = false
+                    if (!quoted && depth == 0) {
+                        yield(start to source.substring(start, end))
+                        start = offset + 1
+                        end = start
                     }
+                    escaped = false
+                    continue
                 }
+                if (comment) continue
+                when {
+                    escaped -> escaped = false
+                    quoted && char == '\\' -> escaped = true
+                    char == '"' -> quoted = !quoted
+                    !quoted && (char == ';' || char == '#') -> comment = true
+                    !quoted && char in "[({" -> depth++
+                    !quoted && char in "])}" -> depth--
+                }
+                require(depth >= 0) { "Unexpected closing delimiter in a Godot setting." }
+                if (!comment) end = offset + 1
             }
-            return value
+            require(!quoted && depth == 0) { "Unterminated Godot setting. Check strings and brackets in Source." }
+            if (start < source.length) yield(start to source.substring(start, end))
         }
     }
 }
