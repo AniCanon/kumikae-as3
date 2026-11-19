@@ -104,14 +104,20 @@ application identifier from the preset, exports and builds the game, installs it
   without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Build & Release**,
   the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
   Xcode. Pick a team and click **Apply** to use it for device exports.
-- **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
-  Debug and release builds package the native ARM64 runtime, which interprets the game’s AS3 scripts.
+- **Android** requires the Android SDK, NDK, matching Godot export templates and an ARM64 emulator or
+  device. Debug runs default to the AS3 interpreter, and release exports compile AS3 to native ARM64 code
+  (`libkas3_program.so`). In **project.godot → Settings → Build & Release**, the Android preset also has
+  the **AS3 execution** override (`Automatic`, `Interpreter`, or `Native`).
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
 ## Release a mobile game
 
 Open **project.godot → Settings → Build & Release** and select the target. Each preset has its own application
 identifier, release version and build number or version code.
+
+![Build & Release settings for iOS](docs/images/project-export-ios.png)
+
+![Build & Release settings for Android](docs/images/project-export-android.png)
 
 ### Send a build to testers
 
@@ -152,6 +158,8 @@ its format to a temporary project copy so the same target remains available for 
 ## The Devices panel
 
 Open **View > Tool Windows > Devices** to start and view simulators and Android emulators.
+
+![Devices panel showing iOS simulators and Android emulators](docs/images/devices.png)
 
 - **Simulators** groups devices by platform, with running devices first. Choose **Open** to view a running
   device or **Start** to boot one. On macOS the list also includes iOS simulators. The gear beside
@@ -214,6 +222,8 @@ application's name, main scene, icon and boot splash, the viewport size, stretch
 the identifier and icon of an existing iOS or Android export preset. Settings and comments it doesn't know
 are kept. **Apply** writes the changes in one undoable step.
 
+![Project settings General tab](docs/images/project-general.png)
+
 Click the icon or splash in **General** to open the artwork gallery, filter project images, or import a
 local image into `assets/` with **Browse…** and **Import and Use**. The splash preview reflects the
 project's launch window size, background, filtering and boot stretch mode.
@@ -224,6 +234,8 @@ and **Properties** to inspect additional settings entered in Source.
 **Scenes.** Open a `.tscn` file to use the **Scene** editor. Its outline shows each node's type and the AS3
 script attached to it. You can open a script, and attach or detach one. Attaching accepts a script that
 directly extends the node's type. Edit inherited and instanced scenes in Godot.
+
+![Scene editor showing node hierarchy and attached AS3 script](docs/images/scene.png)
 
 **From a script to its scenes.** A gutter icon on an AS3 class, and **Find Attached Scene Nodes** in the
 editor's menu, show the scene nodes that use the script.

@@ -14,9 +14,10 @@ C#. While you work, an interpreter runs your scripts and reloads them when you s
 scripts compile to native code through C++.
 
 > **Status: alpha.** Scripts run in Godot 4.7 on macOS and in the iOS Simulator, with hot reload and editor
-> support in Rider and VS Code. Native code matches or beats Godot C# on the project's frame benchmarks, and
-> Godot builds it when you press Play on macOS or export for iOS. Android ARM64 runs on an emulator through
-> Rider. There is no debugger yet. Windows and Linux are untested. See the [roadmap](docs/roadmap.md).
+> support in Rider and VS Code. Native code is level with or ahead of Godot C# on the project's ten macOS frame
+> benchmarks, and Godot builds it when you press Play on macOS or export for iOS and Android. Android ARM64 also
+> runs on an emulator through Rider. There is no debugger yet. Windows and Linux are untested. See the
+> [roadmap](docs/roadmap.md).
 
 ## What a script looks like
 
@@ -68,7 +69,7 @@ package game {
 | **The whole Godot API, typed** | All 1,036 Godot classes are available under AS3 names and checked at compile time, including arithmetic on `Vector2` and the other math types. |
 | **The AS3 language** | Classes, interfaces, closures, `Array`, `Vector.<T>`, `Dictionary`, `try`/`catch`, `RegExp`, `Date`, `JSON`, and AS3's runtime errors with stack traces. |
 | **Hot reload** | Save a script while the game runs and the game takes the new code and keeps its state. On desktop and in the iOS Simulator. [How it works](docs/hot-reload.md). |
-| **Native speed** | The same scripts compile to native code, level with or ahead of Godot C# on every frame benchmark the project runs. [The numbers and the techniques](docs/performance.md). |
+| **Native speed** | The same scripts compile to native code, level with or ahead of Godot C# on the ten macOS frame benchmarks. [The numbers and the techniques](docs/performance.md). |
 | **Editor support** | Errors as you type, completion, navigation and hover through a language server. A [Rider plugin](editors/jetbrains/README.md) adds run configurations, a test runner, settings and scene editors, and embedded iOS and Android device panels; a [VS Code client](editors/vscode/README.md) covers editing. |
 | **Tests in AS3** | A small [testing library](testing/README.md) with results shown in Rider. |
 

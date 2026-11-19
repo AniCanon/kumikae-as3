@@ -47,10 +47,12 @@ state of the project changes.
 ### Native code
 
 - **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
-- **Native iOS exports.** Release exports build the AS3 scripts into the app. Debug exports default to the interpreter. The
-  Simulator runs the native integration suite. The ARM64 device build has been linked and awaits a run on hardware.
+- **Native iOS and Android exports.** Release exports build the AS3 scripts into the app (static objects
+  linked into Xcode for iOS and the Simulator; `libkas3_program.so` compiled with the Android NDK for
+  `arm64-v8a`). Debug exports default to the interpreter. The Simulator runs the native integration suite,
+  and Android APK export modes are verified on macOS. Runs on iOS and Android hardware are next.
 - **Every test program gives the same output** on the interpreter and as native code.
-- **Level with or ahead of Godot C#** on all ten frame benchmarks. See [Performance](performance.md).
+- **Level with or ahead of Godot C#** on all ten macOS frame benchmarks. See [Performance](performance.md).
 - **Native code when you press Play,** on by default on macOS. The extension builds the program library
   by itself, caches it, and falls back to the interpreter when there's no C++ toolchain. A script stuck in a
   loop is stopped as on the interpreter, and an edit moves the running game onto the interpreter with its
@@ -68,14 +70,13 @@ state of the project changes.
 
 ## Next
 
-1. **Run a signed native build on iOS hardware and extend native export to other platforms.**
+1. **Run signed native builds on iOS and Android hardware, and extend native export to Windows and Linux.**
 2. **Hot reload for native code.**
 3. **Godot's larger values inline:** `Vector3`, `Color` and the rest in vectors, fields and parameters.
 4. **Threads.**
 5. **A restart action in the IDE,** to go with hot reload.
 6. **Debugger:** breakpoints and stepping from Rider, in the editor and on a device.
-7. **Android native code, Windows and Linux.** Android ARM64 runs the interpreter on an emulator; Windows and
-   Linux haven't been built or run.
+7. **Windows and Linux.** Neither has been built or run.
 8. **Consoles.** Console support lives in a separate repository, because console SDKs are confidential.
 
 ## Later

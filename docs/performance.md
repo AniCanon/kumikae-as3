@@ -113,6 +113,6 @@ code and isn't meant for release builds.
 
 ## What's next
 
-- Measure native AS3 on iOS hardware and extend native export to other platforms.
+- Measure native AS3 on iOS and Android hardware, and extend native export to Windows and Linux.
 - Larger Godot values (`Vector3`, `Color`) inline in vectors, fields and parameters.
 - Threads.

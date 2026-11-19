@@ -87,18 +87,19 @@ nothing differently for the editor, so one library serves both.
   that generated code reads directly, to learn when the object is freed. The bindings last as long as the
   library does.
 
-## Native iOS exports
+## Native iOS and Android exports
 
-On macOS, `ios_export` registers an editor export plugin. It collects the AS3 paths selected by the iOS
-preset and uses the same test-folder rules and source ordering as the game. Once Godot writes the Xcode
-project, the plugin compiles one object for the device and one for the Simulator. Xcode links the object
-for its destination into the app. At startup the app passes the program table to the extension, which
-checks the runtime layout and source fingerprint just as it does for a program library.
+`ios_export` registers an editor export plugin for iOS and Android. On macOS, it collects the AS3 paths
+selected by an iOS preset and uses the same test-folder rules and source ordering as the game. Once Godot
+writes the Xcode project, the plugin compiles one object for the device and one for the Simulator, and Xcode
+links the object for its destination into the app. On Android exports, it compiles `libkas3_program.so` for
+`arm64-v8a` with the Android NDK (`aarch64-linux-android24-clang++`) and packages it into the APK/AAB, where
+`native_program` loads it alongside `libkas3_godot.so`.
 
-The default **Automatic** mode interprets debug exports and compiles release exports. The iOS preset
-option `actionscript/native_code` accepts Automatic (2), Interpreter (0) and Native (1). Earlier
-boolean settings keep their original meaning. Native debug exports record constructor arguments for
-hot reload. Release exports omit that bookkeeping.
+The default **Automatic** mode interprets debug exports and compiles release exports. Both presets accept
+`actionscript/native_code`: Automatic (2), Interpreter (0) and Native (1). Earlier iOS boolean settings keep
+their original meaning. Native debug exports record constructor arguments for hot reload. Release exports
+omit that bookkeeping.
 
 ## The program library
 
