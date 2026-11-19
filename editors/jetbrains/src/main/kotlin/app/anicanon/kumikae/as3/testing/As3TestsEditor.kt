@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.Column
+import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.google.gson.JsonParser
@@ -20,11 +21,13 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
     private var selection by mutableStateOf(emptySet<String>())
     private var all by mutableStateOf(true)
     private var native by mutableStateOf(false)
+    private var device by mutableStateOf("")
     private var notice by mutableStateOf("")
     override fun resetEditorFrom(configuration: As3TestsConfiguration) {
         selection = configuration.options.cases.lineSequence().filter(String::isNotBlank).toSet()
         all = selection.isEmpty()
         native = configuration.options.native
+        device = configuration.options.device
         groups = runCatching {
             val path = Path.of(requireNotNull(configuration.project.basePath)).resolve(configuration.options.manifest)
             val file =
@@ -42,6 +45,7 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
         if (!all && selection.isEmpty()) throw ConfigurationException("Choose at least one test for this plan.")
         configuration.options.cases = if (all) "" else selection.joinToString("\n")
         configuration.options.native = native
+        configuration.options.device = device.trim()
     }
     override fun createEditor(): JComponent = composePanel(this) {
         Column {
@@ -53,6 +57,15 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
                 native = checked
                 fireEditorStateChanged()
             })
+            LabelledField(
+                label = "Mobile device",
+                value = device,
+                placeholder = "Auto-detect booted simulator or emulator",
+                onChange = { updated ->
+                    device = updated
+                    fireEditorStateChanged()
+                },
+            )
             for (group in groups) {
                 CheckBox(group.replace("::", " › "), all || group in selection, { checked: Boolean ->
                     if (all) selection = groups.toSet()
