@@ -39,6 +39,7 @@ class UiProbeStarter : ApplicationStarter {
                 } else if (game != null) {
                     UiProbeGameRun.run(destination, Path.of(game))
                 } else if (System.getenv("KUMIKAE_DEVICE_SETTINGS_PROBE") == "1") {
+                    UiProbeGameTree.run()
                     checkThemes(destination, deviceSettingsOnly = true)
                 } else if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
                     UiProbeLanguage.run(destination)

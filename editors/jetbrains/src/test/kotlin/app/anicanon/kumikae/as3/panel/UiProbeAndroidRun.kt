@@ -93,7 +93,7 @@ internal object UiProbeAndroidRun {
                         window.contentManager.findContent("Simulators")?.let(window.contentManager::setSelectedContent)
                     }
                 }
-                await("running emulator in Game Devices", 30) {
+                await("running emulator in Devices", 30) {
                     var clicked = false
                     app.invokeAndWait {
                         val content = window.contentManager.findContent("Simulators")?.component

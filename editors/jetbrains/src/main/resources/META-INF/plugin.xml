@@ -1,6 +1,7 @@
 <idea-plugin require-restart="true">
     <id>app.anicanon.kumikae.as3</id>
     <name>Kumikae AS3</name>
+    <resource-bundle>messages.KumikaeBundle</resource-bundle>
     <vendor>AniCanon</vendor>
     <description>Build Godot games in ActionScript 3. Edit game settings and scenes, run individual tests, and launch Godot export presets on iOS simulators and Android devices directly from Rider.</description>
     <depends>com.intellij.modules.platform</depends>

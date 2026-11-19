@@ -96,7 +96,7 @@ Edit a script while the game runs and save. The game takes the new code and keep
 
 ## Run on iOS or Android
 
-Open **Run > Add Game Target…** and choose a Godot export preset. In **Game Devices > Simulators**, start
+Open **Run > Add Game Target…** and choose a Godot export preset. In **Devices > Simulators**, start
 an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
@@ -107,9 +107,9 @@ application identifier from the preset, exports and builds the game, installs it
 - **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
-## The Game Devices panel
+## The Devices panel
 
-Open **View > Tool Windows > Game Devices** to start and view simulators and Android emulators.
+Open **View > Tool Windows > Devices** to start and view simulators and Android emulators.
 
 - **Simulators** groups devices by platform, with running devices first. Choose **Open** to view a running
   device or **Start** to boot one. On macOS the list also includes iOS simulators. The gear beside
