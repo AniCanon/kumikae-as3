@@ -20,7 +20,7 @@ internal fun ArtworkField(
     layout: SplashLayout? = null,
     change: (String) -> Unit,
 ) {
-    Column(SwingModifier.emptyBorder(JBUI.insets(8))) {
+    Column(SwingModifier.emptyBorder(JBUI.insets(4))) {
         Label(kind.title, SwingModifier.font(JBFont.label().asBold()))
         ProjectIconPreview(preview, "Choose ${kind.title.lowercase()}", layout) { choose(kind, change) }
         Label(path.substringAfterLast('/').ifEmpty { "Godot default" })
