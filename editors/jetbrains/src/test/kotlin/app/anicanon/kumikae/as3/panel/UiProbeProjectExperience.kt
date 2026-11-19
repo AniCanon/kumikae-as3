@@ -37,6 +37,7 @@ import javax.swing.JButton
 import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JPasswordField
 import javax.swing.JScrollPane
@@ -149,6 +150,14 @@ internal object UiProbeProjectExperience {
             click(panel, "Build Play bundle…")
             check(keyPreset == "Google Play" && released == "Android" && portal == "Android")
             render(panel, destination.resolve("$theme-project-android.png"))
+            tab(panel, "Properties")
+            await {
+                descendants(panel).filterIsInstance<JLabel>().any {
+                    it.text == "Key"
+                }
+            }
+            render(panel, destination.resolve("$theme-project-properties.png"))
+            tab(panel, "Export")
             for (width in listOf(960, 640, 420)) {
                 edt {
                     panel.setSize(width, 720)

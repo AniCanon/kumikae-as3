@@ -45,6 +45,7 @@ internal data class ProjectSettings(
     val buildNumber: String = "",
     val releaseVersion: String = "",
     val exportDrafts: Map<String, ExportFields> = emptyMap(),
+    val propertyEdits: Map<ConfigKey, String> = emptyMap(),
 ) {
     fun allExportDrafts(): Map<String, ExportFields> = if (preset.isEmpty()) {
         exportDrafts
@@ -132,11 +133,14 @@ internal data class ProjectSettings(
         for ((section, fields) in allExportDrafts()) {
             val selected = presets.firstOrNull { it.section == section } ?: continue
             val (applicationId, image) = fields
-            if (selected.platform == "iOS") {
+            if (selected.platform == "iOS" || selected.platform == "Android") {
                 val options = "$section.options"
                 if (fields.executionMode != IosExecutionMode.read(originalExports.raw(options, NATIVE_CODE))) {
                     exportChanges[ConfigKey(options, NATIVE_CODE)] = fields.executionMode.value.toString()
                 }
+            }
+            if (selected.platform == "iOS") {
+                val options = "$section.options"
                 if (fields.signingTeam != originalExports.string(options, SIGNING_TEAM)) {
                     val team = fields.signingTeam.trim()
                     require(team.isEmpty() || SigningTeam.validId(team)) {
@@ -184,7 +188,11 @@ internal data class ProjectSettings(
                 exportChanges[ConfigKey("$section.options", it)] = GodotConfig.quote(image)
             }
         }
-        return GodotConfig(project).update(changes) to GodotConfig(exports).update(exportChanges)
+        val mergedChanges = linkedMapOf<ConfigKey, String>().apply {
+            putAll(propertyEdits)
+            putAll(changes)
+        }
+        return GodotConfig(project).update(mergedChanges) to GodotConfig(exports).update(exportChanges)
     }
 
     companion object {

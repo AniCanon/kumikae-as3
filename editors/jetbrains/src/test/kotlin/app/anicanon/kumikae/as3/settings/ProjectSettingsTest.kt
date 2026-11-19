@@ -110,4 +110,22 @@ class ProjectSettingsTest {
         val value = ProjectSettings.read("", exports).copy(identifier = "org.example.edited")
         assertEquals("org.example.edited", value.select("preset.1").select("preset.0").identifier)
     }
+
+    @Test fun `android execution mode and raw property edits are saved`() {
+        val project = "[application]\nconfig/name=\"Game\"\n"
+        val exports = "[preset.0]\nname=\"Android\"\nplatform=\"Android\"\n" +
+            "[preset.0.options]\npackage/unique_name=\"org.example.game\"\n"
+        val updated = ProjectSettings.read(project, exports).copy(
+            executionMode = IosExecutionMode.Native,
+            propertyEdits = mapOf(
+                ConfigKey("application", "config/name") to "\"Updated\"",
+                ConfigKey("rendering", "textures/vram_compression/import_etc2_astc") to "true",
+            ),
+        )
+        val (savedProject, savedExports) = updated.write(project, exports)
+        assertEquals("1", GodotConfig(savedExports).raw("preset.0.options", "actionscript/native_code"))
+        val parsedProject = GodotConfig(savedProject)
+        assertEquals("\"Updated\"", parsedProject.raw("application", "config/name"))
+        assertEquals("true", parsedProject.raw("rendering", "textures/vram_compression/import_etc2_astc"))
+    }
 }

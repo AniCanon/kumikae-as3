@@ -54,7 +54,7 @@ internal fun ProjectSettingsView(
 
                     "Display" -> DisplaySettings(draft, controller)
 
-                    "Properties" -> GodotProperties(draft.projectText)
+                    "Properties" -> GodotProperties(draft, controller)
 
                     "Export" -> {
                         ExportSettings(
