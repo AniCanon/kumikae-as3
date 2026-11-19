@@ -176,12 +176,14 @@ Each of these is switched on by an environment variable and never runs in an ord
 | `KUMIKAE_FRAME_RETENTION_PROBE=1` | `:test --tests '*FrameRetentionProbe'` | Paints synthetic frames through the panel's own classes in a plain JVM, and counts retained images |
 | `KUMIKAE_NATIVE_LIFECYCLE_PROBE=1` | `:core:test --tests '*NativeLifecycleProbe'` | Creates one disposable Simulator and checks shutdown, reboot and reselection. It deletes only the device it created |
 
-To check the native iOS Run action end to end, make a private copy of `compiler/tests/godot_project` as
+To check the iOS Run action end to end, make a private copy of `compiler/tests/godot_project` as
 `game/` in a temporary folder. Enable `debug/file_logging/enable_file_logging` in that copy and write
-the UDID of a new disposable simulator to `owned-device` in the temporary folder. Set
-`KUMIKAE_GAME_RUN_PROBE` to that folder and `KUMIKAE_IOS_NATIVE_PROBE=1` for `./gradlew runIde -PuiProbe`.
+the UDID of a new disposable simulator to `owned-device` in the temporary folder. For
+`./gradlew runIde -PuiProbe`, set `KUMIKAE_GAME_RUN_PROBE` to that folder and
+`KUMIKAE_IOS_SCENE_MODE=interpreter`. To exercise native Debug, add `actionscript/native_code=1`
+under the staged iOS preset’s options and use `KUMIKAE_IOS_SCENE_MODE=native`.
 The probe adds the target, chooses that simulator in Rider, presses Run, and checks the launched game's
-log for native execution and the AS3 scene results.
+log for the requested execution mode and the AS3 scene results.
 
 The helper's own probes are in [its README](native/SimulatorBridge/README.md#probes).
 

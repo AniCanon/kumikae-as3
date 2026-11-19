@@ -6,10 +6,12 @@ import app.anicanon.kumikae.as3.scene.SceneNode
 import app.anicanon.kumikae.as3.scene.SceneRepository
 import app.anicanon.kumikae.as3.scene.SceneView
 import app.anicanon.kumikae.as3.settings.Artwork
+import app.anicanon.kumikae.as3.settings.IosExecutionMode
 import app.anicanon.kumikae.as3.settings.ProjectSettings
 import app.anicanon.kumikae.as3.settings.ProjectSettingsView
 import app.anicanon.kumikae.as3.settings.SettingsController
 import app.anicanon.kumikae.as3.settings.SettingsRepository
+import app.anicanon.kumikae.as3.settings.SigningTeam
 import app.anicanon.kumikae.as3.ui.TabControl
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
@@ -21,7 +23,7 @@ import java.awt.image.BufferedImage
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import javax.swing.JButton
-import javax.swing.JCheckBox
+import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.JSpinner
@@ -71,15 +73,24 @@ internal object UiProbeProjectExperience {
             await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
-            await { descendants(panel).filterIsInstance<JCheckBox>().any { it.text == "Compile AS3 to native code" } }
+            fun combos() = descendants(panel).filterIsInstance<JComboBox<*>>()
+            await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
+            edt {
+                val team = combos().single { it.selectedItem.toString() == "Choose a team…" }
+                team.selectedIndex =
+                    (0 until team.itemCount).single { team.getItemAt(it).toString().contains("Studio") }
+            }
+            await { controller.draft?.signingTeam == "EXAMPLE123" && controller.dirty }
             render(panel, destination.resolve("$theme-project-export.png"))
             edt {
-                descendants(panel).filterIsInstance<JCheckBox>().single {
-                    it.text == "Compile AS3 to native code"
-                }.doClick()
+                combos().single { it.selectedItem == IosExecutionMode.Automatic }.selectedItem =
+                    IosExecutionMode.Native
             }
             click(panel, "Apply")
-            await { !repository.value.nativeCode }
+            await {
+                repository.value.executionMode == IosExecutionMode.Native &&
+                    repository.value.signingTeam == "EXAMPLE123"
+            }
 
             edt {
                 frame.contentPane.remove(panel)
@@ -145,6 +156,10 @@ internal object UiProbeProjectExperience {
 }
 
 internal class UiProbeSettingsRepository : SettingsRepository {
+    override val hasXcodeTeams = true
+    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) =
+        ready(Result.success(listOf(SigningTeam("EXAMPLE123", "Example Studio"))))
+
     var value = ProjectSettings.read(
         "[application]\nconfig/name=\"Example Game\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
         "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n",

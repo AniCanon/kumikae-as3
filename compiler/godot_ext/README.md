@@ -95,8 +95,10 @@ project, the plugin compiles one object for the device and one for the Simulator
 for its destination into the app. At startup the app passes the program table to the extension, which
 checks the runtime layout and source fingerprint just as it does for a program library.
 
-Debug exports record constructor arguments for hot reload. Release exports omit that bookkeeping.
-Clear `actionscript/native_code` in the iOS preset to export an interpreter build.
+The default **Automatic** mode interprets debug exports and compiles release exports. The iOS preset
+option `actionscript/native_code` accepts Automatic (2), Interpreter (0) and Native (1). Earlier
+boolean settings keep their original meaning. Native debug exports record constructor arguments for
+hot reload. Release exports omit that bookkeeping.
 
 ## The program library
 

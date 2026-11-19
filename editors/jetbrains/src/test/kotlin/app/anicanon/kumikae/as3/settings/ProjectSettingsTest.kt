@@ -23,14 +23,29 @@ class ProjectSettingsTest {
         val exports = "[preset.0]\nname=\"Device\"\nplatform=\"iOS\"\n" +
             "[preset.1]\nname=\"Simulator\"\nplatform=\"iOS\"\n"
         val original = ProjectSettings.read("", exports)
-        assertEquals(true, original.nativeCode)
-        val edited = original.copy(nativeCode = false, signingTeam = "EXAMPLE123").select("preset.1")
-        assertEquals(true, edited.nativeCode)
+        assertEquals(IosExecutionMode.Automatic, original.executionMode)
+        val edited = original.copy(
+            executionMode = IosExecutionMode.Interpreter,
+            signingTeam = "EXAMPLE123",
+        ).select("preset.1")
+        assertEquals(IosExecutionMode.Automatic, edited.executionMode)
         assertEquals("", edited.signingTeam)
         val saved = edited.write("", exports).second
-        assertEquals(false, ProjectSettings.read("", saved).nativeCode)
+        assertEquals(IosExecutionMode.Interpreter, ProjectSettings.read("", saved).executionMode)
         assertEquals("EXAMPLE123", GodotConfig(saved).string("preset.0.options", "application/app_store_team_id"))
         assertEquals(null, GodotConfig(saved).raw("preset.1.options", "actionscript/native_code"))
+    }
+
+    @Test fun `old boolean choices survive unrelated edits and can return to automatic`() {
+        for ((flag, mode) in listOf("true" to IosExecutionMode.Native, "false" to IosExecutionMode.Interpreter)) {
+            val exports = "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n" +
+                "[preset.0.options]\nactionscript/native_code=$flag\n"
+            val original = ProjectSettings.read("", exports)
+            assertEquals(mode, original.executionMode)
+            assertEquals(exports, original.copy(name = "Game").write("", exports).second)
+            val automatic = original.copy(executionMode = IosExecutionMode.Automatic).write("", exports).second
+            assertEquals("2", GodotConfig(automatic).raw("preset.0.options", "actionscript/native_code"))
+        }
     }
 
     @Test fun `invalid fields cannot be written`() {

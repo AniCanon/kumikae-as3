@@ -47,7 +47,7 @@ state of the project changes.
 ### Native code
 
 - **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
-- **Native iOS exports.** Godot and Rider build the exported AS3 scripts into the app by default. The
+- **Native iOS exports.** Release exports build the AS3 scripts into the app. Debug exports default to the interpreter. The
   Simulator runs the native integration suite. The ARM64 device build has been linked and awaits a run on hardware.
 - **Every test program gives the same output** on the interpreter and as native code.
 - **Level with or ahead of Godot C#** on all ten frame benchmarks. See [Performance](performance.md).

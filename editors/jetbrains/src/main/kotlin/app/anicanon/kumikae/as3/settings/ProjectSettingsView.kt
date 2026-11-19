@@ -15,7 +15,6 @@ import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
-import org.jetbrains.compose.swing.components.button.CheckBox
 import org.jetbrains.compose.swing.components.layout.Panel
 import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.components.layout.ScrollPane
@@ -74,7 +73,10 @@ internal fun ProjectSettingsView(
                                         draft.presets.find { it.section == draft.preset }?.let { selected ->
                                             Button(
                                                 "Export ${selected.name}…",
-                                                { export(draft, listOf(selected)) },
+                                                {
+                                                    val presets = listOf(selected)
+                                                    if (controller.readyToExport(presets)) export(draft, presets)
+                                                },
                                                 SwingModifier.enabled(!controller.dirty),
                                             )
                                         }
@@ -83,7 +85,11 @@ internal fun ProjectSettingsView(
                                         ) {
                                             Button(
                                                 "Export All…",
-                                                { export(draft, draft.presets) },
+                                                {
+                                                    if (controller.readyToExport(draft.presets)) {
+                                                        export(draft, draft.presets)
+                                                    }
+                                                },
                                                 SwingModifier.enabled(!controller.dirty),
                                             )
                                         }
@@ -186,17 +192,7 @@ private fun ExportSettings(
             SwingModifier.emptyBorder(JBUI.insetsTop(16)),
         )
         if (preset.platform == "iOS") {
-            CheckBox("Compile AS3 to native code", value.nativeCode, { checked: Boolean ->
-                controller.edit { it.copy(nativeCode = checked) }
-            })
-            LabelledField(
-                "Apple team ID for device builds",
-                value.signingTeam,
-                { team -> controller.edit { it.copy(signingTeam = team) } },
-                SwingModifier.emptyBorder(JBUI.insetsTop(12)),
-            )
-            StatusLine("For a device, sign in under Xcode → Settings → Apple Accounts.")
-            StatusLine("Simulator runs work without an Apple account.")
+            IosExportSettings(value, controller)
         }
         ArtworkField(GameResourceKind.ExportIcon, value.exportIcon, controller.exportPreview, choose) { path ->
             controller.edit { it.copy(exportIcon = path) }

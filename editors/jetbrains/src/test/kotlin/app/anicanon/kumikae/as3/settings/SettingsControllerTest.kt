@@ -24,6 +24,23 @@ class SettingsControllerTest {
         assertEquals(image, controller.preview)
     }
 
+    @Test fun `export all selects the preset that needs a team before starting a build`() {
+        val repository = object : SettingsRepository {
+            override fun load() = ProjectSettings.read(
+                "",
+                "[preset.0]\nname=\"Android\"\nplatform=\"Android\"\n[preset.1]\nname=\"iOS\"\nplatform=\"iOS\"\n",
+            )
+            override fun save(expected: ProjectSettings, draft: ProjectSettings) = draft
+        }
+        val controller = SettingsController(repository)
+        controller.reload()
+        val presets = requireNotNull(controller.draft).presets
+        assertTrue(controller.readyToExport(listOf(presets.first())))
+        assertEquals(false, controller.readyToExport(presets))
+        assertEquals(presets.last().section, controller.draft?.preset)
+        assertTrue(controller.status.contains("Choose a device signing team"))
+    }
+
     @Test fun `stale draft cannot overwrite an external edit`() {
         val repository = object : SettingsRepository {
             var value = ProjectSettings.read("[application]\nconfig/name=\"Original\"\n", "")

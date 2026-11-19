@@ -100,9 +100,10 @@ Open **Run > Add Game Target…** and choose a Godot export preset. In **Game De
 an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
-- **iOS** requires Xcode and a Simulator runtime. Run builds native AS3 by default and supports hot
-  reload. Simulator builds work without an Apple account. Open **project.godot > Settings > Export** to
-  change native compilation for the selected preset or set its Apple team ID for a device build.
+- **iOS** requires Xcode and a Simulator runtime. Run uses the AS3 interpreter with hot reload and works
+  without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Export**,
+  the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
+  Xcode. Pick a team and click **Apply** to use it for device exports.
 - **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 

@@ -1,4 +1,4 @@
-"""Run the iOS test scene in an installed Simulator app and require native AS3."""
+"""Run the iOS test scene in an installed Simulator app and verify AS3 execution."""
 import argparse
 import os
 import plistlib
@@ -14,7 +14,7 @@ def main():
     parser.add_argument("simulator", help="UDID of a booted test simulator")
     parser.add_argument("app", type=Path, help="the exported test project's .app")
     parser.add_argument("--source-dir", type=Path, help="watch the source folder as a Rider debug run does")
-    parser.add_argument("--interpreted", action="store_true", help="require the interpreter for an opted-out preset")
+    parser.add_argument("--interpreted", action="store_true", help="require the interpreter for a debug or interpreter preset")
     args = parser.parse_args()
     with (args.app / "Info.plist").open("rb") as stream:
         bundle = plistlib.load(stream)["CFBundleIdentifier"]

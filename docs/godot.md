@@ -351,17 +351,20 @@ Your scripts run on the interpreter, which needs no build step, or as native cod
 
 ## iOS
 
-On macOS, exporting an iOS preset compiles the AS3 scripts in the export into the app. In Rider, select
-the simulator in the run toolbar and press **Run**. The console prints `ActionScript: the scripts run as
-native code.` after the app loads them. Edits in a debug session move execution onto the interpreter.
-Run again to build those edits as native code.
+Select an iOS simulator in Rider’s Run toolbar and press **Run**. The default debug build interprets AS3
+and supports hot reload. It needs no Apple account. A release export compiles the selected AS3 scripts
+into the app executable. Godot chooses the mode when it exports the Xcode project.
 
-Native compilation is on by default. To use the interpreter, open the iOS preset in Godot and clear
-**ActionScript > Native Code**, or use **Compile AS3 to native code** in Rider's Export settings.
+In **project.godot → Settings → Export**, select the iOS preset and set **AS3 execution** to
+**Automatic**, **Interpreter**, or **Native**. Use **Native** to exercise compiled code in a debug
+run. The console prints `ActionScript: the scripts run as native code.` when the app loads the compiled
+program. Editing a script during that session moves execution to the interpreter with its state.
+Godot exposes the same choice under **ActionScript → Native Code** in its export preset.
 
-The simulator needs no Apple account. For a physical device, sign in to **Xcode > Settings > Apple
-Accounts**, set the team's ID and the bundle identifier in the iOS preset, and use the team's signing
-configuration. The generated code is part of the app executable. [Apple's device signing guide](https://developer.apple.com/documentation/xcode/building-and-running-an-app).
+For device builds, choose the **Device signing team** by name and click **Apply**. Rider reads the
+teams Xcode has cached on this Mac. If your team is missing, click **Open Xcode**, sign in under
+**Settings → Apple Accounts**, then refresh the picker in Rider. You can also enter a team ID manually.
+[Apple’s device signing guide](https://developer.apple.com/documentation/xcode/building-and-running-an-app).
 
 - `compiler/tests/build_ios.sh <path to godot-cpp>` builds the extension for iOS as an `.xcframework`. It
   needs Xcode.

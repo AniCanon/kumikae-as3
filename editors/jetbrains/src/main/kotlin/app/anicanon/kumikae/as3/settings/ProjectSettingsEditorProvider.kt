@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.settings
 
+import app.anicanon.kumikae.as3.panel.BackgroundWorker
 import app.anicanon.kumikae.as3.project.AddGameTargetDialog
 import app.anicanon.kumikae.as3.project.GameTargetSetup
 import app.anicanon.kumikae.as3.ui.composePanel
@@ -12,6 +13,7 @@ import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VFileProperty
 import com.intellij.openapi.vfs.VfsUtilCore
@@ -41,7 +43,10 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     } else {
         requireNotNull(file.parent.findChild("project.godot"))
     }
-    private val controller = SettingsController(IdeSettingsRepository(project, gameFile, this)).also { it.reload() }
+    private val teamWorker = BackgroundWorker("kumikae-xcode-teams").also { Disposer.register(this, it) }
+    private val controller = SettingsController(IdeSettingsRepository(project, gameFile, this, teamWorker)).also {
+        it.reload()
+    }
     private val panel = composePanel(this) {
         ProjectSettingsView(
             controller,

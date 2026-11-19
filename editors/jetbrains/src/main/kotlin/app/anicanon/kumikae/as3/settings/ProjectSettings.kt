@@ -17,7 +17,7 @@ internal data class ExportPreset(val section: String, val name: String, val plat
 internal data class ExportFields(
     val identifier: String,
     val icon: String,
-    val nativeCode: Boolean,
+    val executionMode: IosExecutionMode,
     val signingTeam: String,
 )
 
@@ -38,7 +38,7 @@ internal data class ProjectSettings(
     val preset: String = "",
     val identifier: String = "",
     val exportIcon: String = "",
-    val nativeCode: Boolean = true,
+    val executionMode: IosExecutionMode = IosExecutionMode.Automatic,
     val signingTeam: String = "",
     val exportDrafts: Map<String, ExportFields> = emptyMap(),
 ) {
@@ -46,7 +46,7 @@ internal data class ProjectSettings(
         exportDrafts
     } else {
         exportDrafts +
-            (preset to ExportFields(identifier, exportIcon, nativeCode, signingTeam))
+            (preset to ExportFields(identifier, exportIcon, executionMode, signingTeam))
     }
 
     fun select(section: String): ProjectSettings {
@@ -56,7 +56,8 @@ internal data class ProjectSettings(
         val remembered = retained[section]
         return copy(
             exportDrafts = retained,
-            nativeCode = remembered?.nativeCode ?: (exports.raw("$section.options", NATIVE_CODE) != "false"),
+            executionMode =
+            remembered?.executionMode ?: IosExecutionMode.read(exports.raw("$section.options", NATIVE_CODE)),
             signingTeam = remembered?.signingTeam ?: exports.string("$section.options", SIGNING_TEAM),
             preset = section,
             identifier =
@@ -114,11 +115,15 @@ internal data class ProjectSettings(
             val (applicationId, image) = fields
             if (selected.platform == "iOS") {
                 val options = "$section.options"
-                if (fields.nativeCode != (originalExports.raw(options, NATIVE_CODE) != "false")) {
-                    exportChanges[ConfigKey(options, NATIVE_CODE)] = fields.nativeCode.toString()
+                if (fields.executionMode != IosExecutionMode.read(originalExports.raw(options, NATIVE_CODE))) {
+                    exportChanges[ConfigKey(options, NATIVE_CODE)] = fields.executionMode.value.toString()
                 }
                 if (fields.signingTeam != originalExports.string(options, SIGNING_TEAM)) {
-                    exportChanges[ConfigKey(options, SIGNING_TEAM)] = GodotConfig.quote(fields.signingTeam.trim())
+                    val team = fields.signingTeam.trim()
+                    require(team.isEmpty() || SigningTeam.validId(team)) {
+                        "Enter the 10-character Apple team ID for ${selected.name}."
+                    }
+                    exportChanges[ConfigKey(options, SIGNING_TEAM)] = GodotConfig.quote(team)
                 }
             }
             validateResource(image)

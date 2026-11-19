@@ -80,16 +80,23 @@ TypedArray<Dictionary> AS3IOSExport::_get_export_options(const Ref<EditorExportP
 		Dictionary option;
 		Dictionary property;
 		property["name"] = OPTION;
-		property["type"] = Variant::BOOL;
+		property["type"] = Variant::INT;
+		property["hint"] = PROPERTY_HINT_ENUM;
+		property["hint_string"] = "Automatic:2,Interpreter:0,Native:1";
 		option["option"] = property;
-		option["default_value"] = true;
+		option["default_value"] = 2;
 		options.push_back(option);
 	}
 	return options;
 }
 
 void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_debug, const String &, uint32_t) {
-	enabled_ = p_features.has("ios") && bool(get_option(OPTION));
+	enabled_ = false;
+	if (p_features.has("ios")) {
+		// Values 0 and 1 also preserve the choices saved by the old boolean option.
+		const int mode = get_option(OPTION);
+		enabled_ = mode == 1 || (mode == 2 && !p_debug);
+	}
 	debug_ = p_debug;
 	scripts_.clear();
 }
