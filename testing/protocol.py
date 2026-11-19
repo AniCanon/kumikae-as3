@@ -15,6 +15,14 @@ def _utf16_units(text):
 
 
 def _take_field(buf, units):
+    if units <= len(buf):
+        prefix = buf[:units]
+        if prefix.isascii():
+            if units >= len(buf):
+                return None
+            if buf[units] != "\n":
+                raise ValueError("Truncated AS3 test event")
+            return prefix, buf[units + 1:]
     end = 0
     remaining = units
     while remaining > 0 and end < len(buf):
@@ -46,6 +54,16 @@ class StreamParser:
 
     def feed(self, chunk):
         """Feed any text chunk (e.g. one line from stdout) and yield ('output', line) or ('event', Event)."""
+        if (
+            self._state == "scan"
+            and not self._buf
+            and chunk.endswith("\n")
+            and PREFIX_V1 not in chunk
+            and PREFIX_V2 not in chunk
+        ):
+            for line in chunk.splitlines():
+                yield ("output", line)
+            return
         self._buf += chunk
         while self._buf:
             if self._state == "scan":

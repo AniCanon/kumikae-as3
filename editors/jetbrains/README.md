@@ -151,8 +151,9 @@ script line in the engine trace. Results stream live with per-test durations, ca
 status; the summary counts individual cases, and a target that fails before its cases start appears as one
 failure.
 
-To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups. The
-same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
+To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups, whether
+Godot engine tests run with native code, and an optional mobile device ID for `"ios-simulator"` or
+`"android"` targets. The same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
 
 New projects place model code under `src/<package>`, engine scripts under `view`, and tests under
 `tests/<package>`. **New > ActionScript** creates files, classes, interfaces, Godot node scripts, test cases

@@ -414,11 +414,10 @@ def _count_planned_cases(tests):
 def _godot_env(root, temp_dir, native):
     here = Path(__file__).resolve().parent
     extra_dirs = [str(temp_dir.resolve())]
-    has_as3_lib = any(root.rglob("app/anicanon/kumikae/testing/TestCase.as"))
-    has_godot_lib = any(root.rglob("app/anicanon/kumikae/testing/EngineTestRunner.as"))
-    if not has_as3_lib:
+    framework = root / "tests" / "framework" / "app" / "anicanon" / "kumikae" / "testing"
+    if not (framework / "TestCase.as").is_file():
         extra_dirs.append(str((here / "as3").resolve()))
-    if not has_godot_lib:
+    if not (framework / "EngineTestRunner.as").is_file():
         godot_lib = here / "godot"
         if godot_lib.is_dir():
             extra_dirs.append(str(godot_lib.resolve()))

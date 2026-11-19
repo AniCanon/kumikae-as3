@@ -29,6 +29,13 @@ _discovery = _load("kas3_mobile_discovery", _HERE / "discovery.py")
 _suite = _load("kas3_mobile_suite", _HERE / "simulator_suite.py")
 
 
+def _hardlink_or_copy(src, dst):
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
 def stage_project(project_root, staged_root, case, filters):
     """Copy the project to staged_root and inject the generated TestRunner scene inside tests/."""
     excluded = {".git", ".idea", ".run", ".godot", ".build", "build"}
@@ -37,9 +44,15 @@ def stage_project(project_root, staged_root, case, filters):
             continue
         target = staged_root / entry.name
         if entry.is_dir():
-            shutil.copytree(entry, target, symlinks=True, ignore=shutil.ignore_patterns(".git", ".godot", ".build", "build"))
+            shutil.copytree(
+                entry,
+                target,
+                symlinks=True,
+                copy_function=_hardlink_or_copy,
+                ignore=shutil.ignore_patterns(".git", ".godot", ".build", "build"),
+            )
         else:
-            shutil.copy2(entry, target)
+            _hardlink_or_copy(entry, target)
 
     runner_dir = staged_root / "tests" / "kas3_runner"
     runner_dir.mkdir(parents=True, exist_ok=True)
@@ -64,6 +77,8 @@ def stage_project(project_root, staged_root, case, filters):
     game_path = staged_root / "project.godot"
     game_text = game_path.read_text()
     game_text = _suite.setting(game_text, "application", "run/main_scene", scene_path)
+    # Unlink first so a hardlinked project.godot never mutates the user's original file.
+    game_path.unlink()
     game_path.write_text(game_text)
     return scene_path
 

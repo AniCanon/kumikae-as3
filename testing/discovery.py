@@ -89,8 +89,14 @@ def _ignore_reason(positional, keyed):
     return ""
 
 
+_METADATA_TOKENS = ("Test", "Before", "After", "Ignore")
+
+
 def inspect_file(compiler, path):
     """Return discovered tests and lifecycle hooks for one AS3 file."""
+    text = Path(path).read_text(encoding="utf-8", errors="ignore")
+    if not any(token in text for token in _METADATA_TOKENS):
+        return [], {}
     result = subprocess.run([compiler, "parse", "--dump-ast", str(path)], capture_output=True, text=True, timeout=30)
     if result.returncode:
         raise ValueError(result.stderr.strip() or result.stdout.strip() or "Cannot parse " + str(path))
