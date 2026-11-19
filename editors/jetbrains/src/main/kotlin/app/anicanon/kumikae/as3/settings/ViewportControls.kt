@@ -6,11 +6,8 @@ import app.anicanon.kumikae.as3.ui.Tab
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.Label
-import org.jetbrains.compose.swing.components.layout.Panel
-import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.Dimension
-import java.awt.FlowLayout
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -23,7 +20,7 @@ internal fun ViewportControls(value: ProjectSettings, controller: SettingsContro
     val width = value.width.toIntOrNull() ?: 0
     val height = value.height.toIntOrNull() ?: 0
     val sizes = listOf(960 to 540, 960 to 720, 720 to 720, 720 to 960, 540 to 960)
-    Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
+    SettingsActions(4) {
         for ((w, h) in sizes) {
             val ratio = viewportRatio(w, h)
             Tab(
@@ -39,7 +36,7 @@ internal fun ViewportControls(value: ProjectSettings, controller: SettingsContro
             repaint()
         }
     })
-    Panel(PanelLayout.Flow(FlowLayout.LEFT, 8, 4)) {
+    SettingsActions(8) {
         Label("Width")
         DimensionSpinner(width, "Viewport width") { size -> controller.edit { it.copy(width = size.toString()) } }
         Label("×")

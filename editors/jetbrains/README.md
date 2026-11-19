@@ -101,7 +101,7 @@ an iOS simulator or Android emulator, select it in the run toolbar, and press **
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
 - **iOS** requires Xcode and a Simulator runtime. Run uses the AS3 interpreter with hot reload and works
-  without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Export**,
+  without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Build & Release**,
   the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
   Xcode. Pick a team and click **Apply** to use it for device exports.
 - **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
@@ -109,22 +109,41 @@ application identifier from the preset, exports and builds the game, installs it
 
 ## Release a mobile game
 
-Open **project.godot → Settings → Export** and select the target. Each preset has its own application
+Open **project.godot → Settings → Build & Release** and select the target. Each preset has its own application
 identifier, release version and build number or version code.
 
-- **iOS.** Choose an Apple Developer Program team under **Device signing team**. To add an account,
-  click **Open Xcode**, sign in under **Xcode → Settings → Apple Accounts**, then refresh the team list
-  in Rider. Click **Prepare Xcode project…** and choose an output folder. Use **Open in Xcode** in the
-  completion notification, select a device build destination, then choose **Product → Archive**.
-  In Organizer, choose **Distribute App → App Store Connect**. After processing, manage testers in
-  TestFlight or select the build for App Review in App Store Connect.
-- **Android.** Running an emulator uses debug signing and requires no Play account. For distribution,
-  click **Configure upload key…** to choose your app's existing upload key or create one for a new app.
-  Keep a backup of the keystore and password outside the game. Rider saves the key reference and
-  password in its password store. Existing Godot signing settings and build-environment credentials
-  also work. If signing needs setup, the build opens the key dialog for you. Click **Build Play bundle…** to produce a signed `.aab` using the Godot Android Gradle
-  template. Open **Play Console**, sign in with your Google Play developer account, and upload the bundle
-  to the app's testing or production track. Play App Signing signs the builds delivered to users.
+### Send a build to testers
+
+Click **Distribute to testers…**. Rider shows the account, app identifier, version, build, and destination
+before you confirm. Follow the build and upload in the Run console. The latest result appears under the
+selected target the next time you open settings.
+
+- **TestFlight.** Register the app and create an internal testing group in App Store Connect. Choose
+  your Apple Developer Program team in Rider. **Open Xcode** takes you to Xcode if you need to add an
+  Apple account, then refresh the team picker. On the first delivery, choose an App Store Connect team
+  API key (`.p8`) with access to this app and permission to upload and manage internal builds. Enter
+  its issuer ID. Rider reads the key ID from the standard filename. Choose your internal group and confirm.
+  Xcode archives the game and uploads it for internal testing. Rider follows processing and assigns the
+  build to the chosen group. Apple also distributes to groups configured for automatic distribution.
+  To resume after closing Rider, distribute the same version and build number again.
+- **Google Play.** Set up the app and its internal testing track in Play Console. Choose the app’s upload
+  keystore under **Android signing** or create one for a new app. Keep a backup of the keystore and password.
+  For the first store connection, select a Google Cloud **Desktop app** OAuth client JSON with the Google
+  Play Developer API enabled, then **Sign in with Google** in your browser using an account with testing-track
+  release access. A studio can preconfigure the client by setting `KUMIKAE_PLAY_OAUTH_CLIENT` to its
+  absolute path in Rider’s environment. Confirm **Internal testing** to build and upload a signed Android
+  App Bundle. Manage your tester list in Play Console. [Google Play API setup](https://developers.google.com/android-publisher/getting_started)
+
+Keep store credential files outside the game folder. Rider remembers the connection in its password
+store. **Disconnect account** clears the saved store connection for this app and preset. Running a
+simulator or emulator works without a store account.
+
+### Prepare a public release
+
+On iOS, choose **Prepare Xcode project…**, open the result in Xcode, and use **Product → Archive** and
+Organizer’s **Distribute App** workflow. Select the uploaded build for App Review in App Store Connect.
+On Android, choose **Build Play bundle…** for a signed `.aab`, then open **Play Console** to create a
+production release.
 
 **Export** and **Export All** build the formats configured in Godot. Preparing a store product applies
 its format to a temporary project copy so the same target remains available for local runs.

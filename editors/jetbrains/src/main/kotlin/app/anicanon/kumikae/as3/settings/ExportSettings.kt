@@ -19,7 +19,6 @@ import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.interaction.enabled
 import org.jetbrains.compose.swing.node.SwingNode
-import java.awt.FlowLayout
 
 @Composable
 internal fun ExportSettings(
@@ -31,6 +30,8 @@ internal fun ExportSettings(
     configureKey: ((ExportPreset) -> Unit)?,
     hasKey: (ExportPreset) -> Boolean,
     openStore: (String) -> Unit,
+    distribute: ((ProjectSettings, ExportPreset) -> Unit)?,
+    deliveryStatus: (ExportPreset) -> String,
 ) {
     SettingsSection("Build target") {
         Panel(PanelLayout.Border(8, 0)) {
@@ -80,7 +81,7 @@ internal fun ExportSettings(
                 },
             )
             if (configureKey != null) {
-                Panel(PanelLayout.Flow(FlowLayout.LEFT, 0, 3)) {
+                SettingsActions(0) {
                     Button(if (hasKey(preset)) "Manage upload key…" else "Configure upload key…", {
                         configureKey(preset)
                     })
@@ -93,18 +94,28 @@ internal fun ExportSettings(
         StatusLine(
             when {
                 personal -> "Choose an Apple Developer Program team to distribute this app."
-                ios -> "Export the Xcode project, choose Product → Archive, then Distribute App in Organizer."
-                else -> "Upload the signed bundle to a testing or production track in Play Console."
+                ios -> "Archive and send this build to an internal TestFlight group."
+                else -> "Send a signed app bundle to your Google Play internal testers."
             },
         )
-        Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
+        SettingsActions(4) {
+            fun prepare(action: (ProjectSettings, ExportPreset) -> Unit) {
+                if (controller.dirty) controller.apply()
+                if (!controller.dirty &&
+                    controller.readyToExport(listOf(preset))
+                ) {
+                    controller.draft?.let { action(it, preset) }
+                }
+            }
+            if (distribute != null) {
+                Button(if (controller.dirty) "Apply & distribute to testers…" else "Distribute to testers…", {
+                    prepare(distribute)
+                }, SwingModifier.enabled(!personal))
+            }
             if (release != null) {
                 val action = if (ios) "Prepare Xcode project…" else "Build Play bundle…"
                 Button(if (controller.dirty) "Apply & " + action.replaceFirstChar(Char::lowercase) else action, {
-                    if (controller.dirty) controller.apply()
-                    if (!controller.dirty && controller.readyToExport(listOf(preset))) {
-                        controller.draft?.let { release(it, preset) }
-                    }
+                    prepare(release)
                 }, SwingModifier.enabled(!personal))
             }
             val open by rememberUpdatedState { openStore(preset.platform) }
@@ -116,9 +127,10 @@ internal fun ExportSettings(
             }, update = { set(ios) { text = if (it) "App Store Connect" else "Play Console" } })
         }
     }
+    deliveryStatus(preset).takeIf { it.isNotBlank() }?.let { StatusLine(it) }
     if (ios) IosExecutionSettings(value, controller)
     var artwork by remember(value.preset) { mutableStateOf(false) }
-    Panel(PanelLayout.Flow(FlowLayout.LEFT)) {
+    SettingsActions {
         Button(if (artwork) "Hide platform icon" else "Platform icon…", { artwork = !artwork })
     }
     if (artwork) {

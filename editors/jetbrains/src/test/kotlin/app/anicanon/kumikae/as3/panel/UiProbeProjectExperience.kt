@@ -11,10 +11,16 @@ import app.anicanon.kumikae.as3.settings.IosExecutionMode
 import app.anicanon.kumikae.as3.settings.ProjectSettings
 import app.anicanon.kumikae.as3.settings.ProjectSettingsView
 import app.anicanon.kumikae.as3.settings.SettingsController
+import app.anicanon.kumikae.as3.settings.SettingsPage
 import app.anicanon.kumikae.as3.settings.SettingsRepository
 import app.anicanon.kumikae.as3.settings.SigningTeam
+import app.anicanon.kumikae.as3.settings.TesterAccount
+import app.anicanon.kumikae.as3.settings.TesterAccounts
+import app.anicanon.kumikae.as3.settings.TesterBuild
+import app.anicanon.kumikae.as3.settings.TesterConnection
+import app.anicanon.kumikae.as3.settings.TesterDeliveryDialog
+import app.anicanon.kumikae.as3.settings.TesterGroup
 import app.anicanon.kumikae.as3.settings.UploadKeyDialog
-import app.anicanon.kumikae.as3.ui.TabControl
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
@@ -28,6 +34,7 @@ import javax.swing.JButton
 import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JList
 import javax.swing.JSpinner
 import javax.swing.JTextField
 
@@ -35,10 +42,12 @@ internal object UiProbeProjectExperience {
     fun run(destination: Path, theme: String) {
         checkCatalog(destination, theme)
         checkUploadKeyDialog(destination, theme)
+        checkTesterDialog(destination, theme)
         val owner = Disposer.newDisposable()
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
         var chosenResource = ""
+        var distributed = ""
         var released = ""
         var portal = ""
         var keyPreset = ""
@@ -57,6 +66,7 @@ internal object UiProbeProjectExperience {
                             chosenResource = kind.title
                             callback("res://new-icon.svg")
                         },
+                        distribute = { _, preset -> distributed = preset.platform },
                         release = { _, preset -> released = preset.platform },
                         addTarget = {},
                         export = { _, _ -> },
@@ -117,6 +127,8 @@ internal object UiProbeProjectExperience {
                     repository.value.signingTeam == "EXAMPLE123"
             }
 
+            click(panel, "Distribute to testers…")
+            check(distributed == "iOS")
             click(panel, "Prepare Xcode project…")
             click(panel, "App Store Connect")
             check(released == "iOS" && portal == "iOS")
@@ -126,9 +138,31 @@ internal object UiProbeProjectExperience {
             }
             click(panel, "Configure upload key…")
             click(panel, "Play Console")
+            click(panel, "Distribute to testers…")
+            check(distributed == "Android")
             click(panel, "Build Play bundle…")
             check(keyPreset == "Google Play" && released == "Android" && portal == "Android")
             render(panel, destination.resolve("$theme-project-android.png"))
+            for (width in listOf(960, 640, 420)) {
+                edt {
+                    panel.setSize(width, 720)
+                    repeat(4) { layout(panel) }
+                }
+                await { fitsViewport(panel) }
+            }
+            render(panel, destination.resolve("$theme-project-narrow.png"), 420, 720)
+            for (page in listOf(
+                SettingsPage.General,
+                SettingsPage.Display,
+                SettingsPage.Properties,
+                SettingsPage.Export,
+            )) {
+                edt {
+                    val navigation = combos().single { it.selectedItem is SettingsPage }
+                    navigation.selectedItem = page
+                }
+                await { combos().any { it.selectedItem == page } && fitsViewport(panel) }
+            }
 
             edt {
                 frame.contentPane.remove(panel)
@@ -149,6 +183,46 @@ internal object UiProbeProjectExperience {
                 Disposer.dispose(owner)
                 frame.dispose()
             }
+        }
+    }
+
+    private fun checkTesterDialog(destination: Path, theme: String) {
+        val groups = listOf(TesterGroup("qa", "Quality assurance"), TesterGroup("studio", "Studio team"))
+        var stored: TesterConnection? = null
+        val store = object : TesterAccounts {
+            override fun read() = stored
+            override fun remember(connection: TesterConnection?) {
+                stored = connection
+            }
+            override fun connect(account: TesterAccount) = TesterConnection(account, "Example Studio", groups)
+        }
+        lateinit var dialog: TesterDeliveryDialog
+        edt {
+            val project = com.intellij.openapi.project.ProjectManager.getInstance().defaultProject
+            dialog =
+                TesterDeliveryDialog(project, TesterBuild("iOS", "org.example.game", "1.2", "24", "EXAMPLE123"), store)
+        }
+        val panel = dialog.contentPanel
+        try {
+            fun fields() = descendants(panel).filterIsInstance<JTextField>().toList()
+            await {
+                fields().size == 3 &&
+                    descendants(panel).filterIsInstance<JButton>().any { it.text == "Connect account" && it.isEnabled }
+            }
+            edt {
+                fields()[0].text = destination.resolve("AuthKey_EXAMPLE123.p8").toString()
+                fields()[1].text = "fixture-issuer"
+                fields()[2].text = "EXAMPLE123"
+            }
+            render(panel, destination.resolve("$theme-connect-testflight.png"), 520, 500)
+            click(panel, "Connect account")
+            await { descendants(panel).filterIsInstance<JComboBox<*>>().any { it.selectedItem == groups[0] } }
+            edt { descendants(panel).filterIsInstance<JComboBox<*>>().single().selectedIndex = 1 }
+            render(panel, destination.resolve("$theme-review-testflight.png"), 520, 400)
+            click(panel, "Distribute to testers")
+            await { dialog.approved?.selected == "studio" && stored?.selected == "studio" }
+        } finally {
+            edt { if (dialog.approved == null) dialog.doCancelAction() }
         }
     }
 
@@ -219,8 +293,24 @@ internal object UiProbeProjectExperience {
         }
     }
 
+    private fun fitsViewport(panel: JComponent): Boolean {
+        repeat(4) { layout(panel) }
+        val scroll = descendants(panel).filterIsInstance<javax.swing.JScrollPane>().single()
+        val view = scroll.viewport.view
+        val width = scroll.viewport.extentSize.width
+        if (scroll.horizontalScrollBar.isVisible || view.width != width) return false
+        return descendants(view).filter {
+            (it is JButton && !it.text.isNullOrBlank()) || it is JComboBox<*> || it is JTextField
+        }.all {
+            val rect = javax.swing.SwingUtilities.convertRectangle(it.parent, it.bounds, view)
+            rect.x >= 0 && rect.x + rect.width <= width && it.width > 0 &&
+                it.y >= 0 && it.y + it.height <= it.parent.height
+        }
+    }
+
     private fun tab(panel: JComponent, name: String) = edt {
-        descendants(panel).filterIsInstance<TabControl>().single { it.name == name }.doClick()
+        val list = descendants(panel).filterIsInstance<JList<*>>().single { it.name == "Project settings navigation" }
+        list.selectedIndex = SettingsPage.valueOf(name).ordinal
     }
     private fun click(panel: JComponent, text: String) {
         fun button() = descendants(panel).filterIsInstance<JButton>().singleOrNull { it.text == text }
@@ -245,6 +335,7 @@ internal object UiProbeProjectExperience {
     private fun render(panel: JComponent, path: Path, width: Int = 960, height: Int = 720) = edt {
         panel.setSize(width, height)
         repeat(3) { layout(panel) }
+        descendants(panel).filterIsInstance<javax.swing.JScrollPane>().forEach { it.verticalScrollBar.value = 0 }
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
         try {

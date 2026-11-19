@@ -105,11 +105,11 @@ def verify_play_bundle(path):
             raise ValueError("The bundle is missing the ARM64 AS3 runtime.")
 
 
-def export(project, destination, godot, native, presets, keys=None):
+def export(project, destination, godot, native, presets, keys=None, private_files=()):
     with tempfile.TemporaryDirectory(prefix="kumikae-export-") as temporary:
         stage = Path(temporary) / "game"
         platforms = {item["platform"] for item in presets}
-        private = [key["path"] for key in (keys or {}).values()]
+        private = list(private_files) + [key["path"] for key in (keys or {}).values()]
         stage_game(project, stage, native / "android/arm64-v8a/libkas3_godot.so", "Android" in platforms, private)
         if "Android" in platforms:
             for name in ("libkas3_godot.dylib", "libkas3_godot.so", "kas3_godot.dll"):

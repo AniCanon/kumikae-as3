@@ -32,6 +32,14 @@ rules hold across all three:
 | `tools/` | Bundled build, export and Android run scripts (`build-ios-simulator.sh`, `android_run.py`, `game_export.py`) |
 | `src/test/kotlin/`, `src/uiProbe/` | Tests, and a test-only plugin that drives the real views in a sandbox IDE |
 
+## Mobile tester distribution
+
+The settings editor captures the selected preset and reviewed version. `TesterDeliveryDialog` reads the
+saved store connection through `TesterAccess` on a background thread. `TesterDelivery` runs the confirmed
+job in the IDE console and keeps a receipt for each project and preset. The bundled
+`tools/tester_distribution.py` receives credentials over stdin, stages the game with `game_export.py`,
+and delegates to Xcode and App Store Connect or the Google Play Developer API.
+
 ## Language support
 
 ### Two clients, one server

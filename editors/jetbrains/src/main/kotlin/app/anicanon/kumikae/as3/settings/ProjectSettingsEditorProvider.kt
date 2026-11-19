@@ -8,6 +8,7 @@ import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorProvider
@@ -64,8 +65,14 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
         return store.configured
     }
 
-    private fun release(settings: ProjectSettings, preset: ExportPreset) {
-        fun build() = exportGame(project, gameFile.parent, settings, listOf(preset), store = true)
+    private fun release(settings: ProjectSettings, preset: ExportPreset, testers: Boolean) {
+        fun build() {
+            if (testers) {
+                project.service<TesterDelivery>().review(gameFile.parent, settings, preset)
+            } else {
+                exportGame(project, gameFile.parent, settings, listOf(preset), store = true)
+            }
+        }
         if (preset.platform != "Android" || keys(preset).configured) {
             build()
             return
@@ -95,7 +102,9 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
                 "Export"
             },
             export = { settings, presets -> exportGame(project, gameFile.parent, settings, presets) },
-            release = ::release,
+            release = { settings, preset -> release(settings, preset, false) },
+            distribute = { settings, preset -> release(settings, preset, true) },
+            deliveryStatus = { preset -> project.service<TesterDelivery>().status(gameFile.parent, preset) },
             configureKey = { configureKey(it) },
             hasKey = { preset -> configuredKeys[preset.name] ?: keys(preset).configured },
             openStore = { platform ->
