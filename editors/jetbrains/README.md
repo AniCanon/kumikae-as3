@@ -105,6 +105,7 @@ application identifier from the preset, exports and builds the game, installs it
   the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
   Xcode. Pick a team and click **Apply** to use it for device exports.
 - **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
+  Debug and release builds package the native ARM64 runtime, which interprets the game’s AS3 scripts.
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
 ## Release a mobile game
@@ -186,11 +187,18 @@ app it launched. The Simulator stays booted.
 
 Click the gutter icon beside a `[Test]` method to run that test, or beside a class to run its fixture. Use
 **Run Game Tests** on the `tests` folder to run the project's test target. Context runs always use the local
-test runner even when a mobile destination is selected. Double-click a failed result to jump to the failing
-assertion.
+test runner even when a mobile destination is selected.
 
-To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups. The
-same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
+Double-click a failed assertion to open the line that called it in the test. If the test uses an assertion
+helper, you can also click the helper's frame in the failure output. Equality and comparison assertions open
+Rider's diff view. Compiler errors open at the reported line and column. Godot script errors link to the
+script line in the engine trace. Results stream live with per-test durations, captured output, and `[Ignore]`
+status; the summary counts individual cases, and a target that fails before its cases start appears as one
+failure.
+
+To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups, whether
+Godot engine tests run with native code, and an optional mobile device ID for `"ios-simulator"` or
+`"android"` targets. The same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
 
 New projects place model code under `src/<package>`, engine scripts under `view`, and tests under
 `tests/<package>`. **New > ActionScript** creates files, classes, interfaces, Godot node scripts, test cases

@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.2.4"
+version = "0.2.5"
 
 repositories {
     mavenCentral()
@@ -148,7 +148,7 @@ val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../.
 tasks.withType<PrepareSandboxTask>().configureEach {
     val root = file(kas3Root.get())
     from(rootDir.resolve("../../testing")) {
-        include("*.py", "as3/**", "README.md")
+        include("*.py", "as3/**", "godot/**", "README.md")
         into("${intellijPlatform.projectName.get()}/native/testing")
     }
     from(root.resolve("compiler/build")) {

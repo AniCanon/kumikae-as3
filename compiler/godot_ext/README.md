@@ -28,7 +28,7 @@ nothing differently for the editor, so one library serves both.
 |---|---|
 | `register.cpp`, `language.h` | The entry point, and the script language Godot sees |
 | `program` | The project's scripts: found, read, checked and lowered. Also the reload, and the collector's step each frame |
-| `sources`, `watch.h`, `test_folders.h` | Where scripts are read from, when a file is read again, and which folders hold tests |
+| `sources`, `watch.h`, `test_folders.h` | Where scripts are read from, when a file is read again, which folders hold tests, and extra `KAS3_TEST_SOURCES` directories loaded when `KAS3_TESTS` is set |
 | `script`, `instance` | A script resource, and one object's script instance |
 | `script_call.cpp` | Godot calling a function of a script object: arguments counted, checked and converted |
 | `members` | What Godot reaches of a script by name: public fields, getters, setters and methods |

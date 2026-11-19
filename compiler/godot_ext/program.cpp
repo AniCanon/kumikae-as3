@@ -57,13 +57,18 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	const String root = scripts_root();
 	std::vector<std::string> files;
 	collect_scripts(root, files);
+	std::vector<std::string> extra;
+	collect_test_sources(extra);
+	std::sort(extra.begin(), extra.end());
+	extra.erase(std::unique(extra.begin(), extra.end()), extra.end());
 	if (r_count) {
-		*r_count = files.size();
+		*r_count = files.size() + extra.size();
 	}
-	return compile_scripts(std::move(files), root, r_module, r_errors);
+	return compile_scripts(std::move(files), root, r_module, r_errors, extra);
 }
 
-bool compile_scripts(std::vector<std::string> files, const String &root, ir::Module *r_module, std::string *r_errors) {
+bool compile_scripts(std::vector<std::string> files, const String &root, ir::Module *r_module, std::string *r_errors,
+		const std::vector<std::string> &extra) {
 	std::sort(files.begin(), files.end());
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -71,6 +76,10 @@ bool compile_scripts(std::vector<std::string> files, const String &root, ir::Mod
 		// Read through Godot: in an exported game the project is inside a pack, not in a folder.
 		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
 		compilation.add(project_path(path, root), std::string(source.get_data(), (size_t)source.length()));
+	}
+	for (const std::string &path : extra) {
+		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
+		compilation.add(path, std::string(source.get_data(), (size_t)source.length()));
 	}
 	compilation.check();
 	const bool lowered = !compilation.has_errors() && ir::lower(compilation, r_module, ir::LowerMode::Library);

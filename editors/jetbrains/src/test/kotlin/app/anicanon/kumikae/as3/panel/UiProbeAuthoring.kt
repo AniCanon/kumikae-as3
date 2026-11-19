@@ -1,9 +1,11 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.project.NewAs3FileAction
 import app.anicanon.kumikae.as3.project.ProjectTemplate
 import app.anicanon.kumikae.as3.testing.As3TestLineMarker
 import app.anicanon.kumikae.as3.testing.TestDiscovery
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.ide.fileTemplates.FileTemplateManager
@@ -11,6 +13,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -27,7 +30,8 @@ internal object UiProbeAuthoring {
     fun run(project: Project, root: Path) {
         val folder = Files.createTempDirectory(root, "new-game")
         try {
-            ProjectTemplate("New Game", emptySet(), "games.qa").write(folder, null)
+            val library = PluginFiles.native()?.takeIf(ProjectTemplate::hasLibrary)
+            ProjectTemplate("New Game", emptySet(), "games.qa").write(folder, library, link = false)
             lateinit var gutter: AnAction
             ApplicationManager.getApplication().invokeAndWait {
                 val game = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
@@ -90,26 +94,29 @@ internal object UiProbeAuthoring {
             var detail = ""
             val expires = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
             while (!navigated && System.nanoTime() < expires) {
+                var result: Pair<SMTestProxy, SMTRunnerConsoleView>? = null
                 ApplicationManager.getApplication().invokeAndWait {
                     val descriptors = RunContentManager.getInstance(project).allDescriptors
                     detail = descriptors.joinToString { it.displayName }
-                    val console = descriptors.mapNotNull {
-                        it.executionConsole as? SMTRunnerConsoleView
-                    }.firstOrNull { view ->
-                        view.resultsViewer.testsRootNode.allTests.any { it.name.endsWith("::example") }
+                    val consoles = descriptors.mapNotNull { it.executionConsole as? SMTRunnerConsoleView }
+                    for (console in consoles) {
+                        val failed = console.resultsViewer.testsRootNode.allTests.singleOrNull {
+                            !it.isSuite && (it.name == "example" || it.name.endsWith("::example")) &&
+                                it.isDefect && !it.isInProgress
+                        }
+                        if (failed != null) result = failed to console
                     }
-                    val failed = console?.resultsViewer?.testsRootNode?.allTests?.singleOrNull {
-                        it.name.endsWith("::example") && it.isDefect && !it.isInProgress
-                    } ?: return@invokeAndWait
-                    val location = failed.getLocation(
-                        project,
-                        GlobalSearchScope.allScope(project),
-                    )
-                    val target = failed.getDescriptor(location, console.properties)
-                        as? OpenFileDescriptor ?: return@invokeAndWait
+                }
+                val target = result?.let { (failed, console) ->
+                    ReadAction.compute<OpenFileDescriptor?, RuntimeException> {
+                        val location = failed.getLocation(project, GlobalSearchScope.allScope(project))
+                        failed.getDescriptor(location, console.properties) as? OpenFileDescriptor
+                    }
+                }
+                if (target != null) {
                     val lines = Files.readAllLines(target.file.toNioPath())
                     check(lines[target.line].trim() == "Assert.assertTrue(false);")
-                    target.navigate(true)
+                    ApplicationManager.getApplication().invokeAndWait { target.navigate(true) }
                     navigated = true
                 }
                 if (!navigated) Thread.sleep(100)

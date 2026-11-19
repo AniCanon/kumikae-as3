@@ -74,7 +74,71 @@ class DiscoveryTest(unittest.TestCase):
                                     capture_output=True, text=True)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             for package in ["first", "second"]:
-                self.assertIn("Model::" + package + ".Score::score", result.stdout)
+                self.assertIn("testSuiteStarted name='" + package + ".Score'", result.stdout)
+                self.assertIn("tests/" + package + "/Score.as?method=score", result.stdout)
+
+    @unittest.skipUnless(os.environ.get("KAS3C"), "Requires the compiler")
+    def test_hooks_ignore_expects_and_comparison_diffs_run_end_to_end(self):
+        runner = Path(__file__).resolve().parents[1] / "runner.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "tests").mkdir()
+            (root / "tests/LifecycleTest.as").write_text('''package qa {
+                import app.anicanon.kumikae.testing.Assert;
+                public class LifecycleTest {
+                    public static var log:Array = [];
+                    private var value:int = 0;
+
+                    [BeforeClass] public static function setupAll():void { log.push("beforeClass"); }
+                    [AfterClass] public static function teardownAll():void { log.push("afterClass"); }
+                    [Before] public function setup():void { value = 41; log.push("before"); }
+                    [After] public function teardown():void { log.push("after"); }
+
+                    [Test] public function runsWithHooks():void {
+                        trace("hello from runsWithHooks");
+                        Assert.assertEquals(42, value + 1);
+                        Assert.assertFalse(false);
+                        Assert.assertNotEquals(0, value);
+                        Assert.assertNull(null);
+                        Assert.assertNotNull(this);
+                        Assert.assertApprox(1.5, 1.50001, 0.001);
+                        Assert.assertThrows(function():void { throw new RangeError("bad"); }, "RangeError");
+                    }
+
+                    [Test(expects="RangeError")] public function expectsSpecificError():void {
+                        throw new RangeError("out of bounds");
+                    }
+
+                    [Test] [Ignore("not ready")] public function skippedCase():void {
+                        Assert.fail("should not run");
+                    }
+
+                    [Test] public function comparisonDiff():void {
+                        Assert.assertEquals("expected-val", "actual-val", "Mismatch");
+                    }
+                }
+            }''')
+            (root / "tests/IgnoredFixture.as").write_text('''package qa {
+                [Ignore("whole fixture skipped")]
+                public class IgnoredFixture {
+                    [Test] public function skippedByClass():void {}
+                }
+            }''')
+            manifest = root / "kas3-tests.json"
+            manifest.write_text(json.dumps({"version": 1, "tests": [{"name": "Unit", "discover": "tests"}]}))
+            result = subprocess.run(
+                [sys.executable, "-I", str(runner), str(manifest), "--compiler", os.environ["KAS3C"]],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+            self.assertIn("testCount count='5'", result.stdout)
+            self.assertIn("testStdOut name='runsWithHooks' out='hello from runsWithHooks|n'", result.stdout)
+            self.assertIn("testFinished name='runsWithHooks' duration='", result.stdout)
+            self.assertIn("testIgnored name='skippedCase' message='not ready'", result.stdout)
+            self.assertIn("testIgnored name='skippedByClass' message='whole fixture skipped'", result.stdout)
+            self.assertIn("type='comparisonFailure'", result.stdout)
+            self.assertIn("expected='expected-val' actual='actual-val'", result.stdout)
+            self.assertIn("AS3 tests: 2 passed, 1 failed, 2 ignored", result.stdout)
 
     @unittest.skipUnless(os.environ.get("KAS3C"), "Requires the compiler")
     def test_discovery_accepts_override_and_rejects_invalid_test_methods(self):

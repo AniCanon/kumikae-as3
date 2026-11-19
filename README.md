@@ -148,6 +148,16 @@ The [roadmap](docs/roadmap.md) has the detail and the known limits.
 
 To change the code, start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## License and credits
 
-The license has not been chosen yet. Until a license file is added, all rights are reserved by AniCanon.
+AniCanon licenses Kumikae AS3 under the [MIT License](LICENSE). You can ship a commercial game and
+keep its source private. When you distribute the Kumikae runtime with your game, include a copy of
+the license and its copyright notice.
+
+The JetBrains plugin’s light and dark AS3 file icons are adapted from the
+[ActionScript icon in vscode-icons](https://github.com/vscode-icons/vscode-icons/blob/master/icons/file_type_actionscript.svg)
+by Roberto Huertas and the vscode-icons contributors. Both variants use
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The
+[icon notice](editors/jetbrains/src/main/resources/icons/NOTICE.md) describes the changes.
+
+The generated Godot API declarations carry [Godot’s MIT notice](compiler/godot/NOTICE.md).
