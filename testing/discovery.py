@@ -6,16 +6,35 @@ import re
 import subprocess
 
 
+def _valid_method(item, label, class_name):
+    if label == class_name or " getter " in item or " setter " in item:
+        return False
+    mods_match = re.search(r"\bmods=([^\s]+)", item)
+    mods = set(mods_match.group(1).split(",")) if mods_match else set()
+    return "public" in mods and "static" not in mods and "native" not in mods
+
+
 def methods(compiler, path):
     result = subprocess.run([compiler, "parse", "--dump-ast", str(path)], capture_output=True, text=True, timeout=30)
     if result.returncode:
         raise ValueError(result.stderr.strip() or result.stdout.strip() or "Cannot parse " + str(path))
     package, fixture, method = "", None, None
+
+    def flush():
+        if method and method["annotated"]:
+            if not method["valid"] or method["has_params"]:
+                raise ValueError(f"{path}: [Test] requires a public no-argument instance method.")
+            return method["fixture"], method["qualified"], method["name"]
+        return None
+
     for line in result.stdout.splitlines():
         item = line.lstrip()
         indent = len(line) - len(item)
-        if method and indent <= method[0]:
+        if method and indent <= method["indent"]:
+            emitted = flush()
             method = None
+            if emitted:
+                yield emitted
         if fixture and indent <= fixture[0]:
             fixture = None
         name = re.match(r'(\w+) name="([^"]*)"', item)
@@ -27,11 +46,23 @@ def methods(compiler, path):
         elif kind == "ClassDecl":
             fixture = indent, label
         elif fixture and kind == "FunctionDecl" and indent == fixture[0] + 2:
-            method = indent, label, "mods=public " in item
-        elif method and kind == "Metadata" and label == "Test" and indent == method[0] + 2:
-            if not method[2]:
-                raise ValueError(f"{path}: [Test] requires a public instance method.")
-            yield fixture[1], ".".join(filter(None, [package, fixture[1]])), method[1]
+            method = {
+                "indent": indent,
+                "name": label,
+                "fixture": fixture[1],
+                "qualified": ".".join(filter(None, [package, fixture[1]])),
+                "valid": _valid_method(item, label, fixture[1]),
+                "annotated": False,
+                "has_params": False,
+            }
+        elif method and indent == method["indent"] + 2:
+            if kind == "Metadata" and label == "Test":
+                method["annotated"] = True
+            elif kind == "Parameter":
+                method["has_params"] = True
+    emitted = flush()
+    if emitted:
+        yield emitted
 
 
 def expand_target(root, target, compiler):
@@ -55,12 +86,17 @@ def expand_target(root, target, compiler):
 
 def entry(folder, case, root):
     groups = defaultdict(list)
+    seen_suites = {}
     for index, item in enumerate(case["cases"]):
-        groups[item["suite"]].append((index, item))
+        suite = item["suite"]
+        fqcn = item["fixture"]
+        if suite in seen_suites and seen_suites[suite] != fqcn:
+            raise ValueError(f"Duplicate suite name '{suite}' across {seen_suites[suite]} and {fqcn}.")
+        seen_suites[suite] = fqcn
+        groups[(suite, fqcn)].append((index, item))
     adapters = []
     registration = []
-    for number, (suite, items) in enumerate(groups.items()):
-        fqcn = items[0][1]["fixture"]
+    for number, ((suite, fqcn), items) in enumerate(groups.items()):
         fixture = fqcn.rsplit(".", 1)[-1]
         name = f"Kas3DiscoveredCase{number}"
         body = []

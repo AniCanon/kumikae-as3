@@ -75,3 +75,29 @@ class DiscoveryTest(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             for package in ["first", "second"]:
                 self.assertIn("Model::" + package + ".Score::score", result.stdout)
+
+    @unittest.skipUnless(os.environ.get("KAS3C"), "Requires the compiler")
+    def test_discovery_accepts_override_and_rejects_invalid_test_methods(self):
+        runner = Path(__file__).resolve().parents[1] / "runner.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "tests").mkdir()
+            (root / "tests/Base.as").write_text("package qa { public class Base { public function check():void {} } }")
+            (root / "tests/Sub.as").write_text("package qa { public class Sub extends Base { [Test] override public function check():void {} } }")
+            manifest = root / "kas3-tests.json"
+            manifest.write_text(json.dumps({"version": 1, "tests": [{"name": "Model", "discover": "tests"}]}))
+            listed = subprocess.run([sys.executable, "-I", str(runner), str(manifest), "--compiler", os.environ["KAS3C"], "--list"],
+                                    capture_output=True, text=True)
+            self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+            self.assertEqual(["check"], [row["method"] for row in json.loads(listed.stdout)[0]["cases"]])
+            for snippet in (
+                "package qa { public class Bad { [Test] public function takesArg(x:int):void {} } }",
+                "package qa { public class Bad { [Test] public static function staticMethod():void {} } }",
+                "package qa { public class Bad { [Test] public function get value():int { return 1; } } }",
+            ):
+                with self.subTest(snippet=snippet):
+                    (root / "tests/Bad.as").write_text(snippet)
+                    bad = subprocess.run([sys.executable, "-I", str(runner), str(manifest), "--compiler", os.environ["KAS3C"], "--list"],
+                                         capture_output=True, text=True)
+                    self.assertNotEqual(0, bad.returncode)
+                    (root / "tests/Bad.as").unlink()

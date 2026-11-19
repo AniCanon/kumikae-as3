@@ -12,7 +12,7 @@ def section(text, name):
     header = re.search(r"(?m)^[ \t]*\[" + re.escape(name) + r"\][ \t]*\r?$", text)
     if not header:
         raise ValueError("Missing Godot section " + name)
-    next_header = re.search(r"(?m)^\s*\[", text[header.end():])
+    next_header = re.search(r"(?m)^[ \t]*\[[^\]\r\n]+\][ \t]*\r?$", text[header.end():])
     return header.end(), header.end() + next_header.start() if next_header else len(text)
 
 
@@ -41,7 +41,13 @@ def prepare(game, exports, preset, scene):
         raise ValueError("The selected iOS preset needs a valid bundle identifier.")
     bundle = identifier + ".tests"
     for other in groups:
-        if setting(exports, other, "platform") == "iOS" and setting(exports, other + ".options", "application/bundle_identifier") == bundle:
+        if setting(exports, other, "platform") != "iOS":
+            continue
+        try:
+            other_bundle = setting(exports, other + ".options", "application/bundle_identifier")
+        except ValueError:
+            continue
+        if other_bundle == bundle:
             raise ValueError("Another game preset already uses the test bundle identifier.")
     game = setting(game, "application", "config/name", setting(game, "application", "config/name") + " Tests")
     game = setting(game, "application", "run/main_scene", scene)
@@ -62,7 +68,8 @@ def main():
     parser.add_argument("--ios-library", type=Path, default=kit / "ios")
     args = parser.parse_args()
     project = args.project.resolve()
-    target = next((t for t in json.loads((project / "kas3-tests.json").read_text())["tests"] if t["name"] == args.case), {})
+    manifest = json.loads((project / "kas3-tests.json").read_text())
+    target = next((t for t in manifest.get("tests", []) if t.get("name") == args.case), {})
     scenes = [arg for arg in target.get("command", []) if arg.startswith("res://") and arg.endswith(".tscn")]
     if len(scenes) != 1 or not (project / scenes[0][6:]).is_file():
         parser.error("Select a registered test target with one project scene.")
@@ -82,7 +89,10 @@ def main():
                                 stdout=subprocess.PIPE, text=True)
         print(result.stdout)
         result.check_returncode()
-        product = result.stdout.strip().splitlines()[-1]
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        if not lines:
+            raise ValueError("The Simulator build did not print the built .app path.")
+        product = lines[-1].strip()
         subprocess.run([sys.executable, "-I", str(Path(__file__).with_name("simulator_report.py")), product, "--device", args.device,
                         "--evidence", project / ".build/verification"], check=True)
 

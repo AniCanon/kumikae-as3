@@ -58,6 +58,9 @@ def validate(manifest):
         if "::" in name or "\n" in name or "\r" in name:
             raise ValueError("Test names must be single-line and cannot contain ::")
         names.add(name)
+        timeout = case.get("timeout", 120)
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 3600:
+            raise ValueError("Test timeout must be between 0 and 3600 seconds")
         if "discover" in case:
             if not isinstance(case["discover"], str) or not case["discover"]:
                 raise ValueError("Choose a fixture directory inside the project.")
@@ -68,9 +71,6 @@ def validate(manifest):
             raise ValueError("Each test needs a command argument array")
         if not isinstance(case.get("marker"), str) or not case["marker"]:
             raise ValueError("Each test needs a completion marker")
-        timeout = case.get("timeout", 120)
-        if not isinstance(timeout, (int, float)) or not 0 < timeout <= 3600:
-            raise ValueError("Test timeout must be between 0 and 3600 seconds")
     return tests
 
 
@@ -110,7 +110,10 @@ def stop(process):
     except (ProcessLookupError, PermissionError):
         if process.poll() is None:
             raise
-    process.wait(timeout=2)
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def run_case(root, case):
@@ -125,7 +128,10 @@ def run_case(root, case):
         except subprocess.TimeoutExpired:
             stop(process)
             stopped = True
-            output, _ = process.communicate(timeout=2)
+            try:
+                output, _ = process.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                output = ""
             return Result(False, output + "\nTest timed out", time.monotonic() - start)
         complete = case["marker"] in output.splitlines()
         failed = process.returncode != 0 or not complete
@@ -223,7 +229,7 @@ def main():
                     command = command_case["command"]
                     files = list(dict.fromkeys(generated + command[2:]))
                     if not any(Path(file).as_posix().endswith("/app/anicanon/kumikae/testing/TestCase.as") for file in files):
-                        files.extend(str(path) for path in (Path(__file__).parent / "as3").rglob("*.as"))
+                        files.extend(sorted(str(path) for path in (Path(__file__).resolve().parent / "as3").rglob("*.as")))
                     command_case["command"] = command[:2] + files
                 if filters:
                     command = command_case["command"]
@@ -266,7 +272,7 @@ def main():
         message("testSuiteFinished", name="AS3 Tests")
         print(f"AS3 tests: {len(tests) - failures} passed, {failures} failed", flush=True)
         return int(failures != 0)
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         print("AS3 test runner error: " + str(error), file=sys.stderr)
         return 1
 
