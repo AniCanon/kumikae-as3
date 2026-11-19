@@ -28,7 +28,10 @@ _discovery_spec.loader.exec_module(_discovery)
 Result = namedtuple("Result", "passed output duration")
 
 
-ERROR_LINE = re.compile(r"^(?:ERROR:|SCRIPT ERROR:|Error:|FAIL(?: |$)|.+?:\d+:\d+: error:).*", re.MULTILINE)
+ERROR_LINE = re.compile(
+    r"^(?:ERROR:|SCRIPT ERROR:|(?:[A-Z][A-Za-z]*)?Error:|FAIL(?: |$)|.+?:\d+:\d+: error:).*",
+    re.MULTILINE,
+)
 
 
 def process_failure(output):

@@ -9,7 +9,6 @@ import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestLocator
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.ConsoleView
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.pom.Navigatable
@@ -30,23 +29,21 @@ internal class As3TestConsole(private val configuration: As3TestsConfiguration, 
 
     override fun getErrorNavigatable(location: Location<*>, stacktrace: String): Navigatable? {
         val frames = As3FailureFrames.read(stacktrace)
-        if (frames.firstOrNull()?.framework == true) {
-            assertionInTest(location, frames)?.let { return it }
-        }
-        return frames.asSequence().filterNot { it.framework }
+        val callable = if (frames.firstOrNull()?.framework == true) testCallable(location) else null
+        return As3FailureFrames.preferredOrder(frames, callable)
             .firstNotNullOfOrNull { it.descriptor(configuration.project, sourceRoot) }
             ?: super.getErrorNavigatable(location, stacktrace)
     }
 
-    private fun assertionInTest(location: Location<*>, frames: List<As3FailureFrame>): OpenFileDescriptor? {
+    private fun testCallable(location: Location<*>): String? {
         val element = location.psiElement
         if (element is PsiFile) return null
         val file = element.containingFile ?: return null
         val source = TestSource.read(file.text)
+        if (source.className.isEmpty()) return null
         val method = source.methodAt(element.textOffset) ?: return null
         val owner = listOf(source.packageName, source.className).filter { it.isNotEmpty() }.joinToString(".")
-        return frames.firstOrNull { it.callable == "$owner/${method.name}" }
-            ?.descriptor(configuration.project, sourceRoot)
+        return "$owner/${method.name}"
     }
 
     override fun getTestLocator() = object : SMTestLocator {
