@@ -96,7 +96,7 @@ class AndroidRunConfiguration(project: Project, factory: ConfigurationFactory, n
                 if (!Files.isRegularFile(runtime)) {
                     throw ExecutionException("The Android AS3 runtime is missing from this plugin.")
                 }
-                val godot = GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+                val godot = IdeGodot.find()
                     ?: throw ExecutionException("Install Godot to export the game.")
                 val line = GeneralCommandLine(
                     "python3",

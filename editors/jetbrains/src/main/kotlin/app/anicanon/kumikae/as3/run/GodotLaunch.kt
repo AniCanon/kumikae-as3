@@ -13,18 +13,22 @@ internal object GodotLaunch {
     private const val DEPTH = 6
 
     /** Godot's program: the one that was set, one named `godot` on the search path, or the usual application. */
-    fun findGodot(
-        configured: String,
+    fun candidates(
+        preferred: List<String>,
         searchPath: String,
-        applications: Path = Path.of("/Applications"),
+        applications: List<Path>,
         installed: List<Path> = listOf(Path.of("/opt/homebrew/bin"), Path.of("/usr/local/bin")),
-    ): Path? {
-        val set = configured.trim().takeIf { it.isNotEmpty() }?.let(Path::of)
+    ): List<Path> {
+        val configured = preferred.map(String::trim).filter(String::isNotEmpty).map(Path::of)
         // An IDE started from the Dock has a short search path: where Godot is usually installed is looked in too.
         val folders = searchPath.split(':').filter { it.startsWith("/") }.map(Path::of) + installed
         val named = folders.flatMap { listOf(it.resolve("godot"), it.resolve("godot4")) }
-        val apps = listOf("Godot.app", "Godot_mono.app").map { applications.resolve("$it/Contents/MacOS/Godot") }
-        return (listOfNotNull(set) + named + apps).firstOrNull { Files.isExecutable(it) && !Files.isDirectory(it) }
+        val apps = applications.flatMap { folder ->
+            listOf("Godot.app", "Godot_mono.app").map { folder.resolve("$it/Contents/MacOS/Godot") }
+        }
+        return (configured + named + apps).distinct().filter {
+            Files.isRegularFile(it) && Files.isExecutable(it)
+        }
     }
 
     fun command(godot: Path, project: Path, scene: String): List<String> =

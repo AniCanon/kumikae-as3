@@ -3,7 +3,7 @@ package app.anicanon.kumikae.as3.settings
 import androidx.compose.runtime.mutableStateMapOf
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.run.AndroidDevices
-import app.anicanon.kumikae.as3.run.GodotLaunch
+import app.anicanon.kumikae.as3.run.IdeGodot
 import com.google.gson.Gson
 import com.intellij.execution.RunContentExecutor
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -62,7 +62,7 @@ internal class TesterDelivery(private val project: Project) : Disposable {
             FileDocumentManager.getInstance().saveAllDocuments()
             val runtime = requireNotNull(PluginFiles.native()) { "Install the plugin with its mobile runtime." }
             val godot =
-                requireNotNull(GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())) {
+                requireNotNull(IdeGodot.find()) {
                     "Install Godot to distribute this game."
                 }
             val job = exportJobs(settings, listOf(preset), true).single()

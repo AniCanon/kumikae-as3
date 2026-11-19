@@ -1,6 +1,10 @@
 package app.anicanon.kumikae.as3.panel
 
 import androidx.compose.runtime.mutableStateOf
+import app.anicanon.kumikae.as3.project.GodotInstallation
+import app.anicanon.kumikae.as3.project.GodotSetup
+import app.anicanon.kumikae.as3.project.GodotSetupController
+import app.anicanon.kumikae.as3.project.GodotSetupSection
 import app.anicanon.kumikae.as3.scene.SceneController
 import app.anicanon.kumikae.as3.scene.SceneDocument
 import app.anicanon.kumikae.as3.scene.SceneNode
@@ -46,6 +50,41 @@ import javax.swing.JTextField
 import javax.swing.SwingUtilities
 
 internal object UiProbeProjectExperience {
+    fun godotSetup(destination: Path, theme: String) {
+        val owner = Disposer.newDisposable()
+        val engine = GodotInstallation(Path.of("/Applications/Godot.app/Contents/MacOS/Godot"), "4.7.2")
+        val setup = object : GodotSetup {
+            override fun detect(): GodotInstallation? = null
+            override fun choose(path: Path) = engine.copy(executable = path)
+            override fun install() = engine
+        }
+        val worker = BackgroundWorker("Godot setup probe").also { Disposer.register(owner, it) }
+        val controller = GodotSetupController(setup, worker)
+        lateinit var frame: JFrame
+        lateinit var panel: JComponent
+        edt {
+            panel = composePanel(owner) {
+                GodotSetupSection(controller, true) { controller.choose(Path.of("/Applications/Custom Godot")) }
+            }
+            frame = JFrame().apply { contentPane.add(panel) }
+            controller.detect()
+        }
+        try {
+            await { descendants(panel).filterIsInstance<JButton>().any { it.text == "Install Godot 4.7.2" } }
+            render(panel, destination.resolve("$theme-godot-missing.png"), 420, 140)
+            click(panel, "Install Godot 4.7.2")
+            await { descendants(panel).filterIsInstance<JLabel>().any { it.text == "Godot 4.7.2 · Ready" } }
+            render(panel, destination.resolve("$theme-godot-ready.png"), 420, 140)
+            click(panel, "Choose existing…")
+            await { controller.installation?.executable == Path.of("/Applications/Custom Godot") }
+        } finally {
+            edt {
+                Disposer.dispose(owner)
+                frame.dispose()
+            }
+        }
+    }
+
     fun run(destination: Path, theme: String) {
         checkCatalog(destination, theme)
         checkUploadKeyDialog(destination, theme)

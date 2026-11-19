@@ -2,7 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.run.AndroidDevices
-import app.anicanon.kumikae.as3.run.GodotLaunch
+import app.anicanon.kumikae.as3.run.IdeGodot
 import com.google.gson.Gson
 import com.intellij.execution.RunContentExecutor
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -89,7 +89,7 @@ internal fun exportGame(
     FileChooser.chooseFile(chooser, project, root.parent) { destination ->
         try {
             FileDocumentManager.getInstance().saveAllDocuments()
-            val godot = requireNotNull(GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())) {
+            val godot = requireNotNull(IdeGodot.find()) {
                 "Install Godot to export the game."
             }
             val runtime = requireNotNull(PluginFiles.native()) { "The plugin's runtime is missing." }

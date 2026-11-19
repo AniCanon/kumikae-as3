@@ -75,13 +75,15 @@ package game {
 
 ## Get started
 
-To run your first desktop game on an Apple silicon Mac, install Godot 4.7 and open Rider or IntelliJ IDEA.
+To run your first desktop game on an Apple silicon Mac, open Rider or IntelliJ IDEA.
 The Kumikae AS3 plugin includes the AS3 compiler and Godot extension.
 
 1. [Install Kumikae AS3 from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/36313-kumikae-as3)
    and restart the IDE. In IntelliJ IDEA, also install **LSP4IJ** for AS3 language support.
    If the Marketplace release is pending, see [Install from disk](editors/jetbrains/README.md#install-the-plugin).
-2. Choose **File → New Project → AS3 Godot Game**, name your game, and click **Create**.
+2. Choose **File → New Project → Kumikae AS3 Game** and name your game. Under **Game engine**, the wizard finds
+   Godot 4.7 automatically. If needed, choose **Install Godot 4.7.2** or **Choose existing…**, then click **Create**.
+   In plugin 0.2.5, install Godot 4.7 separately before you press **Run**.
    The wizard creates a playable scene, starter scripts, and a **Game** run configuration.
 3. Select **Game** and press **Run**. Edit a script and save it to see the change in the running game.
 

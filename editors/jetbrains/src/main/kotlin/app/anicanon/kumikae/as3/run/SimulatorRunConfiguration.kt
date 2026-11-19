@@ -164,7 +164,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
             native,
         )
         return { say ->
-            val godot = GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+            val godot = IdeGodot.find()
                 ?: error("Godot was not found: it writes the Xcode project. Install it or put it on the search path.")
             val template = target?.template?.takeIf { it.isNotBlank() }?.let {
                 folder.resolve(it.removePrefix("res://")).also { path ->
