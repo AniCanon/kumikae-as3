@@ -75,38 +75,18 @@ package game {
 
 ## Get started
 
-[Install Kumikae AS3 for Rider or IntelliJ IDEA from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/36313-kumikae-as3).
-If the release is not yet available in your IDE, follow the [install-from-disk instructions](editors/jetbrains/README.md#install-the-plugin).
+To run your first desktop game on an Apple silicon Mac, install Godot 4.7 and open Rider or IntelliJ IDEA.
+The Kumikae AS3 plugin includes the AS3 compiler and Godot extension.
 
-You need macOS, CMake 3.22 or later, a C++17 compiler, and Python 3 for the tests.
+1. [Install Kumikae AS3 from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/36313-kumikae-as3)
+   and restart the IDE. In IntelliJ IDEA, also install **LSP4IJ** for AS3 language support.
+   If the Marketplace release is pending, see [Install from disk](editors/jetbrains/README.md#install-the-plugin).
+2. Choose **File → New Project → AS3 Godot Game**, name your game, and click **Create**.
+   The wizard creates a playable scene, starter scripts, and a **Game** run configuration.
+3. Select **Game** and press **Run**. Edit a script and save it to see the change in the running game.
 
-1. Build the compiler and run its tests:
-
-   ```bash
-   cmake -S compiler -B compiler/build
-   cmake --build compiler/build -j
-   ctest --test-dir compiler/build --output-on-failure
-   ```
-
-2. Check a script against Godot's API:
-
-   ```bash
-   compiler/build/kas3c check compiler/tests/corpus/RayQueries.as
-   ```
-
-   Errors go to standard error as `<file>:<line>:<column>: error: <message>`.
-
-3. Run a program on the command line:
-
-   ```bash
-   compiler/build/kas3c run compiler/tests/run/classes.as
-   ```
-
-To run scripts inside Godot, build the Godot extension and open the example game. The steps are in
-[examples/coin-dash](examples/coin-dash/README.md). To set up an editor, see [editors](editors/README.md).
-
-To write your own scripts, read [Using AS3 in Godot](docs/godot.md) and
-[The AS3 language](docs/language.md).
+For mobile targets, see [Run on iOS or Android](editors/jetbrains/README.md#run-on-ios-or-android).
+To build the compiler yourself or use the command line, see the [compiler guide](compiler/README.md#build-and-test).
 
 ## How it works
 
