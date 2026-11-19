@@ -3,8 +3,8 @@ package app.anicanon.kumikae.as3.run
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.util.ui.JBUI
@@ -39,12 +39,12 @@ internal class GodotRunEditor : SettingsEditor<GodotRunConfiguration>() {
 
     override fun createEditor(): JComponent = composePanel(this) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insets(8))) {
-            Column(SwingModifier.north()) {
-                LabelledField("Godot (empty: found on the search path or in Applications)", godot, {
+            SettingsSection("Desktop launch", SwingModifier.north()) {
+                LabelledField("Godot executable", godot, {
                     edited { godot = it }
-                })
-                LabelledField("Project folder (empty: this project)", folder, { edited { folder = it } })
-                LabelledField("Scene (empty: the project's main scene)", scene, { edited { scene = it } })
+                }, placeholder = "Find Godot automatically")
+                LabelledField("Project folder", folder, { edited { folder = it } }, placeholder = "Current project")
+                LabelledField("Scene", scene, { edited { scene = it } }, placeholder = "Project main scene")
             }
         }
     }

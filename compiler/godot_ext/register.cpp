@@ -1,9 +1,11 @@
 // The extension's entry point: registers ActionScript 3 as a Godot scripting language.
+#include "ios_export.h"
 #include "language.h"
 #include "play_build.h"
 #include "program.h"
 #include "script.h"
 
+#include <godot_cpp/classes/editor_plugin_registration.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -15,6 +17,13 @@ AS3Language *AS3Language::singleton = nullptr;
 static Ref<AS3ScriptLoader> loader;
 
 static void initialize(ModuleInitializationLevel p_level) {
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		GDREGISTER_INTERNAL_CLASS(AS3IOSExport);
+		GDREGISTER_INTERNAL_CLASS(AS3ExportEditor);
+		EditorPlugins::add_by_type<AS3ExportEditor>();
+	}
+#endif
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
@@ -29,6 +38,11 @@ static void initialize(ModuleInitializationLevel p_level) {
 }
 
 static void terminate(ModuleInitializationLevel p_level) {
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::remove_by_type<AS3ExportEditor>();
+	}
+#endif
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}

@@ -38,6 +38,8 @@ class UiProbeStarter : ApplicationStarter {
                     UiProbeAndroidRun.run(destination, Path.of(game), System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL"))
                 } else if (game != null) {
                     UiProbeGameRun.run(destination, Path.of(game))
+                } else if (System.getenv("KUMIKAE_DEVICE_SETTINGS_PROBE") == "1") {
+                    checkThemes(destination, deviceSettingsOnly = true)
                 } else if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
                     UiProbeLanguage.run(destination)
                     UiProbeCompletion.run(destination, missingClient = true)
@@ -58,7 +60,7 @@ class UiProbeStarter : ApplicationStarter {
         application.invokeLater { (application as ApplicationEx).exit(true, true, if (failure == null) 0 else 1) }
     }
 
-    private fun checkThemes(destination: Path) {
+    private fun checkThemes(destination: Path, deviceSettingsOnly: Boolean = false) {
         val manager = LafManager.getInstance()
         val original = manager.currentUIThemeLookAndFeel
         val available = manager.installedThemes.toList()
@@ -71,7 +73,7 @@ class UiProbeStarter : ApplicationStarter {
                     manager.setCurrentUIThemeLookAndFeel(theme)
                     manager.updateUI()
                 }
-                checkWindow(destination, requested.lowercase())
+                if (!deviceSettingsOnly) checkWindow(destination, requested.lowercase())
                 UiProbeProjectExperience.run(destination, requested.lowercase())
             }
         } finally {

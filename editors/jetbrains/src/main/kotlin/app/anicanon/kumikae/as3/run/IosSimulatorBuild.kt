@@ -27,8 +27,11 @@ internal class IosSimulatorBuild(
         val printed = try {
             ShippedScript(script, limitMinutes = LIMIT_MINUTES).run(arguments) { say("$it\n", false) }
         } catch (failure: ScriptFailed) {
-            // The script's last line is its reason, written for a person.
-            error(failure.output.lines().lastOrNull { it.isNotBlank() } ?: "The build failed. ${failure.message}")
+            val lines = failure.output.lines()
+            val diagnostic = lines.firstOrNull {
+                it.contains("ERROR: Native AS3: ")
+            }?.substringAfter("ERROR: Native AS3: ")
+            error(diagnostic ?: lines.lastOrNull { it.isNotBlank() } ?: "The build failed. ${failure.message}")
         }
         return printed.lines().lastOrNull { it.isNotBlank() }
             ?: error("The Simulator build did not produce an .app path.")
@@ -39,6 +42,9 @@ internal class IosSimulatorBuild(
         private const val OUTPUT = ".godot/ios-simulator"
         private const val LIMIT_MINUTES = 30L
         private const val TEMPLATE = "ios-with-arm64-simulator.zip"
+
+        fun findLibrary(local: Path?, bundled: Path?): Path? = listOfNotNull(local, bundled).map { it.resolve("ios") }
+            .firstOrNull { Files.isDirectory(it.resolve("kas3_godot.xcframework")) }
 
         /** Whether the project says how it is exported for iOS. */
         fun canBuild(project: Path): Boolean = runCatching {

@@ -5,7 +5,6 @@ import app.anicanon.kumikae.as3.project.GameTargetSetup
 import app.anicanon.kumikae.as3.run.AndroidDestination
 import app.anicanon.kumikae.as3.run.AndroidDevices
 import app.anicanon.kumikae.as3.settings.GodotConfig
-import app.anicanon.kumikae.as3.ui.TitleButtonControl
 import com.intellij.execution.ExecutionTargetManager
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
@@ -29,6 +28,7 @@ import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
+import javax.swing.JButton
 
 internal object UiProbeAndroidRun {
     fun run(output: Path, directory: Path, serial: String) {
@@ -93,12 +93,12 @@ internal object UiProbeAndroidRun {
                         window.contentManager.findContent("Simulators")?.let(window.contentManager::setSelectedContent)
                     }
                 }
-                await("running emulator in Game Devices", 30) {
+                await("running emulator in Devices", 30) {
                     var clicked = false
                     app.invokeAndWait {
                         val content = window.contentManager.findContent("Simulators")?.component
-                        content?.let(::children)?.filterIsInstance<TitleButtonControl>()?.firstOrNull {
-                            it.title == avd
+                        content?.let(::children)?.filterIsInstance<JButton>()?.firstOrNull {
+                            it.accessibleContext.accessibleName == "Open $avd"
                         }?.let {
                             it.doClick()
                             clicked = true

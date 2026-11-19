@@ -7,6 +7,10 @@ for `project.godot` and scenes.
 This page is for someone using the plugin. To change it, read [ARCHITECTURE.md](ARCHITECTURE.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+![Rider running an ActionScript 3 Godot game with the Game view, AS3 editor, and live iOS Simulator](docs/images/rider-workspace.png)
+
+*The **Game** view (left) shows compacted AS3 packages alongside expandable classes, fields, and methods; the editor (center) provides live diagnostics and navigation; and **Devices** (right) streams the running iOS Simulator with interactive input.*
+
 ## Requirements
 
 | | |
@@ -96,21 +100,74 @@ Edit a script while the game runs and save. The game takes the new code and keep
 
 ## Run on iOS or Android
 
-Open **Run > Add Game Target…** and choose a Godot export preset. In **Game Devices > Simulators**, start
+Open **Run > Add Game Target…** and choose a Godot export preset. In **Devices > Simulators**, start
 an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
-- **iOS** requires Xcode and a Simulator runtime. Hot reload works in the Simulator.
-- **Android** requires the Android SDK, matching Godot export templates and an ARM64 emulator or device.
+- **iOS** requires Xcode and a Simulator runtime. Run uses the AS3 interpreter with hot reload and works
+  without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Build & Release**,
+  the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
+  Xcode. Pick a team and click **Apply** to use it for device exports.
+- **Android** requires the Android SDK, NDK, matching Godot export templates and an ARM64 emulator or
+  device. Debug runs default to the AS3 interpreter, and release exports compile AS3 to native ARM64 code
+  (`libkas3_program.so`). In **project.godot → Settings → Build & Release**, the Android preset also has
+  the **AS3 execution** override (`Automatic`, `Interpreter`, or `Native`).
 - On macOS, the plugin bundles the AS3 runtimes and Simulator template when built alongside the compiler.
 
-## The Game Devices panel
+## Release a mobile game
 
-Open **View > Tool Windows > Game Devices** to start and view simulators and Android emulators.
+Open **project.godot → Settings → Build & Release** and select the target. Each preset has its own application
+identifier, release version and build number or version code.
 
-- **Simulators** lists iOS simulators (macOS only) and Android emulators. For stopped Android emulators,
-  **Graphics for next emulator start** selects **Device default**, **Host GPU** or **Software** for the
-  next launch without modifying the AVD configuration.
+![Build & Release settings for iOS](docs/images/project-export-ios.png)
+
+![Build & Release settings for Android](docs/images/project-export-android.png)
+
+### Send a build to testers
+
+Click **Distribute to testers…**. Rider shows the account, app identifier, version, build, and destination
+before you confirm. Follow the build and upload in the Run console. The latest result appears under the
+selected target the next time you open settings.
+
+- **TestFlight.** Register the app and create an internal testing group in App Store Connect. Choose
+  your Apple Developer Program team in Rider. **Open Xcode** takes you to Xcode if you need to add an
+  Apple account, then refresh the team picker. On the first delivery, choose an App Store Connect team
+  API key (`.p8`) with access to this app and permission to upload and manage internal builds. Enter
+  its issuer ID. Rider reads the key ID from the standard filename. Choose your internal group and confirm.
+  Xcode archives the game and uploads it for internal testing. Rider follows processing and assigns the
+  build to the chosen group. Apple also distributes to groups configured for automatic distribution.
+  To resume after closing Rider, distribute the same version and build number again.
+- **Google Play.** Set up the app and its internal testing track in Play Console. Choose the app’s upload
+  keystore under **Android signing** or create one for a new app. Keep a backup of the keystore and password.
+  For the first store connection, select a Google Cloud **Desktop app** OAuth client JSON with the Google
+  Play Developer API enabled, then **Sign in with Google** in your browser using an account with testing-track
+  release access. A studio can preconfigure the client by setting `KUMIKAE_PLAY_OAUTH_CLIENT` to its
+  absolute path in Rider’s environment. Confirm **Internal testing** to build and upload a signed Android
+  App Bundle. Manage your tester list in Play Console. [Google Play API setup](https://developers.google.com/android-publisher/getting_started)
+
+Keep store credential files outside the game folder. Rider remembers the connection in its password
+store. **Disconnect account** clears the saved store connection for this app and preset. Running a
+simulator or emulator works without a store account.
+
+### Prepare a public release
+
+On iOS, choose **Prepare Xcode project…**, open the result in Xcode, and use **Product → Archive** and
+Organizer’s **Distribute App** workflow. Select the uploaded build for App Review in App Store Connect.
+On Android, choose **Build Play bundle…** for a signed `.aab`, then open **Play Console** to create a
+production release.
+
+**Export** and **Export All** build the formats configured in Godot. Preparing a store product applies
+its format to a temporary project copy so the same target remains available for local runs.
+
+## The Devices panel
+
+Open **View > Tool Windows > Devices** to start and view simulators and Android emulators.
+
+![Devices panel showing iOS simulators and Android emulators](docs/images/devices.png)
+
+- **Simulators** groups devices by platform, with running devices first. Choose **Open** to view a running
+  device or **Start** to boot one. On macOS the list also includes iOS simulators. The gear beside
+  **Android emulators** selects **Device default**, **Host GPU** or **Software** for the next start.
 - **iOS** shows the selected simulator's screen, input controls and console.
 - **Android** shows the selected emulator's screen and forwards pointer input.
 
@@ -169,6 +226,8 @@ application's name, main scene, icon and boot splash, the viewport size, stretch
 the identifier and icon of an existing iOS or Android export preset. Settings and comments it doesn't know
 are kept. **Apply** writes the changes in one undoable step.
 
+![Project settings General tab](docs/images/project-general.png)
+
 Click the icon or splash in **General** to open the artwork gallery, filter project images, or import a
 local image into `assets/` with **Browse…** and **Import and Use**. The splash preview reflects the
 project's launch window size, background, filtering and boot stretch mode.
@@ -179,6 +238,8 @@ and **Properties** to inspect additional settings entered in Source.
 **Scenes.** Open a `.tscn` file to use the **Scene** editor. Its outline shows each node's type and the AS3
 script attached to it. You can open a script, and attach or detach one. Attaching accepts a script that
 directly extends the node's type. Edit inherited and instanced scenes in Godot.
+
+![Scene editor showing node hierarchy and attached AS3 script](docs/images/scene.png)
 
 **From a script to its scenes.** A gutter icon on an AS3 class, and **Find Attached Scene Nodes** in the
 editor's menu, show the scene nodes that use the script.

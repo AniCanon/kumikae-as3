@@ -16,6 +16,11 @@
 #include <cstring>
 #include <new>
 
+#if defined(__ANDROID__)
+#include <dlfcn.h>
+#include <unistd.h>
+#endif
+
 using namespace godot;
 
 namespace kas3 {
@@ -305,24 +310,58 @@ bool defaults_of(const ir::EngineName &p_entry, size_t p_parameters, size_t p_gi
 
 } // namespace
 
+static const rt::Program *linked_program = nullptr;
+
+#if defined(IOS_ENABLED)
+// Called by the exported app during startup, before Godot creates any script instances.
+extern "C" GDE_EXPORT void kas3_ios_set_program(const rt::Program *p_program) {
+	linked_program = p_program;
+}
+#endif
+
+bool NativeProgram::linked() {
+	return linked_program != nullptr;
+}
+
 std::string NativeProgram::path() {
 	if (const char *named = std::getenv("KAS3_PROGRAM_LIBRARY")) {
 		return named;
 	}
+#if defined(IOS_ENABLED)
+	// The watched project can be on the Mac. Its desktop library cannot run in the app.
+	return {};
+#elif defined(__ANDROID__)
+	Dl_info info{};
+	if (dladdr(reinterpret_cast<const void *>(&NativeProgram::path), &info) && info.dli_fname) {
+		const std::string self(info.dli_fname);
+		const size_t slash = self.rfind('/');
+		if (slash != std::string::npos) {
+			const std::string candidate = self.substr(0, slash + 1) + SharedLibrary::file_name("kas3_program");
+			if (access(candidate.c_str(), F_OK) == 0) {
+				return candidate;
+			}
+		}
+	}
+	return {};
+#else
 	const String beside = scripts_root().path_join(String::utf8(("bin/" + SharedLibrary::file_name("kas3_program")).c_str()));
 	const String file = ProjectSettings::get_singleton()->globalize_path(beside);
 	return FileAccess::file_exists(file) ? std::string(file.utf8().get_data()) : std::string();
+#endif
 }
 
 std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, const ir::Module &p_module, GodotHost &p_engine, uint32_t p_time_limit,
 		bool p_remember, std::string *r_why) {
 	std::unique_ptr<NativeProgram> made(new NativeProgram(p_engine));
-	if (!made->library_.open(p_path, r_why)) {
-		return nullptr;
+	const rt::Program *program = linked_program;
+	if (!p_path.empty()) {
+		if (!made->library_.open(p_path, r_why)) {
+			return nullptr;
+		}
+		using Table = const rt::Program *(*)();
+		const Table table = reinterpret_cast<Table>(made->library_.symbol("kas3_program"));
+		program = table ? table() : nullptr;
 	}
-	using Table = const rt::Program *(*)();
-	const Table table = reinterpret_cast<Table>(made->library_.symbol("kas3_program"));
-	const rt::Program *program = table ? table() : nullptr;
 	if (!program) {
 		*r_why = "it has no kas3_program";
 		return nullptr;

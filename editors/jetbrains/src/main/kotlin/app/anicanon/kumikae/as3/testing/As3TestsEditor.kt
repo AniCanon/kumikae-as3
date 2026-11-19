@@ -3,8 +3,8 @@ package app.anicanon.kumikae.as3.testing
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.google.gson.JsonParser
@@ -48,7 +48,7 @@ internal class As3TestsEditor : SettingsEditor<As3TestsConfiguration>() {
         configuration.options.device = device.trim()
     }
     override fun createEditor(): JComponent = composePanel(this) {
-        Column {
+        SettingsSection("Test selection") {
             CheckBox("All game tests", all, { checked: Boolean ->
                 all = checked
                 fireEditorStateChanged()

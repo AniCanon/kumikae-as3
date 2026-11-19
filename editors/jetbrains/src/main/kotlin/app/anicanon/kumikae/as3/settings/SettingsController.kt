@@ -6,6 +6,9 @@ import androidx.compose.runtime.setValue
 import com.intellij.openapi.progress.ProcessCanceledException
 
 internal interface SettingsRepository {
+    val hasXcodeTeams: Boolean get() = false
+    fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) = ready(Result.success(emptyList()))
+    fun openXcode(ready: (Result<Unit>) -> Unit) = ready(Result.success(Unit))
     fun preview(path: String): Artwork? = null
     fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) = ready(preview(path))
     fun load(): ProjectSettings
@@ -47,6 +50,43 @@ internal class SettingsController(private val repository: SettingsRepository) {
         }
         request(value.exportIcon, previous?.exportIcon, { draft?.exportIcon }) { exportPreview = it }
     }
+    val hasXcodeTeams get() = repository.hasXcodeTeams
+    var teams by mutableStateOf(emptyList<SigningTeam>())
+        private set
+    var teamStatus by mutableStateOf("")
+        private set
+    var teamsBusy by mutableStateOf(false)
+        private set
+    private var requestedTeams = false
+
+    fun refreshTeams() {
+        if (teamsBusy || !hasXcodeTeams) return
+        requestedTeams = true
+        teamsBusy = true
+        teamStatus = "Looking for teams in Xcode…"
+        repository.loadTeams { result ->
+            teamsBusy = false
+            result.onSuccess {
+                teams = it
+                teamStatus =
+                    if (it.isEmpty()) "Add an account in Xcode → Settings → Apple Accounts, then refresh." else ""
+            }.onFailure { teamStatus = "Couldn’t read Xcode teams. Refresh or enter the team ID." }
+        }
+    }
+
+    fun openXcode() {
+        if (teamsBusy || !hasXcodeTeams) return
+        teamsBusy = true
+        repository.openXcode { result ->
+            teamsBusy = false
+            teamStatus = if (result.isSuccess) {
+                "In Xcode, open Settings → Apple Accounts. Refresh here after signing in."
+            } else {
+                "Couldn’t open Xcode. Check that Xcode is installed on this Mac."
+            }
+        }
+    }
+
     private var original: ProjectSettings? = null
     var draft by mutableStateOf<ProjectSettings?>(null)
         private set
@@ -62,7 +102,8 @@ internal class SettingsController(private val repository: SettingsRepository) {
             original = loaded
             draft = loaded
             previews(loaded)
-            status = "Settings are stored in project.godot and export_presets.cfg."
+            if (!requestedTeams && loaded.presets.any { it.platform == "iOS" }) refreshTeams()
+            status = ""
         } catch (canceled: ProcessCanceledException) {
             throw canceled
         } catch (error: Exception) {
@@ -84,6 +125,15 @@ internal class SettingsController(private val repository: SettingsRepository) {
             true
         }
         status = if (dirty) "Unsaved changes" else ""
+    }
+
+    fun readyToExport(presets: List<ExportPreset>): Boolean {
+        val value = draft ?: return false
+        val missing = presets.firstOrNull { it.platform == "iOS" && value.select(it.section).signingTeam.isBlank() }
+            ?: return true
+        edit { it.select(missing.section) }
+        status = "Choose a device signing team for ${missing.name}, then click Apply."
+        return false
     }
 
     fun apply() {

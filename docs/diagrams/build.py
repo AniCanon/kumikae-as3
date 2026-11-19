@@ -34,14 +34,14 @@ ROADMAP = [
     ("4", "Hot reload", "Save a script and the running game changes, keeping its state.",
      "A constant edited during play changes the objects on screen.", "done"),
     ("5", "Native code", "kas3c cpp compiles the same scripts to native code through C++.",
-     "Level with or ahead of Godot C# on every frame benchmark.", "done"),
+     "Level with or ahead of Godot C# on macOS frame benchmarks.", "done"),
     ("6", "Play builds native code", "The extension builds and caches the program library by itself.",
      "Pressing Play runs native code with no manual step.", "done"),
-    ("7", "Native code on iOS and in exports", "Release builds for devices, and hot reload for native code.",
-     "The same game runs as native code on a phone.", "now"),
+    ("7", "Native iOS & Android exports", "Godot and Rider build native AS3 into iOS and Android apps.",
+     "iOS Simulator & Android APK pass. Hardware runs next.", "now"),
     ("8", "Debugger", "Breakpoints and stepping from Rider.",
      "You can step through AS3 in the editor and on a device.", "planned"),
-    ("9", "Android native code, Windows, Linux", "Android ARM64 runs the interpreter; Windows and Linux are untested.",
+    ("9", "Windows and Linux", "Desktop builds beyond macOS are not yet built or tested.",
      "The test suite passes on each platform.", "next"),
     ("10", "Consoles", "Console builds, kept in a separate repository.",
      "The same game runs on console hardware.", "planned"),
@@ -213,31 +213,71 @@ def hot_reload():
 
 
 def roadmap():
-    row_h, gap, top = 68, 12, 100
-    h = top + len(ROADMAP) * (row_h + gap) + 40
-    s = Svg(1000, h, "Roadmap")
-    s.text(40, 48, "Roadmap", size=20, weight="bold")
-    s.text(40, 72, "Each step ends in something you can run. The second line is how you know it is done.",
-           size=13, fill=MUTED)
-    cx = 76
-    s.parts.append(
-        f'<line x1="{cx}" y1="{top + row_h / 2}" x2="{cx}" '
-        f'y2="{top + (len(ROADMAP) - 1) * (row_h + gap) + row_h / 2}" stroke="#BDC1C6" stroke-width="2"/>')
-    y = top
-    for number, name, what, exit_line, status in ROADMAP:
+    w, pad = 1080, 40
+    col_gap, row_gap = 20, 14
+    col_w = (w - 2 * pad - col_gap) // 2
+    card_h = 104
+
+    built = [item for item in ROADMAP if item[4] == "done"]
+    upcoming = [item for item in ROADMAP if item[4] not in ("done", "later")]
+    later = [item for item in ROADMAP if item[4] == "later"]
+
+    built_rows = (len(built) + 1) // 2
+    upcoming_rows = (len(upcoming) + 1) // 2
+    y_built_label = 112
+    y_built = y_built_label + 16
+    y_up_label = y_built + built_rows * (card_h + row_gap) + 22
+    y_up = y_up_label + 16
+    y_later = y_up + upcoming_rows * (card_h + row_gap) + 8
+    later_h = 68
+    h = y_later + (later_h + 32 if later else 20)
+
+    s = Svg(w, h, "Roadmap")
+    s.text(pad, 46, "Roadmap", size=22, weight="bold")
+    s.text(pad, 70, "Each milestone ends in something you can run.", size=13, fill=MUTED)
+    s.legend(w - pad - 375, 58, ["done", "now", "next", "planned"])
+    s.parts.append(f'<line x1="{pad}" y1="88" x2="{w - pad}" y2="88" stroke="#E8EAED" stroke-width="1"/>')
+
+    def draw_card(x, y, cw, ch, item):
+        number, name, what, exit_line, status = item
         fill, stroke, _ = STATUS[status]
         s.parts.append(
-            f'<rect x="116" y="{y}" width="844" height="{row_h}" rx="10" fill="{fill}" stroke="{stroke}" '
-            'stroke-width="1.5"/>')
-        s.parts.append(f'<circle cx="{cx}" cy="{y + row_h / 2}" r="22" fill="{stroke}"/>')
-        s.text(cx, y + row_h / 2 + 5, number, size=14, anchor="middle", weight="bold", fill="#FFFFFF")
-        s.text(136, y + 22, name, size=15, weight="bold")
-        s.text(136, y + 41, what, size=12.5)
+            f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="12" fill="#FFFFFF" stroke="#DADCE0" '
+            'stroke-width="1.2"/>')
+        s.parts.append(
+            f'<rect x="{x}" y="{y}" width="6" height="{ch}" rx="3" fill="{stroke}"/>')
+        s.parts.append(f'<circle cx="{x + 30}" cy="{y + 28}" r="14" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>')
+        s.text(x + 30, y + 32.5, number, size=12, anchor="middle", weight="bold", fill=stroke)
+        s.text(x + 54, y + 32, name, size=14.5, weight="bold")
+        s.pill(x + cw - 110, y + 15, 94, 22, status)
+        s.text(x + 22, y + 60, what, size=12, fill=INK)
         if exit_line:
-            prefix = "" if exit_line.startswith("Result:") else "Done when: "
-            s.text(136, y + 58, prefix + exit_line, size=12, fill=MUTED)
-        s.pill(832, y + 10, 112, 24, status)
-        y += row_h + gap
+            s.text(x + 22, y + 82, "Done when: " + exit_line, size=11.5, fill=MUTED)
+
+    s.text(pad, y_built_label, "BUILT", size=11, weight="bold", fill="#1E8E3E")
+    for idx, item in enumerate(built):
+        col, row = idx % 2, idx // 2
+        draw_card(pad + col * (col_w + col_gap), y_built + row * (card_h + row_gap), col_w, card_h, item)
+
+    s.text(pad, y_up_label, "IN PROGRESS & UPCOMING", size=11, weight="bold", fill="#C77700")
+    for idx, item in enumerate(upcoming):
+        col, row = idx % 2, idx // 2
+        draw_card(pad + col * (col_w + col_gap), y_up + row * (card_h + row_gap), col_w, card_h, item)
+
+    for item in later:
+        number, name, what, _, status = item
+        fill, stroke, _ = STATUS[status]
+        s.parts.append(
+            f'<rect x="{pad}" y="{y_later}" width="{w - 2 * pad}" height="{later_h}" rx="12" fill="#F8F9FA" '
+            'stroke="#DADCE0" stroke-width="1.2"/>')
+        s.parts.append(
+            f'<circle cx="{pad + 30}" cy="{y_later + later_h / 2}" r="14" fill="{fill}" stroke="{stroke}" '
+            'stroke-width="1.5"/>')
+        s.text(pad + 30, y_later + later_h / 2 + 4.5, number, size=12, anchor="middle", weight="bold", fill=stroke)
+        s.text(pad + 56, y_later + 27, name, size=14, weight="bold")
+        s.text(pad + 56, y_later + 48, what, size=12, fill=MUTED)
+        s.pill(w - pad - 110, y_later + 22, 94, 22, status)
+
     s.save("roadmap.svg")
 
 

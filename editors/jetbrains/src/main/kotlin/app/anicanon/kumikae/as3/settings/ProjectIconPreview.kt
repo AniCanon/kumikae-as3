@@ -28,7 +28,10 @@ internal fun ProjectIconPreview(art: Artwork?, title: String, layout: SplashLayo
         }
         set(layout) {
             splash = it
-            preferredSize = if (it == null) JBUI.size(164, 204) else JBUI.size(336, 204)
+            val box = if (it == null) JBUI.size(104, 104) else JBUI.size(184, 104)
+            preferredSize = box
+            minimumSize = box
+            maximumSize = box
             revalidate()
             repaint()
         }

@@ -188,7 +188,7 @@ void warn_failed(const Asked &p_asked) {
 // The compiler started on what was written, beside the game. If it can't be, the marker says so.
 void start(const Asked &p_asked) {
 	const std::string nice = toolchain::runs("/usr/bin/nice") ? "/usr/bin/nice" : "";
-	const Build build{ p_asked.folder.string(), p_asked.key, p_asked.library, p_asked.compiler.path, FLAGS, nice };
+	const Build build{ p_asked.folder.string(), p_asked.key, p_asked.library, p_asked.compiler.path, library_flags(), nice };
 	// Said before it starts, for a run that begins meanwhile; the build names itself there, and takes it away as it ends.
 	write(p_asked.folder / building_name(p_asked.key), std::to_string(OS::get_singleton()->get_process_id()) + "\n");
 	PackedStringArray arguments;
@@ -205,41 +205,16 @@ void start(const Asked &p_asked) {
 	running = Running{ pid, p_asked, Time::get_singleton()->get_ticks_msec() };
 }
 
-// The module as C++ in the build's folder, with the headers it is built against. False, with the marker
-// left, if the backend does not translate the program yet or the files can't be written. Nothing of
-// Godot's is asked: this is what the thread runs.
-bool write_sources(const ir::Module &p_module, const fs::path &p_folder, const std::string &p_key) {
-	backend_cpp::Options options;
-	options.one_unit = true; // One file for the compiler: a small one put inside what calls it, and one program started.
-	// What Play builds is for a game that is being edited: a reload onto the interpreter updates in place
-	// the objects native code made, by what their constructors told.
-	options.remembers = true;
-	const backend_cpp::Generated generated = backend_cpp::generate(p_module, options);
-	if (!generated.unsupported.empty()) {
-		write(p_folder / failed_name(p_key), "native code does not have this yet: " + generated.unsupported + "\n");
-		return false;
-	}
-	// The headers in a folder of their own: the program's `program.h` is not the runtime's.
-	std::error_code failed;
-	fs::create_directories(p_folder / p_key / HEADERS, failed);
-	bool whole = !failed;
-	for (const backend_cpp::File &file : generated.files) {
-		whole = whole && write(p_folder / p_key / file.name, file.text);
-	}
-	for (size_t i = 0; i < RUNTIME_HEADER_COUNT; i++) {
-		whole = whole && write(p_folder / p_key / HEADERS / RUNTIME_HEADERS[i].name, RUNTIME_HEADERS[i].text);
-	}
-	if (!whole) {
-		write(p_folder / failed_name(p_key), "the C++ could not be written into " + (p_folder / p_key).string() + "\n");
-	}
-	return whole;
-}
-
 void write_on_thread(std::unique_ptr<Writing> p_work) {
 	writing = std::move(p_work);
 	Writing *const work = writing.get();
 	work->thread = std::thread([work] {
-		work->done = write_sources(work->module, work->asked.folder, work->asked.key);
+		const auto &asked = work->asked;
+		const std::string error = write_sources(work->module, asked.folder / asked.key, true);
+		work->done = error.empty();
+		if (!work->done) {
+			write(asked.folder / failed_name(asked.key), error + "\n");
+		}
 		work->ended.store(true, std::memory_order_release);
 	});
 }
@@ -293,7 +268,7 @@ std::optional<Asked> asked(const ir::Module &p_module) {
 	}
 	Asked out;
 	out.folder = *project / ".godot" / "kas3";
-	out.key = build_key(KeyParts{ ir::fingerprint(p_module), rt::RUNTIME_LAYOUT, BUILD_IDENTITY, found->identity, FLAGS });
+	out.key = build_key(KeyParts{ ir::fingerprint(p_module), rt::RUNTIME_LAYOUT, BUILD_IDENTITY, found->identity, library_flags() });
 	out.library = SharedLibrary::file_name(library_stem(out.key));
 	out.compiler = *found;
 	return out;
@@ -316,6 +291,26 @@ void begin(const ir::Module &p_module, const Asked &p_asked) {
 }
 
 } // namespace
+
+std::string write_sources(const ir::Module &p_module, const fs::path &p_folder, bool p_remember) {
+	backend_cpp::Options options;
+	options.one_unit = true;
+	options.remembers = p_remember;
+	const auto generated = backend_cpp::generate(p_module, options);
+	if (!generated.unsupported.empty()) {
+		return "native code does not have this yet: " + generated.unsupported;
+	}
+	std::error_code failed;
+	fs::create_directories(p_folder / HEADERS, failed);
+	bool whole = !failed;
+	for (const auto &file : generated.files) {
+		whole = whole && write(p_folder / file.name, file.text);
+	}
+	for (size_t i = 0; i < RUNTIME_HEADER_COUNT; i++) {
+		whole = whole && write(p_folder / HEADERS / RUNTIME_HEADERS[i].name, RUNTIME_HEADERS[i].text);
+	}
+	return whole ? std::string() : "the C++ could not be written into " + p_folder.string();
+}
 
 bool builds() {
 #if (defined(__APPLE__) || defined(__linux__)) && !defined(__ANDROID__)

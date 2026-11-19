@@ -41,6 +41,10 @@ presets="$project/export_presets.cfg"
 
 if [ -n "$library" ] && [ -d "$library/kas3_godot.xcframework" ]; then
     mkdir -p "$project/bin/ios"
+    # The Mac exporter and the iOS runtime share a native program layout.
+    if [ -f "$library/../libkas3_godot.dylib" ]; then
+        cp "$library/../libkas3_godot.dylib" "$project/bin/libkas3_godot.dylib"
+    fi
     rsync -a --delete "$library/kas3_godot.xcframework/" "$project/bin/ios/kas3_godot.xcframework/"
 fi
 [ -d "$project/bin/ios/kas3_godot.xcframework" ] || fail "The AS3 runtime for iOS is missing."

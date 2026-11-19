@@ -33,7 +33,10 @@ internal object UiProbeGameTree {
                 val view = ProjectView.getInstance(project)
                 val files = FileEditorManager.getInstance(project)
                 UiProbeCompletion.edt {
-                    checkNotNull(ToolWindowManager.getInstance(project).getToolWindow("Project")).show()
+                    val windows = ToolWindowManager.getInstance(project)
+                    val devices = checkNotNull(windows.getToolWindow("Game Devices"))
+                    check(devices.stripeTitle == "Devices") { "Device window was labelled ${devices.stripeTitle}" }
+                    checkNotNull(windows.getToolWindow("Project")).show()
                     view.changeView(GamePane.ID)
                 }
                 UiProbeCompletion.await("Game pane") {

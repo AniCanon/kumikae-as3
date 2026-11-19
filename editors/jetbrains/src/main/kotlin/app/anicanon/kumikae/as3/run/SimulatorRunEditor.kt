@@ -5,8 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
-import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -58,7 +58,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
 
     override fun createEditor(): JComponent = composePanel(this) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insets(12))) {
-            Column(SwingModifier.north()) {
+            SettingsSection("iOS Simulator", SwingModifier.north()) {
                 Label(game)
                 if (problem.isNotEmpty()) StatusLine(problem)
                 if (legacy) {

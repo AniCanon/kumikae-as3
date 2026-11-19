@@ -3,8 +3,8 @@ package app.anicanon.kumikae.as3.project
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -60,7 +60,7 @@ internal class AddGameTargetDialog(private val game: Project, private val setup:
     }
 
     override fun createCenterPanel(): JComponent = composePanel(disposable) {
-        Column {
+        SettingsSection("Target configuration") {
             Label("Platform")
             ComboBox(platforms, platform, onSelectionChange = { value ->
                 if (value != null && value != platform) {
@@ -91,13 +91,13 @@ internal class AddGameTargetDialog(private val game: Project, private val setup:
             }
             StatusLine(
                 when (platform) {
-                    "iOS" -> "Choose a simulator in the Run toolbar."
-                    "Android" -> "Choose an Android device in the Run toolbar."
+                    "iOS" -> "Run on an iOS simulator without signing in. Choose a device team in Export settings."
+                    "Android" -> "Run on an Android device without signing in. An upload key is used for Google Play."
                     else -> "Continue to the platform setup."
                 },
             )
         }
-    }.apply { preferredSize = JBUI.size(440, 220) }
+    }.apply { minimumSize = JBUI.size(440, 190) }
 
     override fun doOKAction() {
         try {

@@ -87,6 +87,20 @@ nothing differently for the editor, so one library serves both.
   that generated code reads directly, to learn when the object is freed. The bindings last as long as the
   library does.
 
+## Native iOS and Android exports
+
+`ios_export` registers an editor export plugin for iOS and Android. On macOS, it collects the AS3 paths
+selected by an iOS preset and uses the same test-folder rules and source ordering as the game. Once Godot
+writes the Xcode project, the plugin compiles one object for the device and one for the Simulator, and Xcode
+links the object for its destination into the app. On Android exports, it compiles `libkas3_program.so` for
+`arm64-v8a` with the Android NDK (`aarch64-linux-android24-clang++`) and packages it into the APK/AAB, where
+`native_program` loads it alongside `libkas3_godot.so`.
+
+The default **Automatic** mode interprets debug exports and compiles release exports. Both presets accept
+`actionscript/native_code`: Automatic (2), Interpreter (0) and Native (1). Earlier iOS boolean settings keep
+their original meaning. Native debug exports record constructor arguments for hot reload. Release exports
+omit that bookkeeping.
+
 ## The program library
 
 A project's scripts, written as C++ by `kas3c cpp --godot` and built into one shared library, are the
@@ -110,7 +124,7 @@ c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops
 ```
 
 Give the same files the extension reads, in sorted order: every `.as` file except those in folders whose
-name starts with a dot and in the project's test folders. Both must compile the same module. Leave
+name starts with a dot, folders marked with `.gdignore`, and the project's test folders. Both must compile the same module. Leave
 `--remember` out for a library you ship.
 
 The flags for Linux are in `play_cache.h`. Neither Linux nor Windows has been built or run.

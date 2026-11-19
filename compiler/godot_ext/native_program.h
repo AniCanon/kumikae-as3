@@ -35,7 +35,9 @@ public:
 	// Where the project's program library is looked for: the file KAS3_PROGRAM_LIBRARY names, or
 	// `bin/libkas3_program` beside the project's scripts. Empty if there is none.
 	static std::string path();
-	// The library at that path for this module: null, with why in words, if it can't be loaded or was
+	// Whether the app supplied a program linked into its executable.
+	static bool linked();
+	// The library at that path (the linked program for an empty path): null, with why in words, if it can't be loaded or was
 	// built from other sources than the module was compiled from.
 	// p_time_limit: how long a call from the engine may run, in milliseconds, as the interpreter is told.
 	// p_remember: what objects are constructed with is remembered, as the interpreter is told, where the

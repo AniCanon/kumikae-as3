@@ -63,6 +63,7 @@ internal object UiProbeGameRun {
                     }
                     chosen != null
                 }
+                val started = System.currentTimeMillis()
                 app.invokeAndWait {
                     RunManager.getInstance(project).selectedConfiguration = selection
                     ExecutionTargetManager.setActiveTarget(project, checkNotNull(chosen))
@@ -92,6 +93,14 @@ internal object UiProbeGameRun {
                 }
                 check(repository.status().device?.id == device)
                 check(source == Files.readString(folder.resolve("export_presets.cfg")))
+                val sceneMode =
+                    System.getenv("KUMIKAE_IOS_SCENE_MODE")
+                        ?: if (System.getenv("KUMIKAE_IOS_NATIVE_PROBE") == "1") "native" else null
+                if (sceneMode != null) {
+                    require(sceneMode in setOf("native", "interpreter"))
+                    checkScene(device, bundle, started, report, sceneMode)
+                    return
+                }
                 await("game rendered home screen", 45) {
                     val image = try {
                         repository.screenshot(device).image
@@ -122,6 +131,20 @@ internal object UiProbeGameRun {
             }
         } finally {
             trust.setTrustedPaths(original)
+        }
+    }
+
+    private fun checkScene(device: String, bundle: String, started: Long, report: Path, mode: String) {
+        val command = ProcessBuilder("xcrun", "simctl", "get_app_container", device, bundle, "data").start()
+        val data = command.inputStream.bufferedReader().use { it.readText().trim() }
+        check(command.waitFor(15, TimeUnit.SECONDS) && command.exitValue() == 0)
+        val log = Path.of(data, "Documents/logs/godot.log")
+        await("$mode AS3 test scene", 45) {
+            if (!Files.isRegularFile(log) || Files.getLastModifiedTime(log).toMillis() < started) return@await false
+            val text = Files.readString(log)
+            Files.writeString(report.resolve("$mode-game.txt"), text)
+            (text.contains("ActionScript: the scripts run as native code.") == (mode == "native")) &&
+                Regex("AS3TEST DONE passed=[1-9]\\d* failed=0").containsMatchIn(text)
         }
     }
 

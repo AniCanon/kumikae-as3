@@ -7,7 +7,7 @@ import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
-import app.anicanon.kumikae.as3.ui.Column
+import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.execution.ExecutionException
@@ -147,7 +147,7 @@ internal class AndroidEditor : SettingsEditor<AndroidRunConfiguration>() {
     }
 
     override fun createEditor() = composePanel(this) {
-        Column {
+        SettingsSection("Android launch") {
             if (problem.isNotEmpty()) StatusLine(problem)
             Label("Godot export preset")
             if (presets.isEmpty()) {

@@ -6,7 +6,7 @@ read the [README](README.md).
 
 ![The parts of the JetBrains plugin](../../docs/diagrams/plugin.svg)
 
-The plugin has three parts: language support, project and run tools, and the Game Devices panel. Two
+The plugin has three parts: language support, project and run tools, and the Devices panel. Two
 rules hold across all three:
 
 - **The compiler owns the language.** What a name means, what completes, and what is an error come from
@@ -23,7 +23,7 @@ rules hold across all three:
 | `src/main/kotlin/.../run/` | Run configurations and destinations for Godot desktop, iOS and Android |
 | `src/main/kotlin/.../testing/` | The AS3 Tests run configuration, gutter actions and result tree |
 | `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot`, artwork gallery, GDScript overview and scene editors |
-| `src/main/kotlin/.../panel/` | The Game Devices tool window (Simulators catalog, iOS and Android views) |
+| `src/main/kotlin/.../panel/` | The Devices tool window (Simulators catalog, iOS and Android views) |
 | `src/main/kotlin/.../ui/` | The Compose host and the shared composables |
 | `src/main/resources/META-INF/` | `plugin.xml` and the optional descriptors for Rider and IntelliJ IDEA |
 | `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
@@ -31,6 +31,14 @@ rules hold across all three:
 | `simulator.py`, `tests/` | The command-line client and its tests |
 | `tools/` | Bundled build, export and Android run scripts (`build-ios-simulator.sh`, `android_run.py`, `game_export.py`) |
 | `src/test/kotlin/`, `src/uiProbe/` | Tests, and a test-only plugin that drives the real views in a sandbox IDE |
+
+## Mobile tester distribution
+
+The settings editor captures the selected preset and reviewed version. `TesterDeliveryDialog` reads the
+saved store connection through `TesterAccess` on a background thread. `TesterDelivery` runs the confirmed
+job in the IDE console and keeps a receipt for each project and preset. The bundled
+`tools/tester_distribution.py` receives credentials over stdin, stages the game with `game_export.py`,
+and delegates to Xcode and App Store Connect or the Google Play Developer API.
 
 ## Language support
 
@@ -107,7 +115,7 @@ probes described in [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide).
 - **`run/`** starts Godot for desktop, builds and runs iOS Simulator targets through `tools/build-ios-simulator.sh`
   and the Simulator service, and builds and runs Android targets through `tools/android_run.py`.
 
-## The Game Devices panel
+## The Devices panel
 
 ```text
 SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window

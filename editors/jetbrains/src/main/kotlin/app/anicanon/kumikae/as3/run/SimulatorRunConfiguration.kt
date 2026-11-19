@@ -178,7 +178,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
                         "compiler/tests/build_ios_simulator_template.sh and keep it as " +
                         "~/Library/Application Support/Kumikae AS3/ios-with-arm64-simulator.zip.",
                 )
-            val library = ProjectTemplate.libraryBeside(compiler)?.resolve("ios") ?: native?.resolve("ios")
+            val library = IosSimulatorBuild.findLibrary(ProjectTemplate.libraryBeside(compiler), native)
             IosSimulatorBuild(folder, godot, template, library, target).build(say)
         }
     }

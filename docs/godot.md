@@ -351,13 +351,26 @@ Your scripts run on the interpreter, which needs no build step, or as native cod
 
 ## iOS
 
-The interpreter runs in the iOS Simulator and has run on a device. Native code on iOS isn't built yet.
+Select an iOS simulator in Rider’s Run toolbar and press **Run**. The default debug build interprets AS3
+and supports hot reload. It needs no Apple account. A release export compiles the selected AS3 scripts
+into the app executable. Godot chooses the mode when it exports the Xcode project.
+
+In **project.godot → Settings → Export**, select the iOS preset and set **AS3 execution** to
+**Automatic**, **Interpreter**, or **Native**. Use **Native** to exercise compiled code in a debug
+run. The console prints `ActionScript: the scripts run as native code.` when the app loads the compiled
+program. Editing a script during that session moves execution to the interpreter with its state.
+Godot exposes the same choice under **ActionScript → Native Code** in its export preset.
+
+For device builds, choose the **Device signing team** by name and click **Apply**. Rider reads the
+teams Xcode has cached on this Mac. If your team is missing, click **Open Xcode**, sign in under
+**Settings → Apple Accounts**, then refresh the picker in Rider. You can also enter a team ID manually.
+[Apple’s device signing guide](https://developer.apple.com/documentation/xcode/building-and-running-an-app).
 
 - `compiler/tests/build_ios.sh <path to godot-cpp>` builds the extension for iOS as an `.xcframework`. It
   needs Xcode.
 - Godot's published iOS export template has no Simulator library for Apple silicon.
   `compiler/tests/build_ios_simulator_template.sh` builds one from Godot's source.
-- The Rider plugin's [iOS Simulator run configuration](../editors/jetbrains/README.md#run-on-the-ios-simulator)
+- The Rider plugin's [iOS Simulator run configuration](../editors/jetbrains/README.md#run-on-ios-or-android)
   installs and launches the app, and passes `KAS3_SOURCE_DIR` so that hot reload works in the Simulator.
 
 ## Limits

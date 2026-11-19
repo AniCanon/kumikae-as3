@@ -14,6 +14,15 @@ internal data class ExportPreset(val section: String, val name: String, val plat
     override fun toString() = "$name · $platform"
 }
 
+internal data class ExportFields(
+    val identifier: String,
+    val icon: String,
+    val executionMode: IosExecutionMode,
+    val signingTeam: String,
+    val buildNumber: String,
+    val releaseVersion: String,
+)
+
 internal data class ProjectSettings(
     val projectText: String,
     val exportText: String,
@@ -31,10 +40,19 @@ internal data class ProjectSettings(
     val preset: String = "",
     val identifier: String = "",
     val exportIcon: String = "",
-    val exportDrafts: Map<String, Pair<String, String>> = emptyMap(),
+    val executionMode: IosExecutionMode = IosExecutionMode.Automatic,
+    val signingTeam: String = "",
+    val buildNumber: String = "",
+    val releaseVersion: String = "",
+    val exportDrafts: Map<String, ExportFields> = emptyMap(),
+    val propertyEdits: Map<ConfigKey, String> = emptyMap(),
 ) {
-    fun allExportDrafts(): Map<String, Pair<String, String>> =
-        if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+    fun allExportDrafts(): Map<String, ExportFields> = if (preset.isEmpty()) {
+        exportDrafts
+    } else {
+        exportDrafts +
+            (preset to ExportFields(identifier, exportIcon, executionMode, signingTeam, buildNumber, releaseVersion))
+    }
 
     fun select(section: String): ProjectSettings {
         val selected = presets.firstOrNull { it.section == section }
@@ -43,11 +61,29 @@ internal data class ProjectSettings(
         val remembered = retained[section]
         return copy(
             exportDrafts = retained,
+            executionMode =
+            remembered?.executionMode ?: IosExecutionMode.read(exports.raw("$section.options", NATIVE_CODE)),
+            signingTeam = remembered?.signingTeam ?: exports.string("$section.options", SIGNING_TEAM),
+            buildNumber = remembered?.buildNumber ?: if (selected?.platform == "Android") {
+                exports.raw("$section.options", "version/code") ?: "1"
+            } else {
+                exports.string("$section.options", "application/version")
+            },
+            releaseVersion = remembered?.releaseVersion ?: exports.string(
+                "$section.options",
+                if (selected?.platform ==
+                    "Android"
+                ) {
+                    "version/name"
+                } else {
+                    "application/short_version"
+                },
+            ),
             preset = section,
             identifier =
-            remembered?.first ?: selected?.identifierKey?.let { exports.string("$section.options", it) }.orEmpty(),
+            remembered?.identifier ?: selected?.identifierKey?.let { exports.string("$section.options", it) }.orEmpty(),
             exportIcon =
-            remembered?.second ?: selected?.iconKey?.let { exports.string("$section.options", it) }.orEmpty(),
+            remembered?.icon ?: selected?.iconKey?.let { exports.string("$section.options", it) }.orEmpty(),
         )
     }
 
@@ -97,6 +133,47 @@ internal data class ProjectSettings(
         for ((section, fields) in allExportDrafts()) {
             val selected = presets.firstOrNull { it.section == section } ?: continue
             val (applicationId, image) = fields
+            if (selected.platform == "iOS" || selected.platform == "Android") {
+                val options = "$section.options"
+                if (fields.executionMode != IosExecutionMode.read(originalExports.raw(options, NATIVE_CODE))) {
+                    exportChanges[ConfigKey(options, NATIVE_CODE)] = fields.executionMode.value.toString()
+                }
+            }
+            if (selected.platform == "iOS") {
+                val options = "$section.options"
+                if (fields.signingTeam != originalExports.string(options, SIGNING_TEAM)) {
+                    val team = fields.signingTeam.trim()
+                    require(team.isEmpty() || SigningTeam.validId(team)) {
+                        "Enter the 10-character Apple team ID for ${selected.name}."
+                    }
+                    exportChanges[ConfigKey(options, SIGNING_TEAM)] = GodotConfig.quote(team)
+                }
+            }
+            if (selected.identifierKey != null) {
+                val options = "$section.options"
+                val android = selected.platform == "Android"
+                val versionKey = if (android) "version/name" else "application/short_version"
+                if (fields.releaseVersion != originalExports.string(options, versionKey)) {
+                    require(
+                        android || fields.releaseVersion.isBlank() || APPLE_VERSION.matches(fields.releaseVersion),
+                    ) {
+                        "Enter an iOS version such as 1.2.0."
+                    }
+                    exportChanges[ConfigKey(options, versionKey)] = GodotConfig.quote(fields.releaseVersion.trim())
+                }
+                if (android && fields.buildNumber != (originalExports.raw(options, "version/code") ?: "1")) {
+                    require(fields.buildNumber.toIntOrNull() in 1..2100000000) {
+                        "Enter a positive Android version code up to 2100000000."
+                    }
+                    exportChanges[ConfigKey(options, "version/code")] = fields.buildNumber.toInt().toString()
+                } else if (!android && fields.buildNumber != originalExports.string(options, "application/version")) {
+                    require(fields.buildNumber.isBlank() || APPLE_VERSION.matches(fields.buildNumber)) {
+                        "Enter a numeric iOS build number such as 42."
+                    }
+                    exportChanges[ConfigKey(options, "application/version")] =
+                        GodotConfig.quote(fields.buildNumber.trim())
+                }
+            }
             validateResource(image)
             validateType(GameResourceKind.ExportIcon, image)
             selected.identifierKey?.takeIf {
@@ -111,10 +188,18 @@ internal data class ProjectSettings(
                 exportChanges[ConfigKey("$section.options", it)] = GodotConfig.quote(image)
             }
         }
-        return GodotConfig(project).update(changes) to GodotConfig(exports).update(exportChanges)
+        val mergedChanges = linkedMapOf<ConfigKey, String>().apply {
+            putAll(propertyEdits)
+            putAll(changes)
+        }
+        return GodotConfig(project).update(mergedChanges) to GodotConfig(exports).update(exportChanges)
     }
 
     companion object {
+        private val APPLE_VERSION = Regex("""[0-9]+(\.[0-9]+){0,2}""")
+        private const val NATIVE_CODE = "actionscript/native_code"
+        private const val SIGNING_TEAM = "application/app_store_team_id"
+
         val orientations =
             listOf(
                 "Landscape",
