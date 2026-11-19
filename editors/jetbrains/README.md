@@ -7,6 +7,10 @@ for `project.godot` and scenes.
 This page is for someone using the plugin. To change it, read [ARCHITECTURE.md](ARCHITECTURE.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+![Rider running an ActionScript 3 Godot game with the Game view, AS3 editor, and live iOS Simulator](docs/images/rider-workspace.png)
+
+*The **Game** view (left) shows compacted AS3 packages alongside expandable classes, fields, and methods; the editor (center) provides live diagnostics and navigation; and **Devices** (right) streams the running iOS Simulator with interactive input.*
+
 ## Requirements
 
 | | |
