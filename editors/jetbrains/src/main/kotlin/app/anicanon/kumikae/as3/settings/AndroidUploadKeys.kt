@@ -8,8 +8,10 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.project.Project
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 internal class UploadKey(val path: String, val user: String, val password: String) {
@@ -58,7 +60,7 @@ internal class UploadKey(val path: String, val user: String, val password: Strin
                 if (process.isAlive) process.destroyForcibly().waitFor()
             }
             if (Files.getFileStore(key).supportsFileAttributeView("posix")) {
-                Files.setPosixFilePermissions(key, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))
+                Files.setPosixFilePermissions(key, PosixFilePermissions.fromString("rw-------"))
             }
             Files.move(key, target)
         } finally {
@@ -89,7 +91,7 @@ internal fun hasGodotUploadKey(
 
 /** The project file and export command contain no key paths or passwords from this store. */
 internal class AndroidUploadKeys(project: Project, root: String, preset: String) {
-    private val reference = "kumikae.upload." + java.util.UUID.nameUUIDFromBytes("$root\u0000$preset".toByteArray())
+    private val reference = "kumikae.upload." + UUID.nameUUIDFromBytes("$root\u0000$preset".toByteArray())
     private val attributes = CredentialAttributes("Kumikae AS3 • $reference")
     private val local = PropertiesComponent.getInstance(project)
     val configured get() = local.getBoolean(reference)

@@ -1,6 +1,10 @@
 package app.anicanon.kumikae.as3.settings
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -22,17 +26,15 @@ class ProjectSettingsTest {
         assertEquals("demo.aab", exportJobs(settings, settings.presets, true).single()["filename"])
     }
 
-    @Test fun `a generated upload key can be reopened but never overwritten`(
-        @org.junit.jupiter.api.io.TempDir folder: java.nio.file.Path,
-    ) {
+    @Test fun `a generated upload key can be reopened but never overwritten`(@TempDir folder: Path) {
         val file = folder.resolve("upload.p12")
         val key = UploadKey(file.toString(), "upload", "sample-test-password")
         key.create()
         key.validate()
-        val bytes = java.nio.file.Files.readAllBytes(file)
+        val bytes = Files.readAllBytes(file)
         assertFailsWith<IllegalArgumentException> { key.create() }
         assertFailsWith<IllegalArgumentException> { UploadKey(file.toString(), "other", key.password).validate() }
-        kotlin.test.assertContentEquals(bytes, java.nio.file.Files.readAllBytes(file))
+        assertContentEquals(bytes, Files.readAllBytes(file))
     }
 
     @Test fun `orientation and platform identifiers have distinct storage`() {

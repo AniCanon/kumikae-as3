@@ -69,6 +69,7 @@ internal fun ExportSettings(
             }, placeholder = if (ios) "Use project version" else "1")
         }
     }
+    IosExecutionSettings(value, controller)
     if (ios) {
         IosExportSettings(value, controller)
     } else {
@@ -128,7 +129,6 @@ internal fun ExportSettings(
         }
     }
     deliveryStatus(preset).takeIf { it.isNotBlank() }?.let { StatusLine(it) }
-    if (ios) IosExecutionSettings(value, controller)
     var artwork by remember(value.preset) { mutableStateOf(false) }
     SettingsActions {
         Button(if (artwork) "Hide platform icon" else "Platform icon…", { artwork = !artwork })

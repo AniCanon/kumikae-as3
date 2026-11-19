@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.panel
 
+import androidx.compose.runtime.mutableStateOf
 import app.anicanon.kumikae.as3.scene.SceneController
 import app.anicanon.kumikae.as3.scene.SceneDocument
 import app.anicanon.kumikae.as3.scene.SceneNode
@@ -7,6 +8,7 @@ import app.anicanon.kumikae.as3.scene.SceneRepository
 import app.anicanon.kumikae.as3.scene.SceneView
 import app.anicanon.kumikae.as3.settings.AndroidUploadKeys
 import app.anicanon.kumikae.as3.settings.Artwork
+import app.anicanon.kumikae.as3.settings.ExportPreset
 import app.anicanon.kumikae.as3.settings.IosExecutionMode
 import app.anicanon.kumikae.as3.settings.ProjectSettings
 import app.anicanon.kumikae.as3.settings.ProjectSettingsView
@@ -23,6 +25,7 @@ import app.anicanon.kumikae.as3.settings.TesterGroup
 import app.anicanon.kumikae.as3.settings.UploadKeyDialog
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.Disposer
 import java.awt.Color
 import java.awt.Component
@@ -35,8 +38,11 @@ import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.JList
+import javax.swing.JPasswordField
+import javax.swing.JScrollPane
 import javax.swing.JSpinner
 import javax.swing.JTextField
+import javax.swing.SwingUtilities
 
 internal object UiProbeProjectExperience {
     fun run(destination: Path, theme: String) {
@@ -133,7 +139,7 @@ internal object UiProbeProjectExperience {
             click(panel, "App Store Connect")
             check(released == "iOS" && portal == "iOS")
             edt {
-                val target = combos().single { it.selectedItem is app.anicanon.kumikae.as3.settings.ExportPreset }
+                val target = combos().single { it.selectedItem is ExportPreset }
                 target.selectedIndex = 1
             }
             click(panel, "Configure upload key…")
@@ -198,7 +204,7 @@ internal object UiProbeProjectExperience {
         }
         lateinit var dialog: TesterDeliveryDialog
         edt {
-            val project = com.intellij.openapi.project.ProjectManager.getInstance().defaultProject
+            val project = ProjectManager.getInstance().defaultProject
             dialog =
                 TesterDeliveryDialog(project, TesterBuild("iOS", "org.example.game", "1.2", "24", "EXAMPLE123"), store)
         }
@@ -229,7 +235,7 @@ internal object UiProbeProjectExperience {
     private fun checkUploadKeyDialog(destination: Path, theme: String) {
         lateinit var dialog: UploadKeyDialog
         edt {
-            val project = com.intellij.openapi.project.ProjectManager.getInstance().defaultProject
+            val project = ProjectManager.getInstance().defaultProject
             val store = AndroidUploadKeys(project, destination.toString(), "UI fixture")
             dialog = UploadKeyDialog(project, "Google Play", store)
         }
@@ -237,7 +243,7 @@ internal object UiProbeProjectExperience {
             val panel = dialog.contentPanel
             await { descendants(panel).filterIsInstance<JButton>().any { it.text == "Create new…" } }
             edt {
-                val password = descendants(panel).filterIsInstance<javax.swing.JPasswordField>().single()
+                val password = descendants(panel).filterIsInstance<JPasswordField>().single()
                 check(password.echoChar != '\u0000' && password.accessibleContext.accessibleName == "Keystore password")
             }
             render(panel, destination.resolve("$theme-upload-key.png"), 500, 420)
@@ -253,7 +259,7 @@ internal object UiProbeProjectExperience {
         val android = AndroidAvd("Pixel_9")
         var opened = ""
         var refreshes = 0
-        val mode = androidx.compose.runtime.mutableStateOf(AndroidGraphics.DEVICE)
+        val mode = mutableStateOf(AndroidGraphics.DEVICE)
         lateinit var panel: JComponent
         lateinit var frame: JFrame
         edt {
@@ -295,14 +301,14 @@ internal object UiProbeProjectExperience {
 
     private fun fitsViewport(panel: JComponent): Boolean {
         repeat(4) { layout(panel) }
-        val scroll = descendants(panel).filterIsInstance<javax.swing.JScrollPane>().single()
+        val scroll = descendants(panel).filterIsInstance<JScrollPane>().single()
         val view = scroll.viewport.view
         val width = scroll.viewport.extentSize.width
         if (scroll.horizontalScrollBar.isVisible || view.width != width) return false
         return descendants(view).filter {
             (it is JButton && !it.text.isNullOrBlank()) || it is JComboBox<*> || it is JTextField
         }.all {
-            val rect = javax.swing.SwingUtilities.convertRectangle(it.parent, it.bounds, view)
+            val rect = SwingUtilities.convertRectangle(it.parent, it.bounds, view)
             rect.x >= 0 && rect.x + rect.width <= width && it.width > 0 &&
                 it.y >= 0 && it.y + it.height <= it.parent.height
         }
@@ -335,7 +341,7 @@ internal object UiProbeProjectExperience {
     private fun render(panel: JComponent, path: Path, width: Int = 960, height: Int = 720) = edt {
         panel.setSize(width, height)
         repeat(3) { layout(panel) }
-        descendants(panel).filterIsInstance<javax.swing.JScrollPane>().forEach { it.verticalScrollBar.value = 0 }
+        descendants(panel).filterIsInstance<JScrollPane>().forEach { it.verticalScrollBar.value = 0 }
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
         try {

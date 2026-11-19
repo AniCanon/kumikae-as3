@@ -2,6 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.util.IconLoader
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
@@ -66,7 +67,7 @@ internal fun SettingsNavigation(page: String, onSelect: (String) -> Unit, modifi
 internal fun CompactNavigation(page: String, onSelect: (String) -> Unit, modifier: SwingModifier) {
     val select = rememberUpdatedState(onSelect)
     SwingNode(factory = {
-        com.intellij.openapi.ui.ComboBox(SettingsPage.entries.toTypedArray()).apply {
+        ComboBox(SettingsPage.entries.toTypedArray()).apply {
             accessibleContext.accessibleName = "Project settings navigation"
             renderer = SettingsPageRenderer()
             addActionListener { (selectedItem as? SettingsPage)?.let { select.value(it.name) } }
