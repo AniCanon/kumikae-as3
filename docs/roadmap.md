@@ -58,7 +58,8 @@ state of the project changes.
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
   hover and outline. A change to a million-line project is checked in milliseconds.
 - **Rider plugin:** language support, a project wizard, a `project.godot` settings editor, run
-  configurations for desktop and the iOS Simulator, a live Simulator panel, and a test runner.
+  configurations for desktop and the iOS Simulator, a live Simulator panel, and a test runner. In the Game tree,
+  double-click a script to open it and use its arrow to browse declarations.
 - **VS Code client** for the language server.
 - **A testing library** written in AS3.
 

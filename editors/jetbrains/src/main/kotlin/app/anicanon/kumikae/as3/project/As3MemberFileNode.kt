@@ -15,6 +15,8 @@ import javax.swing.Icon
 
 internal class As3MemberFileNode(project: Project, file: PsiFile, settings: ViewSettings) :
     PsiFileNode(project, file, settings) {
+    override fun expandOnDoubleClick() = false
+
     override fun getChildrenImpl(): Collection<AbstractTreeNode<*>> {
         val file = value ?: return emptyList()
         val game = project ?: return emptyList()

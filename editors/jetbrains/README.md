@@ -173,6 +173,7 @@ editor's menu, show the scene nodes that use the script.
 
 **The Game view.** The project view has a **Game** pane that shows empty folder chains under `src` and
 `tests` as package names, such as `com.studio.game`. Its menu has **Compact AS3 Packages**, **Show AS3 Members** and **Show Generated Files**.
+Double-click an AS3 file to open it. Click its disclosure arrow to show or hide its declarations.
 
 ## Use the Simulator from the command line
 

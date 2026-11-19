@@ -44,6 +44,7 @@ class UiProbeStarter : ApplicationStarter {
                 } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
                     UiProbeCompletion.run(destination, plainText = true)
                 } else {
+                    UiProbeGameTree.run()
                     UiProbeLanguage.run(destination)
                     UiProbeCompletion.run(destination)
                     checkThemes(destination)
