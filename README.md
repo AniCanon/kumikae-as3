@@ -75,6 +75,9 @@ package game {
 
 ## Get started
 
+[Install Kumikae AS3 for Rider or IntelliJ IDEA from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/36313-kumikae-as3).
+If the release is not yet available in your IDE, follow the [install-from-disk instructions](editors/jetbrains/README.md#install-the-plugin).
+
 You need macOS, CMake 3.22 or later, a C++17 compiler, and Python 3 for the tests.
 
 1. Build the compiler and run its tests:
