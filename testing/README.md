@@ -2,7 +2,7 @@
 
 Kumikae Testing lets you write tests for your game in ActionScript 3. It has three parts:
 
-- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing) (`TestCase`, `Suite`, `Assert`, `AssertionError`) and [`godot/app/anicanon/kumikae/testing/`](godot/app/anicanon/kumikae/testing) (`TestScene`, `EngineTestRunner`).
+- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing) (`TestCase`, `Suite`, `Assert`, `AssertionError`, `TestProtocol`) and [`godot/app/anicanon/kumikae/testing/`](godot/app/anicanon/kumikae/testing) (`TestScene`, `TestFlow`, `TestStep`, `EngineTestRunner`).
 - **A command-line runner,** `runner.py`, which runs the tests a project lists and streams each case live.
 - **Rider integration,** in the [plugin](../editors/jetbrains/README.md#tests), which shows results in the
   IDE's Tests window.
@@ -267,28 +267,25 @@ the method runs that case alone, and the icon beside the class runs every case m
 
 ## What isn't there
 
-- **Metadata.** Discovery supports public no-argument instance methods marked with `[Test]`. Use the bundled library for setup and teardown.
-- **No parallel runs.**
-- **No asynchronous cases.** A test that needs frames to pass runs as a Godot scene, as one result.
+- **No parallel runs.** Targets and cases run sequentially.
+- **Per-test timeout on CLI targets.** `[Test(timeout=...)]` is enforced per test inside `"runtime": "godot"` (and mobile) runs; `"cli"` runs enforce only the target-level `timeout` and `KAS3_TIME_LIMIT_MS`.
 
 ## How results are reported
 
-A suite prints one record for each event, in a format that needs no escaping in AS3:
+A suite prints one length-framed record per event (`@kas3-test-v1` with a plain name, or `@kas3-test-v2` with a JSON metadata header carrying `duration`, `reason`, `expected`/`actual`, or `allowEngineErrors`):
 
 ```text
-@kas3-test-v1 testStarted 12 0
-Starts empty
+@kas3-test-v2 testStarted 23 0
+{"name":"Starts empty"}
 
 ```
 
-The first line has the event, the length of the name, and the length of the message, both in UTF-16 code
-units. The name and the message follow, each on its own line. The runner checks the order, the names and
-the lengths before it reports anything, so a program's ordinary output can't inject a test result.
+The first line gives the event kind and the UTF-16 code-unit lengths of the header and details. The header and details follow, each on its own line. The runner checks the order, names, and lengths before reporting anything, so a program's ordinary output can't inject a test result.
 
 ## Test the library itself
 
 ```sh
-python3 -m unittest discover -s testing/tests -v
+KAS3C=compiler/build/kas3c python3 -m unittest discover -s testing/tests -v
 compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as
 ```
 

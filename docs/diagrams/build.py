@@ -36,13 +36,13 @@ ROADMAP = [
     ("5", "Native code", "kas3c cpp compiles the same scripts to native code through C++.",
      "Level with or ahead of Godot C# on every frame benchmark.", "done"),
     ("6", "Play builds native code", "The extension builds and caches the program library by itself.",
-     "Pressing Play runs native code with no manual step.", "now"),
+     "Pressing Play runs native code with no manual step.", "done"),
     ("7", "Native code on iOS and in exports", "Release builds for devices, and hot reload for native code.",
-     "The same game runs as native code on a phone.", "next"),
+     "The same game runs as native code on a phone.", "now"),
     ("8", "Debugger", "Breakpoints and stepping from Rider.",
      "You can step through AS3 in the editor and on a device.", "planned"),
-    ("9", "Android, Windows, Linux", "Build and test the extension and the tools on each.",
-     "The test suite passes on each platform.", "planned"),
+    ("9", "Android native code, Windows, Linux", "Android ARM64 runs the interpreter; Windows and Linux are untested.",
+     "The test suite passes on each platform.", "next"),
     ("10", "Consoles", "Console builds, kept in a separate repository.",
      "The same game runs on console hardware.", "planned"),
     ("+", "Later, designed separately", "async/await, Royale's language additions, the Flash API, SWF loading, web export.",
@@ -277,19 +277,19 @@ def layers():
 def plugin():
     s = Svg(1100, 500, "The parts of the JetBrains plugin")
     s.text(40, 48, "The parts of the JetBrains plugin", size=20, weight="bold")
-    s.text(40, 72, "The IDE shows things. The compiler, Godot and the Simulator stay separate programs.",
+    s.text(40, 72, "The IDE shows things. The compiler, Godot and mobile devices stay separate programs.",
            size=13, fill=MUTED)
 
     s.frame(40, 100, 330, 360, "The plugin, inside Rider or IntelliJ IDEA")
     s.box(70, 140, 270, 70, ["Language support", "LSP client, typing help, highlighting"])
     s.box(70, 240, 270, 70, ["Project and run tools", "wizard, run configurations,", "test runner, settings and scene editors"])
-    s.box(70, 340, 270, 70, ["Simulator panel", "the device's screen, input, console"])
+    s.box(70, 340, 270, 70, ["Game Devices panel", "iOS Simulator and Android screens,", "input and console"])
 
     s.box(520, 140, 220, 70, ["kas3c lsp", "the compiler as a language server"])
     s.arrow([(340, 175), (518, 175)])
     s.text(430, 165, "LSP, standard I/O", size=12, anchor="middle", fill=MUTED)
 
-    s.box(520, 240, 220, 70, ["Godot and the test runner", "started as processes"])
+    s.box(520, 240, 220, 70, ["Godot, runner.py & tools", "desktop, iOS & Android"])
     s.arrow([(340, 275), (518, 275)])
 
     s.box(520, 340, 220, 70, ["Simulator service", "core/: one session,", "local HTTP with a token"])
@@ -297,11 +297,11 @@ def plugin():
     s.box(520, 432, 220, 44, ["simulator.py", "a command-line client"])
     s.arrow([(630, 432), (630, 412)])
 
-    s.box(850, 290, 210, 64, ["xcrun simctl", "boot, install, launch, logs"])
-    s.box(850, 390, 210, 64, ["simulator-bridge", "Swift helper: live screen, input"])
+    s.box(850, 290, 210, 64, ["xcrun simctl / adb", "boot, install, launch, logs"])
+    s.box(850, 390, 210, 64, ["simulator-bridge", "Swift helper: iOS & Android feeds"])
     s.arrow([(740, 360), (800, 360), (800, 322), (848, 322)])
     s.arrow([(740, 390), (800, 390), (800, 422), (848, 422)])
-    s.box(850, 140, 210, 70, ["iOS Simulator", "the running device"])
+    s.box(850, 140, 210, 70, ["iOS Simulator & Android", "running devices & emulators"])
     s.arrow([(955, 290), (955, 212)])
     s.arrow([(1060, 422), (1080, 422), (1080, 175), (1062, 175)])
     s.save("plugin.svg")
