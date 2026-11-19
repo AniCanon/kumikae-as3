@@ -16,6 +16,9 @@ godot::String scripts_root();
 std::string project_path(std::string_view p_file, const godot::String &p_root);
 // Every .as file under a folder, by where it is.
 void collect_scripts(const godot::String &p_folder, std::vector<std::string> &r_files);
+// Extra .as files from KAS3_TEST_SOURCES during a test run (KAS3_TESTS set): lets the runner
+// supply the testing library and generated suite driver without writing into the game folder.
+void collect_test_sources(std::vector<std::string> &r_files);
 // What the project's scripts are now, as one number: it changes when one of them does. In a folder
 // elsewhere, its scenes and resources saved as text (.tscn, .tres) are watched too.
 uint64_t scripts_signature();

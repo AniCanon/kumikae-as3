@@ -87,6 +87,49 @@ void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) 
 	}
 }
 
+static void collect_external_scripts(const String &p_folder, std::vector<std::string> &r_files) {
+	const Ref<DirAccess> folder = DirAccess::open(p_folder);
+	if (folder.is_null()) {
+		return;
+	}
+	for (const String &name : folder->get_files()) {
+		if (name.ends_with(".as") && !name.begins_with(".")) {
+			r_files.push_back(p_folder.path_join(name).simplify_path().utf8().get_data());
+		}
+	}
+	for (const String &name : folder->get_directories()) {
+		if (!name.begins_with(".")) {
+			collect_external_scripts(p_folder.path_join(name), r_files);
+		}
+	}
+}
+
+void collect_test_sources(std::vector<std::string> &r_files) {
+	if (OS::get_singleton()->get_environment("KAS3_TESTS").is_empty()) {
+		return;
+	}
+	const String listed = OS::get_singleton()->get_environment("KAS3_TEST_SOURCES");
+	if (listed.is_empty()) {
+		return;
+	}
+#ifdef _WIN32
+	const String separator = ";";
+#else
+	const String separator = ":";
+#endif
+	for (const String &raw : listed.split(separator, false)) {
+		const String entry = raw.strip_edges().simplify_path();
+		if (entry.is_empty()) {
+			continue;
+		}
+		if (entry.ends_with(".as") && FileAccess::file_exists(entry)) {
+			r_files.push_back(entry.utf8().get_data());
+		} else if (DirAccess::dir_exists_absolute(entry)) {
+			collect_external_scripts(entry, r_files);
+		}
+	}
+}
+
 namespace {
 
 // A folder as it was last listed: when it was last changed, and the files and folders in it.

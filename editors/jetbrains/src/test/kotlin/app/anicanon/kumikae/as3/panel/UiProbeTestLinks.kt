@@ -11,11 +11,17 @@ import java.nio.file.Path
 
 internal object UiProbeTestLinks {
     fun run(project: Project, properties: As3TestConsole, file: Path, line: Int) {
+        val frame = "\tat ProbeCase/run()[${file.fileName}:${line + 1}]"
+        val engine = "    at: ProbeCase/run() (res://${file.fileName}:${line + 1})"
+        for (message in listOf(frame, engine)) checkLink(project, properties, file, line, message)
+    }
+
+    private fun checkLink(project: Project, properties: As3TestConsole, file: Path, line: Int, message: String) {
         lateinit var console: ConsoleViewImpl
         UiProbeCompletion.edt {
             console = properties.createConsole() as ConsoleViewImpl
             console.component
-            console.print("\tat ProbeCase/run()[${file.fileName}:${line + 1}]\n", ConsoleViewContentType.ERROR_OUTPUT)
+            console.print("$message\n", ConsoleViewContentType.ERROR_OUTPUT)
         }
         try {
             UiProbeCompletion.await("clickable AS3 failure frame") {

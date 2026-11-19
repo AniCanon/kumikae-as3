@@ -40,13 +40,17 @@ internal object UiProbeTestResults {
                     private var succeeds:Boolean;
                     public function ProbeCase(name:String, succeeds:Boolean) { super(name); this.succeeds = succeeds; }
                     override public function run():void {
-                        Assert.assertTrue(succeeds, "Expected failure");
+                        expect(true);
+                        expect(succeeds);
+                    }
+                    private function expect(value:Boolean):void {
+                        Assert.assertTrue(value, "Expected failure");
                     }
                 }
             }
                 """.trimIndent(),
             )
-            val failureLine = Files.readAllLines(fixture).indexOfFirst { it.contains("Assert.assertTrue") }
+            val failureLine = Files.readAllLines(fixture).indexOfFirst { it.contains("expect(succeeds)") }
             Files.writeString(
                 root.resolve("ProbeSuite.as"),
                 """
@@ -64,6 +68,9 @@ internal object UiProbeTestResults {
             }
                 """.trimIndent(),
             )
+            val broken = Files.createDirectory(root.resolve("compile errors")).resolve("BadScore.as")
+            val badLine = "        /* 🚀 */ var n:int = \"invalid\";"
+            Files.writeString(broken, "package { public class BadScore { public function BadScore() {\n$badLine\n} } }")
             val manifest = root.resolve("kas3-tests.json")
             Files.writeString(
                 manifest,
@@ -75,9 +82,23 @@ internal object UiProbeTestResults {
                                 "name" to "Probe",
                                 "source" to "ProbeCase.as",
                                 "events" to true,
+                                "cases" to listOf(
+                                    mapOf(
+                                        "name" to "failing case",
+                                        "source" to "ProbeCase.as",
+                                        "suite" to "Probe",
+                                        "method" to "run",
+                                    ),
+                                ),
                                 "marker" to "DONE",
                                 "command" to listOf("{compiler}", "run", "ProbeSuite.as", "ProbeCase.as", "{sources}"),
-                                "sources" to listOf("**/*.as"),
+                                "sources" to listOf("framework/**/*.as"),
+                            ),
+                            mapOf(
+                                "name" to "Compile",
+                                "source" to "ProbeCase.as",
+                                "command" to listOf("{compiler}", "check", "compile errors/BadScore.as"),
+                                "marker" to "DONE",
                             ),
                         ),
                     ),
@@ -92,6 +113,7 @@ internal object UiProbeTestResults {
                 }
             }
             LocalFileSystem.getInstance().refreshAndFindFileByNioFile(fixture)
+            LocalFileSystem.getInstance().refreshAndFindFileByNioFile(broken)
             ApplicationManager.getApplication().invokeAndWait {
                 val type = As3TestsType()
                 val configuration = As3TestsConfiguration(project, type.configurationFactories.single(), "Probe tests")
@@ -119,8 +141,9 @@ internal object UiProbeTestResults {
             while (!verified && System.nanoTime() < deadline) {
                 ApplicationManager.getApplication().invokeAndWait {
                     val leaves = activeConsole.resultsViewer.testsRootNode.allTests.filter { !it.isSuite }
-                    verified = leaves.size == 2 && leaves.any { it.name.endsWith("::passing case") && it.isPassed } &&
-                        leaves.any { it.name.endsWith("::failing case") && it.isDefect }
+                    verified = leaves.size == 3 && leaves.any { it.name == "Compile" && it.isDefect } &&
+                        leaves.any { it.name == "passing case" && it.isPassed } &&
+                        leaves.any { it.name == "failing case" && it.isDefect }
                 }
                 if (!verified) Thread.sleep(30)
             }
@@ -132,10 +155,10 @@ internal object UiProbeTestResults {
                     },
                 )
             }
-            check(verified) { "Native Rider test tree did not show one pass and one failure" }
+            check(verified) { "Native Rider test tree did not show the passing test and both failures" }
             val descriptor = ReadAction.compute<OpenFileDescriptor?, RuntimeException> {
                 val failed = activeConsole.resultsViewer.testsRootNode.allTests.single {
-                    it.name.endsWith("::failing case")
+                    !it.isSuite && it.name == "failing case"
                 }
                 check(failed.stacktrace.orEmpty().contains("ProbeCase.as:" + (failureLine + 1)))
                 failed.getDescriptor(
@@ -154,10 +177,24 @@ internal object UiProbeTestResults {
                 }
                 FileEditorManager.getInstance(project).closeFile(descriptor.file)
             }
+            val compileError = ReadAction.compute<OpenFileDescriptor?, RuntimeException> {
+                val failed = activeConsole.resultsViewer.testsRootNode.allTests.single { it.name == "Compile" }
+                failed.getDescriptor(failed.getLocation(project, GlobalSearchScope.allScope(project)), activeProperties)
+                    as? OpenFileDescriptor
+            }
+            UiProbeCompletion.edt {
+                check(compileError?.file?.toNioPath() == broken) { "Compile failure opened ${compileError?.file}" }
+                compileError.navigate(true)
+                val editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
+                check(editor.caretModel.offset == editor.document.text.indexOf("\"invalid\"")) {
+                    "Compiler diagnostic opened the wrong character after a multibyte comment"
+                }
+                FileEditorManager.getInstance(project).closeFile(compileError.file)
+            }
             UiProbeTestLinks.run(project, activeProperties, fixture, failureLine)
             Files.writeString(
                 destination.resolve("test-results.txt"),
-                "passed: bundled runner and compiler show one pass, one failure and assertion-line navigation\n",
+                "passed: runtime assertion line and compiler diagnostic column open in Rider\n",
             )
         } finally {
             handler?.let { if (!it.isProcessTerminated) it.destroyProcess() }

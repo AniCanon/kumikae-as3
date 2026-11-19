@@ -65,9 +65,8 @@ internal class ProjectTemplate(
         put("$source/Hello.as", HELLO.replace("package {", "package $namespace.view {"))
         put(
             "kas3-tests.json",
-            """{"version":1,"tests":[{"name":"Game tests","discover":"tests",""" +
-                """"sources":["src/**/*.as","tests/**/*.as"],""" +
-                """"exclude":["src/**/view/**/*.as"]}]}""" + "\n",
+            """{"version":1,"tests":[{"name":"Game tests","discover":"tests","runtime":"godot",""" +
+                """"sources":["src/**/*.as","tests/**/*.as"]}]}""" + "\n",
         )
         put(
             "$testRoot/GameTest.as",

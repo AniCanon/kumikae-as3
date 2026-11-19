@@ -89,6 +89,10 @@ class ProjectTemplateTest {
         assertEquals("org.example.game", ProjectTemplate.defaultBundle("---"))
         assertEquals("org.example.gclass", ProjectTemplate.defaultBundle("Class"))
         assertTrue(ProjectTemplate("Class", emptySet()).files().getValue("kas3-tests.json").contains("src/**/*.as"))
+        assertTrue(
+            ProjectTemplate("Class", emptySet()).files().getValue("kas3-tests.json").contains("\"runtime\":\"godot\""),
+        )
+        assertFalse(ProjectTemplate("Class", emptySet()).files().getValue("kas3-tests.json").contains("exclude"))
         assertEquals("org.example.g2048", ProjectTemplate("2048", emptySet()).bundle)
     }
 

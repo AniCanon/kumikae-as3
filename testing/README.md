@@ -2,13 +2,12 @@
 
 Kumikae Testing lets you write tests for your game in ActionScript 3. It has three parts:
 
-- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing): `TestCase`, `Suite` and
-  `Assert`.
-- **A command-line runner,** `runner.py`, which runs the tests a project lists and reports each case.
+- **A small AS3 library,** in [`as3/app/anicanon/kumikae/testing/`](as3/app/anicanon/kumikae/testing) (`TestCase`, `Suite`, `Assert`, `AssertionError`, `TestProtocol`) and [`godot/app/anicanon/kumikae/testing/`](godot/app/anicanon/kumikae/testing) (`TestScene`, `TestFlow`, `TestStep`, `EngineTestRunner`).
+- **A command-line runner,** `runner.py`, which runs the tests a project lists and streams each case live.
 - **Rider integration,** in the [plugin](../editors/jetbrains/README.md#tests), which shows results in the
   IDE's Tests window.
 
-Tests run on the interpreter, with `kas3c run` or inside Godot. Nothing is downloaded.
+Tests run on the interpreter, with `kas3c run` or inside headless Godot. Nothing is downloaded.
 
 Mark public no-argument instance methods with `[Test]` and point a manifest target at the fixture directory:
 
@@ -16,9 +15,57 @@ Mark public no-argument instance methods with `[Test]` and point a manifest targ
 {"version":1,"tests":[{"name":"Models","discover":"tests"}]}
 ```
 
+Add `"runtime": "godot"` to run discovered fixtures inside a single headless Godot process so Godot types
+(`Vector2`, `Node`, `PackedScene`), scenes, and frame stepping work directly. Use `"ios-simulator"` or
+`"android"` to export and stream the same fixtures from a booted iOS Simulator or ARM64 Android emulator:
+
+```json
+{"version":1,"tests":[{"name":"Game tests","discover":"tests","runtime":"godot"}]}
+```
+
 The runner uses the compiler's syntax tree and creates a fresh fixture for each test. Case IDs use the
 qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
 Rider uses the same IDs for the gutter, test results, reruns and source navigation.
+
+### Metadata and lifecycle hooks
+
+| Metadata | Where | Meaning |
+|---|---|---|
+| `[Test]` | Public instance method | Runs as a test case. Accepts optional `timeout=<ms>`, `expects="<ErrorClass>"`, and `allowEngineErrors=true`. |
+| `[Before]`, `[After]` | Public instance method | Runs before and after each test on the same fixture instance. |
+| `[BeforeClass]`, `[AfterClass]` | Public static method | Runs once before and after all tests in the fixture class. |
+| `[Ignore]` / `[Ignore("reason")]` | Class or `[Test]` method | Skips the test(s) and reports them as ignored. |
+
+### Godot engine tests (`TestScene`)
+
+Inside a `"runtime": "godot"` target, tests run synchronously by default and can touch Godot APIs directly.
+To mount scenes or step frames across `_process` / `_physicsProcess`, use `TestScene`:
+
+```actionscript
+[Test]
+public function playerMoves():void {
+    var player:Mover = TestScene.instantiate("res://scenes/Mover.tscn") as Mover;
+    TestScene.afterFrames(2, function():void {
+        Assert.assertTrue(player.position.x > 0);
+    }).afterPhysicsFrames(2, function():void {
+        Assert.assertTrue(player.physicsTicks >= 2);
+    }).until(function():Boolean {
+        return player.position.x >= 40;
+    }, 3000, function():void {
+        Assert.assertTrue(player.position.x >= 40);
+    });
+}
+```
+
+- `TestScene.root`, `TestScene.add(node)`, and `TestScene.instantiate(path)` mount nodes under a per-test
+  sandbox that is freed after the test finishes.
+- `afterFrames(n, fn)`, `afterPhysicsFrames(n, fn)`, `afterSeconds(s, fn)`, `until(pred, timeoutMs, fn)`,
+  and `waitForSignal(signal, timeoutMs, fn)` chain steps on the engine loop before `[After]` and sandbox
+  cleanup run.
+- Any Godot `ERROR:` or `SCRIPT ERROR:` logged while a test is running fails that test unless it is marked
+  `[Test(allowEngineErrors=true)]`.
+- Set `"headless": false` on a Godot target when a test needs a window/GPU, or pass `--native` to `runner.py`
+  to run against compiled native code instead of the interpreter.
 
 ## Write a test case
 
@@ -84,7 +131,13 @@ package game.tests {
 | Assertion | Fails when |
 |---|---|
 | `Assert.assertTrue(value, message)` | `value` is false |
-| `Assert.assertEquals(expected, actual, message)` | The two differ |
+| `Assert.assertFalse(value, message)` | `value` is true |
+| `Assert.assertEquals(expected, actual, message)` | The two differ (`!==`); emits comparison diff values |
+| `Assert.assertNotEquals(unexpected, actual, message)` | The two are strictly equal (`===`) |
+| `Assert.assertNull(value, message)` | `value !== null` |
+| `Assert.assertNotNull(value, message)` | `value` is `null` or `undefined` |
+| `Assert.assertApprox(expected, actual, tolerance, message)` | Difference exceeds `tolerance` (or either is `NaN`) |
+| `Assert.assertThrows(block, expectedErrorName, message)` | `block()` doesn't throw, or throws a different error class |
 | `Assert.fail(message)` | Always |
 
 ## Collect cases into a suite
@@ -148,6 +201,9 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
 | `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
+| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`), `"godot"`, `"ios-simulator"`, or `"android"` |
+| `headless` | Optional (for `"runtime": "godot"`). `true` by default; set `false` when a test needs a window/GPU |
+| `preset` | Optional (for mobile runtimes). Export preset name when more than one exists |
 | `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
 | `command` | The program to run, as an array of arguments (for manual targets). It's run without a shell |
 | `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
@@ -174,7 +230,8 @@ python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/k
 ```
 
 The last line of output is a count, such as `AS3 tests: 1 passed, 0 failed`. The exit status is 0 only
-when every test passed.
+when every test passed. The count includes each case in a suite and each plain script or scene test.
+A target that fails to compile or start contributes one failed result with its diagnostic.
 
 To run one case, name it as `<test>::<suite>::<case>`:
 
@@ -183,7 +240,9 @@ python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/k
     --case 'Scoring::Scoring::Starts empty'
 ```
 
-`--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`.
+`--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`. `--native`
+runs `"runtime": "godot"` targets with `KAS3_NATIVE_PLAY=1` instead of the interpreter. `--device`,
+`--preset`, and `--android-sdk` select the target simulator/emulator and Android SDK for mobile runtimes.
 
 A test fails when its process exits with a nonzero status, prints a compiler or engine error, doesn't
 print its marker, runs past its timeout, or doesn't finish its suite. Asking for a case that doesn't exist
@@ -208,28 +267,25 @@ the method runs that case alone, and the icon beside the class runs every case m
 
 ## What isn't there
 
-- **Metadata.** Discovery supports public no-argument instance methods marked with `[Test]`. Use the bundled library for setup and teardown.
-- **No parallel runs.**
-- **No asynchronous cases.** A test that needs frames to pass runs as a Godot scene, as one result.
+- **No parallel runs.** Targets and cases run sequentially.
+- **Per-test timeout on CLI targets.** `[Test(timeout=...)]` is enforced per test inside `"runtime": "godot"` (and mobile) runs; `"cli"` runs enforce only the target-level `timeout` and `KAS3_TIME_LIMIT_MS`.
 
 ## How results are reported
 
-A suite prints one record for each event, in a format that needs no escaping in AS3:
+A suite prints one length-framed record per event (`@kas3-test-v1` with a plain name, or `@kas3-test-v2` with a JSON metadata header carrying `duration`, `reason`, `expected`/`actual`, or `allowEngineErrors`):
 
 ```text
-@kas3-test-v1 testStarted 12 0
-Starts empty
+@kas3-test-v2 testStarted 23 0
+{"name":"Starts empty"}
 
 ```
 
-The first line has the event, the length of the name, and the length of the message, both in UTF-16 code
-units. The name and the message follow, each on its own line. The runner checks the order, the names and
-the lengths before it reports anything, so a program's ordinary output can't inject a test result.
+The first line gives the event kind and the UTF-16 code-unit lengths of the header and details. The header and details follow, each on its own line. The runner checks the order, names, and lengths before reporting anything, so a program's ordinary output can't inject a test result.
 
 ## Test the library itself
 
 ```sh
-python3 -m unittest discover -s testing/tests -v
+KAS3C=compiler/build/kas3c python3 -m unittest discover -s testing/tests -v
 compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fixtures/ProbeCase.as testing/as3/app/anicanon/kumikae/testing/*.as
 ```
 
