@@ -15,17 +15,30 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 internal object UiProbeRiderReopen {
-    fun run(destination: Path) {
+    fun run(destination: Path, observeNativePanels: Boolean = false) {
         val report = Files.createDirectories(destination.resolve("reopened-project"))
-        UiProbeRetention.checkReleased(exercise(report), report)
+        var survivingPanels = 0
+        val projects = exercise(report, plainText = observeNativePanels) { project, observations ->
+            if (observeNativePanels) {
+                survivingPanels += UiProbeRiderPanels.observeClose(project, observations)
+            } else {
+                UiProbeRetention.closeProject(project, observations)
+            }
+        }
+        UiProbeRetention.checkReleased(projects, report)
+        check(survivingPanels == 0) { "$survivingPanels Current File backend panels survived close" }
     }
 
-    private fun exercise(report: Path): List<WeakReference<Project>> {
+    private fun exercise(
+        report: Path,
+        plainText: Boolean,
+        close: (Project, MutableList<String>) -> Unit,
+    ): List<WeakReference<Project>> {
+        val observations = mutableListOf<String>()
         val folder = Files.createTempDirectory("kas3-reopen-project")
         val trust = TrustedPathsSettings.getInstance()
         val previousTrust = trust.getTrustedPaths().toList()
         val references = mutableListOf<WeakReference<Project>>()
-        val observations = mutableListOf<String>()
         var tabs: List<String>? = null
         var layout: DesktopLayout? = null
         val layoutType = Class.forName("com.jetbrains.rider.settings.perApp.wm.RiderPerAppToolWindowLayoutManager")
@@ -35,19 +48,23 @@ internal object UiProbeRiderReopen {
         try {
             Files.createDirectories(folder.resolve(".idea"))
             Files.writeString(folder.resolve(".idea/.gitignore"), "*\n")
-            Files.writeString(folder.resolve("Reopen.as"), "package { public class Reopen {} }")
+            val fixture = if (plainText) folder.resolve("Reopen.txt") else folder.resolve("Reopen.as")
+            Files.writeString(
+                fixture,
+                if (plainText) "Rider project reopen fixture" else "package { public class Reopen {} }",
+            )
             trust.addTrustedPath(folder.toString())
             repeat(2) { cycle ->
-                if (cycle == 1) UiProbeCompletion.edt { setLayout.invoke(layoutOwner, checkNotNull(layout)) }
+                if (cycle == 1) UiProbeDispatch.edt { setLayout.invoke(layoutOwner, checkNotNull(layout)) }
                 val project =
                     checkNotNull(ProjectUtil.openOrImport(folder, OpenProjectTask { forceOpenInNewFrame = true }))
                 references += WeakReference(project)
                 try {
                     val file =
                         checkNotNull(
-                            LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder.resolve("Reopen.as")),
+                            LocalFileSystem.getInstance().refreshAndFindFileByNioFile(fixture),
                         )
-                    UiProbeCompletion.edt {
+                    UiProbeDispatch.edt {
                         FileEditorManager.getInstance(project).openFile(file, true)
                         if (cycle == 0) {
                             checkNotNull(
@@ -55,15 +72,15 @@ internal object UiProbeRiderReopen {
                             ).show()
                         }
                     }
-                    UiProbeCompletion.await("restored visible Problems window") {
+                    UiProbeDispatch.await("restored visible Problems window") {
                         ToolWindowManager.getInstance(project).getToolWindow("Problems View")?.isVisible == true
                     }
                     // The layout records a shown window after the window reports itself visible.
-                    UiProbeCompletion.await("visible Problems window in the layout") {
+                    UiProbeDispatch.await("visible Problems window in the layout") {
                         (ToolWindowManager.getInstance(project) as ToolWindowManagerImpl).getLayout()
                             .getInfo("Problems View")?.isVisible == true
                     }
-                    UiProbeCompletion.edt {
+                    UiProbeDispatch.edt {
                         UiProbeRetention.checkSplitView(project, observations)
                         val window = checkNotNull(ToolWindowManager.getInstance(project).getToolWindow("Problems View"))
                         val contents = window.contentManager.contents
@@ -88,14 +105,14 @@ internal object UiProbeRiderReopen {
                         }
                     }
                 } finally {
-                    UiProbeCompletion.edt { UiProbeRetention.closeProject(project, observations) }
+                    UiProbeDispatch.edt { close(project, observations) }
                 }
             }
             observations +=
                 "Captured visible split Problems layout restored before project opening with the same tab order"
             return references
         } finally {
-            UiProbeCompletion.edt { setLayout.invoke(layoutOwner, originalLayout) }
+            UiProbeDispatch.edt { setLayout.invoke(layoutOwner, originalLayout) }
             trust.setTrustedPaths(previousTrust)
             Files.write(report.resolve("result.txt"), observations)
             check(folder.toFile().deleteRecursively()) { "Cannot remove reopened project fixture" }

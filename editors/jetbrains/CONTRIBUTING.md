@@ -168,6 +168,14 @@ Save a run's reports before the next run overwrites them.
 Run `KUMIKAE_RIDER_STARTUP_PROBE=1 ./gradlew --offline runIde -PuiProbe` to check Rider’s startup
 adapters and close and reopen a sandbox project with the Problems window visible.
 
+To check Rider itself, run `./gradlew --offline runRiderReopenDisabled`. A standalone test plugin
+verifies that Kumikae is absent from the loaded plugins. It opens a plain text project twice, restores
+the visible split Problems window, checks panel disposal after each close, and counts project weak
+references after full garbage collection. Run `./gradlew --offline runRiderReopenEnabled` for the
+same check with Kumikae loaded. Each task uses its own sandbox and writes its observations under
+`build/reports/<task name>/`. A surviving panel or retained project fails the task.
+The upstream Rider report is [RIDER-145607](https://youtrack.jetbrains.com/issue/RIDER-145607).
+
 ### Opt-in probes
 
 Each of these is switched on by an environment variable and never runs in an ordinary test run.

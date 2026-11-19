@@ -65,7 +65,7 @@ internal object UiProbeRetention {
         // Rider's error-icon queue has a native five-second timeout after its component disappears.
         val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
         do {
-            UiProbeCompletion.edt { paintShowingWindows() }
+            UiProbeDispatch.edt { paintShowingWindows() }
             histogram = UiProbeHeap.collect()
             if (recordRetained(projects, destination) == 0) return
             Thread.sleep(200)
