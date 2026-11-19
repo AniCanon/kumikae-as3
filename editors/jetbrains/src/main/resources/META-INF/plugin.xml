@@ -16,6 +16,7 @@
         <configurationType implementation="app.anicanon.kumikae.as3.run.KumikaeRunType"/>
         <executionTargetProvider implementation="app.anicanon.kumikae.as3.run.AndroidDestinations"/>
         <executionTargetProvider implementation="app.anicanon.kumikae.as3.run.SimulatorDestinations"/>
+        <executionTargetProvider implementation="app.anicanon.kumikae.as3.run.IosExecutionTargetProvider"/>
         <runConfigurationProducer implementation="app.anicanon.kumikae.as3.testing.As3TestProducer"/>
         <runLineMarkerContributor language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.testing.As3TestLineMarker"/>
         <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.GdScriptEditorProvider"/>

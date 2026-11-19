@@ -114,6 +114,10 @@ probes described in [CONTRIBUTING.md](CONTRIBUTING.md#checks-in-a-sandbox-ide).
   ([testing/](../../testing/README.md)). It adds no AS3 reflection and no compiler syntax.
 - **`run/`** starts Godot for desktop, builds and runs iOS Simulator targets through `tools/build-ios-simulator.sh`
   and the Simulator service, and builds and runs Android targets through `tools/android_run.py`.
+  `IosExecutionTargetProvider` adds paired physical devices to the same iOS run configuration. Its
+  project service discovers devices off the UI thread. The selected device supplies the Xcode build
+  destination and the CoreDevice identifier used for install and console launch. `tools/ios-device.py`
+  stages the selected preset, signs a debug build and runs it under the IDE-owned process handler.
 
 ## The Devices panel
 

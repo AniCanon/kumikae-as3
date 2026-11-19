@@ -18,7 +18,7 @@ class KumikaeRunType :
         for (kind in Kind.entries) {
             addFactory(object : ConfigurationFactory(this) {
                 override fun getId() = kind.label
-                override fun getName() = kind.label
+                override fun getName() = if (kind == Kind.SIMULATOR) "iOS" else kind.label
                 override fun getOptionsClass(): Class<out RunConfigurationOptions> = when (kind) {
                     Kind.GAME -> GodotRunOptions::class.java
                     Kind.SIMULATOR -> SimulatorRunOptions::class.java
@@ -27,7 +27,7 @@ class KumikaeRunType :
                 }
                 override fun createTemplateConfiguration(project: Project): RunConfiguration = when (kind) {
                     Kind.GAME -> GodotRunConfiguration(project, this, kind.label)
-                    Kind.SIMULATOR -> SimulatorRunConfiguration(project, this, kind.label)
+                    Kind.SIMULATOR -> SimulatorRunConfiguration(project, this, name)
                     Kind.ANDROID -> AndroidRunConfiguration(project, this, kind.label)
                     Kind.TESTS -> As3TestsConfiguration(project, this, kind.label)
                 }

@@ -27,6 +27,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
     private var preset by mutableStateOf("")
     private var game by mutableStateOf("")
     private var problem by mutableStateOf("")
+    private var deviceAppPath by mutableStateOf("")
     private var legacy by mutableStateOf(false)
     private var bundle by mutableStateOf("")
     private var appPath by mutableStateOf("")
@@ -44,6 +45,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
             presets = emptyList()
             problem = it.message ?: "Cannot read Godot settings."
         }.onSuccess { problem = "" }
+        deviceAppPath = configuration.options.deviceAppPath
         bundle = configuration.options.bundle
         appPath = configuration.options.appPath
         legacy = configuration.options.preset.isEmpty() && bundle.isNotEmpty()
@@ -52,13 +54,14 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
 
     override fun applyEditorTo(configuration: SimulatorRunConfiguration) {
         configuration.options.preset = if (legacy) "" else preset
+        configuration.options.deviceAppPath = deviceAppPath.trim()
         configuration.options.bundle = if (legacy) bundle.trim() else ""
         configuration.options.appPath = if (legacy) appPath.trim() else ""
     }
 
     override fun createEditor(): JComponent = composePanel(this) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insets(12))) {
-            SettingsSection("iOS Simulator", SwingModifier.north()) {
+            SettingsSection("iOS", SwingModifier.north()) {
                 Label(game)
                 if (problem.isNotEmpty()) StatusLine(problem)
                 if (legacy) {
@@ -71,7 +74,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
                         bundle = it
                         fireEditorStateChanged()
                     })
-                    LabelledField("Custom app", appPath, {
+                    LabelledField("Simulator app", appPath, {
                         appPath = it
                         fireEditorStateChanged()
                     })
@@ -87,9 +90,13 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
                             }
                         }) { Label(it) }
                         if (preset !in presets) StatusLine("Choose an existing iOS target.")
-                        StatusLine("Run builds the game and installs it on the simulator selected in the toolbar.")
+                        StatusLine("Select an iPhone, iPad or simulator in the Run toolbar.")
                     }
                 }
+                LabelledField("Signed device .app (optional)", deviceAppPath, {
+                    deviceAppPath = it
+                    fireEditorStateChanged()
+                })
             }
         }
     }
