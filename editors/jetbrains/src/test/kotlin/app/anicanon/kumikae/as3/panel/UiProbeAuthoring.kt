@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.project.NewAs3FileAction
 import app.anicanon.kumikae.as3.project.ProjectTemplate
 import app.anicanon.kumikae.as3.testing.As3TestLineMarker
@@ -29,7 +30,8 @@ internal object UiProbeAuthoring {
     fun run(project: Project, root: Path) {
         val folder = Files.createTempDirectory(root, "new-game")
         try {
-            ProjectTemplate("New Game", emptySet(), "games.qa").write(folder, null)
+            val library = PluginFiles.native()?.takeIf(ProjectTemplate::hasLibrary)
+            ProjectTemplate("New Game", emptySet(), "games.qa").write(folder, library, link = false)
             lateinit var gutter: AnAction
             ApplicationManager.getApplication().invokeAndWait {
                 val game = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
@@ -99,7 +101,8 @@ internal object UiProbeAuthoring {
                     val consoles = descriptors.mapNotNull { it.executionConsole as? SMTRunnerConsoleView }
                     for (console in consoles) {
                         val failed = console.resultsViewer.testsRootNode.allTests.singleOrNull {
-                            it.name.endsWith("::example") && it.isDefect && !it.isInProgress
+                            !it.isSuite && (it.name == "example" || it.name.endsWith("::example")) &&
+                                it.isDefect && !it.isInProgress
                         }
                         if (failed != null) result = failed to console
                     }

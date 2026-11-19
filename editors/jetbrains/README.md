@@ -145,9 +145,11 @@ Click the gutter icon beside a `[Test]` method to run that test, or beside a cla
 test runner even when a mobile destination is selected.
 
 Double-click a failed assertion to open the line that called it in the test. If the test uses an assertion
-helper, you can also click the helper's frame in the failure output. Compiler errors open at the reported
-line and column. Godot script errors link to the script line in the engine trace. The summary counts
-individual cases. A target that fails before it can run its cases appears as one failure.
+helper, you can also click the helper's frame in the failure output. Equality and comparison assertions open
+Rider's diff view. Compiler errors open at the reported line and column. Godot script errors link to the
+script line in the engine trace. Results stream live with per-test durations, captured output, and `[Ignore]`
+status; the summary counts individual cases, and a target that fails before its cases start appears as one
+failure.
 
 To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups. The
 same `kas3-tests.json` manifest drives both the IDE and the command-line runner.

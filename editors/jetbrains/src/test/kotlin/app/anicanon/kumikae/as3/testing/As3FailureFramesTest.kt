@@ -87,4 +87,23 @@ class As3FailureFramesTest {
         )
         assertEquals(listOf(48, 32), runtimeOrdered.map { it.line })
     }
+
+    @Test fun rerunCaseIdentityReconstructsHierarchicalAndSyntheticFailures() {
+        assertEquals(
+            "Game tests::qa.Score::addsPoints",
+            As3TestConsole.caseIdentity(listOf("[root]", "AS3 Tests", "Game tests", "qa.Score", "addsPoints")),
+        )
+        assertEquals(
+            "Compile",
+            As3TestConsole.caseIdentity(listOf("[root]", "AS3 Tests", "Compile")),
+        )
+        assertEquals(
+            "Build",
+            As3TestConsole.caseIdentity(listOf("[root]", "AS3 Tests", "Build", "Build")),
+        )
+        assertEquals(
+            "Game tests",
+            As3TestConsole.caseIdentity(listOf("[root]", "AS3 Tests", "Game tests", "qa.Score", "@AfterClass")),
+        )
+    }
 }

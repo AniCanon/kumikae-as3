@@ -4,6 +4,7 @@ import com.intellij.execution.Executor
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.testframework.AbstractTestProxy
 import com.intellij.execution.testframework.actions.AbstractRerunFailedTestsAction
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestLocator
@@ -72,11 +73,36 @@ internal class As3TestConsole(private val configuration: As3TestsConfiguration, 
             }
             override fun getRunProfile(environment: ExecutionEnvironment): MyRunProfile {
                 val copy = configuration.clone() as As3TestsConfiguration
-                copy.options.cases = getFailedTests(configuration.project).map { it.name }.distinct().joinToString("\n")
+                copy.options.cases = getFailedTests(configuration.project)
+                    .map(::caseIdentity)
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .joinToString("\n")
                 return object : MyRunProfile(copy) {
                     override fun getState(executor: Executor, environment: ExecutionEnvironment) =
                         copy.getState(executor, environment)
                 }
             }
         }
+
+    companion object {
+        private const val ROOT_SUITE = "AS3 Tests"
+
+        internal fun caseIdentity(proxy: AbstractTestProxy): String {
+            if ("::" in proxy.name) return proxy.name
+            val segments = generateSequence(proxy) { it.parent }
+                .map { it.name }
+                .toList()
+                .asReversed()
+            return caseIdentity(segments)
+        }
+
+        internal fun caseIdentity(segments: List<String>): String {
+            val cleaned = segments.dropWhile { it == "[root]" || it == ROOT_SUITE || it.isBlank() }
+            if (cleaned.isEmpty()) return ""
+            if (cleaned.size == 2 && cleaned[0] == cleaned[1]) return cleaned[0]
+            if (cleaned.size >= 3 && cleaned.last() == "@AfterClass") return cleaned[0]
+            return cleaned.joinToString("::")
+        }
+    }
 }

@@ -75,13 +75,18 @@ class TestSourceTest {
         val text = """
             package game {
                 public class ModifierTest {
+                    [BeforeClass] public static function setupAll():void {}
+                    [Before] public function setup():void {}
                     [Test] override public function overridden():void {}
+                    [Test(timeout=5000, expects="RangeError", allowEngineErrors=true)]
+                    [Ignore("wip")]
+                    public function configured():void {}
                     [Test] public static function notInstance():void {}
                     [Test] public function get value():int { return 1; }
                 }
             }
         """.trimIndent()
         val source = TestSource.read(text)
-        assertEquals(listOf("overridden"), source.methods.filter { it.annotated }.map { it.name })
+        assertEquals(listOf("overridden", "configured"), source.methods.filter { it.annotated }.map { it.name })
     }
 }

@@ -142,8 +142,8 @@ internal object UiProbeTestResults {
                 ApplicationManager.getApplication().invokeAndWait {
                     val leaves = activeConsole.resultsViewer.testsRootNode.allTests.filter { !it.isSuite }
                     verified = leaves.size == 3 && leaves.any { it.name == "Compile" && it.isDefect } &&
-                        leaves.any { it.name.endsWith("::passing case") && it.isPassed } &&
-                        leaves.any { it.name.endsWith("::failing case") && it.isDefect }
+                        leaves.any { it.name == "passing case" && it.isPassed } &&
+                        leaves.any { it.name == "failing case" && it.isDefect }
                 }
                 if (!verified) Thread.sleep(30)
             }
@@ -158,7 +158,7 @@ internal object UiProbeTestResults {
             check(verified) { "Native Rider test tree did not show the passing test and both failures" }
             val descriptor = ReadAction.compute<OpenFileDescriptor?, RuntimeException> {
                 val failed = activeConsole.resultsViewer.testsRootNode.allTests.single {
-                    it.name.endsWith("::failing case")
+                    !it.isSuite && it.name == "failing case"
                 }
                 check(failed.stacktrace.orEmpty().contains("ProbeCase.as:" + (failureLine + 1)))
                 failed.getDescriptor(

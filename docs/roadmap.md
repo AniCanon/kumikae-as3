@@ -59,10 +59,10 @@ state of the project changes.
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
   hover and outline. A change to a million-line project is checked in milliseconds.
 - **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
-  for desktop, iOS and Android, a Game Devices panel, and a test runner that opens failed assertions,
-  compiler diagnostics and Godot script errors at their source.
+  for desktop, iOS and Android, a Game Devices panel, and a live test runner that opens failed assertions,
+  comparison diffs, compiler diagnostics and Godot script errors at their source.
 - **VS Code client** for the language server.
-- **A testing library** written in AS3.
+- **A testing library** written in AS3, with CLI and headless Godot engine runners (`TestScene`).
 
 ## Next
 
