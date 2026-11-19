@@ -3,6 +3,7 @@ package app.anicanon.kumikae.testing {
     import godot.PackedScene;
     import godot.Resource;
     import godot.ResourceLoader;
+    import godot.Signal;
 
     // Isolated per-test scene sandbox and multi-frame step scheduler for Godot tests.
     public class TestScene {
@@ -10,6 +11,7 @@ package app.anicanon.kumikae.testing {
         private static var sandbox:Node = null;
         private static var touched:Boolean = false;
         private static var steps:Vector.<TestStep> = new Vector.<TestStep>();
+        private static var cleanups:Vector.<Function> = new Vector.<Function>();
 
         public static function get root():Node {
             if (host == null) {
@@ -55,11 +57,22 @@ package app.anicanon.kumikae.testing {
             return flow().until(predicate, timeoutMs, action);
         }
 
+        public static function waitForSignal(signal:Signal, timeoutMs:int, action:Function):TestFlow {
+            return flow().waitForSignal(signal, timeoutMs, action);
+        }
+
+        public static function onCleanup(cleanup:Function):void {
+            if (cleanup != null) {
+                cleanups.push(cleanup);
+            }
+        }
+
         public static function beginTest(runnerHost:Node):void {
             host = runnerHost;
             sandbox = null;
             touched = false;
             steps = new Vector.<TestStep>();
+            cleanups = new Vector.<Function>();
         }
 
         public static function hasPendingSteps():Boolean {
@@ -85,6 +98,13 @@ package app.anicanon.kumikae.testing {
 
         public static function finishTest():Boolean {
             var needsFlush:Boolean = touched;
+            for (var i:int = cleanups.length - 1; i >= 0; i--) {
+                try {
+                    cleanups[i]();
+                } catch (ignored:*) {
+                }
+            }
+            cleanups = new Vector.<Function>();
             if (sandbox != null) {
                 if (host != null) {
                     host.removeChild(sandbox);

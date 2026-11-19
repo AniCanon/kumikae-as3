@@ -58,8 +58,9 @@ public function playerMoves():void {
 
 - `TestScene.root`, `TestScene.add(node)`, and `TestScene.instantiate(path)` mount nodes under a per-test
   sandbox that is freed after the test finishes.
-- `afterFrames(n, fn)`, `afterPhysicsFrames(n, fn)`, `afterSeconds(s, fn)`, and `until(pred, timeoutMs, fn)`
-  chain steps on the engine loop before `[After]` and sandbox cleanup run.
+- `afterFrames(n, fn)`, `afterPhysicsFrames(n, fn)`, `afterSeconds(s, fn)`, `until(pred, timeoutMs, fn)`,
+  and `waitForSignal(signal, timeoutMs, fn)` chain steps on the engine loop before `[After]` and sandbox
+  cleanup run.
 - Any Godot `ERROR:` or `SCRIPT ERROR:` logged while a test is running fails that test unless it is marked
   `[Test(allowEngineErrors=true)]`.
 - Set `"headless": false` on a Godot target when a test needs a window/GPU, or pass `--native` to `runner.py`
