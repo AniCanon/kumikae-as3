@@ -76,7 +76,7 @@ std::string project_path(std::string_view p_file, const String &p_root) {
 // part of a project, and its tests' folders are not part of the game (skipped()).
 void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) {
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
-	if (folder.is_null()) {
+	if (folder.is_null() || folder->file_exists(".gdignore")) {
 		return;
 	}
 	for (const String &name : folder->get_files()) {
@@ -120,7 +120,7 @@ void list_folder(const String &p_folder, bool p_scenes, Folder *r_folder) {
 	r_folder->files.clear();
 	r_folder->folders.clear();
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
-	if (folder.is_null()) {
+	if (folder.is_null() || folder->file_exists(".gdignore")) {
 		return;
 	}
 	folder->list_dir_begin();

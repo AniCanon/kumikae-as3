@@ -940,6 +940,13 @@ with tempfile.TemporaryDirectory() as edited:
     output = game(["-s", "game_runs.gd"])
     check("test folders: the game runs with a mistake in a test's script",
           "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+    generated = os.path.join(copy, "android", "build")
+    os.makedirs(generated)
+    open(os.path.join(generated, ".gdignore"), "w").close()
+    shutil.copy(os.path.join(copy, "Player.as"), generated)
+    output = game(["-s", "game_runs.gd"])
+    check("ignored Gradle output can contain a second copy of a game script",
+          "VALUE the game's scripts run=6|6" in output and "already defined" not in output, output[-800:])
     output = game(["-s", "tests/run.gd"])
     check("test folders: a run that starts in a test folder has the tests' scripts", "have errors" in output and "Broken.as" in output, output[-800:])
     output = game(["-s", "game_runs.gd"], {"KAS3_TESTS": "1"})

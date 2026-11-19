@@ -123,7 +123,7 @@ c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops
 ```
 
 Give the same files the extension reads, in sorted order: every `.as` file except those in folders whose
-name starts with a dot and in the project's test folders. Both must compile the same module. Leave
+name starts with a dot, folders marked with `.gdignore`, and the project's test folders. Both must compile the same module. Leave
 `--remember` out for a library you ship.
 
 The flags for Linux are in `play_cache.h`. Neither Linux nor Windows has been built or run.
