@@ -92,8 +92,8 @@ def validate(manifest):
             if not isinstance(case["discover"], str) or not case["discover"]:
                 raise ValueError("Choose a fixture directory inside the project.")
             runtime = case.get("runtime", "cli")
-            if runtime not in ("cli", "godot"):
-                raise ValueError("Test runtime must be 'cli' or 'godot'.")
+            if runtime not in ("cli", "godot", "ios-simulator", "android"):
+                raise ValueError("Test runtime must be 'cli', 'godot', 'ios-simulator', or 'android'.")
             if "headless" in case and not isinstance(case["headless"], bool):
                 raise ValueError("Test headless option must be true or false.")
             continue
@@ -441,6 +441,9 @@ def main():
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--native", action="store_true")
+    parser.add_argument("--device", default="")
+    parser.add_argument("--preset", default="")
+    parser.add_argument("--android-sdk", default="")
     args = parser.parse_args()
     root = args.manifest.resolve().parent
     try:
@@ -469,7 +472,27 @@ def main():
             with tempfile.TemporaryDirectory(prefix="kas3-tests-") as temporary:
                 temp_path = Path(temporary).resolve()
                 filters = case.get("_filters", [])
-                if "discover" in case and case.get("runtime") == "godot":
+                if "discover" in case and case.get("runtime") in ("ios-simulator", "android"):
+                    payload_file = temp_path / "mobile-case.json"
+                    payload_file.write_text(json.dumps({"case": case, "filters": filters}))
+                    mobile_cmd = [
+                        sys.executable,
+                        "-u",
+                        str(Path(__file__).resolve().with_name("mobile_runner.py")),
+                        case["runtime"],
+                        str(root),
+                        str(payload_file),
+                        "--godot",
+                        args.godot,
+                    ]
+                    if args.device:
+                        mobile_cmd.extend(["--device", args.device])
+                    if args.preset or case.get("preset"):
+                        mobile_cmd.extend(["--preset", args.preset or case["preset"]])
+                    if args.android_sdk:
+                        mobile_cmd.extend(["--android-sdk", args.android_sdk])
+                    command_case["command"] = mobile_cmd
+                elif "discover" in case and case.get("runtime") == "godot":
                     bootstrap, _, _ = _discovery.godot_entry(temp_path, case, filters=filters)
                     command_case["command"] = [
                         str(bootstrap) if arg == "{driver}" else arg for arg in command_case["command"]

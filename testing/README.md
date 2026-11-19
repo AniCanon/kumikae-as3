@@ -16,7 +16,8 @@ Mark public no-argument instance methods with `[Test]` and point a manifest targ
 ```
 
 Add `"runtime": "godot"` to run discovered fixtures inside a single headless Godot process so Godot types
-(`Vector2`, `Node`, `PackedScene`), scenes, and frame stepping work directly:
+(`Vector2`, `Node`, `PackedScene`), scenes, and frame stepping work directly. Use `"ios-simulator"` or
+`"android"` to export and stream the same fixtures from a booted iOS Simulator or ARM64 Android emulator:
 
 ```json
 {"version":1,"tests":[{"name":"Game tests","discover":"tests","runtime":"godot"}]}
@@ -200,8 +201,9 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
 | `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
-| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`) or `"godot"` (headless Godot) |
+| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`), `"godot"`, `"ios-simulator"`, or `"android"` |
 | `headless` | Optional (for `"runtime": "godot"`). `true` by default; set `false` when a test needs a window/GPU |
+| `preset` | Optional (for mobile runtimes). Export preset name when more than one exists |
 | `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
 | `command` | The program to run, as an array of arguments (for manual targets). It's run without a shell |
 | `sources` | Patterns for the project's `.as` files, relative to the manifest. They replace `{sources}` in the command |
@@ -239,7 +241,8 @@ python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/k
 ```
 
 `--list` prints the manifest's tests. `--godot` names the Godot program, which defaults to `godot`. `--native`
-runs `"runtime": "godot"` targets with `KAS3_NATIVE_PLAY=1` instead of the interpreter.
+runs `"runtime": "godot"` targets with `KAS3_NATIVE_PLAY=1` instead of the interpreter. `--device`,
+`--preset`, and `--android-sdk` select the target simulator/emulator and Android SDK for mobile runtimes.
 
 A test fails when its process exits with a nonzero status, prints a compiler or engine error, doesn't
 print its marker, runs past its timeout, or doesn't finish its suite. Asking for a case that doesn't exist
