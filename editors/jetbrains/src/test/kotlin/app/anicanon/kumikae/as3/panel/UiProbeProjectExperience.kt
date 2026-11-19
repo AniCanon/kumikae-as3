@@ -31,6 +31,7 @@ import javax.swing.JTextField
 
 internal object UiProbeProjectExperience {
     fun run(destination: Path, theme: String) {
+        checkCatalog(destination, theme)
         val owner = Disposer.newDisposable()
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
@@ -114,6 +115,53 @@ internal object UiProbeProjectExperience {
         }
     }
 
+    private fun checkCatalog(destination: Path, theme: String) {
+        val owner = Disposer.newDisposable()
+        val running = SimulatorDevice("first", "iPhone 18 Pro", "iOS 27.0", "Booted")
+        val stopped = SimulatorDevice("second", "iPad Air", "iPadOS 27.0", "Shutdown")
+        val android = AndroidAvd("Pixel_9")
+        var opened = ""
+        var refreshes = 0
+        val mode = androidx.compose.runtime.mutableStateOf(AndroidGraphics.DEVICE)
+        lateinit var panel: JComponent
+        lateinit var frame: JFrame
+        edt {
+            panel = composePanel(owner) {
+                DeviceCatalogView(
+                    listOf(stopped, running), listOf(android), "", "", false, mode.value,
+                    { opened = it.id }, { opened = it.name }, { mode.value = it }, { refreshes++ },
+                )
+            }
+            frame = JFrame().apply { contentPane.add(panel) }
+        }
+        try {
+            fun buttons() = descendants(panel).filterIsInstance<JButton>()
+            fun button(name: String) = buttons().single { it.accessibleContext.accessibleName == name }
+            await { buttons().any { it.accessibleContext.accessibleName == "Open iPhone 18 Pro" } }
+            check(descendants(panel).none { it is JComboBox<*> })
+            render(panel, destination.resolve("$theme-device-catalog.png"), 420, 340)
+            edt {
+                button("Open iPhone 18 Pro").doClick()
+                check(opened == running.id)
+                button("Start iPad Air").doClick()
+                check(opened == stopped.id)
+                button("Start Pixel 9").doClick()
+                check(opened == android.name)
+                button("Refresh devices").doClick()
+                button("Emulator graphics").doClick()
+            }
+            await { descendants(panel).any { it is JComboBox<*> } }
+            edt { descendants(panel).filterIsInstance<JComboBox<*>>().single().selectedItem = AndroidGraphics.SOFTWARE }
+            await { mode.value == AndroidGraphics.SOFTWARE && refreshes == 1 }
+            render(panel, destination.resolve("$theme-device-graphics.png"), 300, 390)
+        } finally {
+            edt {
+                Disposer.dispose(owner)
+                frame.dispose()
+            }
+        }
+    }
+
     private fun tab(panel: JComponent, name: String) = edt {
         descendants(panel).filterIsInstance<TabControl>().single { it.name == name }.doClick()
     }
@@ -137,10 +185,10 @@ internal object UiProbeProjectExperience {
         }
         error("Project experience UI did not reach the expected state")
     }
-    private fun render(panel: JComponent, path: Path) = edt {
-        panel.setSize(960, 720)
+    private fun render(panel: JComponent, path: Path, width: Int = 960, height: Int = 720) = edt {
+        panel.setSize(width, height)
         repeat(3) { layout(panel) }
-        val image = BufferedImage(960, 720, BufferedImage.TYPE_INT_ARGB)
+        val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
         try {
             panel.printAll(graphics)

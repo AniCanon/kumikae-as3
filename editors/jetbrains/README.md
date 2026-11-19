@@ -111,9 +111,9 @@ application identifier from the preset, exports and builds the game, installs it
 
 Open **View > Tool Windows > Game Devices** to start and view simulators and Android emulators.
 
-- **Simulators** lists iOS simulators (macOS only) and Android emulators. For stopped Android emulators,
-  **Graphics for next emulator start** selects **Device default**, **Host GPU** or **Software** for the
-  next launch without modifying the AVD configuration.
+- **Simulators** groups devices by platform, with running devices first. Choose **Open** to view a running
+  device or **Start** to boot one. On macOS the list also includes iOS simulators. The gear beside
+  **Android emulators** selects **Device default**, **Host GPU** or **Software** for the next start.
 - **iOS** shows the selected simulator's screen, input controls and console.
 - **Android** shows the selected emulator's screen and forwards pointer input.
 

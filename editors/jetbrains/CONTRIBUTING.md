@@ -172,6 +172,7 @@ Each of these is switched on by an environment variable and never runs in an ord
 | `KUMIKAE_COMPLETION_CONTROL_PROBE=1` | `runIde -PuiProbe` | Opens the same projects as plain text, with no AS3 session, to tell a platform warning from one the plugin causes |
 | `KUMIKAE_COMPLETION_RETENTION_PROBE=1` | `runIde -PuiProbe` | Opens and closes ten projects over ten minutes and counts closed projects that are still held |
 | `KUMIKAE_SIMULATOR_LIVE_PROBE=1` | `runIde -PuiProbe` | Drives a Simulator that is already booted, through the real panel and the native helper |
+| `KUMIKAE_DEVICE_SETTINGS_PROBE=1` | `runIde -PuiProbe` | Exercises the device catalog and project settings in light and dark themes |
 | `KUMIKAE_SIMULATOR_MEMORY_PROBE=1` | `runIde -PuiProbe` | Ten minutes of synthetic frames through a mounted panel, with memory samples |
 | `KUMIKAE_FRAME_RETENTION_PROBE=1` | `:test --tests '*FrameRetentionProbe'` | Paints synthetic frames through the panel's own classes in a plain JVM, and counts retained images |
 | `KUMIKAE_NATIVE_LIFECYCLE_PROBE=1` | `:core:test --tests '*NativeLifecycleProbe'` | Creates one disposable Simulator and checks shutdown, reboot and reselection. It deletes only the device it created |

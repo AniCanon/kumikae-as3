@@ -3,20 +3,8 @@ package app.anicanon.kumikae.as3.panel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.anicanon.kumikae.as3.ui.Column
-import app.anicanon.kumikae.as3.ui.StatusLine
-import app.anicanon.kumikae.as3.ui.TitleButton
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.Disposable
-import com.intellij.util.ui.JBUI
-import org.jetbrains.compose.swing.components.ComboBox
-import org.jetbrains.compose.swing.components.Label
-import org.jetbrains.compose.swing.components.button.Button
-import org.jetbrains.compose.swing.components.layout.Panel
-import org.jetbrains.compose.swing.components.layout.PanelLayout
-import org.jetbrains.compose.swing.components.layout.ScrollPane
-import org.jetbrains.compose.swing.modifier.SwingModifier
-import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import java.awt.event.HierarchyEvent
 import java.awt.event.HierarchyListener
 
@@ -34,43 +22,18 @@ internal class GameDeviceCatalog(
     private var graphics by mutableStateOf(android.graphics)
     private var androidStatus by mutableStateOf("Loading emulators…")
 
+    private var loadingIos by mutableStateOf(false)
+    private var loadingAndroid by mutableStateOf(false)
     val component = composePanel(this) {
-        ScrollPane {
-            Panel(PanelLayout.Border(), modifier = SwingModifier.viewport()) {
-                Column(SwingModifier.north().emptyBorder(JBUI.insets(12))) {
-                    if (ios != null) {
-                        Label("iOS Simulators")
-                        simulators.forEach { device ->
-                            TitleButton(device.name, "${device.runtime} · ${device.state}", { openIos(device) })
-                        }
-                        if (iosStatus.isNotBlank()) StatusLine(iosStatus)
-                    }
-                    Label("Android Emulators", SwingModifier.emptyBorder(JBUI.insetsTop(12)))
-                    emulators.forEach { device ->
-                        TitleButton(
-                            device.name.replace('_', ' '),
-                            if (device.serial == null) "Stopped" else "Running",
-                            { openAndroid(device) },
-                        )
-                    }
-                    if (emulators.any { it.serial == null }) {
-                        Label("Graphics for next emulator start")
-                        ComboBox(
-                            AndroidGraphics.entries,
-                            graphics,
-                            onSelectionChange = { value ->
-                                if (value != null) {
-                                    graphics = value
-                                    android.graphics = value
-                                }
-                            },
-                        ) { Label(it.label) }
-                    }
-                    if (androidStatus.isNotBlank()) StatusLine(androidStatus)
-                    Button("Refresh devices", ::refresh)
-                }
-            }
-        }
+        DeviceCatalogView(
+            simulators.takeIf { ios != null }, emulators, iosStatus, androidStatus, loadingIos || loadingAndroid,
+            graphics, openIos, openAndroid,
+            { value ->
+                graphics = value
+                android.graphics = value
+            },
+            ::refresh,
+        )
     }
 
     private var showing = false
@@ -86,17 +49,22 @@ internal class GameDeviceCatalog(
     }
 
     private fun refresh() {
+        if (loadingIos || loadingAndroid) return
         ios?.let { repository ->
+            loadingIos = true
             iosWorker.submit({
                 repository.connect()
                 repository.devices()
             }) { result ->
+                loadingIos = false
                 result.onSuccess { simulators = it }.onFailure { simulators = emptyList() }
                 iosStatus =
                     result.exceptionOrNull()?.message ?: if (simulators.isEmpty()) "No installed simulators" else ""
             }
         }
+        loadingAndroid = true
         androidWorker.submit(android::list) { result ->
+            loadingAndroid = false
             result.onSuccess { emulators = it }.onFailure { emulators = emptyList() }
             androidStatus =
                 result.exceptionOrNull()?.message ?: if (emulators.isEmpty()) "No installed emulators" else ""
