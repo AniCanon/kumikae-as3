@@ -256,10 +256,11 @@ object UiProbeCompletion {
             UiProbeStatementCompletion.run(project, editor, observations)
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
-            if (cycle == 0) UiProbeTestActions.run(project, destination)
             UiProbeLanguageFeatures.run(project, editor, observations)
             UiProbeDiagnostics.run(project, editor, observations)
             if (cycle == 0) {
+                // The gutter check opens the failing assertion in another editor.
+                UiProbeTestActions.run(project, destination)
                 UiProbeTestResults.run(project, destination)
                 UiProbeBuildFolders.run(project, folder, observations)
             }
