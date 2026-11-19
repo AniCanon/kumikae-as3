@@ -142,8 +142,12 @@ app it launched. The Simulator stays booted.
 
 Click the gutter icon beside a `[Test]` method to run that test, or beside a class to run its fixture. Use
 **Run Game Tests** on the `tests` folder to run the project's test target. Context runs always use the local
-test runner even when a mobile destination is selected. Double-click a failed result to jump to the failing
-assertion.
+test runner even when a mobile destination is selected.
+
+Double-click a failed assertion to open the line that called it in the test. If the test uses an assertion
+helper, you can also click the helper's frame in the failure output. Compiler errors open at the reported
+line and column. Godot script errors link to the script line in the engine trace. The summary counts
+individual cases. A target that fails before it can run its cases appears as one failure.
 
 To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups. The
 same `kas3-tests.json` manifest drives both the IDE and the command-line runner.

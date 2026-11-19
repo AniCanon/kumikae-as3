@@ -36,6 +36,7 @@ internal object UiProbeFeedbackGuard {
     }
 
     private val DISMISSIBLE_DIALOGS = setOf(
+        "com.intellij.llmInstaller.ui.promo2.AIPromoWindow",
         "com.jetbrains.rider.plugins.appender.feedback.general.evaluation.LongEvaluationFeedbackDialog",
         "com.intellij.platform.ide.newUiOnboarding.newUi.NewUiOnboardingDialog",
     )

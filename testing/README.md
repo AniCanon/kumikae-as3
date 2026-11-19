@@ -174,7 +174,8 @@ python3 testing/runner.py /path/to/project/kas3-tests.json --compiler /path/to/k
 ```
 
 The last line of output is a count, such as `AS3 tests: 1 passed, 0 failed`. The exit status is 0 only
-when every test passed.
+when every test passed. The count includes each case in a suite and each plain script or scene test.
+A target that fails to compile or start contributes one failed result with its diagnostic.
 
 To run one case, name it as `<test>::<suite>::<case>`:
 

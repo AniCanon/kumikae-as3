@@ -28,6 +28,17 @@ _discovery_spec.loader.exec_module(_discovery)
 Result = namedtuple("Result", "passed output duration")
 
 
+ERROR_LINE = re.compile(r"^(?:ERROR:|SCRIPT ERROR:|Error:|FAIL(?: |$)|.+?:\d+:\d+: error:).*", re.MULTILINE)
+
+
+def process_failure(output):
+    diagnostic = ERROR_LINE.search(output)
+    if diagnostic:
+        return diagnostic.group().strip()
+    lines = output.rstrip().splitlines()
+    return lines[-1].strip() if lines else "Test failed without output"
+
+
 def summary(details):
     """A failure's one line for the results tree: the first of its details that says anything."""
     return next((line.strip() for line in details.splitlines() if line.strip()), "Assertion failed")
@@ -135,7 +146,7 @@ def run_case(root, case):
             return Result(False, output + "\nTest timed out", time.monotonic() - start)
         complete = case["marker"] in output.splitlines()
         failed = process.returncode != 0 or not complete
-        failed = failed or re.search(r"^(?:ERROR:|SCRIPT ERROR:|Error:|FAIL(?: |$)|.+?:\d+:\d+: error:)", output, re.MULTILINE) is not None
+        failed = failed or ERROR_LINE.search(output) is not None
         try:
             events = _protocol.parse(output)
             failed = failed or any(event[0] == "testFailed" for event in events)
@@ -216,7 +227,7 @@ def main():
             print(json.dumps(tests))
             return 0
         message("testSuiteStarted", name="AS3 Tests")
-        failures = 0
+        passes = failures = 0
         for case in tests:
             location = (root / case.get("source", "")).as_uri()
             structured = case.get("events", False)
@@ -258,19 +269,24 @@ def main():
                     if kind == "testFailed":
                         attributes.update(message=summary(details), details=details)
                     message(event, **attributes)
-                if not result.passed and not any(event[0] == "testFailed" for event in events):
+                case_failures = sum(kind == "testFailed" for kind, _, _ in events)
+                failures += case_failures
+                passes += sum(kind == "testFinished" for kind, _, _ in events) - case_failures
+                if not result.passed and not case_failures:
+                    failures += 1
                     message("testStarted", name=case["name"], locationHint=location)
-                    message("testFailed", name=case["name"], message="Suite did not complete", details=result.output)
+                    message("testFailed", name=case["name"], message=process_failure(result.output), details=result.output)
                     message("testFinished", name=case["name"])
                 message("testSuiteFinished", name=case["name"])
             else:
                 message("testStdOut", name=case["name"], out=result.output)
                 if not result.passed:
-                    message("testFailed", name=case["name"], message="AS3 test failed", details=result.output)
+                    message("testFailed", name=case["name"], message=process_failure(result.output), details=result.output)
                 message("testFinished", name=case["name"], duration=round(result.duration * 1000))
-            failures += int(not result.passed)
+                passes += int(result.passed)
+                failures += int(not result.passed)
         message("testSuiteFinished", name="AS3 Tests")
-        print(f"AS3 tests: {len(tests) - failures} passed, {failures} failed", flush=True)
+        print(f"AS3 tests: {passes} passed, {failures} failed", flush=True)
         return int(failures != 0)
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         print("AS3 test runner error: " + str(error), file=sys.stderr)
