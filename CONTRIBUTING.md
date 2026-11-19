@@ -24,12 +24,15 @@ where a new thing goes, and how it's tested.
    The project keeps no list of known bugs to fix later.
 4. **Update the docs in the same pull request.** If the change alters what the project does, the
    [roadmap](docs/roadmap.md) and the README of what changed say so.
-5. **Run the checks** below, read their output, and report what you ran. "Not run" is an acceptable answer;
+5. **Run the applicable checks** below, read their output, and report what you ran. "Not run" is an acceptable answer;
    a guess isn't.
 
 ## Checks
 
-Run these from the repository's root before you open a pull request:
+Documentation-only changes, including license text and attribution notices, can skip all build and test
+steps below, both before opening a pull request and before merging it.
+
+For other changes, run the following from the repository root before opening a pull request:
 
 ```bash
 cmake --build compiler/build -j && ctest --test-dir compiler/build
