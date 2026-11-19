@@ -143,6 +143,9 @@ The probe proves layout and wiring. It doesn't prove behavior against a real Sim
 
 ### Both IDEs, with and without LSP4IJ
 
+To check which AS3 adapter the plugin descriptor registers, set `KUMIKAE_LSP_DESCRIPTOR_PROBE=1`
+for the four sandbox tasks below. Each sandbox checks whether the AS3 parameter-help handler is present.
+
 After you change a language client, run all four combinations, one after another:
 
 ```sh

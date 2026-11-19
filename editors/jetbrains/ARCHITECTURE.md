@@ -50,8 +50,9 @@ Both IDEs talk to the same `kas3c lsp`. The descriptors keep the two clients apa
 |---|---|---|
 | `plugin.xml` | Always | The file type, typing help, project tools and the Simulator panel |
 | `as3-rider.xml` | In Rider | Rider's own LSP client (`As3LspSupportProvider`) |
-| `as3-idea.xml`, `as3-idea-lsp4ij.xml` | In IntelliJ IDEA, the second only with LSP4IJ | The LSP4IJ server, parameter help and outline |
+| `as3-lsp4ij.xml`, `as3-idea-lsp4ij.xml` | With LSP4IJ installed, the second only in IntelliJ IDEA | The LSP4IJ server, parameter help and outline |
 
+The main descriptor declares LSP4IJ as optional so Marketplace can resolve it during verification.
 Rider never loads an LSP4IJ class, even when that plugin is installed, and IntelliJ IDEA never loads a
 class of Rider's client. An IntelliJ IDEA project without LSP4IJ gets one notification when an AS3 file
 opens. The listener that shows it imports no client class, so a missing dependency can't break typing

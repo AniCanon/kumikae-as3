@@ -7,7 +7,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
     <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>
-    <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
+    <depends optional="true" config-file="as3-lsp4ij.xml">com.redhat.devtools.lsp4ij</depends>
     <extensionPoints>
         <extensionPoint name="gameTarget" beanClass="app.anicanon.kumikae.as3.project.GameTargetContribution" dynamic="true"/>
     </extensionPoints>
