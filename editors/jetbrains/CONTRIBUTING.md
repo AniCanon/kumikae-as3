@@ -172,6 +172,7 @@ Each of these is switched on by an environment variable and never runs in an ord
 | `KUMIKAE_COMPLETION_CONTROL_PROBE=1` | `runIde -PuiProbe` | Opens the same projects as plain text, with no AS3 session, to tell a platform warning from one the plugin causes |
 | `KUMIKAE_COMPLETION_RETENTION_PROBE=1` | `runIde -PuiProbe` | Opens and closes ten projects over ten minutes and counts closed projects that are still held |
 | `KUMIKAE_SIMULATOR_LIVE_PROBE=1` | `runIde -PuiProbe` | Drives a Simulator that is already booted, through the real panel and the native helper |
+| `KUMIKAE_IOS_TARGET_PROBE_ONLY=1` | `runIde -PuiProbe` | Checks physical and simulator selection and the signed app field in both themes |
 | `KUMIKAE_DEVICE_SETTINGS_PROBE=1` | `runIde -PuiProbe` | Exercises the device catalog and project settings in light and dark themes |
 | `KUMIKAE_SIMULATOR_MEMORY_PROBE=1` | `runIde -PuiProbe` | Ten minutes of synthetic frames through a mounted panel, with memory samples |
 | `KUMIKAE_FRAME_RETENTION_PROBE=1` | `:test --tests '*FrameRetentionProbe'` | Paints synthetic frames through the panel's own classes in a plain JVM, and counts retained images |
@@ -185,6 +186,11 @@ the UDID of a new disposable simulator to `owned-device` in the temporary folder
 under the staged iOS preset’s options and use `KUMIKAE_IOS_SCENE_MODE=native`.
 The probe adds the target, chooses that simulator in Rider, presses Run, and checks the launched game's
 log for the requested execution mode and the AS3 scene results.
+
+For a paired physical test device, give the app a disposable bundle identifier and put the device’s
+CoreDevice identifier in `owned-device`. Set `KUMIKAE_GAME_RUN_PROBE` and `KUMIKAE_IOS_PHYSICAL_PROBE=1`. Start with the
+test app uninstalled so the report comes from this run. The probe builds and signs the game, selects
+the phone in Rider and reads the AS3 scene results from its app container. Remove the app after the run.
 
 The helper's own probes are in [its README](native/SimulatorBridge/README.md#probes).
 

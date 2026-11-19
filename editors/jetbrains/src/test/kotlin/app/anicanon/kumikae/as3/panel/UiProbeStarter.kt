@@ -34,6 +34,8 @@ class UiProbeStarter : ApplicationStarter {
                 val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
                 if (System.getenv("KUMIKAE_GODOT_SETUP_PROBE") == "1") {
                     checkThemes(destination, godotSetupOnly = true)
+                } else if (System.getenv("KUMIKAE_IOS_TARGET_PROBE_ONLY") == "1") {
+                    UiProbeIosTargets.run(destination)
                 } else if (System.getenv("KUMIKAE_DEVICE_PERF_PROBE") == "1") {
                     UiProbeLive.run(destination)
                 } else if (game != null && System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL") != null) {

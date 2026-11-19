@@ -163,7 +163,14 @@ tasks.withType<PrepareSandboxTask>().configureEach {
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(rootDir.resolve("tools")) {
-        include("android_run.py", "game_export.py", "build-ios-simulator.sh", "tester_distribution.py", "store_*.py")
+        include(
+            "ios-device.py",
+            "android_run.py",
+            "game_export.py",
+            "build-ios-simulator.sh",
+            "tester_distribution.py",
+            "store_*.py",
+        )
         into("${intellijPlatform.projectName.get()}/native/tools")
     }
     val androidRuntime = "compiler/build-android-arm64/out/libkas3_godot.so"

@@ -85,7 +85,7 @@ The wizard creates a small game that runs: a
 - **Package name.** The app's identifier, such as `com.studio.game`. Left empty, it's made from the
   project's name.
 - **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and a
-  Simulator run configuration. Choosing Android adds an Android export preset and run configuration.
+  run configuration for simulators and physical devices. Choosing Android adds an Android export preset and run configuration.
   Companion plugins can contribute additional targets.
 
 ## Run the game
@@ -109,10 +109,14 @@ Open **Run > Add Game Target…** and choose a Godot export preset. In **Devices
 an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
-- **iOS** requires Xcode and a Simulator runtime. Run uses the AS3 interpreter with hot reload and works
-  without signing in. Release exports compile AS3 to native code. In **project.godot → Settings → Build & Release**,
-  the iOS preset has an **AS3 execution** override and a **Device signing team** picker populated from
-  Xcode. Pick a team and click **Apply** to use it for device exports.
+- **iOS Simulator** requires Xcode and a Simulator runtime. Run defaults to the AS3 interpreter with hot
+  reload. The iOS preset’s **AS3 execution** setting also supports native builds.
+- **iPhone or iPad.** Pair the device in Xcode, enable Developer Mode and unlock it. In **project.godot →
+  Settings → Build & Release**, open the iOS preset, choose a **Device signing team** and click **Apply**.
+  If the team is blank, Run can use a single local Apple Development signing identity. Select the device
+  in the Run toolbar and press **Run** to sign, install and launch the game. Follow its console in the Run
+  window. To install an existing signed build with the same bundle identifier, set **Signed device .app**
+  in the run configuration.
 - **Android** requires the Android SDK, NDK, matching Godot export templates and an ARM64 emulator or
   device. Debug runs default to the AS3 interpreter, and release exports compile AS3 to native ARM64 code
   (`libkas3_program.so`). In **project.godot → Settings → Build & Release**, the Android preset also has

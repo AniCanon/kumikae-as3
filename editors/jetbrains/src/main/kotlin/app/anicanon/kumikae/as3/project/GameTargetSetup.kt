@@ -103,7 +103,7 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                 project,
                 KumikaeRunType.Kind.SIMULATOR,
                 presetName = name,
-                displayName = "$name Simulator",
+                displayName = name,
                 presetOf = { it.options.preset },
                 assign = { it.options.preset = name },
             )

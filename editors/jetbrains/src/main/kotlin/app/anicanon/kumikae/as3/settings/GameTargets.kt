@@ -2,7 +2,13 @@ package app.anicanon.kumikae.as3.settings
 
 import app.anicanon.kumikae.as3.project.ProjectTemplate
 
-internal data class IosTarget(val name: String, val section: String, val bundle: String, val template: String = "")
+internal data class IosTarget(
+    val name: String,
+    val section: String,
+    val bundle: String,
+    val template: String = "",
+    val signingTeam: String = "",
+)
 
 internal object GameTargets {
     private val ANDROID_ID = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
@@ -35,6 +41,7 @@ internal object GameTargets {
             preset.section,
             bundle,
             config.string("${preset.section}.options", "custom_template/debug"),
+            config.string("${preset.section}.options", "application/app_store_team_id"),
         )
     }
 

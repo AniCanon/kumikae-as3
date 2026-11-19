@@ -2,13 +2,18 @@ package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.project.AddGameTargetDialog
 import app.anicanon.kumikae.as3.project.GameTargetSetup
+import app.anicanon.kumikae.as3.run.IosExecutionTarget
 import app.anicanon.kumikae.as3.run.SimulatorDestination
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.simulator.SimulatorException
+import com.intellij.execution.ExecutionManager
+import com.intellij.execution.ExecutionTarget
 import com.intellij.execution.ExecutionTargetManager
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.impl.ConsoleViewImpl
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
+import com.intellij.execution.ui.RunContentManager
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.impl.TrustedPathsSettings
@@ -23,7 +28,7 @@ import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import javax.swing.Timer
 
-/** Launch a disposable copy of a game on the explicitly supplied, probe-owned simulator. */
+/** Launch a disposable copy of a game on an explicitly selected test device. */
 internal object UiProbeGameRun {
     fun run(report: Path, directory: Path) {
         val folder = directory.resolve("game")
@@ -55,11 +60,18 @@ internal object UiProbeGameRun {
                 }
                 val bundle = GameTargets.ios(source, "").bundle
                 val selection = checkNotNull(RunManager.getInstance(project).selectedConfiguration)
-                var chosen: SimulatorDestination? = null
+                val physical = System.getenv("KUMIKAE_IOS_PHYSICAL_PROBE") == "1"
+                var chosen: ExecutionTarget? = null
                 await("owned device in Rider's destination picker", 45) {
                     app.invokeAndWait {
                         chosen = ExecutionTargetManager.getTargetsToChooseFor(project, selection.configuration)
-                            .filterIsInstance<SimulatorDestination>().singleOrNull { it.device.id == device }
+                            .singleOrNull {
+                                if (physical) {
+                                    it is IosExecutionTarget && it.device.id == device && it.isReady
+                                } else {
+                                    it is SimulatorDestination && it.device.id == device
+                                }
+                            }
                     }
                     chosen != null
                 }
@@ -69,12 +81,36 @@ internal object UiProbeGameRun {
                     ExecutionTargetManager.setActiveTarget(project, checkNotNull(chosen))
                     val env = ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), selection)
                         .activeTarget().build()
-                    check((env.executionTarget as? SimulatorDestination)?.device?.id == device) {
+                    check(env.executionTarget.id == checkNotNull(chosen).id) {
                         "Rider selected ${env.executionTarget.displayName} for ${RunManager.getInstance(
                             project,
                         ).selectedConfiguration?.name}"
                     }
                     env.runner.execute(env)
+                }
+                if (physical) {
+                    try {
+                        checkPhysicalScene(device, bundle, report) {
+                            app.invokeAndWait {
+                                val descriptor = RunContentManager.getInstance(project).allDescriptors
+                                    .firstOrNull { it.displayName == selection.name } ?: return@invokeAndWait
+                                val console = descriptor.executionConsole as? ConsoleViewImpl
+                                val output = console?.editor?.document?.text.orEmpty()
+                                Files.writeString(report.resolve("physical-console.txt"), output)
+                                val code = descriptor.processHandler?.exitCode
+                                check(code == null || code == 0) {
+                                    "iOS Run exited with $code. See physical-console.txt."
+                                }
+                            }
+                        }
+                        check(source == Files.readString(folder.resolve("export_presets.cfg")))
+                    } finally {
+                        app.invokeAndWait {
+                            ExecutionManager.getInstance(project).getRunningDescriptors { it == selection }
+                                .forEach { it.processHandler?.destroyProcess() }
+                        }
+                    }
+                    return
                 }
                 val repository = project.service<SimulatorHost>().repository
                 await("game process on the selected simulator", 225) {
@@ -131,6 +167,26 @@ internal object UiProbeGameRun {
             }
         } finally {
             trust.setTrustedPaths(original)
+        }
+    }
+
+    private fun checkPhysicalScene(device: String, bundle: String, report: Path, checkRun: () -> Unit) {
+        val result = report.resolve("physical-game.txt")
+        await("AS3 test results from the selected iOS device", 225) {
+            checkRun()
+            Files.deleteIfExists(result)
+            val copy = ProcessBuilder(
+                "xcrun", "devicectl", "device", "copy", "from", "--timeout", "5",
+                "--device", device, "--domain-type", "appDataContainer", "--domain-identifier", bundle,
+                "--source", "Documents/as3test.txt", "--destination", result.toString(),
+            ).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            if (copy.waitFor() != 0) {
+                Thread.sleep(1500)
+                return@await false
+            }
+            val text = Files.readString(result)
+            check(Regex("(?m)^[1-9]\\d* passed, 0 failed$").containsMatchIn(text)) { text }
+            true
         }
     }
 

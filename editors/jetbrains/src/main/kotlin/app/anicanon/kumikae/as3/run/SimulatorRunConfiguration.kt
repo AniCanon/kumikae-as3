@@ -13,6 +13,7 @@ import com.intellij.execution.ExecutionException
 import com.intellij.execution.ExecutionResult
 import com.intellij.execution.ExecutionTarget
 import com.intellij.execution.Executor
+import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RunConfigurationBase
@@ -33,23 +34,28 @@ import org.jdom.Element
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** "iOS Simulator (AS3)" in Run > Edit Configurations: an app's bundle, and optionally the app to install. */
+/** Reads configurations created before the unified Kumikae AS3 run type. */
 class SimulatorConfigurationType :
     SimpleConfigurationType(
         "KumikaeAs3Simulator",
-        "iOS Simulator (AS3)",
-        "Install and launch an app on a running iOS Simulator",
+        "iOS (AS3)",
+        "Install and launch an app on an iOS device or simulator",
         NotNullLazyValue.createValue { PluginFiles.mark },
     ) {
     override fun isApplicable(project: Project) = false
 
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
-        SimulatorRunConfiguration(project, this, "iOS Simulator")
+        SimulatorRunConfiguration(project, this, "iOS")
 }
 
 class SimulatorRunOptions : RunConfigurationOptions() {
     private val bundleProperty = string("").provideDelegate(this, "bundle")
     private val appProperty = string("").provideDelegate(this, "appPath")
+
+    private val deviceAppProperty = string("").provideDelegate(this, "deviceAppPath")
+    var deviceAppPath: String
+        get() = deviceAppProperty.getValue(this).orEmpty()
+        set(value) = deviceAppProperty.setValue(this, value)
 
     private val presetProperty = string("").provideDelegate(this, "preset")
     var preset: String
@@ -92,6 +98,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> = SimulatorRunEditor()
 
     override fun canRunOn(target: ExecutionTarget) = target is SimulatorDestination ||
+        target is IosExecutionTarget || target is IosUnavailableTarget ||
         (options.preset.isBlank() && options.bundle.isNotBlank() && super.canRunOn(target))
 
     override fun checkConfiguration() {
@@ -108,10 +115,20 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
         } catch (error: Exception) {
             throw ExecutionException(error.message ?: "Cannot read the iOS target.")
         }
-        if (target != null && environment.executionTarget !is SimulatorDestination) {
-            throw ExecutionException("Choose an available simulator in the Run toolbar.")
-        }
+        val destination = environment.executionTarget
         val bundle = target?.bundle ?: options.bundle
+        if (destination is IosUnavailableTarget) throw ExecutionException(destination.displayName)
+        if (destination is IosExecutionTarget) {
+            if (!destination.isReady) throw ExecutionException("Connect and unlock the selected iOS device.")
+            val folder = project.basePath?.let(Path::of) ?: throw ExecutionException("Open the game project.")
+            return object : CommandLineState(environment) {
+                override fun startProcess() =
+                    IosDeviceLaunch.start(folder, destination.device, target, bundle, options.deviceAppPath)
+            }
+        }
+        if (target != null && destination !is SimulatorDestination) {
+            throw ExecutionException("Choose an available iOS device or simulator in the Run toolbar.")
+        }
         val appPath = if (target == null) options.appPath else ""
         return object : RunProfileState {
             override fun execute(executor: Executor?, runner: ProgramRunner<*>): ExecutionResult {
