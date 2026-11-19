@@ -1,32 +1,38 @@
 package app.anicanon.kumikae.as3.settings
 
+import app.anicanon.kumikae.as3.scene.resolveProjectResource
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.ReadonlyStatusHandler
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 
 /** Uses IDE documents so Apply participates in undo and sees unsaved source edits. */
 internal class IdeSettingsRepository(
     private val project: Project,
     private val file: VirtualFile,
-    private val owner: com.intellij.openapi.Disposable,
+    private val owner: Disposable,
 ) : SettingsRepository {
-    private fun documents() = com.intellij.openapi.application.ReadAction.compute<
-        Pair<com.intellij.openapi.editor.Document, com.intellij.openapi.editor.Document?>,
-        RuntimeException,
-        > {
-        val manager = FileDocumentManager.getInstance()
-        val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
-        val exports = file.parent.findChild("export_presets.cfg")?.let(manager::getDocument)
-        main to exports
-    }
+    private fun root(): VirtualFile = requireNotNull(file.parent) { "Project file has no parent directory." }
+
+    private fun documents(): Pair<Document, Document?> =
+        ReadAction.compute<Pair<Document, Document?>, RuntimeException> {
+            val manager = FileDocumentManager.getInstance()
+            val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
+            val exports = root().findChild("export_presets.cfg")?.let(manager::getDocument)
+            main to exports
+        }
 
     override fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) {
-        com.intellij.openapi.application.ReadAction.nonBlocking<Artwork?> {
-            GameArtwork.preview(file.parent, path, filter)
-        }.expireWith(owner).finishOnUiThread(com.intellij.openapi.application.ModalityState.any(), ready)
-            .submit(com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService())
+        ReadAction.nonBlocking<Artwork?> {
+            file.parent?.let { GameArtwork.preview(it, path, filter) }
+        }.expireWith(owner).finishOnUiThread(ModalityState.any(), ready)
+            .submit(AppExecutorUtil.getAppExecutorService())
     }
 
     override fun load(): ProjectSettings {
@@ -40,15 +46,17 @@ internal class IdeSettingsRepository(
             "Project files changed. Reload before applying your changes."
         }
         val (newMain, newExports) = draft.write(main.text, exports?.text.orEmpty())
-        for (resource in listOf(draft.mainScene, draft.icon, draft.splash, draft.exportIcon) +
-            draft.exportDrafts.values.map { it.second }) {
+        val folder = root()
+        val resources = listOf(draft.mainScene, draft.icon, draft.splash) +
+            draft.allExportDrafts().values.map { it.second }
+        for (resource in resources) {
             if (resource.startsWith("res://")) {
-                require(file.parent.findFileByRelativePath(resource.removePrefix("res://")) != null) {
+                require(resolveProjectResource(folder, resource) != null) {
                     "Resource does not exist: $resource"
                 }
             }
         }
-        val files = listOfNotNull(file, file.parent.findChild("export_presets.cfg"))
+        val files = listOfNotNull(file, folder.findChild("export_presets.cfg"))
         check(!ReadonlyStatusHandler.getInstance(project).ensureFilesWritable(files).hasReadonlyFiles()) {
             "Project settings are read-only."
         }
@@ -64,8 +72,8 @@ internal class IdeSettingsRepository(
                     main.setText(newMain)
                     exports?.setText(newExports)
                 } catch (error: Exception) {
-                    main.setText(expected.projectText)
-                    exports?.setText(expected.exportText)
+                    runCatching { main.setText(expected.projectText) }.onFailure(error::addSuppressed)
+                    runCatching { exports?.setText(expected.exportText) }.onFailure(error::addSuppressed)
                     throw error
                 }
             },

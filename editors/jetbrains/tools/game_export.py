@@ -44,18 +44,24 @@ def export(project, destination, godot, native, presets):
         if "iOS" in platforms:
             framework = stage / "bin/ios/kas3_godot.xcframework"
             if not framework.is_dir():
+                source = native / "ios/kas3_godot.xcframework"
+                if not source.is_dir():
+                    raise ValueError("The iOS AS3 runtime is missing from this plugin.")
                 framework.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(native / "ios/kas3_godot.xcframework", framework)
+                shutil.copytree(source, framework)
         base = [godot, "--headless", "--path", str(stage)]
-        subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True)
+        subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
         output = Path(tempfile.mkdtemp(prefix="Game-exports-", dir=destination))
         print(f"Export directory: {output}", flush=True)
         failed = []
         for index, preset in enumerate(presets, 1):
             label = preset["name"]
+            filename = Path(preset["filename"]).name
+            if not filename or filename in {".", ".."}:
+                raise ValueError(f"Invalid export filename for {label}.")
             subdir = output / (str(index) + "-" + (re.sub(r"[^a-zA-Z0-9._-]+", "-", label) or "target"))
             subdir.mkdir()
-            artifact = subdir / Path(preset["filename"]).name
+            artifact = subdir / filename
             print(f"Exporting {label} to {artifact}", flush=True)
             missing_runtime = False
             with subprocess.Popen(base + ["--language", "en", "--export-release", label, str(artifact)],
@@ -64,15 +70,19 @@ def export(project, destination, godot, native, presets):
                     print(line, end="", flush=True)
                     if "library found for GDExtension:" in line and "kas3.gdextension" in line:
                         missing_runtime = True
-            if missing_runtime or engine.returncode or not (artifact.exists() or
-                    (preset["platform"] == "iOS" and artifact.with_suffix(".xcodeproj").is_dir())):
+            produced = artifact.is_file() or artifact.is_dir() or (
+                preset["platform"] == "iOS" and artifact.with_suffix(".xcodeproj").is_dir()
+            )
+            if missing_runtime or engine.returncode or not produced:
                 failed.append(label)
         if failed:
             raise ValueError("Godot could not export: " + ", ".join(failed) + ". See the engine output above.")
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 6:
+        sys.exit("Usage: game_export.py <project> <destination> <godot> <native> <presets-json>")
     try:
         export(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], Path(sys.argv[4]), json.loads(sys.argv[5]))
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         sys.exit(str(error))

@@ -33,13 +33,15 @@ def wait_for_device(adb):
 
 def install(adb, apk):
     wait_for_device(adb)
-    subprocess.run([*adb, "install", "-r", apk], check=True)
+    subprocess.run([*adb, "install", "-r", apk], check=True, timeout=180)
 
 
 def run(project, preset, serial, sdk, godot, runtime):
     adb = [str(sdk / "platform-tools/adb"), "-s", serial]
-    def shell(*args):
-        return subprocess.check_output([*adb, "shell", *args], text=True).strip()
+
+    def shell(*args, timeout=30):
+        return subprocess.check_output([*adb, "shell", *args], text=True, timeout=timeout).strip()
+
     wait_for_device(adb)
     abi = shell("getprop", "ro.product.cpu.abilist").split(",")
     if "arm64-v8a" not in abi:
@@ -53,32 +55,53 @@ def run(project, preset, serial, sdk, godot, runtime):
         module.stage_game(project, stage, runtime, android=True)
         apk = Path(folder) / "game.apk"
         env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
-        subprocess.run([godot, "--headless", "--path", stage, "--editor", "--quit-after", "120", "--max-fps", "60"], env=env, check=True)
-        subprocess.run([godot, "--headless", "--path", stage, "--export-debug", preset, apk], env=env, check=True)
+        subprocess.run(
+            [godot, "--headless", "--path", stage, "--editor", "--quit-after", "120", "--max-fps", "60"],
+            env=env,
+            check=True,
+            timeout=180,
+        )
+        subprocess.run(
+            [godot, "--headless", "--path", stage, "--export-debug", preset, apk],
+            env=env,
+            check=True,
+            timeout=900,
+        )
         with zipfile.ZipFile(apk) as archive:
             if not any(item.startswith("lib/arm64-v8a/") and "kas3" in item for item in archive.namelist()):
                 raise ValueError("The selected Android preset did not export the ARM64 AS3 runtime.")
-        package, activity = launch_activity(subprocess.check_output([aapt, "dump", "badging", apk], text=True))
+        badging = subprocess.check_output([aapt, "dump", "badging", apk], text=True, timeout=30)
+        package, activity = launch_activity(badging)
         install(adb, apk)
-        component = package + "/" + activity if activity else shell(
-            "cmd", "package", "resolve-activity", "--brief", "-a", "android.intent.action.MAIN",
-            "-c", "android.intent.category.LAUNCHER", package).splitlines()[-1]
+        if activity:
+            component = package + "/" + activity
+        else:
+            resolved = shell(
+                "cmd", "package", "resolve-activity", "--brief", "-a", "android.intent.action.MAIN",
+                "-c", "android.intent.category.LAUNCHER", package,
+            ).splitlines()
+            component = resolved[-1] if resolved else ""
         if not component.startswith(package + "/"):
             raise ValueError("Android could not resolve a launcher for " + package)
-        result = shell("am", "start", "-W", "-n", component)
+        result = shell("am", "start", "-W", "-n", component, timeout=60)
         print(result, flush=True)
         if "Status: ok" not in result:
             raise ValueError("Android could not launch this game.")
         try:
-            while subprocess.run([*adb, "shell", "pidof", package], stdout=subprocess.DEVNULL).returncode == 0:
+            while subprocess.run([*adb, "shell", "pidof", package], stdout=subprocess.DEVNULL, timeout=15).returncode == 0:
                 time.sleep(1)
         finally:
-            subprocess.run([*adb, "shell", "am", "force-stop", package], check=True)
+            try:
+                subprocess.run([*adb, "shell", "am", "force-stop", package], check=False, timeout=10, stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.SubprocessError):
+                pass
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(130))
+    if len(sys.argv) != 7:
+        sys.exit("Usage: android_run.py <project> <preset> <serial> <sdk> <godot> <runtime>")
     try:
         run(Path(sys.argv[1]), sys.argv[2], sys.argv[3], Path(sys.argv[4]), sys.argv[5], Path(sys.argv[6]))
-    except (OSError, ValueError, subprocess.CalledProcessError) as failure:
+    except (OSError, ValueError, subprocess.SubprocessError) as failure:
         sys.exit(str(failure))

@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import app.anicanon.kumikae.as3.settings.GameTargets
+import app.anicanon.kumikae.as3.settings.GodotConfig
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -27,7 +28,7 @@ internal enum class Platform(val label: String) {
                 ANDROID,
                 available = true,
                 always = false,
-                note = "Adds an Android export preset.",
+                note = "Adds Android export settings and an Android run target.",
             ),
         )
     }
@@ -47,7 +48,7 @@ internal class ProjectTemplate(
         val source = "src/" + bundle.replace('.', '/').replace('-', '_') + "/view"
         val namespace = bundle.replace('-', '_')
         require(namespace.split('.').all(As3Names::valid)) { "Choose a valid ActionScript package name." }
-        require(Regex("""\d+\.\d+\.\d+""").matches(version)) { "Enter a version such as 1.0.0." }
+        require(VERSION_PATTERN.matches(version)) { "Enter a version such as 1.0.0." }
         val testRoot = "tests/" + namespace.replace('.', '/')
         put(
             "project.godot",
@@ -57,7 +58,7 @@ internal class ProjectTemplate(
             ).replace(
                 "{package}",
                 bundle,
-            ).replace("{name}", app.anicanon.kumikae.as3.settings.GodotConfig.quote(name).removeSurrounding("\"")),
+            ).replace("{name}", GodotConfig.quote(name).removeSurrounding("\"")),
         )
         put("scenes/main.tscn", SCENE.replace("{source}", source))
         put("$source/Main.as", SCRIPT.replace("package {", "package $namespace.view {"))
@@ -126,6 +127,20 @@ internal class ProjectTemplate(
                         it.fileName.toString().startsWith(LIBRARY)
                     }.forEach { Files.copy(it, bin.resolve(it.fileName)) }
                 }
+                val ios = library.resolve("ios")
+                if (Files.isDirectory(ios)) {
+                    Files.walk(ios).use { entries ->
+                        entries.forEach { source ->
+                            val target = bin.resolve("ios").resolve(ios.relativize(source))
+                            if (Files.isDirectory(source)) {
+                                Files.createDirectories(target)
+                            } else {
+                                Files.createDirectories(target.parent)
+                                Files.copy(source, target)
+                            }
+                        }
+                    }
+                }
             }
             written += "bin"
         }
@@ -146,6 +161,7 @@ internal class ProjectTemplate(
 
     companion object {
         const val DEFAULT_VERSION = "1.0.0"
+        val VERSION_PATTERN = Regex("""\d+\.\d+\.\d+""")
         private const val LIBRARY = "libkas3_godot"
 
         /** The project's icon: the Kumikae mark, to be replaced by the game's own. */

@@ -1,10 +1,12 @@
 package app.anicanon.kumikae.as3.project
 
+import app.anicanon.kumikae.as3.run.AndroidRunConfiguration
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.run.SimulatorRunConfiguration
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import com.intellij.execution.RunManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -13,15 +15,15 @@ import com.intellij.openapi.vfs.VirtualFile
 
 internal class GameTargetSetup(private val project: Project, private val root: VirtualFile) {
     private val manager = FileDocumentManager.getInstance()
-    private fun text(file: VirtualFile): String =
-        com.intellij.openapi.application.ReadAction.compute<String, RuntimeException> {
-            requireNotNull(manager.getDocument(file)) { "Cannot read ${file.name}." }.text
-        }
+    private fun text(file: VirtualFile): String = ReadAction.compute<String, RuntimeException> {
+        requireNotNull(manager.getDocument(file)) { "Cannot read ${file.name}." }.text
+    }
     private fun file() = root.findChild("export_presets.cfg")
     private fun exports() = file()?.let(::text).orEmpty()
     fun presets() = GameTargets.presets(GodotConfig(exports()))
     fun defaultIdentifier(): String {
-        val config = GodotConfig(text(requireNotNull(root.findChild("project.godot"))))
+        val projectFile = requireNotNull(root.findChild("project.godot")) { "Missing project.godot." }
+        val config = GodotConfig(text(projectFile))
         val stored = config.string("application", "config/kumikae_package")
         if (stored.isNotBlank()) return stored
         val export = GodotConfig(exports())
@@ -57,36 +59,54 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                 },
             )
         }
-        if (platform == "iOS") selectSimulator(project, name) else selectAndroid(project, name)
+        when (platform) {
+            "iOS" -> selectSimulator(project, name)
+            "Android" -> selectAndroid(project, name)
+            else -> error("Unsupported Godot target platform: $platform")
+        }
     }
 
     companion object {
-        fun selectAndroid(project: Project, name: String) {
+        private inline fun <reified T> selectPreset(
+            project: Project,
+            kind: KumikaeRunType.Kind,
+            presetName: String,
+            displayName: String,
+            presetOf: (T) -> String,
+            assign: (T) -> Unit,
+        ) {
             val manager = RunManager.getInstance(project)
-            val factory = KumikaeRunType.factory(KumikaeRunType.Kind.ANDROID)
+            val factory = KumikaeRunType.factory(kind)
             val chosen = manager.allSettings.firstOrNull {
-                (it.configuration as? app.anicanon.kumikae.as3.run.AndroidRunConfiguration)?.options?.preset == name
-            } ?: manager.createConfiguration(manager.suggestUniqueName(name, factory.type), factory).also {
-                (it.configuration as app.anicanon.kumikae.as3.run.AndroidRunConfiguration).options.preset = name
+                val config = it.configuration as? T
+                config != null && presetOf(config) == presetName
+            } ?: manager.createConfiguration(manager.suggestUniqueName(displayName, factory.type), factory).also {
+                assign(it.configuration as T)
                 manager.addConfiguration(it)
             }
             manager.selectedConfiguration = chosen
         }
 
+        fun selectAndroid(project: Project, name: String) {
+            selectPreset<AndroidRunConfiguration>(
+                project,
+                KumikaeRunType.Kind.ANDROID,
+                presetName = name,
+                displayName = name,
+                presetOf = { it.options.preset },
+                assign = { it.options.preset = name },
+            )
+        }
+
         fun selectSimulator(project: Project, name: String) {
-            val manager = RunManager.getInstance(project)
-            val existing = manager.allSettings.firstOrNull {
-                (it.configuration as? SimulatorRunConfiguration)?.options?.preset == name
-            }
-            val factory = KumikaeRunType.factory(KumikaeRunType.Kind.SIMULATOR)
-            val chosen = existing ?: manager.createConfiguration(
-                manager.suggestUniqueName("$name Simulator", factory.type),
-                factory,
-            ).also {
-                (it.configuration as SimulatorRunConfiguration).options.preset = name
-                manager.addConfiguration(it)
-            }
-            manager.selectedConfiguration = chosen
+            selectPreset<SimulatorRunConfiguration>(
+                project,
+                KumikaeRunType.Kind.SIMULATOR,
+                presetName = name,
+                displayName = "$name Simulator",
+                presetOf = { it.options.preset },
+                assign = { it.options.preset = name },
+            )
         }
     }
 }

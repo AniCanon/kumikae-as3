@@ -69,11 +69,18 @@ private class GdScriptOverview(private val project: Project, private val script:
                     } else {
                         Label("Declarations", SwingModifier.font(JBFont.h3()).emptyBorder(JBUI.insetsTop(18)))
                         if (data.members.isEmpty()) StatusLine("No declarations")
-                        data.members.forEach { member -> TitleButton(member.name, "", { source(member.offset) }) }
+                        data.members.forEach { member ->
+                            TitleButton(member.name, "", { source(member.offset) }, chevron = false)
+                        }
                         Label("Attached scenes", SwingModifier.font(JBFont.h3()).emptyBorder(JBUI.insetsTop(18)))
                         if (data.scenes.isEmpty()) StatusLine("No scene attachments")
                         data.scenes.forEach { usage ->
-                            TitleButton(usage.file.name, usage.node.path, { files.openFile(usage.file, true) })
+                            TitleButton(
+                                usage.file.name,
+                                usage.node.path,
+                                { files.openFile(usage.file, true) },
+                                chevron = false,
+                            )
                         }
                     }
                 }
@@ -111,12 +118,10 @@ private class GdScriptOverview(private val project: Project, private val script:
             }
         }
         val document = FileDocumentManager.getInstance().getDocument(script) ?: return emptyList()
-        val pattern =
-            Regex(
-                "^(?:@\\w+(?:\\([^)]*\\))?\\s+)*(?:(?:static|abstract)\\s+)?(func|var|const|signal|enum|class|class_name)\\s+([A-Za-z_]\\w*)",
-            )
-        return document.text.lineSequence().mapIndexedNotNull { line, text ->
-            pattern.find(text)?.let { match -> ScriptMember(match.value, document.getLineStartOffset(line)) }
+        return document.immutableCharSequence.lineSequence().mapIndexedNotNull { line, text ->
+            DECLARATION_PATTERN.find(text)?.let { match ->
+                ScriptMember(match.value.trim(), document.getLineStartOffset(line))
+            }
         }.toList()
     }
     override fun getFile() = script
@@ -129,4 +134,10 @@ private class GdScriptOverview(private val project: Project, private val script:
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun dispose() = Unit
+
+    private companion object {
+        val DECLARATION_PATTERN = Regex(
+            "^\\s*(?:@\\w+(?:\\([^)]*\\))?\\s+)*(?:(?:static|abstract)\\s+)?(func|var|const|signal|enum|class|class_name)\\s+([A-Za-z_]\\w*)",
+        )
+    }
 }

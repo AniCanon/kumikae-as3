@@ -20,6 +20,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.PsiDocumentManager
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit
 
 /** Native LSP lookup and acceptance in a disposable sandbox project. */
 object UiProbeCompletion {
-    private val projects = mutableListOf<WeakReference<com.intellij.openapi.project.Project>>()
+    private val projects = mutableListOf<WeakReference<Project>>()
 
     fun run(destination: Path, plainText: Boolean = false, missingClient: Boolean = false) = UiProbeFocus.run {
         projects.clear()
@@ -280,7 +281,7 @@ object UiProbeCompletion {
         }
     }
 
-    private fun checkSnippet(project: com.intellij.openapi.project.Project, editor: Editor, source: String) {
+    private fun checkSnippet(project: Project, editor: Editor, source: String) {
         val call = source.replace("public function run", "public function move(amount:int):void {} public function run")
             .replace("transform.origin.normsuffix", "movsuffix")
         edt {
@@ -318,7 +319,7 @@ object UiProbeCompletion {
         )
     }
 
-    internal fun invokeCompletion(project: com.intellij.openapi.project.Project, editor: Editor) {
+    internal fun invokeCompletion(project: Project, editor: Editor) {
         // A Gradle sandbox can start in the background. Deliver activation to its own frame so the
         // platform's hint manager permits showing the real lookup without stealing desktop focus.
         activate(project)
@@ -328,16 +329,15 @@ object UiProbeCompletion {
         CodeCompletionHandlerBase(CompletionType.BASIC).invokeCompletion(project, editor)
     }
 
-    internal fun activate(project: com.intellij.openapi.project.Project) {
+    internal fun activate(project: Project) {
         val frame = checkNotNull(WindowManager.getInstance().getFrame(project))
         ApplicationActivationStateManager.updateState(WindowEvent(frame, WindowEvent.WINDOW_ACTIVATED))
     }
 
-    private fun editorText(project: com.intellij.openapi.project.Project): String =
-        FileEditorManager.getInstance(project).selectedTextEditor?.let {
-            "${it.document.text}; caret=${it.caretModel.offset}; selected=${it.selectionModel.selectedText}; " +
-                "lookup=${LookupManager.getActiveLookup(it)?.items?.map { item -> item.lookupString }}"
-        }.orEmpty()
+    private fun editorText(project: Project): String = FileEditorManager.getInstance(project).selectedTextEditor?.let {
+        "${it.document.text}; caret=${it.caretModel.offset}; selected=${it.selectionModel.selectedText}; " +
+            "lookup=${LookupManager.getActiveLookup(it)?.items?.map { item -> item.lookupString }}"
+    }.orEmpty()
 
     internal fun edt(action: () -> Unit) = ApplicationManager.getApplication().invokeAndWait(action)
 

@@ -2,7 +2,9 @@ package app.anicanon.kumikae.as3.settings
 
 import org.junit.jupiter.api.Test
 import java.awt.Rectangle
+import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SplashLayoutTest {
     @Test fun `window overrides and translucent background match the launch settings`() {
@@ -24,7 +26,7 @@ class SplashLayoutTest {
     }
 
     @Test fun `tree icons fit rectangular artwork and unfiltered thumbnails keep their palette`() {
-        val image = java.awt.image.BufferedImage(1600, 800, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val image = BufferedImage(1600, 800, BufferedImage.TYPE_INT_RGB)
         for (x in 0 until image.width step 2) {
             for (y in 0 until image.height) image.setRGB(x, y, -1)
         }
@@ -32,9 +34,9 @@ class SplashLayoutTest {
         assertEquals(960, art.image.width)
         assertEquals(480, art.image.height)
         assertEquals(1600, art.width)
-        kotlin.test.assertTrue((0 until 960).all { art.image.getRGB(it, 0) in setOf(-1, -16777216) })
+        assertTrue((0 until 960).all { art.image.getRGB(it, 0) in setOf(-1, -16777216) })
         val icon = art.treeIcon
-        val result = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        val result = BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
         val g = result.createGraphics()
         try {
             icon.paintIcon(null, g, 0, 0)

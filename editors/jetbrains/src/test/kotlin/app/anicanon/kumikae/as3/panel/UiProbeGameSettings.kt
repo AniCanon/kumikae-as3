@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import app.anicanon.kumikae.as3.settings.ArtworkButton
 import app.anicanon.kumikae.as3.ui.TabControl
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
@@ -63,7 +64,7 @@ internal object UiProbeGameSettings {
                     (rgb shr 16 and 255) > 232 && (rgb shr 8 and 255) in 155..220 && (rgb and 255) < 110
                 }
             }
-            check(gold > 120) { "Support Sprint artwork is missing its gold token: $gold pixels." }
+            check(gold > 120) { "Project artwork is missing its accent pixels: $gold pixels." }
         }
         if (System.getenv("KUMIKAE_ARTWORK_UI_ONLY") == "1") UiProbeArtworkPicker.run(panel, file, output)
         app.invokeAndWait {
@@ -72,7 +73,7 @@ internal object UiProbeGameSettings {
         await { children(panel).filterIsInstance<JSpinner>().count() == 2 }
         app.invokeAndWait { capture(panel, output.resolve("godot-display.png")) }
         val tests = checkNotNull(root.findChild("tests"))
-        com.intellij.openapi.application.ReadAction.run<RuntimeException> {
+        ReadAction.run<RuntimeException> {
             check(ProjectFileIndex.getInstance(project).isInTestSourceContent(tests)) { "Unregistered game test root" }
         }
     }

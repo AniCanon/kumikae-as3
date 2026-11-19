@@ -9,14 +9,18 @@ import java.awt.BasicStroke
 import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.geom.RoundRectangle2D
 import javax.swing.JButton
-import kotlin.math.roundToInt
 
 @Composable
 internal fun ProjectIconPreview(art: Artwork?, title: String, layout: SplashLayout?, choose: () -> Unit) {
     SwingNode(factory = { ArtworkButton(title, choose) }, update = {
+        set(title) {
+            toolTipText = it
+            getAccessibleContext().accessibleName = it
+        }
         set(choose) { onChoose = it }
         set(art) {
             artwork = it
@@ -54,9 +58,10 @@ internal class ArtworkButton(title: String, var onChoose: () -> Unit) : JButton(
             val areaH = height - pad * 2
             if (areaW <= 0 || areaH <= 0) return
             val layout = splash
-            val ratio = layout?.let { it.width.toDouble() / it.height } ?: 1.0
-            val w = minOf(areaW.toDouble(), areaH * ratio).roundToInt().coerceAtLeast(1)
-            val h = (w / ratio).roundToInt().coerceIn(1, areaH)
+            val fitted = fitRect(layout?.width?.toDouble() ?: 1.0, layout?.height?.toDouble() ?: 1.0, areaW, areaH)
+            if (fitted.width <= 0 || fitted.height <= 0) return
+            val w = fitted.width
+            val h = fitted.height
             val x = pad
             val y = pad
             val radius = JBUI.scale(if (layout == null) 18 else 6).toDouble()
@@ -72,7 +77,7 @@ internal class ArtworkButton(title: String, var onChoose: () -> Unit) : JButton(
             g.clip(bounds)
             val asset = artwork
             if (asset != null && layout?.visible != false) {
-                asset.draw(g, java.awt.Rectangle(x, y, w, h), layout)
+                asset.draw(g, Rectangle(x, y, w, h), layout)
             } else if (asset == null && layout?.visible != false) {
                 icon.paintIcon(this, g, x + (w - icon.iconWidth) / 2, y + (h - icon.iconHeight) / 2)
             }

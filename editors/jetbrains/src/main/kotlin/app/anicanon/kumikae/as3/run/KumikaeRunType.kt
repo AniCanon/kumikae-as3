@@ -2,10 +2,12 @@ package app.anicanon.kumikae.as3.run
 
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.testing.As3TestsConfiguration
+import app.anicanon.kumikae.as3.testing.As3TestsOptions
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeBase
 import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.execution.configurations.RunConfigurationOptions
 import com.intellij.openapi.project.Project
 
 class KumikaeRunType :
@@ -17,6 +19,12 @@ class KumikaeRunType :
             addFactory(object : ConfigurationFactory(this) {
                 override fun getId() = kind.label
                 override fun getName() = kind.label
+                override fun getOptionsClass(): Class<out RunConfigurationOptions> = when (kind) {
+                    Kind.GAME -> GodotRunOptions::class.java
+                    Kind.SIMULATOR -> SimulatorRunOptions::class.java
+                    Kind.ANDROID -> AndroidOptions::class.java
+                    Kind.TESTS -> As3TestsOptions::class.java
+                }
                 override fun createTemplateConfiguration(project: Project): RunConfiguration = when (kind) {
                     Kind.GAME -> GodotRunConfiguration(project, this, kind.label)
                     Kind.SIMULATOR -> SimulatorRunConfiguration(project, this, kind.label)

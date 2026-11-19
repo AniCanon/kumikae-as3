@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.project
 
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.module.ModuleType
 import com.intellij.openapi.project.Project
@@ -17,9 +19,9 @@ internal object GameSourceRoots {
         if (folders.isEmpty()) return
         val index = ProjectFileIndex.getInstance(project)
         val modules = ModuleManager.getInstance(project)
-        val module = index.getModuleForFile(root) ?: run {
+        val module = ReadAction.compute<Module?, RuntimeException> { index.getModuleForFile(root) } ?: run {
             if (modules.modules.isNotEmpty()) return
-            WriteAction.computeAndWait<com.intellij.openapi.module.Module, RuntimeException> {
+            WriteAction.computeAndWait<Module, RuntimeException> {
                 modules.newModule(base.resolve(".idea/KumikaeGame.iml"), ModuleType.EMPTY.id)
             }
         }

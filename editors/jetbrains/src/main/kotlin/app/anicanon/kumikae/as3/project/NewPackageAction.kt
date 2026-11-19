@@ -12,8 +12,11 @@ import com.intellij.openapi.ui.Messages
 class NewPackageAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
     override fun update(e: AnActionEvent) {
+        val basePath = e.project?.basePath
         e.presentation.isEnabledAndVisible = e.getData(LangDataKeys.IDE_VIEW)?.directories?.any { dir ->
-            generateSequence(dir) { it.parentDirectory }.any { it.findFile("project.godot") != null }
+            generateSequence(dir) {
+                if (it.virtualFile.path == basePath) null else it.parentDirectory
+            }.any { it.findFile("project.godot") != null }
         } == true
     }
     override fun actionPerformed(e: AnActionEvent) {

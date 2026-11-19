@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -21,7 +22,9 @@ import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import org.jetbrains.compose.swing.modifier.appearance.font
 import org.jetbrains.compose.swing.modifier.interaction.enabled
+import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.FlowLayout
+import javax.swing.JLabel
 
 @Composable
 internal fun ProjectSettingsView(
@@ -36,12 +39,8 @@ internal fun ProjectSettingsView(
     Panel(PanelLayout.Border(14, 10), modifier = modifier.emptyBorder(JBUI.insets(16))) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.west()) {
             Column(SwingModifier.north()) {
-                org.jetbrains.compose.swing.node.SwingNode(factory = {
-                    javax.swing.JLabel(
-                        "Kumikae AS3",
-                        app.anicanon.kumikae.as3.PluginFiles.mark,
-                        javax.swing.JLabel.LEADING,
-                    )
+                SwingNode(factory = {
+                    JLabel("Kumikae AS3", PluginFiles.mark, JLabel.LEADING)
                         .apply { border = JBUI.Borders.emptyBottom(8) }
                 })
                 for (name in listOf("General", "Display", "Export", "Properties")) {
@@ -172,7 +171,6 @@ private fun ExportSettings(
 ) {
     if (value.presets.isEmpty()) {
         Label("No export presets")
-
         return
     }
     val preset = value.presets.firstOrNull { it.section == value.preset }

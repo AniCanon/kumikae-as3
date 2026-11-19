@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds a Godot game written in AS3 for the iOS Simulator, ready to be installed and launched.
 #
-#   build-ios-simulator.sh <project folder> <output folder> <godot> <simulator template .zip> [<folder with kas3_godot.xcframework>]
+#   build-ios-simulator.sh <project folder> <output folder> <godot> <simulator template .zip> [<folder with kas3_godot.xcframework> [<preset> [<section> [<expected bundle>]]]]
 #
 # The last line it prints is the path of the built .app.
 #
@@ -31,8 +31,8 @@ mkdir -p "$out"
 out=$(cd "$out" && pwd)
 lock="$out/.building"
 mkdir "$lock" 2>/dev/null || fail "Another build is using $out."
-stage=$(mktemp -d "${TMPDIR:-/tmp}/kumikae-game.XXXXXXXX") || { rmdir "$lock"; exit 1; }
-trap 'rm -rf "$stage"; rmdir "$lock"' EXIT
+stage=$(mktemp -d "${TMPDIR:-/tmp}/kumikae-game.XXXXXXXX") || { rmdir "$lock" 2>/dev/null || true; exit 1; }
+trap 'rm -rf "$stage" || true; rmdir "$lock" 2>/dev/null || true' EXIT
 trap 'exit 1' HUP INT TERM
 rsync -aL --exclude='/.godot/' --exclude='/.build/' --exclude='/build/' --exclude='/.git/' \
     --exclude='/.idea/' --exclude='/.run/' "$project/" "$stage/"
@@ -47,13 +47,22 @@ fi
 
 # The caller normally supplies the parsed section. Older CLI callers use the standard iOS preset.
 if [ -z "$section" ]; then
-    section=$(awk -v name="$preset" '/^\[preset\.[0-9]+\]/{s=substr($0,2,length($0)-2)} $0=="name=\""name"\""{print s}' "$presets")
+    section=$(KUMIKAE_PRESET=$preset awk '
+        {clean=$0; sub(/^[[:space:]]+/, "", clean); sub(/[[:space:]]+$/, "", clean)}
+        clean ~ /^\[preset\.[0-9]+\]$/ {s=substr(clean, 2, length(clean)-2)}
+        clean == "name=\"" ENVIRON["KUMIKAE_PRESET"] "\"" {print s; exit}
+    ' "$presets")
 fi
 [ -n "$section" ] || fail "There is no export preset named $preset."
 KUMIKAE_SIM_TEMPLATE=$template awk -v header="[$section.options]" '
+    function escape_ini(v) {
+        gsub(/\\/, "\\\\", v)
+        gsub(/"/, "\\\"", v)
+        return v
+    }
     function finish() {
         if (active) print "application/export_project_only=true"
-        if (active) print "custom_template/debug=\"" ENVIRON["KUMIKAE_SIM_TEMPLATE"] "\""
+        if (active) print "custom_template/debug=\"" escape_ini(ENVIRON["KUMIKAE_SIM_TEMPLATE"]) "\""
         if (active && !team) print "application/app_store_team_id=\"ABCDE12345\""
     }
     {clean=$0; sub(/^[[:space:]]+/, "", clean); sub(/[[:space:]]+$/, "", clean)}
@@ -74,7 +83,6 @@ fi
 
 name=$(sed -n 's/^config\/name="\(.*\)"$/\1/p' "$project/project.godot" | head -1 | tr -cd 'A-Za-z0-9')
 [ -n "$name" ] || name=Game
-mkdir -p "$out"
 
 echo "Exporting the Xcode project with Godot…"
 "$godot" --headless --path "$project" --export-debug "$preset" "$out/$name.ipa"

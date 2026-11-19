@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import app.anicanon.kumikae.as3.PluginFiles
+import app.anicanon.kumikae.as3.settings.GameArtwork
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import com.intellij.icons.AllIcons
 import com.intellij.ide.projectView.PresentationData
@@ -23,9 +24,9 @@ internal class GameRootNode(private val game: Project, node: PsiDirectoryNode) :
         val config = projectFile?.let { FileDocumentManager.getInstance().getDocument(it) } ?: return
         val identity = runCatching { GodotConfig(config.text) }.getOrNull() ?: return
         val gameName = identity.string("application", "config/name")
-        if (!gameName.isNullOrBlank()) data.presentableText = gameName
+        if (gameName.isNotBlank()) data.presentableText = gameName
         val image = virtualFile?.let {
-            app.anicanon.kumikae.as3.settings.GameArtwork.preview(it, identity.string("application", "config/icon"))
+            GameArtwork.preview(it, identity.string("application", "config/icon"))
         }
         data.setIcon(image?.treeIcon ?: PluginFiles.mark)
     }

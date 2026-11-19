@@ -6,15 +6,26 @@ import com.intellij.ui.scale.ScaleContext
 import com.intellij.ui.scale.ScaleType
 import com.intellij.util.ui.ImageUtil
 import java.io.InputStream
+import javax.xml.XMLConstants
 import javax.xml.stream.XMLInputFactory
 import javax.xml.stream.XMLStreamConstants
 import kotlin.math.roundToInt
 
 internal object VectorArtwork {
-    private val length = Regex("""([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(px|pt|pc|mm|cm|in)?""")
+    private val length =
+        Regex("""([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(px|pt|pc|mm|cm|in)?""", RegexOption.IGNORE_CASE)
+    private val viewBoxSeparator = Regex("[,\\s]+")
+    private val xmlFactory = XMLInputFactory.newDefaultFactory().apply {
+        setProperty(XMLInputFactory.SUPPORT_DTD, false)
+        setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
+        setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false)
+        runCatching { setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "") }
+        runCatching { setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "") }
+    }
+
     private fun pixels(text: String?): Double? {
         val match = length.matchEntire(text?.trim().orEmpty()) ?: return null
-        val unit = when (match.groupValues[2]) {
+        val unit = when (match.groupValues[2].lowercase()) {
             "in" -> 96.0
             "cm" -> 96.0 / 2.54
             "mm" -> 96.0 / 25.4
@@ -26,15 +37,12 @@ internal object VectorArtwork {
     }
 
     fun size(input: InputStream): Pair<Int, Int> {
-        val xml = XMLInputFactory.newDefaultFactory().apply {
-            setProperty(XMLInputFactory.SUPPORT_DTD, false)
-            setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
-        }.createXMLStreamReader(input)
+        val xml = xmlFactory.createXMLStreamReader(input)
         try {
             while (xml.hasNext() && xml.eventType != XMLStreamConstants.START_ELEMENT) xml.next()
             require(xml.eventType == XMLStreamConstants.START_ELEMENT && xml.localName == "svg")
             fun attr(key: String) = xml.getAttributeValue(null, key)
-            val box = attr("viewBox")?.trim()?.split(Regex("[,\\s]+"))
+            val box = attr("viewBox")?.trim()?.split(viewBoxSeparator)?.takeIf { it.size == 4 }
             val vw = box?.getOrNull(2)?.let(::pixels)
             val vh = box?.getOrNull(3)?.let(::pixels)
             val ratio = if (vw != null && vh != null) vw / vh else null
@@ -49,8 +57,9 @@ internal object VectorArtwork {
     }
 
     fun decode(file: VirtualFile, edge: Int): Artwork {
+        require(edge > 0) { "Target edge must be positive." }
         val (w, h) = file.inputStream.use(::size)
-        val scale = minOf(1.0, edge.toDouble() / maxOf(w, h))
+        val scale = (edge.toDouble() / maxOf(w, h)).coerceAtLeast(0.01)
         val icon = requireNotNull(IconLoader.findIcon(file.toNioPath().toUri().toURL(), false))
         val context = ScaleContext.createIdentity().copyWithScale(ScaleType.OBJ_SCALE.of(scale))
         val image = requireNotNull(IconLoader.toImage(icon, context))

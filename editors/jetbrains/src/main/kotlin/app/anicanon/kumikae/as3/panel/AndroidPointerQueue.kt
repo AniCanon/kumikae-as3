@@ -7,11 +7,12 @@ internal class AndroidPointerQueue {
     private var closed = false
 
     @Synchronized fun offer(phase: String, x: Int, y: Int) {
-        require(phase in listOf("DOWN", "MOVE", "UP"))
+        require(phase in PHASES) { "Unsupported pointer phase: $phase" }
         if (closed) return
         if (phase == "MOVE" && events.peekLast()?.startsWith("MOVE ") == true) events.pollLast()
         events.add("$phase $x $y")
     }
+
     fun take(): String = events.take()
 
     @Synchronized fun close() {
@@ -19,5 +20,9 @@ internal class AndroidPointerQueue {
             closed = true
             events.add("")
         }
+    }
+
+    private companion object {
+        val PHASES = setOf("DOWN", "MOVE", "UP")
     }
 }

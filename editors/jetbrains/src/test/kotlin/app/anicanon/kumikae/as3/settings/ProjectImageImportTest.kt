@@ -1,7 +1,9 @@
 package app.anicanon.kumikae.as3.settings
 
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -21,15 +23,23 @@ class ProjectImageImportTest {
         assertEquals("new", Files.readString(assets.resolve("title-2.png")))
     }
 
+    @Test fun `extensionless imports get a numeric suffix without duplicating the filename`() {
+        val project = Files.createDirectory(folder.resolve("game"))
+        val assets = Files.createDirectory(project.resolve("assets"))
+        Files.writeString(assets.resolve("icon"), "old")
+        val source = Files.writeString(folder.resolve("icon"), "new")
+        assertEquals("res://assets/icon-2", ProjectImageImport.copy(source, project))
+    }
+
     @Test fun `a linked assets directory assigns the visible resource under its canonical path`() {
         val project = Files.createDirectory(folder.resolve("game"))
         val art = Files.createDirectory(project.resolve("art"))
         try {
             Files.createSymbolicLink(project.resolve("assets"), art)
-        } catch (unsupported: java.nio.file.FileSystemException) {
-            org.junit.jupiter.api.Assumptions.assumeTrue(false, unsupported.reason)
+        } catch (unsupported: FileSystemException) {
+            Assumptions.assumeTrue(false, unsupported.reason)
         } catch (_: UnsupportedOperationException) {
-            org.junit.jupiter.api.Assumptions.assumeTrue(false, "Filesystem does not support symbolic links")
+            Assumptions.assumeTrue(false, "Filesystem does not support symbolic links")
         }
         val source = Files.writeString(folder.resolve("title.png"), "new")
         assertEquals("res://art/title.png", ProjectImageImport.copy(source, project))

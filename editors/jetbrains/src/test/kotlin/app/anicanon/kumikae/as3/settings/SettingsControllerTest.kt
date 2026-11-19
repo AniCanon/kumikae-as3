@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.settings
 
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -17,7 +18,7 @@ class SettingsControllerTest {
         val controller = SettingsController(repository)
         controller.reload()
         controller.reload()
-        val image = Artwork(java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_RGB))
+        val image = Artwork(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB))
         callbacks.last()(image)
         callbacks.first()(null)
         assertEquals(image, controller.preview)

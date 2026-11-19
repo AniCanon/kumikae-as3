@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.testing
 
 import com.google.gson.JsonParser
+import java.nio.file.Path
 
 internal data class TestSelection(val identity: String, val method: String?)
 
@@ -14,14 +15,20 @@ internal object TestCaseMappings {
         return cases.filter { it.method == method }.ifEmpty { cases.filter { it.method == null } }
     }
 
+    private fun insideDiscoverFolder(folder: String, relative: String): Boolean {
+        val normalized = Path.of(folder).normalize().toString().replace('\\', '/').trimEnd('/')
+        if (normalized.isEmpty() || normalized == ".") return true
+        return relative.startsWith("$normalized/")
+    }
+
     fun forFile(source: String, relative: String, declarations: TestSource? = null): List<TestSelection> {
         val manifest = JsonParser.parseString(source).asJsonObject
         require(manifest["version"].asInt == 1) { "Unsupported test manifest version" }
         return manifest.getAsJsonArray("tests").flatMap { value ->
             val test = value.asJsonObject
             val base = test["name"].asString
-            val folder = test["discover"]?.asString?.trimEnd('/')
-            if (folder != null && relative.startsWith("$folder/") && declarations != null) {
+            val folder = test["discover"]?.asString
+            if (folder != null && insideDiscoverFolder(folder, relative) && declarations != null) {
                 val qualified = listOf(
                     declarations.packageName,
                     declarations.className,

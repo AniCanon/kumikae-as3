@@ -14,6 +14,7 @@ import app.anicanon.kumikae.as3.ui.TabControl
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
+import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
@@ -22,6 +23,7 @@ import javax.imageio.ImageIO
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JSpinner
 import javax.swing.JTextField
 
 internal object UiProbeProjectExperience {
@@ -61,7 +63,7 @@ internal object UiProbeProjectExperience {
             await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
             render(panel, destination.resolve("$theme-project-display.png"))
             edt {
-                descendants(panel).filterIsInstance<javax.swing.JSpinner>()
+                descendants(panel).filterIsInstance<JSpinner>()
                     .single { it.accessibleContext.accessibleName == "Viewport width" }.value = 1280
             }
             click(panel, "Apply")
@@ -135,15 +137,15 @@ internal object UiProbeProjectExperience {
 
 internal class UiProbeSettingsRepository : SettingsRepository {
     var value = ProjectSettings.read(
-        "[application]\nconfig/name=\"Support Sprint\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
+        "[application]\nconfig/name=\"Example Game\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
         "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n",
     )
     override fun preview(path: String): Artwork = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
         val graphics = it.createGraphics()
         try {
-            graphics.color = java.awt.Color(245, 196, 65)
+            graphics.color = Color(245, 196, 65)
             graphics.fillRoundRect(0, 0, 80, 80, 16, 16)
-            graphics.color = java.awt.Color(46, 67, 57)
+            graphics.color = Color(46, 67, 57)
             graphics.fillRect(20, 20, 16, 40)
             graphics.fillRect(36, 20, 24, 12)
             graphics.fillRect(36, 36, 18, 12)

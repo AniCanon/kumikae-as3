@@ -45,8 +45,11 @@ case " $* " in *" -showBuildSettings "*) settings=yes;; *) settings=no;; esac
 while [ "$1" != "-derivedDataPath" ]; do shift; done
 dir="$2/Products"
 mkdir -p "$dir/Custom Product.app" "$dir/Example.app"
-/usr/bin/plutil -create xml1 "$dir/Custom Product.app/Info.plist"
-/usr/bin/plutil -insert CFBundleIdentifier -string org.example.qa "$dir/Custom Product.app/Info.plist"
+cat > "$dir/Custom Product.app/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>org.example.qa</string></dict></plist>
+PLIST
 if [ "$settings" = yes ]; then
   printf '[{"buildSettings":{"PRODUCT_TYPE":"com.apple.product-type.application","TARGET_BUILD_DIR":"%s","WRAPPER_NAME":"Custom Product.app"}}]' "$dir"
 fi

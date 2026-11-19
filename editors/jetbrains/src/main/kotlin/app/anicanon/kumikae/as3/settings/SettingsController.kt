@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.intellij.openapi.progress.ProcessCanceledException
 
 internal interface SettingsRepository {
     fun preview(path: String): Artwork? = null
@@ -55,13 +56,18 @@ internal class SettingsController(private val repository: SettingsRepository) {
         private set
 
     fun reload() {
-        runCatching { repository.load() }.onSuccess {
+        try {
+            val loaded = repository.load()
             dirty = false
-            original = it
-            draft = it
-            previews(it)
+            original = loaded
+            draft = loaded
+            previews(loaded)
             status = "Settings are stored in project.godot and export_presets.cfg."
-        }.onFailure { status = it.message ?: "Could not load project settings." }
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (error: Exception) {
+            status = error.message ?: "Could not load project settings."
+        }
     }
 
     fun edit(change: (ProjectSettings) -> ProjectSettings) {
@@ -70,22 +76,30 @@ internal class SettingsController(private val repository: SettingsRepository) {
         draft?.let { previews(it, previous) }
         val value = draft ?: return
         if (value == previous) return
-        dirty =
-            runCatching {
-                value.write(value.projectText, value.exportText) != (value.projectText to value.exportText)
-            }.getOrDefault(true)
+        dirty = try {
+            value.write(value.projectText, value.exportText) != (value.projectText to value.exportText)
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            true
+        }
         status = if (dirty) "Unsaved changes" else ""
     }
 
     fun apply() {
         val expected = original ?: return
         val value = draft ?: return
-        runCatching { repository.save(expected, value) }.onSuccess {
+        try {
+            val saved = repository.save(expected, value)
             dirty = false
-            original = it
-            draft = it
-            previews(it)
+            original = saved
+            draft = saved
+            previews(saved)
             status = "Applied. Rebuild exported apps to use these settings."
-        }.onFailure { status = it.message ?: "Could not apply project settings." }
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (error: Exception) {
+            status = error.message ?: "Could not apply project settings."
+        }
     }
 }

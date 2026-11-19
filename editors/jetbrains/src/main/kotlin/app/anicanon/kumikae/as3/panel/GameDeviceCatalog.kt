@@ -9,6 +9,7 @@ import app.anicanon.kumikae.as3.ui.TitleButton
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.Disposable
 import com.intellij.util.ui.JBUI
+import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
 import org.jetbrains.compose.swing.components.layout.Panel
@@ -16,6 +17,8 @@ import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.components.layout.ScrollPane
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
+import java.awt.event.HierarchyEvent
+import java.awt.event.HierarchyListener
 
 internal class GameDeviceCatalog(
     private val ios: SimulatorRepository?,
@@ -52,7 +55,7 @@ internal class GameDeviceCatalog(
                     }
                     if (emulators.any { it.serial == null }) {
                         Label("Graphics for next emulator start")
-                        org.jetbrains.compose.swing.components.ComboBox(
+                        ComboBox(
                             AndroidGraphics.entries,
                             graphics,
                             onSelectionChange = { value ->
@@ -70,8 +73,16 @@ internal class GameDeviceCatalog(
         }
     }
 
+    private var showing = false
+    private val visibility = HierarchyListener { event ->
+        if ((event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong()) == 0L) return@HierarchyListener
+        val now = component.isShowing
+        if (now && !showing) refresh()
+        showing = now
+    }
+
     init {
-        component.addHierarchyListener { if (component.isShowing) refresh() }
+        component.addHierarchyListener(visibility)
     }
 
     private fun refresh() {
@@ -93,6 +104,7 @@ internal class GameDeviceCatalog(
     }
 
     override fun dispose() {
+        component.removeHierarchyListener(visibility)
         iosWorker.dispose()
         androidWorker.dispose()
     }

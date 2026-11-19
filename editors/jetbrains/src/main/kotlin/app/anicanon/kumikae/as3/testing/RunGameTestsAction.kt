@@ -14,17 +14,16 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiElement
 import com.intellij.psi.SmartPointerManager
+import com.intellij.psi.SmartPsiElementPointer
 
-class RunGameTestsAction() :
-    DumbAwareAction("Run Game Tests", "Run tests in this selection", AllIcons.Actions.Execute) {
-    private var pointer: com.intellij.psi.SmartPsiElementPointer<PsiElement>? = null
+class RunGameTestsAction private constructor(private val pointer: SmartPsiElementPointer<PsiElement>?, label: String) :
+    DumbAwareAction(label, "Run tests in this selection", AllIcons.Actions.Execute) {
+    constructor() : this(null, "Run Game Tests")
 
-    internal constructor(element: PsiElement, label: String) : this() {
-        pointer = SmartPointerManager.createPointer(element)
-        templatePresentation.text = label
-    }
+    internal constructor(element: PsiElement, label: String) : this(SmartPointerManager.createPointer(element), label)
 
-    private fun element(event: AnActionEvent) = pointer?.element ?: event.getData(CommonDataKeys.PSI_ELEMENT)
+    private fun element(event: AnActionEvent) =
+        if (pointer != null) pointer.element else event.getData(CommonDataKeys.PSI_ELEMENT)
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
     override fun update(event: AnActionEvent) {
         event.presentation.isEnabledAndVisible =

@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
+import app.anicanon.kumikae.as3.ui.Tab
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.Label
@@ -15,7 +17,6 @@ import java.awt.RenderingHints
 import javax.swing.JComponent
 import javax.swing.JSpinner
 import javax.swing.SpinnerNumberModel
-import kotlin.math.roundToInt
 
 @Composable
 internal fun ViewportControls(value: ProjectSettings, controller: SettingsController) {
@@ -25,7 +26,7 @@ internal fun ViewportControls(value: ProjectSettings, controller: SettingsContro
     Panel(PanelLayout.Flow(FlowLayout.LEFT, 4, 2)) {
         for ((w, h) in sizes) {
             val ratio = viewportRatio(w, h)
-            app.anicanon.kumikae.as3.ui.Tab(
+            Tab(
                 ratio,
                 width > 0 && height > 0 && viewportRatio(width, height) == ratio,
                 { controller.edit { it.copy(width = w.toString(), height = h.toString()) } },
@@ -50,12 +51,35 @@ internal fun ViewportControls(value: ProjectSettings, controller: SettingsContro
 
 @Composable
 private fun DimensionSpinner(size: Int, title: String, change: (Int) -> Unit) {
-    SwingNode(factory = {
-        JSpinner(SpinnerNumberModel(size.coerceIn(1, 16384), 1, 16384, 1)).apply {
-            accessibleContext.accessibleName = title
-            addChangeListener { change(value as Int) }
+    val onChange = rememberUpdatedState(change)
+    SwingNode(
+        factory = { DimensionSpinnerControl(size.coerceIn(1, 16384)) { onChange.value(it) } },
+        update = {
+            set(title) { accessibleContext.accessibleName = it }
+            set(size) { syncValue(it) }
+        },
+    )
+}
+
+private class DimensionSpinnerControl(initial: Int, private val onChange: (Int) -> Unit) :
+    JSpinner(SpinnerNumberModel(initial, 1, 16384, 1)) {
+    private var syncing = false
+
+    init {
+        addChangeListener {
+            if (!syncing) onChange(value as Int)
         }
-    }, update = { set(size) { if (it in 1..16384 && value != it) value = it } })
+    }
+
+    fun syncValue(next: Int) {
+        if (next !in 1..16384 || value == next) return
+        syncing = true
+        try {
+            value = next
+        } finally {
+            syncing = false
+        }
+    }
 }
 
 private class ViewportDiagram : JComponent() {
@@ -70,19 +94,17 @@ private class ViewportDiagram : JComponent() {
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             val pad = JBUI.scale(12)
-            val scale = minOf((width - 2.0 * pad) / w, (height - 2.0 * pad) / h)
-            if (scale <= 0) return
-            val rw = (w * scale).roundToInt().coerceAtLeast(1)
-            val rh = (h * scale).roundToInt().coerceAtLeast(1)
-            val x = (width - rw) / 2
-            val y = (height - rh) / 2
+            val fitted = fitRect(w.toDouble(), h.toDouble(), width - 2 * pad, height - 2 * pad)
+            if (fitted.width <= 0 || fitted.height <= 0) return
+            val x = pad + fitted.x
+            val y = pad + fitted.y
             g.color = JBColor.namedColor("TextField.background", JBColor.background())
-            g.fillRoundRect(x, y, rw, rh, pad, pad)
+            g.fillRoundRect(x, y, fitted.width, fitted.height, pad, pad)
             g.color = JBColor.namedColor("Component.borderColor", JBColor.GRAY)
-            g.drawRoundRect(x, y, rw, rh, pad, pad)
+            g.drawRoundRect(x, y, fitted.width, fitted.height, pad, pad)
             val label = viewportRatio(w, h)
             val measured = g.fontMetrics.stringWidth(label)
-            if (measured + pad < rw && g.fontMetrics.height < rh) {
+            if (measured + pad < fitted.width && g.fontMetrics.height < fitted.height) {
                 g.color = JBColor.foreground()
                 g.drawString(label, (width - measured) / 2, (height + g.fontMetrics.ascent) / 2)
             }

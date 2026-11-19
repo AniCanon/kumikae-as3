@@ -14,6 +14,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.SystemInfo
 import java.util.concurrent.TimeUnit
 
 internal class SimulatorDestination(val device: SimulatorDevice) : ExecutionTarget() {
@@ -26,7 +27,7 @@ internal class SimulatorDestination(val device: SimulatorDevice) : ExecutionTarg
 
 class SimulatorDestinations : ExecutionTargetProvider() {
     override fun getTargets(project: Project, configuration: RunConfiguration): List<ExecutionTarget> =
-        if (configuration is SimulatorRunConfiguration && com.intellij.openapi.util.SystemInfo.isMac) {
+        if (configuration is SimulatorRunConfiguration && SystemInfo.isMac) {
             project.service<SimulatorDeviceList>().targets()
         } else {
             emptyList()
@@ -44,12 +45,12 @@ internal class SimulatorDeviceList(private val project: Project) : Disposable {
     @Synchronized fun targets(): List<ExecutionTarget> {
         val now = System.nanoTime()
         if (refreshAt == 0L || now - refreshAt >= 0) {
-            refreshAt = now + TimeUnit.SECONDS.toNanos(5)
-            tasks.submit({
+            val submitted = tasks.submit({
                 val repository = project.service<SimulatorHost>().repository
                 repository.connect()
                 repository.devices()
             }) { result ->
+                if (project.isDisposed) return@submit
                 result.onSuccess {
                     lastError = null
                     if (it != devices) {
@@ -65,6 +66,7 @@ internal class SimulatorDeviceList(private val project: Project) : Disposable {
                     lastError = message
                 }
             }
+            if (submitted) refreshAt = now + TimeUnit.SECONDS.toNanos(5)
         }
         return devices.map(::SimulatorDestination)
     }

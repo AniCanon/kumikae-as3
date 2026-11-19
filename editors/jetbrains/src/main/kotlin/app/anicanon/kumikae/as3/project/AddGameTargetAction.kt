@@ -9,6 +9,7 @@ import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -23,15 +24,21 @@ class AddGameTargetAction : DumbAwareAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
     private fun root(project: Project) = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.project?.let(::root)?.findChild("kas3.gdextension") != null
+        val dir = e.project?.let(::root)
+        e.presentation.isEnabledAndVisible = dir?.findChild("project.godot") != null &&
+            dir.findChild("kas3.gdextension") != null
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val root = root(project) ?: return
-        runCatching {
+        try {
             AddGameTargetDialog(project, GameTargetSetup(project, root)).show()
-        }.onFailure { Messages.showErrorDialog(project, it.message ?: "Cannot open game targets.", "Add Target") }
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (error: Exception) {
+            Messages.showErrorDialog(project, error.message ?: "Cannot open game targets.", "Add Target")
+        }
     }
 }
 
@@ -63,7 +70,7 @@ internal class AddGameTargetDialog(private val game: Project, private val setup:
                 }
             }) { Label(it) }
             val options = choices()
-            if (options.isNotEmpty()) {
+            if (options.isNotEmpty() && platform !in contributed) {
                 Label("Godot export preset")
                 val create = "Create new preset…"
                 val entries = options.map { it.name }
@@ -93,11 +100,14 @@ internal class AddGameTargetDialog(private val game: Project, private val setup:
     }.apply { preferredSize = JBUI.size(440, 220) }
 
     override fun doOKAction() {
-        runCatching {
+        try {
             val external = contributed[platform]
             if (external == null) setup.add(platform, name.trim(), identifier.trim()) else external.configure(game)
-        }.onSuccess {
             super.doOKAction()
-        }.onFailure { setErrorText(it.message ?: "Cannot add target.") }
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (error: Exception) {
+            setErrorText(error.message ?: "Cannot add target.")
+        }
     }
 }

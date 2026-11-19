@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.awt.Color
 import kotlin.test.assertEquals
 
 class LiveControllerTest {
@@ -49,7 +50,7 @@ class LiveControllerTest {
         repository.feeds.single().next = first
         controller.frameTick()
         val snapshot = first.snapshot()
-        first.image.setRGB(0, 0, java.awt.Color.RED.rgb)
+        first.image.setRGB(0, 0, Color.RED.rgb)
         assertFalse(snapshot.getRGB(0, 0) == first.image.getRGB(0, 0))
         controller.onFrame = { detached = it !== first }
         controller.hidden()

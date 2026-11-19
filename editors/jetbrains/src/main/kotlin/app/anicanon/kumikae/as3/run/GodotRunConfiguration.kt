@@ -32,7 +32,7 @@ class GodotConfigurationType :
     override fun isApplicable(project: Project) = false
 
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
-        KumikaeRunType.factory(KumikaeRunType.Kind.GAME).createTemplateConfiguration(project)
+        GodotRunConfiguration(project, this, "Godot")
 
     companion object {
         const val ID = "KumikaeAs3Godot"

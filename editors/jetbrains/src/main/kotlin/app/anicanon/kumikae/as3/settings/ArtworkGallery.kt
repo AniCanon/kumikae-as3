@@ -52,7 +52,6 @@ internal class ArtworkGallery : JBList<String>() {
                 label.verticalTextPosition = SwingConstants.BOTTOM
                 label.iconTextGap = JBUI.scale(5)
                 label.icon = TileIcon(thumbnails[path])
-                label.toolTipText = path.removePrefix("res://")
                 return label
             }
         }
@@ -60,8 +59,9 @@ internal class ArtworkGallery : JBList<String>() {
 
     fun missingVisible(): List<String> {
         val first = firstVisibleIndex
-        if (first < 0) return emptyList()
-        return (first..lastVisibleIndex).map(model::getElementAt).filterNot(thumbnails::containsKey)
+        val last = minOf(lastVisibleIndex, model.size - 1)
+        if (first < 0 || last < first) return emptyList()
+        return (first..last).map(model::getElementAt).filterNot(thumbnails::containsKey)
     }
 
     fun showThumbnails(images: Map<String, Artwork?>) {
@@ -71,7 +71,11 @@ internal class ArtworkGallery : JBList<String>() {
 
     override fun getToolTipText(event: MouseEvent): String? {
         val index = locationToIndex(event.point)
-        return if (index >= 0 && getCellBounds(index, index).contains(event.point)) model.getElementAt(index) else null
+        return if (index >= 0 && getCellBounds(index, index)?.contains(event.point) == true) {
+            model.getElementAt(index)
+        } else {
+            null
+        }
     }
 
     private class TileIcon(val art: Artwork?) : Icon {

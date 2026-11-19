@@ -5,16 +5,18 @@ import app.anicanon.kumikae.as3.project.ProjectTemplate
 internal data class IosTarget(val name: String, val section: String, val bundle: String, val template: String = "")
 
 internal object GameTargets {
+    private val ANDROID_ID = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
+    private val PRESET_SECTION = Regex("preset\\.\\d+")
+
     fun validIdentifier(platform: String, value: String) = if (platform == "Android") {
-        Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+").matches(value)
+        ANDROID_ID.matches(value)
     } else {
         ProjectTemplate.isBundle(value)
     }
 
-    fun presets(config: GodotConfig): List<ExportPreset> =
-        config.sections.filter { it.matches(Regex("preset\\.\\d+")) }.map {
-            ExportPreset(it, config.string(it, "name"), config.string(it, "platform"))
-        }
+    fun presets(config: GodotConfig): List<ExportPreset> = config.sections.filter { PRESET_SECTION.matches(it) }.map {
+        ExportPreset(it, config.string(it, "name"), config.string(it, "platform"))
+    }
 
     fun ios(text: String, name: String): IosTarget {
         val config = GodotConfig(text)

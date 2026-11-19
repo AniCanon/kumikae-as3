@@ -37,11 +37,13 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
             root?.findChild(name)?.let { FileDocumentManager.getInstance().getDocument(it)?.text }.orEmpty()
         runCatching {
             game = GodotConfig(text("project.godot")).string("application", "config/name", configuration.project.name)
-            presets =
-                GameTargets.presets(GodotConfig(text("export_presets.cfg"))).filter {
-                    it.platform == "iOS"
-                }.map { it.name }
-        }.onFailure { problem = it.message ?: "Cannot read Godot settings." }.onSuccess { problem = "" }
+            presets = GameTargets.presets(GodotConfig(text("export_presets.cfg"))).filter {
+                it.platform == "iOS"
+            }.map { it.name }
+        }.onFailure {
+            presets = emptyList()
+            problem = it.message ?: "Cannot read Godot settings."
+        }.onSuccess { problem = "" }
         bundle = configuration.options.bundle
         appPath = configuration.options.appPath
         legacy = configuration.options.preset.isEmpty() && bundle.isNotEmpty()

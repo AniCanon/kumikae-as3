@@ -23,6 +23,38 @@ internal data class TestSource(
 
     companion object {
         private data class Token(val text: String, val start: Int, val end: Int)
+        private val MODIFIERS =
+            setOf("public", "private", "protected", "internal", "override", "final", "static", "native")
+
+        private fun isAnnotatedTest(tokens: List<Token>, functionIndex: Int): Boolean {
+            var cursor = functionIndex - 1
+            var isPublic = false
+            var isStatic = false
+            while (cursor >= 0 && tokens[cursor].text in MODIFIERS) {
+                when (tokens[cursor].text) {
+                    "public" -> isPublic = true
+                    "static", "native" -> isStatic = true
+                }
+                cursor--
+            }
+            if (!isPublic || isStatic) return false
+            while (cursor >= 2 && tokens[cursor].text == "]") {
+                var depth = 1
+                var start = cursor - 1
+                while (start >= 0 && depth > 0) {
+                    when (tokens[start].text) {
+                        "]" -> depth++
+                        "[" -> depth--
+                    }
+                    start--
+                }
+                val open = start + 1
+                if (depth != 0) return false
+                if (tokens.getOrNull(open + 1)?.text == "Test") return true
+                cursor = open - 1
+            }
+            return false
+        }
         fun read(text: String): TestSource {
             val lexer = As3Lexer()
             lexer.start(text)
@@ -89,9 +121,7 @@ internal data class TestSource(
                     } else {
                         end++
                     }
-                    val annotated =
-                        index >= 4 &&
-                            tokens.subList(index - 4, index).map { it.text } == listOf("[", "Test", "]", "public")
+                    val annotated = !accessor && isAnnotatedTest(tokens, index)
                     methods += TestMethod(name, token.start, tokens.getOrNull(end - 1)?.end ?: text.length, annotated)
                     index = end
                     continue

@@ -134,11 +134,11 @@ internal object UiProbeLive {
                     SimulatorInput.Swipe(
                         frame.generation,
                         size,
-                        app.anicanon.kumikae.as3.simulator.Pixel(
+                        Pixel(
                             size.width / 2,
                             (size.height * if (up) .8 else .3).toInt(),
                         ),
-                        app.anicanon.kumikae.as3.simulator.Pixel(
+                        Pixel(
                             size.width / 2,
                             (size.height * if (up) .3 else .8).toInt(),
                         ),
@@ -192,7 +192,7 @@ internal object UiProbeLive {
                 Disposer.dispose(controller)
                 host.dispose()
             }
-            Files.delete(directory)
+            directory.toFile().deleteRecursively()
         }
     }
 

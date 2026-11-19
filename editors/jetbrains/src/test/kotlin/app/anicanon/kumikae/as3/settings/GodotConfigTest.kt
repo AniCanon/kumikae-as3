@@ -41,6 +41,10 @@ config/name="Before"
         assertEquals(value, GodotConfig(edited).string("application", "config/name"))
     }
 
+    @Test fun `standard Godot string escapes decode cleanly`() {
+        assertEquals("it's \u00e9", GodotConfig.unquote("\"it\\'s \\u00e9\""))
+    }
+
     @Test fun `ambiguous keys and malformed values are refused`() {
         assertFailsWith<IllegalArgumentException> { GodotConfig("[display]\na=1\na=2\n") }
         assertFailsWith<IllegalArgumentException> { GodotConfig("[display\na=1") }

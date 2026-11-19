@@ -1,9 +1,11 @@
 package app.anicanon.kumikae.as3.testing
 
+import com.google.gson.JsonParser
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.CachedValueProvider
@@ -30,20 +32,22 @@ internal class FileTests(
 }
 
 internal object TestDiscovery {
-    fun forElement(element: PsiElement): List<RegisteredTest> = if (element is com.intellij.psi.PsiDirectory) {
+    fun forElement(element: PsiElement): List<RegisteredTest> = if (element is PsiDirectory) {
         directoryTests(element)
     } else {
         element.containingFile?.let { of(it).at(element.textOffset) }.orEmpty()
     }
 
-    private fun directoryTests(directory: com.intellij.psi.PsiDirectory): List<RegisteredTest> {
+    private fun directoryTests(directory: PsiDirectory): List<RegisteredTest> {
         val folder = directory.virtualFile
         val root = folder.parent ?: return emptyList()
         if (folder.name != "tests") return emptyList()
         val manifest = root.findChild("kas3-tests.json") ?: return emptyList()
         val text = FileDocumentManager.getInstance().getDocument(manifest)?.text ?: return emptyList()
         return runCatching {
-            com.google.gson.JsonParser.parseString(text).asJsonObject.getAsJsonArray("tests").map {
+            val rootObject = JsonParser.parseString(text).asJsonObject
+            require(rootObject["version"].asInt == 1)
+            rootObject.getAsJsonArray("tests").map {
                 RegisteredTest(manifest, it.asJsonObject["name"].asString)
             }
         }.getOrDefault(emptyList())
@@ -74,7 +78,7 @@ internal object TestDiscovery {
             val cases = mutableListOf<TestSelection>()
             val directory = if (source.suiteFixtures.isEmpty()) virtual.parent else root
             VfsUtilCore.iterateChildrenRecursively(directory, {
-                !it.name.startsWith('.') && it.name != "build"
+                !it.name.startsWith('.') && it.name != "build" && it.name != "bin"
             }) { entry ->
                 if (entry != virtual && entry.extension == "as") {
                     val declaration = FileDocumentManager.getInstance().getDocument(entry)?.let {

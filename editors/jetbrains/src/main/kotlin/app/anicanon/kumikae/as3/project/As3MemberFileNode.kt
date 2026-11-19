@@ -19,12 +19,13 @@ internal class As3MemberFileNode(project: Project, file: PsiFile, settings: View
 
     override fun getChildrenImpl(): Collection<AbstractTreeNode<*>> {
         val file = value ?: return emptyList()
+        val virtualFile = file.virtualFile ?: return emptyList()
         val game = project ?: return emptyList()
         val parsed = TestSource.read(file.text)
-        if (parsed.classOffset < 0) return emptyList()
+        if (parsed.classOffset < 0 || parsed.className.isBlank()) return emptyList()
         fun member(name: String, offset: Int, icon: Icon) = DeclarationNode(
             game,
-            file.virtualFile,
+            virtualFile,
             settings,
             name,
             offset,
@@ -41,7 +42,7 @@ internal class As3MemberFileNode(project: Project, file: PsiFile, settings: View
         return listOf(
             DeclarationNode(
                 game,
-                file.virtualFile,
+                virtualFile,
                 settings,
                 parsed.className,
                 parsed.classOffset,
@@ -70,6 +71,7 @@ private class DeclarationNode(
     override fun canNavigate() = file.isValid
     override fun canNavigateToSource() = canNavigate()
     override fun navigate(requestFocus: Boolean) {
+        if (!file.isValid) return
         project?.let { OpenFileDescriptor(it, file, offset).navigate(requestFocus) }
     }
 }

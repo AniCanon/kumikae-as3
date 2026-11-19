@@ -77,28 +77,43 @@ internal class GodotConfig(private val source: String) {
             require(value.length >= 2 && value.first() == '"' && value.last() == '"') {
                 "Unsupported value; edit it in Source: $value"
             }
-            val result = StringBuilder()
-            var escaped = false
-            for (char in value.substring(1, value.length - 1)) {
-                if (escaped) {
-                    result.append(
-                        when (char) {
-                            'n' -> '\n'
-                            'r' -> '\r'
-                            't' -> '\t'
-                            '\\', '"' -> char
-                            else -> error("Unsupported string escape: \\$char")
-                        },
-                    )
-                    escaped = false
-                } else if (char == '\\') {
-                    escaped = true
+            val body = value.substring(1, value.length - 1)
+            val result = StringBuilder(body.length)
+            var index = 0
+            while (index < body.length) {
+                val char = body[index++]
+                if (char == '\\') {
+                    require(index < body.length) { "Unterminated string escape" }
+                    when (val escaped = body[index++]) {
+                        'n' -> result.append('\n')
+
+                        'r' -> result.append('\r')
+
+                        't' -> result.append('\t')
+
+                        'b' -> result.append('\b')
+
+                        'f' -> result.append('\u000C')
+
+                        '\\', '"', '\'' -> result.append(escaped)
+
+                        'u', 'U' -> {
+                            val digits = if (escaped == 'u') 4 else 8
+                            require(index + digits <= body.length) { "Unterminated unicode escape" }
+                            val codePoint = body.substring(index, index + digits).toIntOrNull(16)
+                                ?: error("Invalid unicode escape")
+                            require(Character.isValidCodePoint(codePoint)) { "Invalid unicode code point" }
+                            result.appendCodePoint(codePoint)
+                            index += digits
+                        }
+
+                        else -> error("Unsupported string escape: \\$escaped")
+                    }
                 } else {
                     require(char != '"') { "Malformed quoted value" }
                     result.append(char)
                 }
             }
-            require(!escaped) { "Unterminated string escape" }
             return result.toString()
         }
 

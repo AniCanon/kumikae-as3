@@ -14,6 +14,7 @@ internal data class SplashLayout(
     val filter: Boolean = true,
 ) {
     fun placement(imageWidth: Int, imageHeight: Int): Rectangle {
+        if (width <= 0 || height <= 0 || imageWidth <= 0 || imageHeight <= 0) return Rectangle(0, 0, 0, 0)
         val sx = width.toDouble() / imageWidth
         val sy = height.toDouble() / imageHeight
         val scale = when (mode) {

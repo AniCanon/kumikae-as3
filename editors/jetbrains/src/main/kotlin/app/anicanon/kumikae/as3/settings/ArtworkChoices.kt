@@ -8,8 +8,12 @@ internal class ArtworkChoices(paths: List<String>, current: String) {
     )
 
     fun search(query: String): List<String> {
-        val words = query.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        val words = query.trim().split(WHITESPACE).filter(String::isNotEmpty)
         if (words.isEmpty()) return sorted
         return sorted.filter { path -> words.all { path.removePrefix("res://").contains(it, ignoreCase = true) } }
+    }
+
+    private companion object {
+        val WHITESPACE = Regex("\\s+")
     }
 }

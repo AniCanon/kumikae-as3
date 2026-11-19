@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.simulator
 
 import java.awt.image.BufferedImage
+import java.util.concurrent.atomic.AtomicReference
 
 class LiveFrame(
     val device: String,
@@ -8,14 +9,13 @@ class LiveFrame(
     val image: BufferedImage,
     val receivedNanos: Long,
     val decodedNanos: Long,
-    private var recycler: ((BufferedImage) -> Unit)? = null,
+    recycler: ((BufferedImage) -> Unit)? = null,
 ) {
+    private val pendingRecycler = AtomicReference(recycler)
+
     /** The sole consumer has detached this image. Any lasting copy must have its own raster. */
     fun retire() {
-        recycler?.let {
-            recycler = null
-            it(image)
-        }
+        pendingRecycler.getAndSet(null)?.invoke(image)
     }
 }
 

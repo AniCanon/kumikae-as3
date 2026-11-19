@@ -40,6 +40,7 @@ internal class ArtworkPickerDialog(
     private var selection by mutableStateOf<String?>(null)
     private var preview by mutableStateOf<Artwork?>(null)
     private var loading by mutableStateOf(false)
+    private var selectable by mutableStateOf(false)
     private var requested = emptyList<String>()
     private var browsedPath: String? = null
     private var imported: String? = null
@@ -99,12 +100,14 @@ internal class ArtworkPickerDialog(
         selection = path
         preview = null
         loading = path != null
+        selectable = false
         isOKActionEnabled = false
         if (path == null) return
         library.preview(path, layout?.filter != false) { image ->
             if (path == selection) {
                 preview = image.art
                 loading = false
+                selectable = image.selectable
                 isOKActionEnabled = image.selectable
             }
         }
@@ -116,7 +119,10 @@ internal class ArtworkPickerDialog(
         requested = missing
         library.thumbnails(missing) {
             requested = emptyList()
-            gallery.showThumbnails(it)
+            if (it.isNotEmpty()) {
+                gallery.showThumbnails(it)
+                loadVisible()
+            }
         }
     }
 
@@ -159,7 +165,7 @@ internal class ArtworkPickerDialog(
                 Button("Browse…", ::browse, SwingModifier.east())
             }
             Native(scroll, SwingModifier.center())
-            ArtworkPickerDetail(selection, current, preview, loading, layout, isOKActionEnabled, SwingModifier.east())
+            ArtworkPickerDetail(selection, current, preview, loading, layout, selectable, SwingModifier.east())
         }
     }.apply { preferredSize = JBUI.size(740, 405) }
 

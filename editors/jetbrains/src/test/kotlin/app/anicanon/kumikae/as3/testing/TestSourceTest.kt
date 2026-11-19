@@ -70,4 +70,18 @@ class TestSourceTest {
         assertEquals("get helper", source.methodAt(text.indexOf("return 1"))?.name)
         assertEquals("set helper", source.methodAt(text.indexOf("check(v)"))?.name)
     }
+
+    @Test fun annotatedTestsHandleExtraModifiersAndIgnoreStaticOrAccessors() {
+        val text = """
+            package game {
+                public class ModifierTest {
+                    [Test] override public function overridden():void {}
+                    [Test] public static function notInstance():void {}
+                    [Test] public function get value():int { return 1; }
+                }
+            }
+        """.trimIndent()
+        val source = TestSource.read(text)
+        assertEquals(listOf("overridden"), source.methods.filter { it.annotated }.map { it.name })
+    }
 }

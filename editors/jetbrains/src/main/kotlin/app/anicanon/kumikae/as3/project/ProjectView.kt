@@ -67,10 +67,11 @@ class GameProjectView : TreeStructureProvider {
         if (settings == null) return visible
         if (parent is GameScenesGroup) return visible
         val nodes = visible.mapTo(ArrayList()) { node ->
+            val psiFile = (node as? PsiFileNode)?.value
             if (node is PsiFileNode && node !is As3MemberFileNode && node.virtualFile?.extension == "as" &&
-                node.value != null && GameViewOptions.members(project)
+                psiFile != null && GameViewOptions.members(project)
             ) {
-                As3MemberFileNode(project, checkNotNull(node.value), settings)
+                As3MemberFileNode(project, psiFile, settings)
             } else if (node !is PsiDirectoryNode) {
                 node
             } else {
@@ -87,10 +88,10 @@ class GameProjectView : TreeStructureProvider {
     }
 
     private fun isGame(project: Project): Boolean {
-        project.getUserData(GAME)?.let { return it }
+        if (project.getUserData(GAME) == true) return true
         val game =
             project.basePath?.let { runCatching { GodotLaunch.isAs3Game(Path.of(it)) }.getOrDefault(false) } ?: false
-        project.putUserData(GAME, game)
+        if (game) project.putUserData(GAME, true)
         return game
     }
 

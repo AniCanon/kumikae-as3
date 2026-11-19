@@ -6,6 +6,7 @@ import app.anicanon.kumikae.as3.ui.StatusLine
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
@@ -13,9 +14,8 @@ import org.jetbrains.compose.swing.modifier.appearance.font
 import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.Graphics
 import java.awt.Graphics2D
-import java.awt.Rectangle
+import javax.swing.JComponent
 import javax.swing.JLabel
-import kotlin.math.roundToInt
 
 @Composable
 internal fun ArtworkPickerDetail(
@@ -45,8 +45,7 @@ internal fun ArtworkPickerDetail(
         }
         DetailLabel(location, false)
         if (art != null && path != null) {
-            val format = path.substringAfterLast('.').uppercase()
-            StatusLine("$format  ·  ${art.width} × ${art.height} px")
+            StatusLine(formatArtworkMeta(path, art))
             if (layout?.visible == false) StatusLine("Hidden at launch")
             if (path == current) StatusLine("Currently assigned")
         } else if (path != null) {
@@ -67,7 +66,7 @@ private fun DetailLabel(value: String, bold: Boolean) {
         JLabel().apply {
             font = if (bold) JBFont.label().asBold() else JBFont.small()
             preferredSize = JBUI.size(260, if (bold) 26 else 18)
-            if (!bold) foreground = com.intellij.util.ui.UIUtil.getContextHelpForeground()
+            if (!bold) foreground = UIUtil.getContextHelpForeground()
             putClientProperty("html.disable", true)
         }
     }, update = {
@@ -78,7 +77,7 @@ private fun DetailLabel(value: String, bold: Boolean) {
     })
 }
 
-private class Swatch : JLabel() {
+private class Swatch : JComponent() {
     var content: Pair<Artwork?, SplashLayout?> = null to null
     init {
         preferredSize = JBUI.size(260, 202)
@@ -91,17 +90,21 @@ private class Swatch : JLabel() {
             g.fillRect(0, 0, width, height)
             val (art, layout) = content
             if (art == null) return
-            val ratio = layout?.let { it.width.toDouble() / it.height } ?: 1.0
             val margin = JBUI.scale(8)
-            val w = minOf((width - margin).toDouble(), (height - margin) * ratio).roundToInt().coerceAtLeast(1)
-            val h = (w / ratio).roundToInt().coerceAtLeast(1)
-            val box = Rectangle((width - w) / 2, (height - h) / 2, w, h)
-            g.clip(box)
+            val areaW = width - margin
+            val areaH = height - margin
+            if (areaW <= 0 || areaH <= 0) return
+            val srcW = layout?.width?.toDouble() ?: 1.0
+            val srcH = layout?.height?.toDouble() ?: 1.0
+            val fitted = fitRect(srcW, srcH, areaW, areaH)
+            if (fitted.width <= 0 || fitted.height <= 0) return
+            fitted.translate(margin / 2, margin / 2)
+            g.clip(fitted)
             if (layout != null) {
                 g.color = layout.background
-                g.fill(box)
+                g.fill(fitted)
             }
-            if (layout?.visible != false) art.draw(g, box, layout)
+            if (layout?.visible != false) art.draw(g, fitted, layout)
         } finally {
             g.dispose()
         }

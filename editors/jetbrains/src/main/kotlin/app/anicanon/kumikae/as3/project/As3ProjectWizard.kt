@@ -8,6 +8,7 @@ import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.run.ensureDefaultTests
+import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -20,11 +21,14 @@ import com.intellij.ide.wizard.GeneratorNewProjectWizard
 import com.intellij.ide.wizard.NewProjectWizardBaseStep
 import com.intellij.ide.wizard.NewProjectWizardStep
 import com.intellij.ide.wizard.RootNewProjectWizardStep
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
+import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.CheckBox
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.interaction.enabled
@@ -49,9 +53,11 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
         }
         private var version by mutableStateOf("")
         private var bundle by mutableStateOf("")
+        private var projectName by mutableStateOf(base.name)
 
         override fun setupUI(builder: Panel) {
             base.setupUI(builder)
+            base.nameProperty.afterChange(context.disposable) { projectName = it }
             builder.row {
                 cell(
                     composePanel(context.disposable) {
@@ -60,12 +66,12 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                                 "Application identifier",
                                 bundle,
                                 { bundle = it },
-                                placeholder = ProjectTemplate.defaultBundle(base.name),
+                                placeholder = ProjectTemplate.defaultBundle(projectName),
                             )
                             LabelledField("Version", version, {
                                 version = it
                             }, placeholder = ProjectTemplate.DEFAULT_VERSION)
-                            org.jetbrains.compose.swing.components.Label("Run targets")
+                            Label("Run targets")
                             for (choice in choices) {
                                 CheckBox(
                                     choice.platform.label,
@@ -83,22 +89,30 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                         }
                     },
                 ).align(AlignX.FILL).validationOnApply {
-                    if (version.isNotBlank() && !Regex("""\d+\.\d+\.\d+""").matches(version.trim())) {
+                    val trimmedBundle = bundle.trim()
+                    if (version.isNotBlank() && !ProjectTemplate.VERSION_PATTERN.matches(version.trim())) {
                         ValidationInfo("Enter a version such as 1.0.0.")
-                    } else if (bundle.isNotBlank() && (
-                            !bundle.trim().contains('.') ||
-                                !bundle.trim().replace('-', '_').split('.').all(As3Names::valid)
+                    } else if (trimmedBundle.isNotEmpty() && (
+                            !trimmedBundle.contains('.') ||
+                                !trimmedBundle.replace('-', '_').split('.').all(As3Names::valid)
                             )
                     ) {
                         ValidationInfo("Use a dot-separated ActionScript package name, such as com.studio.game.")
-                    } else if (bundle.isBlank() ||
-                        chosen.filterValues { it }.keys.filter { it != Platform.DESKTOP }.all {
-                            app.anicanon.kumikae.as3.settings.GameTargets.validIdentifier(it.label, bundle.trim())
-                        }
-                    ) {
-                        null
                     } else {
-                        ValidationInfo("A package name is words joined by dots, like com.studio.game.")
+                        val invalidPlatform = trimmedBundle.takeIf { it.isNotEmpty() }?.let { id ->
+                            chosen.filterValues { it }.keys.firstOrNull {
+                                it != Platform.DESKTOP && !GameTargets.validIdentifier(it.label, id)
+                            }
+                        }
+                        when (invalidPlatform) {
+                            null -> null
+
+                            Platform.ANDROID -> ValidationInfo(
+                                "Android application identifiers cannot contain hyphens; use letters, digits and dots.",
+                            )
+
+                            else -> ValidationInfo("A package name is words joined by dots, like com.studio.game.")
+                        }
                     }
                 }
             }
@@ -130,13 +144,9 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             template.write(folder, built ?: carried, link = built != null)
             LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder)?.refresh(true, true)
             addRunTargets(project, platforms)
-            com.intellij.openapi.project.DumbService.getInstance(project).smartInvokeLater {
-                val game = LocalFileSystem.getInstance().findFileByNioFile(folder.resolve("project.godot"))
-                if (game !=
-                    null
-                ) {
-                    com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFile(game, true)
-                }
+            DumbService.getInstance(project).smartInvokeLater {
+                val game = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder.resolve("project.godot"))
+                if (game != null) FileEditorManager.getInstance(project).openFile(game, true)
             }
             contributions.filter { optional[it.setupAction] == true }.forEach { it.configure(project) }
         }

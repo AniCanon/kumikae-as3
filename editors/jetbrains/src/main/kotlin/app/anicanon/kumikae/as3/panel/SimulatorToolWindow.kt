@@ -4,6 +4,7 @@ import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
+import java.awt.EventQueue
 import javax.swing.JPanel
 import javax.swing.Timer
 
@@ -37,13 +38,14 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
         controller.poll()
         controller.frameTick() // Startup, disconnect and retry use the status cadence.
     }
-    private val frames = FrameDispatch({ java.awt.EventQueue.invokeLater(it) }, controller::frameTick)
+    private val frames = FrameDispatch({ EventQueue.invokeLater(it) }, controller::frameTick)
 
     init {
         controller.onFramesReady = frames::request
         controller.onFrame = { screen.frame = it }
         component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }
         Disposer.register(controller) {
+            screen.frame = null
             controller.onFrame = {}
             timer.stop()
             controller.onFramesReady = {}
@@ -54,6 +56,7 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
                 timer.start()
                 controller.frameTick()
             } else {
+                requested = null
                 controller.hidden()
                 timer.stop()
             }

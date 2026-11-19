@@ -15,14 +15,20 @@ class AuthoringTemplates(unittest.TestCase):
             with self.subTest(entry=entry):
                 self.assertIn("ensureDefaultTests(manager)", (plugin / entry).read_text())
 
+    def test_templates_have_package_placeholder(self):
+        for kind in ("Class", "Interface", "File", "Test Case", "Test Suite", "Node Script"):
+            with self.subTest(kind=kind):
+                text = (TEMPLATES / ("AS3 " + kind + ".as.ft")).read_text()
+                self.assertIn("${AS3_PACKAGE}", text)
+
+    @unittest.skipUnless(os.environ.get("KAS3C"), "Set KAS3C to parse generated templates with the compiler")
     def test_templates_compile_in_the_selected_package(self):
+        compiler = os.environ["KAS3C"]
         with tempfile.TemporaryDirectory() as directory:
             for kind in ("Class", "Interface", "File", "Test Case", "Test Suite", "Node Script"):
                 with self.subTest(kind=kind):
                     text = (TEMPLATES / ("AS3 " + kind + ".as.ft")).read_text()
-                    self.assertIn("${AS3_PACKAGE}", text)
                     file = Path(directory) / "Sample.as"
                     file.write_text(text.replace("${AS3_PACKAGE}", " game.sample").replace("${NAME}", "Sample"))
-                    if compiler := os.environ.get("KAS3C"):
-                        result = subprocess.run([compiler, "parse", str(file)], capture_output=True, text=True)
-                        self.assertEqual(0, result.returncode, result.stderr)
+                    result = subprocess.run([compiler, "parse", str(file)], capture_output=True, text=True)
+                    self.assertEqual(0, result.returncode, result.stderr)

@@ -33,10 +33,13 @@ internal data class ProjectSettings(
     val exportIcon: String = "",
     val exportDrafts: Map<String, Pair<String, String>> = emptyMap(),
 ) {
+    fun allExportDrafts(): Map<String, Pair<String, String>> =
+        if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+
     fun select(section: String): ProjectSettings {
         val selected = presets.firstOrNull { it.section == section }
         val exports = GodotConfig(exportText)
-        val retained = if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
+        val retained = allExportDrafts()
         val remembered = retained[section]
         return copy(
             exportDrafts = retained,
@@ -49,9 +52,13 @@ internal data class ProjectSettings(
     }
 
     fun write(project: String, exports: String): Pair<String, String> {
-        require(width.toIntOrNull() in 1..16384 && height.toIntOrNull() in 1..16384) {
+        val parsedWidth = width.trim().toIntOrNull()
+        val parsedHeight = height.trim().toIntOrNull()
+        require(parsedWidth in 1..16384 && parsedHeight in 1..16384) {
             "Viewport dimensions must be between 1 and 16384 pixels."
         }
+        val normalizedWidth = parsedWidth.toString()
+        val normalizedHeight = parsedHeight.toString()
         require(orientation in orientations.indices) { "Choose a supported orientation." }
         require(stretch in stretches) { "Unsupported stretch mode; edit it in Source." }
         require(aspect in aspects) { "Choose a supported stretch aspect." }
@@ -78,17 +85,16 @@ internal data class ProjectSettings(
         string("application", "boot_splash/image", base.splash, splash)
         string("display", "window/stretch/mode", base.stretch, stretch)
         string("display", "window/stretch/aspect", base.aspect, aspect)
-        if (width != base.width) changes[ConfigKey("display", "window/size/viewport_width")] = width
-        if (height != base.height) changes[ConfigKey("display", "window/size/viewport_height")] = height
-        if (orientation !=
-            base.orientation
-        ) {
+        if (normalizedWidth != base.width) changes[ConfigKey("display", "window/size/viewport_width")] = normalizedWidth
+        if (normalizedHeight != base.height) {
+            changes[ConfigKey("display", "window/size/viewport_height")] = normalizedHeight
+        }
+        if (orientation != base.orientation) {
             changes[ConfigKey("display", "window/handheld/orientation")] = orientation.toString()
         }
         val originalExports = GodotConfig(exportText)
         val exportChanges = linkedMapOf<ConfigKey, String>()
-        val drafts = if (preset.isEmpty()) exportDrafts else exportDrafts + (preset to (identifier to exportIcon))
-        for ((section, fields) in drafts) {
+        for ((section, fields) in allExportDrafts()) {
             val selected = presets.firstOrNull { it.section == section } ?: continue
             val (applicationId, image) = fields
             validateResource(image)
@@ -102,8 +108,7 @@ internal data class ProjectSettings(
                 exportChanges[ConfigKey("$section.options", key)] = GodotConfig.quote(applicationId)
             }
             selected.iconKey?.takeIf { originalExports.string("$section.options", it) != image }?.let {
-                exportChanges[ConfigKey("$section.options", it)] =
-                    GodotConfig.quote(image)
+                exportChanges[ConfigKey("$section.options", it)] = GodotConfig.quote(image)
             }
         }
         return GodotConfig(project).update(changes) to GodotConfig(exports).update(exportChanges)
@@ -124,11 +129,14 @@ internal data class ProjectSettings(
         val stretches = listOf("disabled", "canvas_items", "viewport")
 
         fun validateResource(value: String) {
+            val relative = value.removePrefix("res://")
             require(
-                value.isEmpty() || value.startsWith("uid://") ||
+                value.isEmpty() ||
+                    (value.startsWith("uid://") && value.length > 6 && value.none(Char::isISOControl)) ||
                     (
-                        value.startsWith("res://") && value.removePrefix("res://").split('/').none { it == ".." } &&
-                            !value.contains('\\')
+                        value.startsWith("res://") && relative.isNotEmpty() && !relative.contains('\\') &&
+                            relative.none(Char::isISOControl) &&
+                            relative.split('/').none { it == ".." || it == "." }
                         ),
             ) {
                 "Choose a resource inside this project (res://…)."

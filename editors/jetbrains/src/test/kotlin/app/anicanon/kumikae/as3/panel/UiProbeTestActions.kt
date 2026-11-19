@@ -1,11 +1,17 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.testing.As3TestConsole
 import app.anicanon.kumikae.as3.testing.As3TestLineMarker
 import app.anicanon.kumikae.as3.testing.As3TestProducer
 import app.anicanon.kumikae.as3.testing.As3TestsConfiguration
+import app.anicanon.kumikae.as3.testing.RunGameTestsAction
+import com.intellij.execution.DefaultExecutionTarget
+import com.intellij.execution.ExecutionTargetManager
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.actions.ConfigurationContext
+import com.intellij.execution.actions.RunConfigurationProducer
+import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -49,16 +55,11 @@ internal object UiProbeTestActions {
                 check(gutter.getInfo(nestedLeaf) == null) { "Nested helper has a test gutter" }
                 check(gutter.getInfo(helperLeaf) == null) { "Helper has a test gutter" }
                 val producer = As3TestProducer()
-                val android = app.anicanon.kumikae.as3.run.KumikaeRunType
-                    .factory(
-                        app.anicanon.kumikae.as3.run.KumikaeRunType.Kind.ANDROID,
-                    ).createTemplateConfiguration(project)
+                val android = KumikaeRunType.factory(KumikaeRunType.Kind.ANDROID).createTemplateConfiguration(project)
                 val context = ConfigurationContext.createEmptyContextForLocation(PsiLocation(methodLeaf))
 
                 @Suppress("UNCHECKED_CAST")
-                val platformProducer = producer as com.intellij.execution.actions.RunConfigurationProducer<
-                    com.intellij.execution.configurations.RunConfiguration,
-                    >
+                val platformProducer = producer as RunConfigurationProducer<RunConfiguration>
                 check(!platformProducer.isConfigurationFromContext(android, context))
                 fun configured(element: PsiElement): As3TestsConfiguration {
                     val context = ConfigurationContext.createEmptyContextForLocation(PsiLocation(element))
@@ -72,13 +73,13 @@ internal object UiProbeTestActions {
                 check(configured(psi).options.cases == "Models::Course::gapJump\nModels::Course::magnet")
                 val config = configured(methodLeaf)
                 check(
-                    com.intellij.execution.ExecutionTargetManager.getInstance(project).getTargetsFor(config)
-                        .any { it == com.intellij.execution.DefaultExecutionTarget.INSTANCE },
+                    ExecutionTargetManager.getInstance(project).getTargetsFor(config)
+                        .any { it == DefaultExecutionTarget.INSTANCE },
                 ) {
                     "Gutter tests need a local execution target."
                 }
                 val action = checkNotNull(gutter.getInfo(methodLeaf)).actions.single()
-                check(action is app.anicanon.kumikae.as3.testing.RunGameTestsAction)
+                check(action is RunGameTestsAction)
                 check(config.options.cases == "Models::Course::gapJump")
                 val properties = As3TestConsole(config, DefaultRunExecutor.getRunExecutorInstance())
                 val location = properties.getTestLocator().getLocation(

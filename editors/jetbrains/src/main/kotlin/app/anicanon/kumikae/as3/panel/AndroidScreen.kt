@@ -4,6 +4,8 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Point
 import java.awt.RenderingHints
+import java.awt.event.FocusAdapter
+import java.awt.event.FocusEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -62,6 +64,7 @@ internal class AndroidScreen(private val input: (String, Point) -> Unit) : JComp
                 picture?.takeIf { guest != null }?.let { viewport(it).point(event.x, event.y, guest) }
             override fun mousePressed(event: MouseEvent) {
                 if (event.button == MouseEvent.BUTTON1) {
+                    cancelTouch()
                     point(event)?.let {
                         pressed = it
                         input("DOWN", it)
@@ -77,12 +80,19 @@ internal class AndroidScreen(private val input: (String, Point) -> Unit) : JComp
                 }
             }
             override fun mouseReleased(event: MouseEvent) {
+                if (event.button != MouseEvent.BUTTON1) return
                 pressed?.let { input("UP", point(event) ?: it) }
                 pressed = null
             }
         }
         addMouseListener(mouse)
         addMouseMotionListener(mouse)
+        addFocusListener(
+            object : FocusAdapter() {
+                override fun focusLost(event: FocusEvent) = cancelTouch()
+            },
+        )
+        addHierarchyListener { if (!isShowing) cancelTouch() }
     }
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)

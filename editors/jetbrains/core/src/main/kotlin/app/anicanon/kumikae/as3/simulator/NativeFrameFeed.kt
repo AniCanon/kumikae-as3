@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.simulator
 
+import java.awt.image.BufferedImage
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class NativeFrameFeed(
@@ -22,7 +23,7 @@ internal class NativeFrameFeed(
         private set
 
     // Startup runs on the service worker; mapping failure must reach the stream controller immediately.
-    private val images = FrameImagePool(java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE)
+    private val images = FrameImagePool(BufferedImage.TYPE_INT_ARGB_PRE)
     private val mapped = NativeFrameReader(bridge.slot, discard = images::release, allocate = images::acquire)
     private val worker = Thread({
         try {
@@ -73,6 +74,7 @@ internal class NativeFrameFeed(
     fun start() {
         worker.start()
     }
+
     override fun poll(): LiveFrame? = latest.poll()
 
     override fun close() {

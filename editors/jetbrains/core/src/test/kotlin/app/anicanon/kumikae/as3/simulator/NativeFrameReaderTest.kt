@@ -1,11 +1,13 @@
 package app.anicanon.kumikae.as3.simulator
 
 import org.junit.Test
+import java.awt.image.BufferedImage
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class NativeFrameReaderTest {
     @Test fun returnsAnUnusedImageWhenDimensionsChangeDuringAllocation() {
@@ -15,15 +17,15 @@ class NativeFrameReaderTest {
                 writer.setLength(NativeFrameLayout.fileBytes)
                 val header = NativeFrameHeader(1, 1, 1, 4, 1, 2, 1, 1, 1000)
                 writer.write(header.encode())
-                val expected = java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB)
-                var discarded: java.awt.image.BufferedImage? = null
+                val expected = BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB)
+                var discarded: BufferedImage? = null
                 NativeFrameReader(file, discard = { discarded = it }) { _, _ ->
                     writer.seek(0)
                     writer.write(header.copy(sequence = 2, width = 2, stride = 8).encode())
                     expected
                 }.use { reader ->
                     assertNull(reader.poll())
-                    kotlin.test.assertSame(expected, discarded)
+                    assertSame(expected, discarded)
                 }
             }
         } finally {
@@ -46,7 +48,7 @@ class NativeFrameReaderTest {
                         writer.write(header.copy(sequence = 2).encode())
                         writer.write(byteArrayOf(-1, 0, 0, -1))
                     }
-                    java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE)
+                    BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
                 }.use { reader ->
                     val newest = assertNotNull(reader.poll())
                     assertEquals(2, newest.header.sequence)

@@ -11,12 +11,13 @@ import com.intellij.util.xmlb.annotations.Attribute
 /** A platform plugin contributes its own setup workflow through its existing IDE action. */
 class GameTargetContribution {
     @Attribute("label")
-    lateinit var label: String
+    var label: String = ""
 
     @Attribute("setupAction")
-    lateinit var setupAction: String
+    var setupAction: String = ""
 
     fun configure(project: Project) {
+        require(setupAction.isNotBlank()) { "Missing setup action for $label." }
         val action =
             requireNotNull(ActionManager.getInstance().getAction(setupAction)) { "Missing setup action for $label." }
         val context = SimpleDataContext.getSimpleContext(CommonDataKeys.PROJECT, project)

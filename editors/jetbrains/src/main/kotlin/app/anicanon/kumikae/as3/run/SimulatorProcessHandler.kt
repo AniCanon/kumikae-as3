@@ -3,6 +3,8 @@ package app.anicanon.kumikae.as3.run
 import app.anicanon.kumikae.as3.panel.SimulatorRepository
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessOutputTypes
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -57,12 +59,17 @@ internal class SimulatorProcessHandler(
     override fun destroyProcessImpl() {
         stopping.set(true)
         worker.interrupt()
-        com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService().execute(run::stop)
+        AppExecutorUtil.getAppExecutorService().execute {
+            runCatching(run::stop).onFailure {
+                Logger.getInstance(SimulatorProcessHandler::class.java).warn("Stopping Simulator app $bundle", it)
+            }
+        }
     }
 
     override fun detachProcessImpl() {
         // Detached, the app keeps running on the Simulator; only the Run window stops following it.
         stopping.set(true)
+        worker.interrupt()
         notifyProcessDetached()
     }
 

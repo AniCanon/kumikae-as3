@@ -1,6 +1,6 @@
 package${AS3_PACKAGE} {
-	public class ${NAME} {
-		public function ${NAME}() {
-		}
-	}
+    public class ${NAME} {
+        public function ${NAME}() {
+        }
+    }
 }

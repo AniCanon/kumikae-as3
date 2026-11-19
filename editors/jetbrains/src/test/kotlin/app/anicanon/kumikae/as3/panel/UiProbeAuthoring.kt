@@ -2,23 +2,33 @@ package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.project.NewAs3FileAction
 import app.anicanon.kumikae.as3.project.ProjectTemplate
+import app.anicanon.kumikae.as3.testing.As3TestLineMarker
 import app.anicanon.kumikae.as3.testing.TestDiscovery
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+import com.intellij.execution.ui.RunContentManager
 import com.intellij.ide.fileTemplates.FileTemplateManager
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
+import com.intellij.psi.search.GlobalSearchScope
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 internal object UiProbeAuthoring {
     fun run(project: Project, root: Path) {
         val folder = Files.createTempDirectory(root, "new-game")
         try {
             ProjectTemplate("New Game", emptySet(), "games.qa").write(folder, null)
-            lateinit var gutter: com.intellij.openapi.actionSystem.AnAction
+            lateinit var gutter: AnAction
             ApplicationManager.getApplication().invokeAndWait {
                 val game = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
                 game.refresh(false, true)
@@ -61,33 +71,30 @@ internal object UiProbeAuthoring {
                     val at = doc.text.indexOf("assertTrue(true)")
                     check(at >= 0)
                     doc.replaceString(at, at + "assertTrue(true)".length, "assertTrue(false)")
-                    com.intellij.psi.PsiDocumentManager.getInstance(project).commitDocument(doc)
+                    PsiDocumentManager.getInstance(project).commitDocument(doc)
                     val keyword = checkNotNull(fixture.findElementAt(doc.text.indexOf("function example")))
-                    gutter =
-                        checkNotNull(
-                            app.anicanon.kumikae.as3.testing.As3TestLineMarker().getInfo(keyword),
-                        ).actions.single()
+                    gutter = checkNotNull(As3TestLineMarker().getInfo(keyword)).actions.single()
                     val testsDirectory = checkNotNull(directory.findSubdirectory("tests"))
                     check(TestDiscovery.forElement(testsDirectory).single().name == "Game tests")
                 }
                 FileDocumentManager.getInstance().saveAllDocuments()
-                val event = com.intellij.openapi.actionSystem.AnActionEvent.createFromAnAction(
+                val event = AnActionEvent.createFromAnAction(
                     gutter,
                     null,
                     "EditorGutter",
-                    com.intellij.openapi.actionSystem.DataContext.EMPTY_CONTEXT,
+                    DataContext.EMPTY_CONTEXT,
                 )
                 gutter.actionPerformed(event)
             }
             var navigated = false
             var detail = ""
-            val expires = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
+            val expires = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
             while (!navigated && System.nanoTime() < expires) {
                 ApplicationManager.getApplication().invokeAndWait {
-                    val descriptors = com.intellij.execution.ui.RunContentManager.getInstance(project).allDescriptors
+                    val descriptors = RunContentManager.getInstance(project).allDescriptors
                     detail = descriptors.joinToString { it.displayName }
                     val console = descriptors.mapNotNull {
-                        it.executionConsole as? com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+                        it.executionConsole as? SMTRunnerConsoleView
                     }.firstOrNull { view ->
                         view.resultsViewer.testsRootNode.allTests.any { it.name.endsWith("::example") }
                     }
@@ -96,10 +103,10 @@ internal object UiProbeAuthoring {
                     } ?: return@invokeAndWait
                     val location = failed.getLocation(
                         project,
-                        com.intellij.psi.search.GlobalSearchScope.allScope(project),
+                        GlobalSearchScope.allScope(project),
                     )
                     val target = failed.getDescriptor(location, console.properties)
-                        as? com.intellij.openapi.fileEditor.OpenFileDescriptor ?: return@invokeAndWait
+                        as? OpenFileDescriptor ?: return@invokeAndWait
                     val lines = Files.readAllLines(target.file.toNioPath())
                     check(lines[target.line].trim() == "Assert.assertTrue(false);")
                     target.navigate(true)

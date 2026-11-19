@@ -29,14 +29,24 @@ internal class LocalSimulatorService(
             session?.let { return it.server.endpointFile.toString() }
         }
         val opened = LocalSession(stateDirectory, nativeExecutable)
-        synchronized(lock) {
+        val duplicate = synchronized(lock) {
             // The window may close while the session is still being created on the worker.
             if (closed) {
                 opened.close()
                 error(CLOSED)
             }
-            session = opened
-            client = ApiClient(opened.server.endpoint)
+            val existing = session
+            if (existing != null) {
+                existing.server.endpointFile.toString()
+            } else {
+                session = opened
+                client = ApiClient(opened.server.endpoint)
+                null
+            }
+        }
+        if (duplicate != null) {
+            opened.close()
+            return duplicate
         }
         return opened.server.endpointFile.toString()
     }

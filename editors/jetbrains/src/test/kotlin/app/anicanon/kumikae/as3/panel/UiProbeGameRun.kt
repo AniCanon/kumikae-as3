@@ -4,6 +4,7 @@ import app.anicanon.kumikae.as3.project.AddGameTargetDialog
 import app.anicanon.kumikae.as3.project.GameTargetSetup
 import app.anicanon.kumikae.as3.run.SimulatorDestination
 import app.anicanon.kumikae.as3.settings.GameTargets
+import app.anicanon.kumikae.as3.simulator.SimulatorException
 import com.intellij.execution.ExecutionTargetManager
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
@@ -20,6 +21,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
+import javax.swing.Timer
 
 /** Launch a disposable copy of a game on the explicitly supplied, probe-owned simulator. */
 internal object UiProbeGameRun {
@@ -42,7 +44,7 @@ internal object UiProbeGameRun {
                 app.invokeAndWait {
                     val setup = GameTargetSetup(project, root)
                     val dialog = AddGameTargetDialog(project, setup)
-                    javax.swing.Timer(600) {
+                    Timer(600) {
                         dialog.rootPane?.defaultButton?.doClick()
                     }.also {
                         it.isRepeats = false
@@ -81,7 +83,7 @@ internal object UiProbeGameRun {
                     val running = ProcessBuilder("xcrun", "simctl", "spawn", device, "launchctl", "list")
                         .redirectErrorStream(true).start()
                     val processes = running.inputStream.bufferedReader().use { it.readText() }
-                    running.waitFor()
+                    running.waitFor(15, TimeUnit.SECONDS)
                     page.running &&
                         processes.lines().any {
                             it.contains("UIKitApplication:") &&
@@ -90,10 +92,10 @@ internal object UiProbeGameRun {
                 }
                 check(repository.status().device?.id == device)
                 check(source == Files.readString(folder.resolve("export_presets.cfg")))
-                await("Support Sprint's rendered home screen", 45) {
+                await("game rendered home screen", 45) {
                     val image = try {
                         repository.screenshot(device).image
-                    } catch (retry: app.anicanon.kumikae.as3.simulator.SimulatorException) {
+                    } catch (retry: SimulatorException) {
                         if (retry.code == "STALE_FRAME") return@await false
                         throw retry
                     }
@@ -113,7 +115,7 @@ internal object UiProbeGameRun {
                 Files.writeString(
                     report.resolve("game-run.txt"),
                     "Rider built the named Godot preset and installed the game on the selected simulator. " +
-                        "Support Sprint reached its home screen. Export presets preserved.\n",
+                        "The game reached its home screen. Export presets preserved.\n",
                 )
             } finally {
                 app.invokeAndWait { ProjectManagerEx.getInstanceEx().forceCloseProject(project, false) }

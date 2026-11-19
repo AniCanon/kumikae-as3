@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -9,7 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ProjectTemplateTest {
-    private val root = Files.createTempDirectory("template")
+    @TempDir lateinit var root: Path
 
     @Test fun `the disc of a new game goes the way it is swiped, by a finger or the mouse`() {
         val files = ProjectTemplate("Star Hopper", emptySet()).files()

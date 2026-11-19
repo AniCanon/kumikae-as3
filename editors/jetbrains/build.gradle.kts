@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import java.time.Duration
 
 plugins {
@@ -47,7 +48,7 @@ dependencies {
 
 allprojects {
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
-    extensions.configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> { version.set("1.8.0") }
+    extensions.configure<KtlintExtension> { version.set("1.8.0") }
 }
 
 kotlin { jvmToolchain(25) }

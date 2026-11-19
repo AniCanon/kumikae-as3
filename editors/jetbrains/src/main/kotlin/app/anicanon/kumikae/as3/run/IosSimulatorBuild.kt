@@ -2,6 +2,8 @@ package app.anicanon.kumikae.as3.run
 
 import app.anicanon.kumikae.as3.ScriptFailed
 import app.anicanon.kumikae.as3.ShippedScript
+import app.anicanon.kumikae.as3.settings.GameTargets
+import app.anicanon.kumikae.as3.settings.GodotConfig
 import app.anicanon.kumikae.as3.settings.IosTarget
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,7 +30,8 @@ internal class IosSimulatorBuild(
             // The script's last line is its reason, written for a person.
             error(failure.output.lines().lastOrNull { it.isNotBlank() } ?: "The build failed. ${failure.message}")
         }
-        return printed.lines().last { it.isNotBlank() }
+        return printed.lines().lastOrNull { it.isNotBlank() }
+            ?: error("The Simulator build did not produce an .app path.")
     }
 
     companion object {
@@ -39,7 +42,8 @@ internal class IosSimulatorBuild(
 
         /** Whether the project says how it is exported for iOS. */
         fun canBuild(project: Path): Boolean = runCatching {
-            Files.readString(project.resolve("export_presets.cfg")).lines().any { it.trim() == "platform=\"iOS\"" }
+            GameTargets.presets(GodotConfig(Files.readString(project.resolve("export_presets.cfg"))))
+                .any { it.platform == "iOS" }
         }.getOrDefault(false)
 
         /**

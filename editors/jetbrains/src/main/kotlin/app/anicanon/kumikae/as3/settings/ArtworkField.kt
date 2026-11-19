@@ -29,16 +29,9 @@ internal fun ArtworkField(
         Label(path.substringAfterLast('/').ifEmpty { "Godot default" })
         val details = when {
             layout?.visible == false -> "Hidden at launch"
-
-            preview != null -> {
-                val type = path.substringAfterLast('.').uppercase()
-                if (type == "SVG") "SVG  ·  Vector" else "$type  ·  ${preview.width} × ${preview.height} px"
-            }
-
+            preview != null -> formatArtworkMeta(path, preview)
             path.isNotEmpty() -> "Preview unavailable"
-
             kind == GameResourceKind.Splash -> "PNG"
-
             else -> "No custom artwork"
         }
         StatusLine(details)

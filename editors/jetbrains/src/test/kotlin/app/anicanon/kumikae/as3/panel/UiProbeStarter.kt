@@ -198,10 +198,6 @@ class UiProbeStarter : ApplicationStarter {
         onEdt { icon(view, name).doClick() }
     }
 
-    private fun click(view: SimulatorToolWindow, text: String) = onEdt {
-        descendants(view.component).filterIsInstance<JButton>().single { it.text == text }.doClick()
-    }
-
     private fun menu(entries: List<MenuEntry>, text: String) {
         val entry = entries.single { it.text.startsWith(text) }
         check(entry.enabled) { "'$text' is disabled" }

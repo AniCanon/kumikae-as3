@@ -13,17 +13,21 @@ import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.impl.TrustedPathsSettings
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.ToolWindowManager
+import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
 internal object UiProbeAndroidRun {
@@ -40,12 +44,7 @@ internal object UiProbeAndroidRun {
                 val root = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
                 if (System.getenv("KUMIKAE_EXPECT_TARGET_PROVIDER") == "1") {
                     val providers = GameTargetContribution.EP.extensionList
-                    check(
-                        providers.any {
-                            com.intellij.openapi.actionSystem.ActionManager.getInstance().getAction(it.setupAction) !=
-                                null
-                        },
-                    )
+                    check(providers.any { ActionManager.getInstance().getAction(it.setupAction) != null })
                 }
                 UiProbeGameSettings.run(project, root, output)
                 val source = Files.readString(folder.resolve("export_presets.cfg"))
@@ -60,7 +59,9 @@ internal object UiProbeAndroidRun {
                 val adb = checkNotNull(project.service<AndroidDevices>().sdk).resolve("platform-tools/adb").toString()
                 fun adb(vararg args: String): String {
                     val process = ProcessBuilder(adb, "-s", serial, *args).redirectErrorStream(true).start()
-                    return process.inputStream.bufferedReader().use { it.readText().trim() }.also { process.waitFor() }
+                    val text = process.inputStream.bufferedReader().use { it.readText().trim() }
+                    check(process.waitFor(30, TimeUnit.SECONDS)) { "adb timed out: ${args.joinToString(" ")}" }
+                    return text
                 }
                 adb("shell", "am", "force-stop", bundle)
                 check(adb("shell", "pidof", bundle).isEmpty())
@@ -119,7 +120,7 @@ internal object UiProbeAndroidRun {
                     }
                     ready
                 }
-                val paints = java.util.concurrent.CopyOnWriteArrayList<Long>()
+                val paints = CopyOnWriteArrayList<Long>()
 
                 // Dismiss the OS full-screen hint if it overlays this disposable device's first launch.
                 fun tap(x: Double, y: Double) {
@@ -157,15 +158,15 @@ internal object UiProbeAndroidRun {
                             3 -> y to (1 - x)
                             else -> x to y
                         }
-                        val color = java.awt.Color(image.getRGB((u * image.width).toInt(), (v * image.height).toInt()))
+                        val color = Color(image.getRGB((u * image.width).toInt(), (v * image.height).toInt()))
                         highlighted = color.red in 225..238 && color.green in 230..244 && color.blue in 104..121
                     }
                     return highlighted
                 }
                 await("highlighted Start button on the home screen", 20) { isHighlighted(.14, .67) }
-                val sequences = mutableListOf<Long>()
-                val observed = mutableListOf<Long>()
-                val delays = mutableListOf<Double>()
+                val sequences = CopyOnWriteArrayList<Long>()
+                val observed = CopyOnWriteArrayList<Long>()
+                val delays = CopyOnWriteArrayList<Double>()
                 val reader = UiProbeReaderAllocation("Kumikae Android display")
                 var sampleStart = 0L
                 app.invokeAndWait {
@@ -200,8 +201,9 @@ internal object UiProbeAndroidRun {
                     ImageIO.write(image, "png", output.resolve("android-embedded.png").toFile())
                 }
                 check(paints.size >= 2)
-                val fps = paints.size * 1e9 / (sampleEnd - sampleStart)
-                val sourceFps = (sequences.last() - sequences.first()) * 1e9 / (observed.last() - observed.first())
+                val fps = paints.size * 1e9 / (sampleEnd - sampleStart).coerceAtLeast(1L)
+                val span = observed.last() - observed.first()
+                val sourceFps = if (span > 0) (sequences.last() - sequences.first()) * 1e9 / span else 0.0
                 val sorted = delays.sorted()
                 Files.writeString(
                     output.resolve("android-display.txt"),

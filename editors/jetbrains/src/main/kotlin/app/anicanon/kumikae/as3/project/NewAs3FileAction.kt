@@ -40,7 +40,8 @@ class NewAs3FileAction :
         val isTest = template.name.startsWith("AS3 Test")
         val defaultPackage = game?.findFile("project.godot")?.virtualFile?.let {
             FileDocumentManager.getInstance().getDocument(it)?.text
-        }?.let { GodotConfig(it).string("application", "config/kumikae_package") }?.takeIf { it.isNotBlank() }
+        }?.let { runCatching { GodotConfig(it).string("application", "config/kumikae_package") }.getOrNull() }
+            ?.takeIf { it.isNotBlank() }
             ?: game?.findSubdirectory("src")?.let { src ->
                 generateSequence(src) { folder ->
                     folder.subdirectories.singleOrNull()?.takeIf {
