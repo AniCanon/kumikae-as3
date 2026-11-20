@@ -38,6 +38,35 @@ internal class GameTargetSetup(private val project: Project, private val root: V
 
     fun add(platform: String, name: String, identifier: String) {
         val old = exports()
+        savePreset(old, platform, name, identifier)
+        when (platform) {
+            "iOS" -> selectSimulator(project, name)
+            "Web" -> selectWeb(project, name)
+            "Android" -> selectAndroid(project, name)
+            else -> error("Unsupported Godot target platform: $platform")
+        }
+    }
+
+    fun suggestedPreset(platform: String): String {
+        val config = GodotConfig(exports())
+        val all = GameTargets.presets(config)
+        val existing = all.filter { it.platform == platform }
+        if (existing.isNotEmpty()) {
+            val preset = existing.firstOrNull { config.raw(it.section, "runnable") == "true" }
+                ?: existing.firstOrNull { it.name == platform } ?: existing.first()
+            return preset.name
+        }
+        return generateSequence(1) { it + 1 }.map { if (it == 1) platform else "$platform ($it)" }
+            .first { candidate -> all.none { it.name == candidate } }
+    }
+
+    fun ensurePreset(platform: String, name: String, identifier: String) {
+        val old = exports()
+        if (GameTargets.presets(GodotConfig(old)).any { it.platform == platform && it.name == name }) return
+        savePreset(old, platform, name, identifier)
+    }
+
+    private fun savePreset(old: String, platform: String, name: String, identifier: String) {
         val updated = GameTargets.add(old, platform, name, identifier)
         if (platform == "iOS") GameTargets.ios(updated, name)
         if (updated != old) {
@@ -59,12 +88,6 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                     manager.saveDocument(doc)
                 },
             )
-        }
-        when (platform) {
-            "iOS" -> selectSimulator(project, name)
-            "Web" -> selectWeb(project, name)
-            "Android" -> selectAndroid(project, name)
-            else -> error("Unsupported Godot target platform: $platform")
         }
     }
 

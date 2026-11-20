@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.run
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.anicanon.kumikae.as3.project.NewGameTargetListener
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import app.anicanon.kumikae.as3.ui.SettingsSection
@@ -38,6 +39,10 @@ abstract class PresetRunConfiguration(
 ) : RunConfigurationBase<PresetOptions>(project, factory, name) {
     public override fun getOptions() = super.getOptions() as PresetOptions
     override fun getOptionsClass() = PresetOptions::class.java
+    override fun onNewConfigurationCreated() {
+        options.preset = NewGameTargetListener.prepare(this, platform, options.preset)
+    }
+
     internal fun presets(): List<String> {
         val folder = project.basePath ?: return emptyList()
         val file = Path.of(folder, "export_presets.cfg")
@@ -84,7 +89,7 @@ internal class PresetEditor(
     }
 
     override fun applyEditorTo(configuration: PresetRunConfiguration) {
-        configuration.options.preset = selected
+        if (selected.isNotEmpty()) configuration.options.preset = selected
     }
 
     override fun createEditor() = composePanel(this) {
@@ -93,7 +98,7 @@ internal class PresetEditor(
             if (problem.isNotEmpty()) {
                 StatusLine(problem)
             } else if (presets.isEmpty()) {
-                StatusLine("Use Run > Add Game Target to configure $platform.")
+                StatusLine("Adding this configuration creates a $platform export preset.")
             } else {
                 ComboBox(presets, selected.takeIf(presets::contains), onSelectionChange = {
                     if (it != null) {

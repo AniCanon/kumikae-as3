@@ -58,6 +58,7 @@
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
     <projectListeners>
+        <listener class="app.anicanon.kumikae.as3.project.NewGameTargetListener" topic="com.intellij.execution.RunManagerListener"/>
         <listener class="app.anicanon.kumikae.as3.language.As3LspDependencyListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>

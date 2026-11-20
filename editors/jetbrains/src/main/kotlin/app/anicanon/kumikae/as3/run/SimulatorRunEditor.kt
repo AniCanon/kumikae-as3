@@ -53,7 +53,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
     }
 
     override fun applyEditorTo(configuration: SimulatorRunConfiguration) {
-        configuration.options.preset = if (legacy) "" else preset
+        configuration.options.preset = if (legacy) "" else preset.ifEmpty { configuration.options.preset }
         configuration.options.deviceAppPath = deviceAppPath.trim()
         configuration.options.bundle = if (legacy) bundle.trim() else ""
         configuration.options.appPath = if (legacy) appPath.trim() else ""
@@ -81,7 +81,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
                 } else {
                     Label("Godot target")
                     if (presets.isEmpty()) {
-                        StatusLine("Use Run → Add Game Target to configure iOS.")
+                        StatusLine("Adding this configuration creates an iOS export preset.")
                     } else {
                         ComboBox(presets, preset.takeIf { it in presets }, onSelectionChange = {
                             if (it != null) {

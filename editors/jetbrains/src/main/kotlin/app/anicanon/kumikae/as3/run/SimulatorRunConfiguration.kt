@@ -4,6 +4,7 @@ import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
 import app.anicanon.kumikae.as3.panel.SimulatorHost
 import app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory
+import app.anicanon.kumikae.as3.project.NewGameTargetListener
 import app.anicanon.kumikae.as3.project.ProjectTemplate
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
@@ -76,6 +77,10 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
 
     override fun getOptionsClass(): Class<out RunConfigurationOptions> = SimulatorRunOptions::class.java
 
+    override fun onNewConfigurationCreated() {
+        if (options.bundle.isEmpty()) options.preset = NewGameTargetListener.prepare(this, "iOS", options.preset)
+    }
+
     override fun readExternal(element: Element) {
         super.readExternal(element)
         val base = project.basePath?.let(Path::of) ?: return
@@ -102,6 +107,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
         (options.preset.isBlank() && options.bundle.isNotBlank() && super.canRunOn(target))
 
     override fun checkConfiguration() {
+        if (NewGameTargetListener.isPending(this)) return
         try {
             target()
         } catch (error: Exception) {

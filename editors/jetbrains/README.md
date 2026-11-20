@@ -103,6 +103,13 @@ appears in the Run window.
 Edit a script while the game runs and save. The game takes the new code and keeps its state. See
 [Hot reload](../../docs/hot-reload.md).
 
+## Add a run target
+
+In **Run > Edit Configurations…**, click **+**, then choose **Kumikae AS3 > Web**, **iOS**, or **Android**.
+Click **OK** or **Apply**. Rider selects the platform’s runnable export preset if one exists. Otherwise it
+reuses an existing preset for that platform or creates one with the game’s settings. You can also use
+**Run > Add Game Target…** to explicitly choose or name a preset.
+
 ## Run in a browser
 
 Select **Web** in the project wizard or choose **Run > Add Game Target… > Web** in an existing game.
