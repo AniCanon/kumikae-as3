@@ -100,14 +100,15 @@ internal class GodotConfig(private val source: String) {
                         'u', 'U' -> {
                             val digits = if (escaped == 'u') 4 else 8
                             require(index + digits <= body.length) { "Unterminated unicode escape" }
-                            val codePoint = body.substring(index, index + digits).toIntOrNull(16)
-                                ?: error("Invalid unicode escape")
+                            val codePoint = requireNotNull(body.substring(index, index + digits).toIntOrNull(16)) {
+                                "Invalid unicode escape"
+                            }
                             require(Character.isValidCodePoint(codePoint)) { "Invalid unicode code point" }
                             result.appendCodePoint(codePoint)
                             index += digits
                         }
 
-                        else -> error("Unsupported string escape: \\$escaped")
+                        else -> throw IllegalArgumentException("Unsupported string escape: \\$escaped")
                     }
                 } else {
                     require(char != '"') { "Malformed quoted value" }

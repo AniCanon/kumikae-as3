@@ -46,21 +46,27 @@ abstract class PresetRunConfiguration(
     internal fun presets(): List<String> {
         val folder = project.basePath ?: return emptyList()
         val file = Path.of(folder, "export_presets.cfg")
-        if (!Files.isRegularFile(file)) return emptyList()
-        return GameTargets.presets(GodotConfig(Files.readString(file))).filter {
-            it.platform == platform
-        }.map { it.name }
+        return readPresetNames(file, platform)
     }
 
     protected fun selectedPreset(): String = try {
         presets().singleOrNull { options.preset.isEmpty() || it == options.preset }
             ?: throw ExecutionException("Choose a $platform export preset in this configuration.")
     } catch (error: IOException) {
-        throw ExecutionException("Cannot read export_presets.cfg.", error)
+        throw ExecutionException("Cannot read export_presets.cfg. ${error.message}", error)
     }
 
     override fun getConfigurationEditor(): SettingsEditor<PresetRunConfiguration> =
         PresetEditor(platform, PresetRunConfiguration::presets)
+}
+
+internal fun readPresetNames(file: Path, platform: String): List<String> {
+    if (!Files.isRegularFile(file)) return emptyList()
+    return try {
+        GameTargets.presets(GodotConfig(Files.readString(file))).filter { it.platform == platform }.map { it.name }
+    } catch (error: IllegalArgumentException) {
+        throw IOException(error.message, error)
+    }
 }
 
 internal class PresetEditor(

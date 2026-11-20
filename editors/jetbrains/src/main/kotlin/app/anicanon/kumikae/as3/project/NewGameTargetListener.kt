@@ -10,6 +10,7 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -37,15 +38,23 @@ internal class NewGameTargetListener : RunManagerListener {
         } catch (cancel: ProcessCanceledException) {
             throw cancel
         } catch (error: Exception) {
-            NotificationGroupManager.getInstance().getNotificationGroup("Kumikae AS3")
-                .createNotification("Cannot set up game target", error.message.orEmpty(), NotificationType.ERROR)
-                .notify(project)
+            notifySetupError(project, error)
         }
     }
 
     companion object {
         private data class Pending(val setup: GameTargetSetup, val name: String, val identifier: String)
         private val PENDING = Key.create<Pending>("kumikae.newGameTarget")
+
+        private fun notifySetupError(project: Project, error: Exception) {
+            NotificationGroupManager.getInstance().getNotificationGroup("Kumikae AS3")
+                .createNotification(
+                    "Cannot set up game target",
+                    error.message ?: "Cannot read Godot settings.",
+                    NotificationType.ERROR,
+                )
+                .notify(project)
+        }
 
         fun prepare(config: RunConfigurationBase<*>, platform: String, current: String): String {
             val project = config.project
@@ -65,8 +74,17 @@ internal class NewGameTargetListener : RunManagerListener {
                 }
                 Pending(setup, current.ifEmpty { setup.suggestedPreset(platform) }, identifier)
             }
-            val pending = ProgressManager.getInstance()
-                .runProcessWithProgressSynchronously(read, "Reading game targets", true, project) ?: return current
+            val pending = try {
+                ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                    read,
+                    "Reading game targets",
+                    true,
+                    project,
+                )
+            } catch (error: IllegalArgumentException) {
+                notifySetupError(project, error)
+                null
+            } ?: return current
             config.putUserData(PENDING, pending)
             return pending.name
         }
