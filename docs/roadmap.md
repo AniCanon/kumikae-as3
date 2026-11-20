@@ -45,6 +45,8 @@ state of the project changes.
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
 - **iOS:** the interpreter runs in the Simulator and on a device. Rider can sign, install and run a game on a paired iPhone or iPad.
 - **Android:** the interpreter runs on an ARM64 emulator through Rider.
+- **Web (WebAssembly):** `libkas3_godot.wasm` builds with Emscripten for Godot 4.7's single-threaded Web export
+  and runs projects such as `examples/coin-dash` on the interpreter in the browser.
 
 ### Native code
 
@@ -90,7 +92,7 @@ These are designed separately. Nothing above delivers them, and the design keeps
 - Language additions from Apache Royale, such as arrow functions, `?.` and `??`.
 - The Flash API (`flash.display.Sprite`, `MovieClip`) as a library on top of Godot nodes.
 - Loading `.swf` files.
-- Web export.
+- Native ahead-of-time C++ WebAssembly program libraries for Web export (the interpreter Web export works today).
 
 ## Known limits
 

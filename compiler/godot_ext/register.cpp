@@ -11,13 +11,28 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
 
+#if defined(__EMSCRIPTEN__)
+#include <functional>
+#if defined(_LIBCPP_AVAILABILITY_HAS_HASH_MEMORY) && _LIBCPP_AVAILABILITY_HAS_HASH_MEMORY
+// Godot 4.7's Web export template is built with Emscripten 4.0.20 (LLVM 20), whose libc++ dylib does not
+// export std::__hash_memory (added in LLVM 21). Provide it locally so newer Emscripten toolchains link.
+namespace std {
+inline namespace _LIBCPP_ABI_NAMESPACE {
+[[__gnu__::__pure__]] _LIBCPP_EXPORTED_FROM_ABI size_t __hash_memory(_LIBCPP_NOESCAPE const void *p_ptr, size_t p_size) _NOEXCEPT {
+	return __murmur2_or_cityhash<size_t>()(p_ptr, p_size);
+}
+} // namespace _LIBCPP_ABI_NAMESPACE
+} // namespace std
+#endif
+#endif
+
 using namespace godot;
 
 AS3Language *AS3Language::singleton = nullptr;
 static Ref<AS3ScriptLoader> loader;
 
 static void initialize(ModuleInitializationLevel p_level) {
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
 		GDREGISTER_INTERNAL_CLASS(AS3IOSExport);
 		GDREGISTER_INTERNAL_CLASS(AS3ExportEditor);
@@ -38,7 +53,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 }
 
 static void terminate(ModuleInitializationLevel p_level) {
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
 		EditorPlugins::remove_by_type<AS3ExportEditor>();
 	}

@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <pthread.h>
 #endif
 
@@ -45,7 +45,7 @@ struct Started {
 	void *data;
 };
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 void *run_started(void *p_started) {
 	Started *started = static_cast<Started *>(p_started);
 	started->run(started->data);
@@ -74,7 +74,7 @@ uintptr_t stack_floor() {
 }
 
 bool run_with_stack(size_t p_bytes, void (*p_run)(void *), void *p_data) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 	pthread_attr_t attributes;
 	pthread_t thread;
 	if (pthread_attr_init(&attributes) != 0) {

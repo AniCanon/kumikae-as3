@@ -1,5 +1,31 @@
 #include "play_build.h"
 
+#if defined(__EMSCRIPTEN__)
+
+namespace kas3 {
+namespace play {
+
+std::string write_sources(const ir::Module &, const std::filesystem::path &, bool) {
+	return "native Play builds are not supported on the Web";
+}
+
+bool builds() {
+	return false;
+}
+
+std::string library_for(const ir::Module &) {
+	return {};
+}
+
+void build_ahead(const ir::Module &) {}
+void poll() {}
+void finish() {}
+
+} // namespace play
+} // namespace kas3
+
+#else
+
 #include "generate.h"
 #include "native_host.h"
 #include "play_cache.h"
@@ -401,3 +427,4 @@ void finish() {
 
 } // namespace play
 } // namespace kas3
+#endif

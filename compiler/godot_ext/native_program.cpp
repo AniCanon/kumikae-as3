@@ -327,8 +327,8 @@ std::string NativeProgram::path() {
 	if (const char *named = std::getenv("KAS3_PROGRAM_LIBRARY")) {
 		return named;
 	}
-#if defined(IOS_ENABLED)
-	// The watched project can be on the Mac. Its desktop library cannot run in the app.
+#if defined(IOS_ENABLED) || defined(__EMSCRIPTEN__)
+	// The watched project can be on the desktop; its host library cannot run on iOS or the Web.
 	return {};
 #elif defined(__ANDROID__)
 	Dl_info info{};

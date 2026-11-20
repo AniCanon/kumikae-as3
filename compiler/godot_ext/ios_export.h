@@ -1,7 +1,7 @@
 // Godot and the IDE both use this plugin when exporting iOS or Android projects.
 #pragma once
 
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_export_platform.hpp>
 #include <godot_cpp/classes/editor_export_plugin.hpp>

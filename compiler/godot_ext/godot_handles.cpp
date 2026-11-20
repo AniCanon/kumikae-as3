@@ -23,14 +23,16 @@ static std::vector<void *> &spare_handles() {
 
 static constexpr size_t SPARE_HANDLES = 4096; // The most kept; more are freed.
 
-// An untyped value keeps its tag in the low bits of a handle's address: the head keeps it sixteen bytes apart.
-static_assert(sizeof(rt::HandleHead) % 16 == 0 && __STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16, "a handle is sixteen bytes aligned");
+// An untyped value keeps its tag in the low bits of a handle's address: the head and allocator keep it
+// sixteen bytes aligned on both 32-bit (WebAssembly) and 64-bit platforms.
+static constexpr std::align_val_t HANDLE_ALIGNMENT{ 16 };
+static_assert(sizeof(rt::HandleHead) % 16 == 0, "a handle is sixteen bytes aligned");
 
 void *handle_memory() {
 	std::vector<void *> &spare = spare_handles();
 	void *memory = nullptr;
 	if (!on_main_thread() || spare.empty()) {
-		memory = ::operator new(sizeof(rt::HandleHead) + sizeof(Variant));
+		memory = ::operator new(sizeof(rt::HandleHead) + sizeof(Variant), HANDLE_ALIGNMENT);
 	} else {
 		memory = spare.back();
 		spare.pop_back();
@@ -48,7 +50,7 @@ void free_handle_memory(void *p_memory) {
 	void *memory = rt::head_of(p_memory);
 	std::vector<void *> &spare = spare_handles();
 	if (!on_main_thread() || spare.size() >= SPARE_HANDLES) {
-		::operator delete(memory);
+		::operator delete(memory, HANDLE_ALIGNMENT);
 		return;
 	}
 	spare.push_back(memory);

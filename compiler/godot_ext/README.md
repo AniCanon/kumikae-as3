@@ -17,7 +17,7 @@ python3 compiler/tests/run_godot.py compiler/tests compiler/build/kas3c
 ```
 
 The library is written to `tests/godot_project/bin`. The tests need `godot` 4.7 on the `PATH`, or its path
-in `KAS3_GODOT`. For iOS, run `tests/build_ios.sh`.
+in `KAS3_GODOT`. For iOS, run `tests/build_ios.sh`. For the Web (WebAssembly), run `tests/build_web.sh`.
 
 godot-cpp is built as `template_release`, and Godot's editor loads that library too. godot-cpp compiles
 nothing differently for the editor, so one library serves both.
@@ -100,6 +100,14 @@ The default **Automatic** mode interprets debug exports and compiles release exp
 `actionscript/native_code`: Automatic (2), Interpreter (0) and Native (1). Earlier iOS boolean settings keep
 their original meaning. Native debug exports record constructor arguments for hot reload. Release exports
 omit that bookkeeping.
+
+## Web export (WebAssembly)
+
+`tests/build_web.sh <path to godot-cpp>` compiles `kas3_godot` with Emscripten as a single-threaded
+WebAssembly GDExtension side module (`bin/web/libkas3_godot.wasm`, registered under `web.wasm32` in
+`kas3.gdextension`). Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true`
+and `variant/thread_support=false`; scripts run on the interpreter in the browser without requiring
+`SharedArrayBuffer` headers. Native ahead-of-time WebAssembly program libraries are future work.
 
 ## The program library
 
