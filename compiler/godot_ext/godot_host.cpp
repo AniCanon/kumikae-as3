@@ -3,9 +3,7 @@
 
 #include "any.h"
 
-#if !defined(KAS3_RUNTIME_ONLY)
-#include "builtins.h"
-#endif
+#include "runtime_names.gen.h"
 #include "callable.h"
 #include "members.h"
 #include "program.h"
@@ -27,6 +25,7 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <new>
@@ -453,42 +452,29 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		*r_error = FREED;
 		return false;
 	}
-	// The name is AS3's. Godot's own comes from the name table (or ClassDB in runtime-only builds).
-	std::optional<std::string> godot;
-#if defined(KAS3_RUNTIME_ONLY)
-	std::string snake;
-	for (size_t i = 0; i < p_name.size(); i++) {
-		const unsigned char c = static_cast<unsigned char>(p_name[i]);
-		if (c >= 'A' && c <= 'Z') {
-			if (i > 0) {
-				snake.push_back('_');
+	const uint64_t id = gdextension_interface::object_get_instance_id(object->_owner);
+	if (last_signal_.owner != id || last_signal_.as3 != p_name) {
+		const auto end = std::end(SIGNAL_MEMBERS);
+		const auto it = std::lower_bound(std::begin(SIGNAL_MEMBERS), end, p_name,
+				[](const SignalMember &member, std::string_view key) { return member.as3 < key; });
+		last_signal_.owner = 0;
+		if (it != end && it->as3 == p_name) {
+			const StringName &candidate = name(it->godot);
+			const StringName klass = object->get_class();
+			if (ClassDB::class_has_signal(klass, candidate) || !ClassDB::class_get_property_getter(klass, candidate).is_empty()) {
+				last_signal_ = { it->as3, candidate, id };
 			}
-			snake.push_back(static_cast<char>(c - 'A' + 'a'));
-		} else {
-			snake.push_back(static_cast<char>(c));
 		}
 	}
-	const StringName candidate(String::utf8(snake.c_str()));
-	const StringName klass_name = object->get_class();
-	if (ClassDB::class_has_signal(klass_name, candidate) || !ClassDB::class_get_property_getter(klass_name, candidate).is_empty()) {
-		godot = snake;
-	}
-#else
-	for (StringName at = object->get_class(); !godot && !String(at).is_empty(); at = ClassDB::get_parent_class(at)) {
-		CharString klass = String(at).utf8();
-		godot = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name);
-	}
-#endif
-	const bool found = godot.has_value();
-	// Not one of Godot's: a public field of the AS3 script attached to it, as Godot itself would reach it.
+	const bool found = last_signal_.owner != 0;
 	const vm::Object *script = found ? nullptr : script_object(object);
-	const Member field = script ? find_member(script->klass, StringName(String::utf8(p_name.data(), (int64_t)p_name.size()))) : Member{};
+	const Member field = script ? find_member(script->klass, StringName(to_godot(p_name))) : Member{};
 	if (!found && field.what != Member::What::Field) {
-		CharString klass = String(object->get_class()).utf8();
-		*r_error = "a " + std::string(klass.get_data()) + " has no '" + std::string(p_name) + "'";
+		CharString type = object->get_class().utf8();
+		*r_error = "a " + std::string(type.get_data()) + " has no signal '" + std::string(p_name) + "'";
 		return false;
 	}
-	const Variant value = found ? object->get(StringName(to_godot(*godot))) : read_field(script, field.index);
+	const Variant value = found ? object->get(last_signal_.godot) : read_field(script, field.index);
 	if (p_result.type == "Signal" && value.get_type() != Variant::SIGNAL) {
 		*r_error = "'" + std::string(p_name) + "' is not a signal";
 		return false;

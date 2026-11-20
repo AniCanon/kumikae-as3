@@ -8,9 +8,7 @@
 #include "godot_calls.h"
 #include "worked.h"
 
-#if !defined(KAS3_RUNTIME_ONLY)
-#include "godot_names.h"
-#endif
+#include "runtime_names.gen.h"
 
 #include <cstring>
 
@@ -22,26 +20,11 @@ std::unique_ptr<GodotHost::Worked> emit_of(const ir::EngineName &p_entry, const 
 	if (p_entry.key != "Signal.emit" || p_words.size() < 6 || p_words[1] != "method") {
 		return nullptr;
 	}
-#if defined(KAS3_RUNTIME_ONLY)
 	auto worked = std::make_unique<GodotHost::Worked>();
 	worked->what = GodotHost::Worked::What::Emit;
 	worked->name = std::string(p_words[0]);
-	worked->bound = method_bind("Object", "emit_signal", "4047867050");
+	worked->bound = method_bind(EMIT_BIND[0], EMIT_BIND[1], EMIT_BIND[2]);
 	return worked->bound ? std::move(worked) : nullptr;
-#else
-	// Object's own method, by the hash its entry in the name table carries.
-	const std::optional<std::string_view> owner = godot_value("GodotObject");
-	const std::optional<std::string_view> method = godot_value("GodotObject.emitSignal");
-	const std::vector<std::string_view> words = method ? entry_words(*method) : std::vector<std::string_view>();
-	if (!owner || words.size() < 3 || words[1] != "method") {
-		return nullptr;
-	}
-	auto worked = std::make_unique<GodotHost::Worked>();
-	worked->what = GodotHost::Worked::What::Emit;
-	worked->name = std::string(p_words[0]);
-	worked->bound = method_bind(*owner, words[0], words[2]);
-	return worked->bound ? std::move(worked) : nullptr;
-#endif
 }
 
 bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, const Variant **p_pointers, size_t p_count) {

@@ -34,25 +34,6 @@ inline constexpr size_t MOST_OPERANDS = 16;
 // Where a Variant of a type keeps its bare value, as Godot's entries read and write it.
 void *inside(godot::Variant &p_value, int p_type);
 
-// Splits space-separated words inside a Godot name-table entry value without linking the name table itself.
-inline std::vector<std::string_view> entry_words(std::string_view p_value) {
-	std::vector<std::string_view> words;
-	size_t at = 0;
-	while (at < p_value.size()) {
-		while (at < p_value.size() && p_value[at] == ' ') {
-			at++;
-		}
-		const size_t start = at;
-		while (at < p_value.size() && p_value[at] != ' ') {
-			at++;
-		}
-		if (at > start) {
-			words.push_back(p_value.substr(start, at - start));
-		}
-	}
-	return words;
-}
-
 // One of Godot's classes' methods by its hash, if this Godot has it: one that is missing (a class of the
 // editor's in an exported game) is left to be reported by name where it is used, not at load.
 GDExtensionMethodBindPtr method_bind(std::string_view p_class, std::string_view p_method, std::string_view p_hash);

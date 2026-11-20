@@ -144,7 +144,13 @@ if(KAS3_GODOT_CPP)
             COMMENT "Embedding the runtime's headers")
         set(KAS3_GODOT_EXTRA_SOURCES "${play_runtime_path}")
     endif()
-    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES})
+    set(runtime_names "${CMAKE_CURRENT_BINARY_DIR}/runtime_names.gen.h")
+    add_custom_command(OUTPUT ${runtime_names}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/godot/runtime_names.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${runtime_names}
+        DEPENDS godot/runtime_names.py godot/godot_names.txt)
+    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES} ${runtime_names})
+    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)

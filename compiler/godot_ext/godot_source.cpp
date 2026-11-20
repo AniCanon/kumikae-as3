@@ -3,7 +3,7 @@
 #include "godot_calls.h"
 #include "godot_host.h"
 #include "handles.h"
-#include "worked.h"
+#include "godot_names.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -132,8 +132,7 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 	}
 	// A class's static method comes with its entry in the name table ("print_orphan_nodes method 2648703342
 	// void -"): the hash is its third word.
-	const std::vector<std::string_view> words = entry_words(p_method);
-	const std::string_view method = words[0];
+	const std::string_view method = p_method.substr(0, p_method.find(' '));
 	const StringName &method_name = name(method);
 	Arguments arguments(p_arguments, p_count);
 	Variant result;
@@ -145,6 +144,7 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 		const std::string key = std::string(p_class) + "." + std::string(p_method);
 		auto found = static_methods_.find(key);
 		if (found == static_methods_.end()) {
+			const std::vector<std::string_view> words = godot_words(p_method);
 			const bool hashed = words.size() > 2 && words[1] == "method" && words[2] != "-";
 			const GDExtensionInt hash = hashed ? std::strtoll(std::string(words[2]).c_str(), nullptr, 10) : 0;
 			const StringName class_name(String::utf8(p_class.data(), (int64_t)p_class.size()));

@@ -73,16 +73,6 @@ std::optional<std::string_view> godot_value(std::string_view p_key) {
 	return id ? std::optional<std::string_view>(godot_entry_at(*id).value) : std::nullopt;
 }
 
-std::vector<std::string_view> godot_words(std::string_view p_value) {
-	std::vector<std::string_view> words;
-	for (size_t at = 0; at <= p_value.size();) {
-		const size_t space = std::min(p_value.find(' ', at), p_value.size());
-		words.push_back(p_value.substr(at, space - at));
-		at = space + 1;
-	}
-	return words;
-}
-
 std::optional<std::string> godot_name(std::string_view p_class, std::string_view p_member) {
 	std::string key(p_class);
 	if (!p_member.empty()) {
