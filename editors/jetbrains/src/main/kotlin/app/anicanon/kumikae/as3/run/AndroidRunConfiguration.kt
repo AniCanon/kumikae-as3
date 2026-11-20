@@ -40,11 +40,7 @@ class AndroidRunConfiguration(project: Project, factory: ConfigurationFactory, n
                 val basePath = project.basePath ?: throw ExecutionException("Open the Godot project directory.")
                 val sdk = project.service<AndroidDevices>().sdk
                     ?: throw ExecutionException("Install Android SDK Platform Tools.")
-                val presetName = try {
-                    selectedPreset()
-                } catch (error: Exception) {
-                    throw ExecutionException(error.message ?: "Choose an Android export preset in this configuration.")
-                }
+                val presetName = selectedPreset()
                 val native =
                     PluginFiles.native() ?: throw ExecutionException("Reinstall the plugin with the Android runtime.")
                 val runnerScript = native.resolve("tools/android_run.py")

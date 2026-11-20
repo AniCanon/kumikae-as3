@@ -10,8 +10,6 @@ import com.intellij.execution.process.KillableColoredProcessHandler
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.project.Project
-import java.nio.file.Files
-import java.nio.file.Path
 
 class WebRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     PresetRunConfiguration(project, factory, name, "Web") {

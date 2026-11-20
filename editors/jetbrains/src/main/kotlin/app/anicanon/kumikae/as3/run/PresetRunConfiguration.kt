@@ -8,14 +8,18 @@ import app.anicanon.kumikae.as3.settings.GodotConfig
 import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
+import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.RunConfigurationBase
 import com.intellij.execution.configurations.RunConfigurationOptions
-import com.intellij.execution.configurations.RuntimeConfigurationError
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -43,38 +47,40 @@ abstract class PresetRunConfiguration(
         }.map { it.name }
     }
 
-    protected fun selectedPreset(): String = presets().singleOrNull { options.preset.isEmpty() || it == options.preset }
-        ?: throw RuntimeConfigurationError("Choose a $platform export preset in this configuration.")
-
-    override fun checkConfiguration() {
-        try {
-            selectedPreset()
-        } catch (error: RuntimeConfigurationError) {
-            throw error
-        } catch (error: Exception) {
-            throw RuntimeConfigurationError(error.message ?: "Cannot read export_presets.cfg.")
-        }
+    protected fun selectedPreset(): String = try {
+        presets().singleOrNull { options.preset.isEmpty() || it == options.preset }
+            ?: throw ExecutionException("Choose a $platform export preset in this configuration.")
+    } catch (error: IOException) {
+        throw ExecutionException("Cannot read export_presets.cfg.", error)
     }
 
-    override fun getConfigurationEditor(): SettingsEditor<PresetRunConfiguration> = PresetEditor(platform)
+    override fun getConfigurationEditor(): SettingsEditor<PresetRunConfiguration> =
+        PresetEditor(platform, PresetRunConfiguration::presets)
 }
 
-internal class PresetEditor(private val platform: String) : SettingsEditor<PresetRunConfiguration>() {
+internal class PresetEditor(
+    private val platform: String,
+    private val loadPresets: (PresetRunConfiguration) -> List<String>,
+) : SettingsEditor<PresetRunConfiguration>() {
     private var presets by mutableStateOf(emptyList<String>())
     private var selected by mutableStateOf("")
     private var problem by mutableStateOf("")
 
     override fun resetEditorFrom(configuration: PresetRunConfiguration) {
-        runCatching { configuration.presets() }
-            .onSuccess {
-                presets = it
-                problem = ""
+        selected = configuration.options.preset
+        presets = emptyList()
+        problem = "Loading export presets…"
+        ReadAction.nonBlocking<Result<List<String>>> {
+            try {
+                Result.success(loadPresets(configuration))
+            } catch (error: IOException) {
+                Result.failure(error)
             }
-            .onFailure {
-                presets = emptyList()
-                problem = it.message ?: "Cannot read Godot export presets."
-            }
-        selected = configuration.options.preset.ifEmpty { presets.singleOrNull().orEmpty() }
+        }.coalesceBy(this).expireWith(this).finishOnUiThread(ModalityState.any()) { result ->
+            presets = result.getOrDefault(emptyList())
+            problem = result.exceptionOrNull()?.message.orEmpty()
+            if (selected.isEmpty()) selected = presets.singleOrNull().orEmpty()
+        }.submit(AppExecutorUtil.getAppExecutorService())
     }
 
     override fun applyEditorTo(configuration: PresetRunConfiguration) {
@@ -83,9 +89,10 @@ internal class PresetEditor(private val platform: String) : SettingsEditor<Prese
 
     override fun createEditor() = composePanel(this) {
         SettingsSection("$platform launch") {
-            if (problem.isNotEmpty()) StatusLine(problem)
             Label("Godot export preset")
-            if (presets.isEmpty()) {
+            if (problem.isNotEmpty()) {
+                StatusLine(problem)
+            } else if (presets.isEmpty()) {
                 StatusLine("Use Run > Add Game Target to configure $platform.")
             } else {
                 ComboBox(presets, selected.takeIf(presets::contains), onSelectionChange = {

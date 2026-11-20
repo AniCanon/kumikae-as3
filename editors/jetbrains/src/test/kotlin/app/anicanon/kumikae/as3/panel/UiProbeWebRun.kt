@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.project.GameTargetSetup
+import app.anicanon.kumikae.as3.run.PresetEditor
 import app.anicanon.kumikae.as3.run.WebRunConfiguration
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.RunManager
@@ -10,8 +11,11 @@ import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import java.net.URI
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 internal object UiProbeWebRun {
     fun run(project: Project, root: VirtualFile) {
@@ -24,6 +28,17 @@ internal object UiProbeWebRun {
         }
         val selection = checkNotNull(RunManager.getInstance(project).selectedConfiguration)
         check((selection.configuration as WebRunConfiguration).options.preset == "Browser preview")
+        val readOnEdt = CompletableFuture<Boolean>()
+        val editor = PresetEditor("Web") {
+            readOnEdt.complete(app.isDispatchThread)
+            listOf("Browser preview")
+        }
+        try {
+            app.invokeAndWait { editor.resetFrom(selection.configuration as WebRunConfiguration) }
+            check(!readOnEdt.get(5, TimeUnit.SECONDS)) { "The preset editor reads project files on the UI thread." }
+        } finally {
+            app.invokeAndWait { Disposer.dispose(editor) }
+        }
         try {
             app.invokeAndWait {
                 ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), selection)
