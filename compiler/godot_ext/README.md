@@ -104,14 +104,20 @@ omit that bookkeeping.
 
 ## Web export (WebAssembly)
 
-`tests/build_web.sh <path to godot-cpp>` compiles `kas3_godot` with Emscripten as a single-threaded
-WebAssembly GDExtension side module (`bin/web/libkas3_godot.wasm`, registered under `web.wasm32` in
-`kas3.gdextension`). Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true`
-and `variant/thread_support=false`; scripts run on the interpreter in the browser without requiring
-`SharedArrayBuffer` headers. The release link removes unused code and retains the entry point Godot
-loads by name plus `web_reload`'s `kas3_web_reload`, `kas3_web_last_error`, and `kas3_web_reset_sources`
-C API so a host page can edit `.as` sources and hot-reload running scripts in place. Native ahead-of-time
-WebAssembly program libraries are future work.
+`tests/build_web.sh <path to godot-cpp>` compiles `kas3_godot` with Emscripten as a size-optimized
+(`-Oz` + `wasm-opt -Oz`), single-threaded, runtime-only WebAssembly GDExtension side module
+(`KAS3_RUNTIME_ONLY=ON`, written to `bin/web/libkas3_godot.wasm`, registered under `web.wasm32` in
+`kas3.gdextension`). Because it omits the AS3 front end and Godot's embedded declaration tables, it loads
+the precompiled `res://.kas3/program.kas3` binary IR module that `AS3IOSExport` packs automatically during
+Godot's Web export (~620 KiB raw / ~193 KiB Brotli). Pass `--compiler` to `tests/build_web.sh` to build
+`bin/web/libkas3_godot_compiler.wasm` with the in-browser compiler and `web_reload` hot-reload C API
+(`kas3_web_reload`, `kas3_web_last_error`, `kas3_web_reset_sources`).
+
+Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true` and
+`variant/thread_support=false`; scripts run on the interpreter in the browser without requiring
+`SharedArrayBuffer` headers. To shrink Godot's own `index.side.wasm` template as well, use
+`tools/build_web_template.sh --2d <godot checkout> <output.zip>`. Native ahead-of-time WebAssembly program
+libraries are future work.
 
 ## The program library
 

@@ -153,6 +153,13 @@ def stage_web_runtime(stage, native):
             available.add(destination.name)
     if not available:
         raise ValueError("Missing Web AS3 runtime at " + ", ".join(sorted(paths)) + ". Install the Kumikae Web kit.")
+    # Stage the host editor extension alongside the Web runtime so Godot runs AS3IOSExport and packs
+    # res://.kas3/program.kas3 for the slim runtime-only WebAssembly library.
+    for name in ("libkas3_godot.dylib", "libkas3_godot.so", "kas3_godot.dll"):
+        host = native / name
+        if host.is_file():
+            (stage / "bin").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(host, stage / "bin" / name)
     return available
 
 

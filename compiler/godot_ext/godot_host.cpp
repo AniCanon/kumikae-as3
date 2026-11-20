@@ -3,7 +3,9 @@
 
 #include "any.h"
 
+#if !defined(KAS3_RUNTIME_ONLY)
 #include "builtins.h"
+#endif
 #include "callable.h"
 #include "members.h"
 #include "program.h"
@@ -451,12 +453,32 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		*r_error = FREED;
 		return false;
 	}
-	// The name is AS3's. Godot's own comes from the name table, for the object's class or one it extends.
+	// The name is AS3's. Godot's own comes from the name table (or ClassDB in runtime-only builds).
 	std::optional<std::string> godot;
+#if defined(KAS3_RUNTIME_ONLY)
+	std::string snake;
+	for (size_t i = 0; i < p_name.size(); i++) {
+		const unsigned char c = static_cast<unsigned char>(p_name[i]);
+		if (c >= 'A' && c <= 'Z') {
+			if (i > 0) {
+				snake.push_back('_');
+			}
+			snake.push_back(static_cast<char>(c - 'A' + 'a'));
+		} else {
+			snake.push_back(static_cast<char>(c));
+		}
+	}
+	const StringName candidate(String::utf8(snake.c_str()));
+	const StringName klass_name = object->get_class();
+	if (ClassDB::class_has_signal(klass_name, candidate) || !ClassDB::class_get_property_getter(klass_name, candidate).is_empty()) {
+		godot = snake;
+	}
+#else
 	for (StringName at = object->get_class(); !godot && !String(at).is_empty(); at = ClassDB::get_parent_class(at)) {
 		CharString klass = String(at).utf8();
 		godot = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name);
 	}
+#endif
 	const bool found = godot.has_value();
 	// Not one of Godot's: a public field of the AS3 script attached to it, as Godot itself would reach it.
 	const vm::Object *script = found ? nullptr : script_object(object);

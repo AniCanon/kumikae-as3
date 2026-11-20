@@ -93,6 +93,7 @@ cmake --build compiler/build-san -j && ctest --test-dir compiler/build-san --out
 | `kas3c check <file>...` | Reads the files as one program and reports every error. |
 | `kas3c run <file>...` | Checks the program and runs it on the interpreter. |
 | `kas3c ir <file>...` | Prints the typed IR the interpreter runs. |
+| `kas3c pack [--godot] <file>... -o <file.kas3>` | Writes a precompiled binary IR module to run without the front end. |
 | `kas3c cpp <file>... -o <folder>` | Writes the program as C++ source. |
 | `kas3c lsp` | Serves an editor with the Language Server Protocol, over standard input and output. |
 

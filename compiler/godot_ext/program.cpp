@@ -1,14 +1,18 @@
 #include "program.h"
 
-#include "builtins.h"
 #include "callable.h"
 #include "instance.h"
-#include "lower.h"
-#include "names.h"
+#include "ir_binary.h"
 #include "play_build.h"
 #include "script.h"
 #include "sources.h"
 #include "web_reload.h"
+
+#if !defined(KAS3_RUNTIME_ONLY)
+#include "builtins.h"
+#include "lower.h"
+#include "names.h"
+#endif
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -53,6 +57,23 @@ void Project::before_shutdown() {
 	}
 }
 
+static constexpr const char *PRECOMPILED_MODULE = "res://.kas3/program.kas3";
+
+static bool load_precompiled(ir::Module *r_module, std::string *r_error) {
+	if (!FileAccess::file_exists(PRECOMPILED_MODULE)) {
+		*r_error = "precompiled module res://.kas3/program.kas3 is missing from the export";
+		return false;
+	}
+	const PackedByteArray bytes = FileAccess::get_file_as_bytes(PRECOMPILED_MODULE);
+	const std::optional<std::string> err = ir::read_binary(bytes.ptr(), static_cast<size_t>(bytes.size()), r_module);
+	if (err) {
+		*r_error = *err;
+		return false;
+	}
+	return true;
+}
+
+#if !defined(KAS3_RUNTIME_ONLY)
 // Compiles every script of the project. False, with what is wrong, if they do not compile.
 static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t *r_count = nullptr) {
 	const String root = scripts_root();
@@ -99,6 +120,20 @@ bool compile_scripts(std::vector<std::string> files, const String &root, ir::Mod
 	}
 	return true;
 }
+#endif
+
+static bool load_project_module(ir::Module *r_module, std::string *r_errors) {
+#if defined(KAS3_RUNTIME_ONLY)
+	return load_precompiled(r_module, r_errors);
+#else
+	// Exported packs can carry a precompiled binary IR module to skip front-end compilation at startup.
+	const bool local_folder = DirAccess::dir_exists_absolute(ProjectSettings::get_singleton()->globalize_path(scripts_root()));
+	if (!local_folder && FileAccess::file_exists(PRECOMPILED_MODULE)) {
+		return load_precompiled(r_module, r_errors);
+	}
+	return compile_project(r_module, r_errors);
+#endif
+}
 
 // Flash stops a script that runs too long, after 15 seconds; so does this, after the project's setting
 // `actionscript/limits/script_timeout_seconds` (0 for no limit), whichever way the scripts run. In
@@ -113,8 +148,10 @@ static uint32_t time_limit() {
 // objects are constructed with is remembered, so that a reload can update them in place, whichever way the
 // scripts run. An exported game pays nothing for it.
 static bool remembers() {
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 	return true;
+#elif defined(KAS3_RUNTIME_ONLY)
+	return false;
 #else
 	return OS::get_singleton()->is_debug_build();
 #endif
@@ -147,7 +184,7 @@ Project &Project::get() {
 	watch_loaded = watch_seen = scripts_signature();
 	refresh_scenes(); // What they are now: an edit from here on is read again.
 	std::string errors;
-	if (!compile_project(program->module_.get(), &errors)) {
+	if (!load_project_module(program->module_.get(), &errors)) {
 		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
 				String::utf8(errors.c_str()));
 		return *program;
@@ -296,6 +333,12 @@ void Project::reload() {
 }
 
 bool Project::reload_with_errors(std::string *r_errors) {
+#if defined(KAS3_RUNTIME_ONLY)
+	if (r_errors) {
+		*r_errors = "hot reload is unavailable in runtime-only builds";
+	}
+	return false;
+#else
 	if (program && program->valid_ && program->running()) {
 		if (r_errors) {
 			*r_errors = "cannot reload while a script is running";
@@ -378,6 +421,7 @@ bool Project::reload_with_errors(std::string *r_errors) {
 	restart.scenes = refresh_scenes();
 	kas3::restart_scene(restart);
 	return true;
+#endif
 }
 
 void Project::restart_scene() {

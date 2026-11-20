@@ -16,10 +16,14 @@ if(KAS3_SANITIZE)
 endif()
 
 option(KAS3_WEB_THREADS "Build the Web Godot extension with pthreads" OFF)
+option(KAS3_RUNTIME_ONLY "Build the Godot extension without the AS3 compiler front end (loads precompiled .kas3 modules)" OFF)
 if(EMSCRIPTEN)
     # Every static library linked into a Web GDExtension side module must match godot-cpp's side-module ABI,
     # and hide internal symbols so only GDE_EXPORT entry points are resolved dynamically against Godot.
     add_compile_options(-sSIDE_MODULE=1 -sSUPPORT_LONGJMP=wasm -fvisibility=hidden)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+        add_compile_options(-Oz)
+    endif()
     if(KAS3_WEB_THREADS)
         add_compile_options(-sUSE_PTHREADS=1)
     endif()
@@ -69,25 +73,32 @@ add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path} ${godot_path} ${go
 target_include_directories(kas3front PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(kas3front PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
-# The typed IR and the lowering from the checked tree to it.
-file(GLOB KAS3_IR_SOURCES CONFIGURE_DEPENDS ir/*.cpp)
-add_library(kas3ir STATIC ${KAS3_IR_SOURCES})
+# The typed IR data model and binary codec depend on nothing in src/, so a runtime-only extension links
+# without the front end or Godot's embedded declaration tables.
+file(GLOB KAS3_IR_CORE_SOURCES CONFIGURE_DEPENDS ir/ir_*.cpp)
+add_library(kas3ir_core STATIC ${KAS3_IR_CORE_SOURCES})
+target_include_directories(kas3ir_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ir)
+target_compile_options(kas3ir_core PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
+# The lowerer turns the checked syntax tree into typed IR.
+file(GLOB KAS3_IR_LOWER_SOURCES CONFIGURE_DEPENDS ir/lower*.cpp)
+add_library(kas3ir STATIC ${KAS3_IR_LOWER_SOURCES})
 target_include_directories(kas3ir PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ir)
-target_link_libraries(kas3ir PUBLIC kas3front)
+target_link_libraries(kas3ir PUBLIC kas3ir_core kas3front)
 target_compile_options(kas3ir PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # The interpreter and its runtime. No Godot header: the engine is reached through vm/host.h.
 file(GLOB KAS3_VM_SOURCES CONFIGURE_DEPENDS vm/*.cpp)
 add_library(kas3vm STATIC ${KAS3_VM_SOURCES})
 target_include_directories(kas3vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vm)
-target_link_libraries(kas3vm PUBLIC kas3ir)
+target_link_libraries(kas3vm PUBLIC kas3ir_core)
 target_compile_options(kas3vm PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # The C++ backend: the IR written as C++ source. It includes ir/ only, and writes text.
 file(GLOB KAS3_BACKEND_CPP_SOURCES CONFIGURE_DEPENDS backend_cpp/*.cpp)
 add_library(kas3backend_cpp STATIC ${KAS3_BACKEND_CPP_SOURCES})
 target_include_directories(kas3backend_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/backend_cpp)
-target_link_libraries(kas3backend_cpp PUBLIC kas3ir)
+target_link_libraries(kas3backend_cpp PUBLIC kas3ir_core)
 target_compile_options(kas3backend_cpp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # What generated code is built against and, where there is no engine, the host it runs in.
@@ -121,19 +132,30 @@ if(KAS3_GODOT_CPP)
     endif()
     add_subdirectory(${KAS3_GODOT_CPP} ${CMAKE_CURRENT_BINARY_DIR}/godot-cpp EXCLUDE_FROM_ALL)
     file(GLOB KAS3_GODOT_SOURCES CONFIGURE_DEPENDS godot_ext/*.cpp)
-    # What Play builds a project's program library from is carried by the extension: the headers generated
-    # code is built against, and one word for them and the backend together (tools/embed_runtime.py).
-    file(GLOB KAS3_PLAY_INPUTS CONFIGURE_DEPENDS runtime/*.h vm/*.h ir/*.h backend_cpp/*.cpp backend_cpp/*.h)
-    set(play_runtime_path "${CMAKE_CURRENT_BINARY_DIR}/play_runtime_data.cpp")
-    add_custom_command(OUTPUT ${play_runtime_path}
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py ${CMAKE_CURRENT_SOURCE_DIR} ${play_runtime_path}
-        DEPENDS ${KAS3_PLAY_INPUTS} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py
-        COMMENT "Embedding the runtime's headers")
-    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${play_runtime_path})
+    set(KAS3_GODOT_EXTRA_SOURCES "")
+    if(NOT EMSCRIPTEN AND NOT KAS3_RUNTIME_ONLY)
+        # What Play builds a project's program library from is carried by the extension: the headers generated
+        # code is built against, and one word for them and the backend together (tools/embed_runtime.py).
+        file(GLOB KAS3_PLAY_INPUTS CONFIGURE_DEPENDS runtime/*.h vm/*.h ir/*.h backend_cpp/*.cpp backend_cpp/*.h)
+        set(play_runtime_path "${CMAKE_CURRENT_BINARY_DIR}/play_runtime_data.cpp")
+        add_custom_command(OUTPUT ${play_runtime_path}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py ${CMAKE_CURRENT_SOURCE_DIR} ${play_runtime_path}
+            DEPENDS ${KAS3_PLAY_INPUTS} ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_runtime.py
+            COMMENT "Embedding the runtime's headers")
+        set(KAS3_GODOT_EXTRA_SOURCES "${play_runtime_path}")
+    endif()
+    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES})
     target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
-    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3backend_cpp)
+    if(KAS3_RUNTIME_ONLY)
+        target_compile_definitions(kas3_godot PRIVATE KAS3_RUNTIME_ONLY=1)
+        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir_core)
+    elseif(EMSCRIPTEN)
+        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir)
+    else()
+        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir kas3backend_cpp)
+    endif()
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     # -DKAS3_GODOT_OUTPUT=<folder> puts it elsewhere: a build under the sanitizers must not take the place of
@@ -148,12 +170,17 @@ if(KAS3_GODOT_CPP)
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
     if(EMSCRIPTEN)
-        # Godot looks up the entry point by name; host pages look up the web hot-reload C API.
-        target_link_options(kas3_godot PRIVATE -sSIDE_MODULE=2
-            -Wl,--export=kas3_godot_init
-            -Wl,--export=kas3_web_reload
-            -Wl,--export=kas3_web_last_error
-            -Wl,--export=kas3_web_reset_sources)
+        set(KAS3_WEB_EXPORTS -Wl,--export=kas3_godot_init)
+        if(NOT KAS3_RUNTIME_ONLY)
+            list(APPEND KAS3_WEB_EXPORTS
+                -Wl,--export=kas3_web_reload
+                -Wl,--export=kas3_web_last_error
+                -Wl,--export=kas3_web_reset_sources)
+        endif()
+        target_link_options(kas3_godot PRIVATE -sSIDE_MODULE=2 ${KAS3_WEB_EXPORTS})
+        if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+            target_link_options(kas3_godot PRIVATE -Oz)
+        endif()
         set_target_properties(kas3_godot PROPERTIES SUFFIX ".wasm")
     endif()
 endif()
@@ -171,7 +198,7 @@ file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm kas3backend_cpp)
+    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm kas3ir kas3backend_cpp)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -182,7 +209,7 @@ target_include_directories(test_time_limit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/r
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
-target_link_libraries(kas3c PRIVATE kas3lsp kas3vm kas3backend_cpp)
+target_link_libraries(kas3c PRIVATE kas3lsp kas3vm kas3ir kas3backend_cpp)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # Not a test: prints how long a re-check takes (tests/bench/generate_project.py writes a project to try).
@@ -207,7 +234,7 @@ add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
     --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
     --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
-    --lib $<TARGET_FILE:kas3standalone> --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
+    --lib $<TARGET_FILE:kas3standalone> --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir_core> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

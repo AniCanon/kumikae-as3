@@ -378,13 +378,19 @@ teams Xcode has cached on this Mac. If your team is missing, click **Open Xcode*
 Godot 4.7's Web export runs ActionScript 3 games in the browser via a WebAssembly GDExtension side module
 (`web.wasm32` in `kas3.gdextension`).
 
-- Build the Web extension once with Emscripten (`emcmake` / `emcc`):
-  `compiler/tests/build_web.sh <path to godot-cpp>`. This writes `bin/web/libkas3_godot.wasm`.
-- Configure a Godot **Web** export preset with **Extensions Support** enabled (`variant/extensions_support=true`),
-  **Thread Support** disabled (`variant/thread_support=false`), and `include_filter="*.as"`.
+- Build the slim runtime-only Web extension once with Emscripten (`emcmake` / `emcc`):
+  `compiler/tests/build_web.sh <path to godot-cpp>`. This builds with `-Oz` + `wasm-opt -Oz` and writes
+  `bin/web/libkas3_godot.wasm` (~620 KiB raw / ~193 KiB Brotli), omitting the AS3 front end and Godot
+  declaration tables. Pass `--compiler` if you need in-browser compilation and `kas3_web_reload` hot reload
+  (`bin/web/libkas3_godot_compiler.wasm`).
+- Configure a Godot **Web** export preset with **Extensions Support** enabled (`variant/extensions_support=true`)
+  and **Thread Support** disabled (`variant/thread_support=false`). During Web export, the editor extension
+  compiles the project's scripts into `res://.kas3/program.kas3` inside the `.pck` automatically.
 - Export with `godot --headless --path <project> --export-release "Web" <out>/index.html` and serve over HTTP.
   Because thread support is off, the export runs on standard static hosts without `SharedArrayBuffer` headers.
-  Web exports currently run on the interpreter.
+- To also shrink Godot's own `index.side.wasm` export template (~42 MiB stock), build a trimmed template with
+  `compiler/tools/build_web_template.sh --2d <godot checkout> <output.zip>` and set it as the preset's
+  custom Web template.
 
 ## Limits
 

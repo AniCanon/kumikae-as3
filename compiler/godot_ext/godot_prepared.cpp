@@ -8,8 +8,6 @@
 #include "handles.h"
 #include "worked.h"
 
-#include "godot_names.h"
-
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
@@ -552,7 +550,7 @@ std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_modul
 	}
 	const bool member = op == ir::Op::HostGet;
 	const ir::EngineName &entry = p_module.engine_names[member ? p_in.c : p_in.b];
-	const std::vector<std::string_view> words = godot_words(entry.value);
+	const std::vector<std::string_view> words = entry_words(entry.value);
 	*r_key = std::to_string((int)p_in.op) + " " + entry.key;
 	switch (p_in.op) {
 		case ir::Op::HostOperate:

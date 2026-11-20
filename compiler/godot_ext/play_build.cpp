@@ -1,6 +1,6 @@
 #include "play_build.h"
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || defined(KAS3_RUNTIME_ONLY)
 
 namespace kas3 {
 namespace play {

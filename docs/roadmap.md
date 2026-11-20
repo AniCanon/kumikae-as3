@@ -45,10 +45,13 @@ state of the project changes.
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
 - **iOS:** the interpreter runs in the Simulator and on a device. Rider can sign, install and run a game on a paired iPhone or iPad.
 - **Android:** the interpreter runs on an ARM64 emulator through Rider.
-- **Web (WebAssembly):** `libkas3_godot.wasm` builds with Emscripten for Godot 4.7's single-threaded Web export
-  and runs projects such as `examples/coin-dash` on the interpreter in the browser. Claude Code starters
-  include a Web export preset when the native kit supplies the Web runtime. Rider and Claude Code can
-  build and preview the game in a browser and run gameplay fixtures in headless Chromium.
+- **Web (WebAssembly):** `libkas3_godot.wasm` builds with Emscripten (`-Oz` + `wasm-opt -Oz`) as a slim
+  runtime-only GDExtension (~620 KiB raw / ~193 KiB Brotli) that loads the precompiled `res://.kas3/program.kas3`
+  binary IR packed automatically during Godot's Web export (plus an optional `--compiler` build with
+  in-browser `kas3_web_reload` hot reload, and `compiler/tools/build_web_template.sh` for trimmed Godot Web
+  templates). Claude Code starters include a Web export preset when the native kit supplies the Web runtime.
+  Rider and Claude Code can build and preview the game in a browser and run gameplay fixtures in headless
+  Chromium.
 
 ### Native code
 

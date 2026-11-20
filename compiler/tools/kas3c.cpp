@@ -5,6 +5,7 @@
 #include "diagnostics.h"
 #include "generate.h"
 #include "interpreter.h"
+#include "ir_binary.h"
 #include "lower.h"
 #include "names.h"
 #include "parser.h"
@@ -25,6 +26,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
+		"       kas3c pack [--godot] <file>... -o <file.kas3>\n"
 		"       kas3c cpp [--godot] [--unit] [--remember] <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
@@ -288,6 +290,46 @@ static bool write_file(const std::filesystem::path &p_path, const std::string &p
 	return std::fclose(file) == 0 && written;
 }
 
+static int run_pack(int p_argc, char **p_argv) {
+	std::vector<char *> rest(p_argv, p_argv + std::min(p_argc, 2));
+	const char *output = nullptr;
+	for (int i = 2; i < p_argc; i++) {
+		if (std::strcmp(p_argv[i], "-o") == 0) {
+			if (output || i + 1 >= p_argc) {
+				return usage_error();
+			}
+			output = p_argv[++i];
+		} else {
+			rest.push_back(p_argv[i]);
+		}
+	}
+	if (!output) {
+		return usage_error();
+	}
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status, true)) {
+		return status;
+	}
+	const std::vector<uint8_t> bytes = kas3::ir::write_binary(module);
+	const std::filesystem::path destination(output);
+	std::error_code failed;
+	if (!destination.parent_path().empty()) {
+		std::filesystem::create_directories(destination.parent_path(), failed);
+	}
+	std::FILE *file = failed ? nullptr : std::fopen(destination.string().c_str(), "wb");
+	if (!file) {
+		std::fprintf(stderr, "kas3c: cannot write %s\n", output);
+		return 2;
+	}
+	const bool ok = std::fwrite(bytes.data(), 1, bytes.size(), file) == bytes.size() && std::fclose(file) == 0;
+	if (!ok) {
+		std::fprintf(stderr, "kas3c: cannot write %s\n", output);
+		return 2;
+	}
+	return 0;
+}
+
 static int run_cpp(int p_argc, char **p_argv) {
 	// compile() takes the files alone: `-o <folder>` is taken out first, wherever it is written.
 	std::vector<char *> rest(p_argv, p_argv + std::min(p_argc, 2));
@@ -375,6 +417,9 @@ int main(int p_argc, char **p_argv) {
 	}
 	if (command == "ir") {
 		return run_ir(p_argc, p_argv);
+	}
+	if (command == "pack") {
+		return run_pack(p_argc, p_argv);
 	}
 	if (command == "cpp") {
 		return run_cpp(p_argc, p_argv);

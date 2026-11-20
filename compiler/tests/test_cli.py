@@ -317,6 +317,14 @@ check("ir without godot", result.returncode == 1 and "can't find 'godot.Node2D'"
 result = run("ir", "--godot", empty)
 check("ir --godot", result.returncode == 0 and "Empty" in result.stdout and result.stderr == "", repr(result.stderr[:200]))
 
+with tempfile.TemporaryDirectory() as pack_dir:
+    packed = os.path.join(pack_dir, "program.kas3")
+    result = run("pack", "--godot", empty, "-o", packed)
+    check("pack --godot", result.returncode == 0 and result.stderr == "" and os.path.isfile(packed) and
+          open(packed, "rb").read(4) == b"KAS3", repr(result.stderr[:200]))
+    result = run("pack", "--godot", empty)
+    check("pack requires -o", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
+
 for failure in failures:
     print("FAIL " + failure)
 print("cli: %s" % ("OK" if not failures else "%d failed" % len(failures)))

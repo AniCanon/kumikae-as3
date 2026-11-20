@@ -1,6 +1,6 @@
 #include "web_reload.h"
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 #include "program.h"
 
 #include <godot_cpp/godot.hpp>
