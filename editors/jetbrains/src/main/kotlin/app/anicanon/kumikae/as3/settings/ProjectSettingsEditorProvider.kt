@@ -2,8 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 import androidx.compose.runtime.mutableStateMapOf
 import app.anicanon.kumikae.as3.panel.BackgroundWorker
-import app.anicanon.kumikae.as3.project.AddGameTargetDialog
-import app.anicanon.kumikae.as3.project.GameTargetSetup
+import app.anicanon.kumikae.as3.project.showAddGameTarget
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ModalityState
@@ -119,8 +118,7 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
                 )
             },
             addTarget = {
-                val setup = GameTargetSetup(project, gameFile.parent)
-                if (AddGameTargetDialog(project, setup).showAndGet()) controller.reload()
+                showAddGameTarget(project, gameFile.parent) { controller.reload() }
             },
         )
     }

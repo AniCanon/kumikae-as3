@@ -17,7 +17,9 @@ Mark public no-argument instance methods with `[Test]` and point a manifest targ
 
 Add `"runtime": "godot"` to run discovered fixtures inside a single headless Godot process so Godot types
 (`Vector2`, `Node`, `PackedScene`), scenes, and frame stepping work directly. Use `"ios-simulator"` or
-`"android"` to export and stream the same fixtures from a booted iOS Simulator or ARM64 Android emulator:
+`"android"` to export and stream the same fixtures from a booted iOS Simulator or ARM64 Android emulator. Use `"web"` to run them in a fresh headless
+Chrome or Chromium profile. Web tests need the Godot Web templates and a Web preset with GDExtension
+support enabled and threads disabled. Set `KAS3_CHROME` to choose the browser executable.
 
 ```json
 {"version":1,"tests":[{"name":"Game tests","discover":"tests","runtime":"godot"}]}
@@ -201,7 +203,7 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
 |---|---|
 | `name` | The test's name. Unique, one line, with no `::` |
 | `discover` | Optional. Directory of fixture classes whose `[Test]` methods are discovered automatically |
-| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`), `"godot"`, `"ios-simulator"`, or `"android"` |
+| `runtime` | Optional (for `discover` targets). `"cli"` (default, `kas3c run`), `"godot"`, `"ios-simulator"`, `"android"`, or `"web"` |
 | `headless` | Optional (for `"runtime": "godot"`). `true` by default; set `false` when a test needs a window/GPU |
 | `preset` | Optional (for mobile runtimes). Export preset name when more than one exists |
 | `suitePackage` | Optional. Package prefix omitted from displayed case IDs for a `discover` target |
@@ -292,7 +294,7 @@ compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fix
 The second command runs a fixture that records a failing case on purpose and checks that the suite carries
 on. Its last line is `PASS framework lifecycle`.
 
-Use `--runtime godot`, `--runtime ios-simulator` or `--runtime android` to run a discovered fixture
+Use `--runtime godot`, `--runtime ios-simulator`, `--runtime android` or `--runtime web` to run a discovered fixture
 on that target. The manifest and the case ID stay the same. The CLI rejects a manual command target
 when a runtime override is requested. Add `--require-pass` to fail a verification run in which
 every selected case was ignored.

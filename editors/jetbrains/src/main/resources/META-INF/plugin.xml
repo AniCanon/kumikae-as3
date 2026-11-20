@@ -3,7 +3,7 @@
     <name>Kumikae AS3</name>
     <resource-bundle>messages.KumikaeBundle</resource-bundle>
     <vendor>AniCanon</vendor>
-    <description>Build Godot games in ActionScript 3. Edit game settings and scenes, run individual tests, and launch Godot export presets on iOS simulators and Android devices directly from Rider.</description>
+    <description>Build Godot games in ActionScript 3. Edit game settings and scenes, run individual tests, and launch Godot export presets in a browser, on iOS simulators and on Android devices.</description>
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
     <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>

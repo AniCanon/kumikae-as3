@@ -1,7 +1,7 @@
 # Kumikae AS3 for Rider and IntelliJ IDEA
 
 A plugin for writing Godot games in ActionScript 3. It adds language support, a project wizard, run
-configurations for desktop, iOS and Android, embedded device displays, a test runner, and editors
+configurations for desktop, Web, iOS and Android, embedded device displays, a test runner, and editors
 for `project.godot` and scenes.
 
 This page is for someone using the plugin. To change it, read [ARCHITECTURE.md](ARCHITECTURE.md) and
@@ -85,7 +85,7 @@ The wizard creates a small game that runs: a
 - **Package name.** The app's identifier, such as `com.studio.game`. Left empty, it's made from the
   project's name.
 - **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and a
-  run configuration for simulators and physical devices. Choosing Android adds an Android export preset and run configuration.
+  run configuration for simulators and physical devices. Choosing Android or Web adds its export preset and run configuration.
   Companion plugins can contribute additional targets.
 
 ## Run the game
@@ -102,6 +102,15 @@ appears in the Run window.
 
 Edit a script while the game runs and save. The game takes the new code and keeps its state. See
 [Hot reload](../../docs/hot-reload.md).
+
+## Run in a browser
+
+Select **Web** in the project wizard or choose **Run > Add Game Target… > Web** in an existing game.
+Select its run configuration and press **Run**. The plugin builds the selected Godot preset, serves the
+export on localhost and opens the URL in your default browser. **Stop** closes the preview server.
+Install the matching Godot Web export templates and use a plugin kit with the WebAssembly runtime.
+For an existing preset, enable **Extensions Support**, disable **Thread Support**, and include `*.as`.
+Use **Export Game** to create a release build for hosting.
 
 ## Run on iOS or Android
 
@@ -219,7 +228,7 @@ failure.
 
 To save a named test plan, create a **Kumikae AS3 > Tests** run configuration and choose its groups, whether
 Godot engine tests run with native code, and an optional mobile device ID for `"ios-simulator"` or
-`"android"` targets. The same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
+`"android"` targets. Use `"runtime": "web"` to run a group in headless Chromium. The same `kas3-tests.json` manifest drives both the IDE and the command-line runner.
 
 New projects place model code under `src/<package>`, engine scripts under `view`, and tests under
 `tests/<package>`. **New > ActionScript** creates files, classes, interfaces, Godot node scripts, test cases

@@ -1,7 +1,7 @@
 {
   "name": "kumikae",
   "version": "1.0.0",
-  "description": "Develop and test ActionScript 3 games for Godot on macOS, iOS Simulator and Android.",
+  "description": "Develop and test ActionScript 3 games for Godot on macOS, Web, iOS Simulator and Android.",
   "author": { "name": "AniCanon" },
   "license": "MIT"
 }

@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.project
 import app.anicanon.kumikae.as3.run.AndroidRunConfiguration
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.run.SimulatorRunConfiguration
+import app.anicanon.kumikae.as3.run.WebRunConfiguration
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import com.intellij.execution.RunManager
@@ -61,6 +62,7 @@ internal class GameTargetSetup(private val project: Project, private val root: V
         }
         when (platform) {
             "iOS" -> selectSimulator(project, name)
+            "Web" -> selectWeb(project, name)
             "Android" -> selectAndroid(project, name)
             else -> error("Unsupported Godot target platform: $platform")
         }
@@ -85,6 +87,12 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                 manager.addConfiguration(it)
             }
             manager.selectedConfiguration = chosen
+        }
+
+        fun selectWeb(project: Project, name: String) {
+            selectPreset<WebRunConfiguration>(project, KumikaeRunType.Kind.WEB, name, name, { it.options.preset }) {
+                it.options.preset = name
+            }
         }
 
         fun selectAndroid(project: Project, name: String) {

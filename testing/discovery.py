@@ -242,8 +242,8 @@ def expand_target(root, target, compiler):
     if "cases" in target:
         raise ValueError("A discovered target cannot also register explicit cases.")
     runtime = target.get("runtime", "cli")
-    if runtime not in ("cli", "godot", "ios-simulator", "android"):
-        raise ValueError("Test runtime must be 'cli', 'godot', 'ios-simulator', or 'android'.")
+    if runtime not in ("cli", "godot", "ios-simulator", "android", "web"):
+        raise ValueError("Test runtime must be 'cli', 'godot', 'ios-simulator', 'android', or 'web'.")
     headless = target.get("headless", True)
     if not isinstance(headless, bool):
         raise ValueError("Test headless option must be true or false.")
@@ -276,7 +276,7 @@ def expand_target(root, target, compiler):
             cases.append(entry_case)
     if not cases:
         raise ValueError(f"No [Test] methods found in {target['discover']}.")
-    if runtime in ("godot", "ios-simulator", "android"):
+    if runtime in ("godot", "ios-simulator", "android", "web"):
         command = ["{godot}"]
         if runtime == "godot" and headless:
             command.append("--headless")

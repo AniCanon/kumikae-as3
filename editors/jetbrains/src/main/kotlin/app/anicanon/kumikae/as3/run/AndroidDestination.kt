@@ -43,7 +43,7 @@ class AndroidDestinations : ExecutionTargetProvider() {
         when (configuration) {
             is AndroidRunConfiguration -> project.service<AndroidDevices>().targets()
 
-            is As3TestsConfiguration, is GodotRunConfiguration ->
+            is As3TestsConfiguration, is GodotRunConfiguration, is WebRunConfiguration ->
                 listOf(DefaultExecutionTarget.INSTANCE)
 
             else -> emptyList()

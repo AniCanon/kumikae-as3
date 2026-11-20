@@ -10,6 +10,7 @@ internal enum class Platform(val label: String) {
     DESKTOP("Desktop (this computer)"),
     IOS("iOS"),
     ANDROID("Android"),
+    WEB("Web"),
     ;
 
     /** One line of the wizard: whether the platform can be chosen, and if not, why. */
@@ -30,6 +31,7 @@ internal enum class Platform(val label: String) {
                 always = false,
                 note = "Adds Android export settings and an Android run target.",
             ),
+            Choice(WEB, available = true, always = false, note = "Run the Web export in a browser."),
         )
     }
 }
@@ -87,11 +89,11 @@ internal class ProjectTemplate(
         put("assets/icon.svg", icon())
         // What Godot's editor writes on its first import: with it, the game runs before the editor ever opens.
         put(".godot/extension_list.cfg", "res://kas3.gdextension\n")
-        put("kas3.gdextension", EXTENSION)
+        put("kas3.gdextension", if (Platform.WEB in platforms) EXTENSION + WEB_LIBRARY + "\n" else EXTENSION)
         put(".gitignore", ".godot/\nbin\n")
         put("README.md", readme())
         var exports = ""
-        for (platform in platforms.filter { it == Platform.IOS || it == Platform.ANDROID }) {
+        for (platform in platforms.filter { it != Platform.DESKTOP }) {
             exports = GameTargets.add(exports, platform.label, platform.label, bundle)
         }
         if (exports.isNotEmpty()) put("export_presets.cfg", exports)
@@ -126,6 +128,10 @@ internal class ProjectTemplate(
                         it.fileName.toString().startsWith(LIBRARY)
                     }.forEach { Files.copy(it, bin.resolve(it.fileName)) }
                 }
+                val wasm = library.resolve("web/libkas3_godot.wasm")
+                if (Platform.WEB in platforms && Files.isRegularFile(wasm)) {
+                    Files.copy(wasm, Files.createDirectories(bin.resolve("web")).resolve(wasm.fileName))
+                }
                 val ios = library.resolve("ios")
                 if (Files.isDirectory(ios)) {
                     Files.walk(ios).use { entries ->
@@ -152,6 +158,11 @@ internal class ProjectTemplate(
         append("Edit a script while the game runs and save: the game takes the new code and keeps its state.\n\n")
         append("`bin` must hold the AS3 extension's library (`libkas3_godot`). ")
         append("The wizard links it to where the extension was built, when it finds it.\n")
+        if (Platform.WEB in platforms) {
+            append(
+                "\n## Web\n\nSelect Web and press Run to preview the game in your browser. Stop closes the server.\n",
+            )
+        }
         if (Platform.IOS in platforms) {
             append("\n## iOS\n\nSelect the iOS run configuration and choose a simulator or paired device. ")
             append("Run builds the export preset and launches its bundle identifier.\n")
@@ -297,6 +308,8 @@ script = ExtResource("1")
 	}
 }
 """
+
+        private const val WEB_LIBRARY = """web.wasm32 = "res://bin/web/libkas3_godot.wasm""""
 
         private const val EXTENSION = """[configuration]
 

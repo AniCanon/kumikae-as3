@@ -13,7 +13,7 @@ import game_export
 from mobile_runner import resolve_android_sdk, resolve_ios_device
 from simulator_suite import setting
 
-PLATFORMS = {"desktop": "macOS", "ios-simulator": "iOS", "android": "Android"}
+PLATFORMS = {"desktop": "macOS", "ios-simulator": "iOS", "android": "Android", "web": "Web"}
 
 
 def preset_for(project, target, requested):
@@ -45,6 +45,9 @@ def device_for(target, device):
 
 
 def build(kit, project, target, preset, godot):
+    if target == "web":
+        from web_game import build as build_web
+        return build_web(project, kit, godot, preset)
     required = {"desktop": (), "android": ("android/arm64-v8a/libkas3_godot.so",),
                 "ios-simulator": ("ios/kas3_godot.xcframework", "ios-with-arm64-simulator.zip")}
     for name in required[target]:

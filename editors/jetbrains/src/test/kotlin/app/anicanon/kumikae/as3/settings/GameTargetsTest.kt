@@ -6,6 +6,14 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class GameTargetsTest {
+    @Test fun `web presets enable the extension without a mobile identity`() {
+        val config = GodotConfig(GameTargets.add("", "Web", "Browser QA", ""))
+        assertEquals("Web", config.string("preset.0", "platform"))
+        assertEquals("true", config.raw("preset.0.options", "variant/extensions_support"))
+        assertEquals("false", config.raw("preset.0.options", "variant/thread_support"))
+        assertEquals("*.as", config.string("preset.0", "include_filter"))
+    }
+
     @Test fun `add reuses existing named presets and launches with the current Godot identifier`() {
         val existing = "[preset.0]\nname=\"iOS\"\nplatform=\"Android\"\n"
         val added = GameTargets.add(existing, "iOS", "QA Phone", "org.example.qa")

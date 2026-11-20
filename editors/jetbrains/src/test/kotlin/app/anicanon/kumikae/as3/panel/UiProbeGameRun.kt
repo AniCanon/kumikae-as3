@@ -44,11 +44,17 @@ internal object UiProbeGameRun {
                     UiProbeGameSettings.run(project, root, report)
                     return
                 }
+                if (System.getenv("KUMIKAE_WEB_RUN_PROBE") == "1") {
+                    UiProbeWebRun.run(project, root)
+                    return
+                }
                 val device = Files.readString(directory.resolve("owned-device")).trim()
                 val source = Files.readString(folder.resolve("export_presets.cfg"))
+                val setup = GameTargetSetup(project, root)
+                val presets = setup.presets()
+                val identifier = setup.defaultIdentifier()
                 app.invokeAndWait {
-                    val setup = GameTargetSetup(project, root)
-                    val dialog = AddGameTargetDialog(project, setup)
+                    val dialog = AddGameTargetDialog(project, setup, presets, identifier)
                     Timer(600) {
                         dialog.rootPane?.defaultButton?.doClick()
                     }.also {

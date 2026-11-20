@@ -120,9 +120,24 @@ class ProjectTemplateTest {
         assertTrue(Files.isRegularFile(folder.resolve("bin/libkas3_godot.dylib")))
     }
 
+    @Test fun `a new Web game includes its selected preset and bundled WebAssembly runtime`() {
+        val kit = Files.createDirectories(root.resolve("kit/web"))
+        Files.writeString(kit.resolve("libkas3_godot.wasm"), "web-runtime")
+        val game = root.resolve("game")
+        ProjectTemplate("Game", setOf(Platform.WEB)).write(game, kit.parent, link = false)
+        assertEquals("web-runtime", Files.readString(game.resolve("bin/web/libkas3_godot.wasm")))
+        assertTrue(Files.readString(game.resolve("kas3.gdextension")).contains("res://bin/web/libkas3_godot.wasm"))
+        assertTrue(Files.readString(game.resolve("export_presets.cfg")).contains("variant/extensions_support=true"))
+    }
+
     @Test fun `what can be chosen says why when it can't`() {
         val choices = Platform.choices()
-        assertEquals(listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID), choices.map { it.platform })
+        assertEquals(
+            listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID, Platform.WEB),
+            choices.map {
+                it.platform
+            },
+        )
         assertTrue(choices.first().always)
         val game = ProjectTemplate("Game", setOf(Platform.ANDROID, Platform.IOS))
         val config = game.files().getValue("export_presets.cfg")

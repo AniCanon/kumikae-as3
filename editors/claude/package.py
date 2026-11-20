@@ -14,9 +14,6 @@ ROOT = PLUGIN.parents[1]
 def configure_starter_web(starter, native):
     wasm = Path("web/libkas3_godot.wasm")
     if (native / wasm).is_file():
-        destination = starter / "bin" / wasm
-        destination.parent.mkdir(parents=True)
-        shutil.copy2(native / wasm, destination)
         return
 
     descriptor = starter / "kas3.gdextension"
@@ -47,7 +44,7 @@ def assemble(native, destination):
         kit.mkdir()
         for name in ("kas3c", "libkas3_godot.dylib"):
             shutil.copy2(native / name, kit / name)
-        for name in ("ios", "android"):
+        for name in ("ios", "android", "web"):
             if (native / name).is_dir():
                 shutil.copytree(native / name, kit / name)
         template = native / "ios-with-arm64-simulator.zip"
@@ -57,7 +54,7 @@ def assemble(native, destination):
                         ignore=shutil.ignore_patterns("tests", "__pycache__", "*.uid"))
         tools = kit / "tools"
         tools.mkdir()
-        for name in ("android_run.py", "game_export.py", "build-ios-simulator.sh"):
+        for name in ("android_run.py", "game_export.py", "web_game.py", "build-ios-simulator.sh"):
             shutil.copy2(ROOT / "editors/jetbrains/tools" / name, tools / name)
         starter = kit / "starter"
         starter.mkdir()

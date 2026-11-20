@@ -12,6 +12,10 @@ import game
 
 
 class TargetsTest(unittest.TestCase):
+    def test_web_uses_its_own_preset_without_a_device(self):
+        self.assertEqual("Web", game.preset_for(ROOT / "examples/coin-dash", "web", None))
+        self.assertEqual("", game.device_for("web", None))
+
     def test_unknown_preset_reports_available_names(self):
         project = ROOT / "examples/coin-dash"
         self.assertEqual("Desktop", game.preset_for(project, "desktop", None))
