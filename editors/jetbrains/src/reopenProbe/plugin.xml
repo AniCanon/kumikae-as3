@@ -1,0 +1,10 @@
+<idea-plugin>
+    <id>app.anicanon.rider.reopen.probe</id>
+    <name>Rider Project Reopen Probe</name>
+    <version>1</version>
+    <vendor>AniCanon</vendor>
+    <depends>com.intellij.modules.rider</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <appStarter id="rider-reopen-check" implementation="app.anicanon.kumikae.as3.panel.RiderReopenStarter"/>
+    </extensions>
+</idea-plugin>

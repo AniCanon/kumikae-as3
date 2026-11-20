@@ -19,7 +19,7 @@ internal object GameSourceRoots {
         if (folders.isEmpty()) return
         val index = ProjectFileIndex.getInstance(project)
         val modules = ModuleManager.getInstance(project)
-        val module = ReadAction.compute<Module?, RuntimeException> { index.getModuleForFile(root) } ?: run {
+        val module = ReadAction.computeBlocking<Module?, RuntimeException> { index.getModuleForFile(root) } ?: run {
             if (modules.modules.isNotEmpty()) return
             WriteAction.computeAndWait<Module, RuntimeException> {
                 modules.newModule(base.resolve(".idea/KumikaeGame.iml"), ModuleType.EMPTY.id)

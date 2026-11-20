@@ -17,18 +17,20 @@ class LspDescriptorTest {
         for (i in 0 until dependencies.length) {
             val dependency = dependencies.item(i) as org.w3c.dom.Element
             assertFalse(dependency.textContent == "com.intellij.modules.lsp")
-            assertFalse(dependency.textContent == "com.redhat.devtools.lsp4ij")
+            if (dependency.textContent == "com.redhat.devtools.lsp4ij") {
+                assertEquals("true", dependency.getAttribute("optional"))
+            }
         }
         assertEquals(0, root.getElementsByTagName("platform.lsp.integrationProvider").length)
         assertEquals(0, root.getElementsByTagName("gotoDeclarationHandler").length)
     }
 
     @Test fun `LSP4IJ editor handlers are not registered outside IDEA`() {
-        val bridge = descriptor("as3-idea.xml")
+        val bridge = descriptor("as3-lsp4ij.xml")
         assertEquals(0, bridge.getElementsByTagName("codeInsight.parameterInfo").length)
         assertEquals(0, bridge.getElementsByTagName("lang.psiStructureViewFactory").length)
         val dependency = bridge.getElementsByTagName("depends").item(0) as org.w3c.dom.Element
-        assertEquals("com.redhat.devtools.lsp4ij", dependency.textContent)
+        assertEquals("com.intellij.modules.idea", dependency.textContent)
         assertEquals("true", dependency.getAttribute("optional"))
         val idea = descriptor(dependency.getAttribute("config-file"))
         assertEquals(1, idea.getElementsByTagName("codeInsight.parameterInfo").length)
@@ -41,7 +43,7 @@ class LspDescriptorTest {
             .filter { it.getAttribute("optional") == "true" }
             .associate { it.textContent to it.getAttribute("config-file") }
         assertTrue("com.intellij.modules.rider" in adapters)
-        assertEquals("as3-idea.xml", adapters["com.intellij.modules.idea"])
+        assertEquals("as3-lsp4ij.xml", adapters["com.redhat.devtools.lsp4ij"])
         assertEquals(
             1,
             descriptor(adapters.getValue("com.intellij.modules.rider"))

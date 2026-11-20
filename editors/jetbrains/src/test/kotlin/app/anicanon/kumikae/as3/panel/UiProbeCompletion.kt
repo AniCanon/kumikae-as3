@@ -14,7 +14,6 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.IdeActions
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -339,18 +338,8 @@ object UiProbeCompletion {
             "lookup=${LookupManager.getActiveLookup(it)?.items?.map { item -> item.lookupString }}"
     }.orEmpty()
 
-    internal fun edt(action: () -> Unit) = ApplicationManager.getApplication().invokeAndWait(action)
+    internal fun edt(action: () -> Unit) = UiProbeDispatch.edt(action)
 
-    internal fun await(name: String, state: () -> String = { "" }, condition: () -> Boolean) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
-        while (System.nanoTime() < deadline) {
-            var ready = false
-            edt { ready = condition() }
-            if (ready) return
-            Thread.sleep(10)
-        }
-        var found = ""
-        edt { found = state() }
-        error("Timed out waiting for $name" + if (found.isEmpty()) "" else ": $found")
-    }
+    internal fun await(name: String, state: () -> String = { "" }, condition: () -> Boolean) =
+        UiProbeDispatch.await(name, state, condition)
 }

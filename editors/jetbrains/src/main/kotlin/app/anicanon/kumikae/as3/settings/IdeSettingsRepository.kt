@@ -40,7 +40,7 @@ internal class IdeSettingsRepository(
     private fun root(): VirtualFile = requireNotNull(file.parent) { "Project file has no parent directory." }
 
     private fun documents(): Pair<Document, Document?> =
-        ReadAction.compute<Pair<Document, Document?>, RuntimeException> {
+        ReadAction.computeBlocking<Pair<Document, Document?>, RuntimeException> {
             val manager = FileDocumentManager.getInstance()
             val main = requireNotNull(manager.getDocument(file)) { "Cannot open project.godot." }
             val exports = root().findChild("export_presets.cfg")?.let(manager::getDocument)

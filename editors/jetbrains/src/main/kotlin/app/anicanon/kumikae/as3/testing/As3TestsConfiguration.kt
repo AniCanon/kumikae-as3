@@ -95,12 +95,12 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                 val projectRoot = try {
                     root()
                 } catch (error: RuntimeConfigurationError) {
-                    throw ExecutionException(error.message)
+                    throw ExecutionException(error)
                 }
                 val runnerScript = try {
                     runner()
                 } catch (error: RuntimeConfigurationError) {
-                    throw ExecutionException(error.message)
+                    throw ExecutionException(error)
                 }
                 val compiler = CompilerLocator.find(
                     projectRoot,
