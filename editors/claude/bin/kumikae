@@ -13,7 +13,7 @@ import uuid
 
 BIN = Path(__file__).resolve().parent
 KIT = BIN.parent / "kit"
-TARGETS = ("desktop", "ios-simulator", "android")
+TARGETS = ("desktop", "ios-simulator", "android", "web")
 
 
 def options():
@@ -54,6 +54,8 @@ def new_game(destination):
                                     settings.read_text()))
         (game / "bin").mkdir(exist_ok=True)
         shutil.copy2(KIT / "libkas3_godot.dylib", game / "bin")
+        if (KIT / "web").is_dir():
+            shutil.copytree(KIT / "web", game / "bin/web")
         for tier in ("as3", "godot"):
             shutil.copytree(KIT / "testing" / tier / "app", game / "tests/framework/app", dirs_exist_ok=True)
         destination.mkdir()
@@ -95,6 +97,10 @@ def main():
     if args.command == "run":
         device = device_for(args.target, args.ios_device if args.target == "ios-simulator" else args.android_device)
     preset = preset_for(project, args.target, args.preset)
+    if args.command == "run" and args.target == "web":
+        from web_game import run
+        run(project, KIT, godot, preset)
+        return 0
     product = build(KIT, project, args.target, preset, godot)
     print(product, flush=True)
     if args.command == "run":

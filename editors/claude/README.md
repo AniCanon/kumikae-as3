@@ -28,9 +28,10 @@ or testing on it. Set `ANDROID_HOME` for a nonstandard SDK location.
 |---|---|
 | `/kumikae:new MyGame` | Create a playable Coin Dash starter with export presets, the game runtime and a gameplay test. Open the new folder in Claude Code. |
 | `/kumikae:doctor` | Create a temporary starter and run its physics and HUD test through the local Godot runtime. |
-| `/kumikae:build desktop` | Export a debug game and print its artifact path. Mobile targets are `ios-simulator` and `android`. |
+| `/kumikae:build desktop` | Export a debug game and print its artifact path. Other targets are `ios-simulator`, `android` and `web`. |
+| `/kumikae:run web` | Export the game and open a local preview in your default browser. Stop the command to close the server and discard the temporary export. Use `build web` to keep the files. |
 | `/kumikae:run desktop` | Play the desktop project in Godot. On mobile, build, install and launch on the selected destination. |
-| `/kumikae:test all --case Gameplay::CoinPickupTest::pickupUpdatesHud` | Run the same discovered AS3 case in desktop Godot, iOS Simulator and Android emulator. Report each result and exit nonzero if any target failed or was unavailable. |
+| `/kumikae:test all --case Gameplay::CoinPickupTest::pickupUpdatesHud` | Run the same discovered AS3 case in desktop Godot, iOS Simulator, Android emulator and headless Chromium. Report each result and exit nonzero if any target failed or was unavailable. |
 
 Use these commands in an existing Kumikae project with its desktop runtime, export presets and
 `kas3-tests.json`. For multiple destinations, pass `--ios-device UDID` or
@@ -67,4 +68,4 @@ in the native kit, and the test runner, export helpers and starter from this che
 release for the native binaries and source. The resulting marketplace can be moved or installed on
 another supported Mac. LSP and desktop development need only the macOS portion of the kit.
 When the kit contains `web/libkas3_godot.wasm`, new games include the library and a **Web** preset
-for exporting from Godot. A desktop-only kit omits that preset.
+for Godot, `build web`, `run web` and `test web`. Web tests use Chrome or Chromium. Set `KAS3_CHROME` to its executable if it is outside the usual locations. A desktop-only kit omits that preset.

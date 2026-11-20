@@ -92,8 +92,8 @@ def validate(manifest):
             if not isinstance(case["discover"], str) or not case["discover"]:
                 raise ValueError("Choose a fixture directory inside the project.")
             runtime = case.get("runtime", "cli")
-            if runtime not in ("cli", "godot", "ios-simulator", "android"):
-                raise ValueError("Test runtime must be 'cli', 'godot', 'ios-simulator', or 'android'.")
+            if runtime not in ("cli", "godot", "ios-simulator", "android", "web"):
+                raise ValueError("Test runtime must be 'cli', 'godot', 'ios-simulator', 'android', or 'web'.")
             if "headless" in case and not isinstance(case["headless"], bool):
                 raise ValueError("Test headless option must be true or false.")
             continue
@@ -437,7 +437,7 @@ def main():
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--device", default="")
     parser.add_argument("--preset", default="")
-    parser.add_argument("--runtime", choices=("godot", "ios-simulator", "android"),
+    parser.add_argument("--runtime", choices=("godot", "ios-simulator", "android", "web"),
                         help="Run the selected discovery fixtures on this engine target")
     parser.add_argument("--android-sdk", default="")
     args = parser.parse_args()
@@ -472,7 +472,7 @@ def main():
             with tempfile.TemporaryDirectory(prefix="kas3-tests-") as temporary:
                 temp_path = Path(temporary).resolve()
                 filters = case.get("_filters", [])
-                if "discover" in case and case.get("runtime") in ("ios-simulator", "android"):
+                if "discover" in case and case.get("runtime") in ("ios-simulator", "android", "web"):
                     payload_file = temp_path / "mobile-case.json"
                     payload_file.write_text(json.dumps({"case": case, "filters": filters}))
                     mobile_cmd = [

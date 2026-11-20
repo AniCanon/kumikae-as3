@@ -27,7 +27,7 @@ runner = _load("runner_for_mobile_test", ROOT / "runner.py")
 
 class MobileRunnerTest(unittest.TestCase):
     def test_validates_mobile_runtimes(self):
-        for runtime in ("ios-simulator", "android"):
+        for runtime in ("ios-simulator", "android", "web"):
             manifest = {"version": 1, "tests": [{"name": "Mobile", "discover": "tests", "runtime": runtime}]}
             runner.validate(manifest)
         with self.assertRaises(ValueError):

@@ -47,7 +47,8 @@ state of the project changes.
 - **Android:** the interpreter runs on an ARM64 emulator through Rider.
 - **Web (WebAssembly):** `libkas3_godot.wasm` builds with Emscripten for Godot 4.7's single-threaded Web export
   and runs projects such as `examples/coin-dash` on the interpreter in the browser. Claude Code starters
-  include a Web export preset when the native kit supplies the Web runtime.
+  include a Web export preset when the native kit supplies the Web runtime. Rider and Claude Code can
+  build and preview the game in a browser and run gameplay fixtures in headless Chromium.
 
 ### Native code
 
@@ -68,10 +69,10 @@ state of the project changes.
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
   hover and outline. A change to a million-line project is checked in milliseconds.
 - **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
-  for desktop, iOS and Android, a Devices panel, and a live test runner that opens failed assertions,
+  for desktop, Web, iOS and Android, automatic Godot preset setup for new run targets, a Devices panel, and a live test runner that opens failed assertions,
   comparison diffs, compiler diagnostics and Godot script errors at their source.
-- **Claude Code plugin** with AS3 language support, a playable starter, debug exports and gameplay tests on desktop, iOS Simulator and Android emulator. [Setup](../editors/claude/README.md).
-- **VS Code client** for the language server.
+- **Claude Code plugin** with AS3 language support, a playable starter, debug exports and gameplay tests on desktop, Web, iOS Simulator and Android emulator. [Setup](../editors/claude/README.md).
+- **VS Code client** for the language server on VS Code 1.82 and newer.
 - **A testing library** written in AS3, with CLI and headless Godot engine runners (`TestScene`).
 
 ## Next

@@ -181,6 +181,7 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             manager.addConfiguration(game)
             ensureDefaultTests(manager)
             manager.selectedConfiguration = game
+            if (Platform.WEB in platforms) GameTargetSetup.selectWeb(project, "Web")
             if (Platform.ANDROID in platforms) GameTargetSetup.selectAndroid(project, "Android")
             if (Platform.IOS in platforms) GameTargetSetup.selectSimulator(project, "iOS")
         }

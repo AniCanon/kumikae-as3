@@ -1,7 +1,7 @@
 # `editors/vscode/`: the VS Code client
 
-A thin client. It starts `kas3c lsp` and adds syntax coloring. Everything else, from errors to completion,
-comes from the language server.
+Requires VS Code 1.82 or newer. The client starts `kas3c lsp` and adds syntax coloring. Everything else, from errors to completion,
+comes from the language server. The server registers the workspace file watcher over LSP.
 
 To install and use it, see [Editor support](../README.md#vs-code). This page is for someone changing the
 client.

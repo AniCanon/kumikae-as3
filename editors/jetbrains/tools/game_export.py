@@ -105,6 +105,57 @@ def verify_play_bundle(path):
             raise ValueError("The bundle is missing the ARM64 AS3 runtime.")
 
 
+def validate_web_preset(stage, preset):
+    # Read only the scalar fields used by Web. Other export options can span multiple lines.
+    sections = {}
+    fields = {}
+    for line in (stage / "export_presets.cfg").read_text().splitlines():
+        line = line.strip()
+        if line.startswith("[") and "]" in line:
+            fields = sections.setdefault(line[1:line.index("]")], {})
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() in ("name", "platform", "variant/extensions_support", "variant/thread_support"):
+            fields[key.strip()] = json.JSONDecoder().raw_decode(value.lstrip())[0]
+    for name, fields in sections.items():
+        if fields.get("platform") == "Web" and fields.get("name") == preset:
+            options = sections.get(name + ".options", {})
+            if options.get("variant/extensions_support") is not True or options.get("variant/thread_support") is True:
+                raise ValueError(f"Enable GDExtension support and disable threads in Web preset {preset}.")
+            return
+    raise ValueError(f"Missing Web preset {preset}.")
+
+
+def stage_web_runtime(stage, native):
+    descriptor = stage / "kas3.gdextension"
+    text = descriptor.read_text()
+    libraries = re.search(r"(?ms)^\[libraries\][ \t]*\n(.*?)(?=^\[|\Z)", text)
+    if not libraries:
+        raise ValueError("The AS3 extension descriptor needs a libraries section.")
+    paths = {value.removeprefix("res://") for tags, value in
+             re.findall(r'(?m)^[ \t]*([\w.-]+)[ \t]*=[ \t]*"([^"]+)"', libraries[1])
+             if "web" in tags.split(".")}
+    standard = "bin/web/libkas3_godot.wasm"
+    if not paths:
+        paths.add(standard)
+        start = libraries.start(1)
+        descriptor.write_text(text[:start] + f'web.wasm32 = "res://{standard}"\n' + text[start:])
+    available = set()
+    for relative in paths:
+        destination = (stage / relative).resolve()
+        if not destination.is_relative_to(stage.resolve()):
+            raise ValueError("The Web runtime must be inside the project.")
+        bundled = native / "web/libkas3_godot.wasm"
+        if relative == standard and bundled.is_file():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bundled, destination)
+        if destination.is_file():
+            available.add(destination.name)
+    if not available:
+        raise ValueError("Missing Web AS3 runtime at " + ", ".join(sorted(paths)) + ". Install the Kumikae Web kit.")
+    return available
+
+
 def stage_ios_runtime(stage, native):
     framework = stage / "bin/ios/kas3_godot.xcframework"
     source = native / "ios/kas3_godot.xcframework"
@@ -155,10 +206,12 @@ def export(project, destination, godot, native, presets, keys=None, private_file
                 host = native / name
                 if host.is_file() and (stage / "bin" / name).is_file():
                     shutil.copy2(host, stage / "bin" / name)
+        web_libraries = stage_web_runtime(stage, native) if "Web" in platforms else set()
         if "iOS" in platforms:
             stage_ios_runtime(stage, native)
         base = [godot, "--headless", "--path", str(stage)]
-        subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
+        if platforms != {"Web"}:
+            subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
         output = Path(tempfile.mkdtemp(prefix="Game-exports-", dir=destination))
         print(f"Export directory: {output}", flush=True)
         failed = []
@@ -180,12 +233,16 @@ def export(project, destination, godot, native, presets, keys=None, private_file
                     env["GODOT_ANDROID_KEYSTORE_RELEASE_" + field.upper()] = key[field]
             command = base + ["--language", "en", *flags, "--export-release", label, str(artifact)]
             try:
+                if preset["platform"] == "Web":
+                    validate_web_preset(stage, label)
                 run_export(command, env)
             except ValueError as error:
                 failed.append(f"{label} ({error})")
                 continue
             produced = product(artifact, preset)
-            if not produced:
+            if preset["platform"] == "Web" and not any((subdir / name).is_file() for name in web_libraries):
+                failed.append(f"{label} (enable GDExtension support in the Web preset)")
+            elif not produced:
                 failed.append(label)
             else:
                 if preset.get("store") and preset["platform"] == "Android":

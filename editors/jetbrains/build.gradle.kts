@@ -156,7 +156,7 @@ tasks.withType<PrepareSandboxTask>().configureEach {
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(root.resolve("compiler/tests/godot_project/bin")) {
-        include("libkas3_godot.*")
+        include("libkas3_godot.*", "web/libkas3_godot.wasm")
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(root.resolve("spike/third_party/godot-ios-template/ios-with-arm64-simulator.zip")) {
@@ -167,6 +167,7 @@ tasks.withType<PrepareSandboxTask>().configureEach {
             "ios-device.py",
             "android_run.py",
             "game_export.py",
+            "web_game.py",
             "build-ios-simulator.sh",
             "tester_distribution.py",
             "store_*.py",

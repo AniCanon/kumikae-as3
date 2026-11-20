@@ -3,6 +3,9 @@ const vscode = require("vscode");
 const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 
 let client;
+let pending = Promise.resolve();
+let generation = 0;
+let settingsListener;
 
 function start() {
   const settings = vscode.workspace.getConfiguration("kas3");
@@ -16,25 +19,37 @@ function start() {
   const server = { command: settings.get("serverPath", "kas3c"), args, transport: TransportKind.stdio };
   client = new LanguageClient("kas3", "Kumikae AS3", server, {
     documentSelector: [{ scheme: "file", language: "actionscript" }],
-    synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher("**/*") },
   });
   return client.start();
 }
 
-function activate(context) {
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (event.affectsConfiguration("kas3") && client) {
-        await client.stop();
-        await start();
-      }
-    })
-  );
-  return start();
+function restart() {
+  const requested = ++generation;
+  const apply = async () => {
+    if (requested !== generation) return;
+    if (client?.needsStop()) await client.stop();
+    if (requested === generation) await start();
+  };
+  pending = pending.then(apply, apply);
+  return pending;
 }
 
-function deactivate() {
-  return client ? client.stop() : undefined;
+function activate(context) {
+  settingsListener = vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration("kas3")) return restart();
+  });
+  context.subscriptions.push(settingsListener);
+  return restart();
+}
+
+async function deactivate() {
+  settingsListener?.dispose();
+  ++generation;
+  try {
+    await pending;
+  } finally {
+    if (client && client.needsStop()) await client.stop();
+  }
 }
 
 module.exports = { activate, deactivate };

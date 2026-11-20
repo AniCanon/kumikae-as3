@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.project
 import app.anicanon.kumikae.as3.run.AndroidRunConfiguration
 import app.anicanon.kumikae.as3.run.KumikaeRunType
 import app.anicanon.kumikae.as3.run.SimulatorRunConfiguration
+import app.anicanon.kumikae.as3.run.WebRunConfiguration
 import app.anicanon.kumikae.as3.settings.GameTargets
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import com.intellij.execution.RunManager
@@ -37,6 +38,24 @@ internal class GameTargetSetup(private val project: Project, private val root: V
 
     fun add(platform: String, name: String, identifier: String) {
         val old = exports()
+        savePreset(old, platform, name, identifier)
+        when (platform) {
+            "iOS" -> selectSimulator(project, name)
+            "Web" -> selectWeb(project, name)
+            "Android" -> selectAndroid(project, name)
+            else -> error("Unsupported Godot target platform: $platform")
+        }
+    }
+
+    fun suggestedPreset(platform: String) = GameTargets.suggestedPreset(GodotConfig(exports()), platform)
+
+    fun ensurePreset(platform: String, name: String, identifier: String) {
+        val old = exports()
+        if (GameTargets.presets(GodotConfig(old)).any { it.platform == platform && it.name == name }) return
+        savePreset(old, platform, name, identifier)
+    }
+
+    private fun savePreset(old: String, platform: String, name: String, identifier: String) {
         val updated = GameTargets.add(old, platform, name, identifier)
         if (platform == "iOS") GameTargets.ios(updated, name)
         if (updated != old) {
@@ -59,11 +78,6 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                 },
             )
         }
-        when (platform) {
-            "iOS" -> selectSimulator(project, name)
-            "Android" -> selectAndroid(project, name)
-            else -> error("Unsupported Godot target platform: $platform")
-        }
     }
 
     companion object {
@@ -85,6 +99,12 @@ internal class GameTargetSetup(private val project: Project, private val root: V
                 manager.addConfiguration(it)
             }
             manager.selectedConfiguration = chosen
+        }
+
+        fun selectWeb(project: Project, name: String) {
+            selectPreset<WebRunConfiguration>(project, KumikaeRunType.Kind.WEB, name, name, { it.options.preset }) {
+                it.options.preset = name
+            }
         }
 
         fun selectAndroid(project: Project, name: String) {

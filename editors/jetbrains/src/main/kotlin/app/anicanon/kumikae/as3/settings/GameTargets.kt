@@ -14,14 +14,28 @@ internal object GameTargets {
     private val ANDROID_ID = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
     private val PRESET_SECTION = Regex("preset\\.\\d+")
 
-    fun validIdentifier(platform: String, value: String) = if (platform == "Android") {
-        ANDROID_ID.matches(value)
-    } else {
-        ProjectTemplate.isBundle(value)
+    fun validIdentifier(platform: String, value: String) = when (platform) {
+        "Web" -> true
+        "Android" -> ANDROID_ID.matches(value)
+        else -> ProjectTemplate.isBundle(value)
     }
 
     fun presets(config: GodotConfig): List<ExportPreset> = config.sections.filter { PRESET_SECTION.matches(it) }.map {
         ExportPreset(it, config.string(it, "name"), config.string(it, "platform"))
+    }
+
+    fun suggestedPreset(config: GodotConfig, platform: String): String {
+        val all = presets(config)
+        val existing = all.filter { it.platform == platform }
+        if (existing.isNotEmpty()) {
+            val runnable = config.string("runnable_presets", platform)
+            val preset = existing.firstOrNull { it.name == runnable }
+                ?: existing.firstOrNull { config.raw(it.section, "runnable") == "true" }
+                ?: existing.firstOrNull { it.name == platform } ?: existing.first()
+            return preset.name
+        }
+        return generateSequence(1) { it + 1 }.map { if (it == 1) platform else "$platform ($it)" }
+            .first { candidate -> all.none { it.name == candidate } }
     }
 
     fun ios(text: String, name: String): IosTarget {
@@ -46,7 +60,7 @@ internal object GameTargets {
     }
 
     fun add(text: String, platform: String, name: String, identifier: String): String {
-        require(platform == "iOS" || platform == "Android") { "Unsupported platform: $platform" }
+        require(platform in setOf("iOS", "Android", "Web")) { "Unsupported platform: $platform" }
         require(name.isNotBlank() && name.none(Char::isISOControl)) { "Enter a single-line preset name." }
         val config = GodotConfig(text)
         val all = presets(config)
@@ -70,8 +84,12 @@ internal object GameTargets {
             ConfigKey(section, "export_filter") to "\"all_resources\"",
             ConfigKey(section, "include_filter") to "\"*.as\"",
             ConfigKey(section, "exclude_filter") to "\"tests/*\"",
-            ConfigKey(options, requireNotNull(preset.identifierKey)) to GodotConfig.quote(identifier),
         )
+        preset.identifierKey?.let { settings[ConfigKey(options, it)] = GodotConfig.quote(identifier) }
+        if (platform == "Web") {
+            settings[ConfigKey(options, "variant/extensions_support")] = "true"
+            settings[ConfigKey(options, "variant/thread_support")] = "false"
+        }
         if (platform == "iOS") {
             settings[ConfigKey(options, "application/export_project_only")] = "true"
             settings[ConfigKey(options, "application/app_store_team_id")] = "\"\""

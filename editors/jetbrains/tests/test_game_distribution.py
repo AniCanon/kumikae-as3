@@ -24,6 +24,56 @@ class GameDistributionTest(unittest.TestCase):
         names = [node.get("implementation", "").split(".")[-1] for node in plugin.iter("configurationType")]
         self.assertIn("KumikaeRunType", names)
 
+    def test_only_the_selected_web_preset_needs_single_threaded_extension_support(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            cfg = stage / "export_presets.cfg"
+            cfg.write_text('[preset.0]\nname="Other"\nplatform="Web"\n'
+                           '[preset.1]\nname="Browser"\nplatform="Web"\n'
+                           '[preset.1.options]\nvariant/extensions_support=true\nvariant/thread_support=false\n')
+            self.exporter.validate_web_preset(stage, "Browser")
+            with self.assertRaisesRegex(ValueError, "Enable GDExtension"):
+                self.exporter.validate_web_preset(stage, "Other")
+            cfg.write_text(cfg.read_text().replace("thread_support=false", "thread_support=true"))
+            with self.assertRaisesRegex(ValueError, "disable threads"):
+                self.exporter.validate_web_preset(stage, "Browser")
+
+    def test_web_export_stages_legacy_and_custom_runtimes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            native = root / "native"
+            wasm = native / "web/libkas3_godot.wasm"
+            wasm.parent.mkdir(parents=True)
+            wasm.write_bytes(b"bundled")
+            project = root / "game"
+            project.mkdir()
+            descriptor = project / "kas3.gdextension"
+            descriptor.write_text("[libraries]\n")
+            stage = root / "stage"
+            self.exporter.stage_game(project, stage, None)
+            self.exporter.stage_web_runtime(stage, native)
+            self.assertEqual(b"bundled", (stage / "bin/web/libkas3_godot.wasm").read_bytes())
+            self.assertIn('web.wasm32 = "res://bin/web/libkas3_godot.wasm"', (stage / descriptor.name).read_text())
+            self.assertEqual("[libraries]\n", descriptor.read_text())
+            (stage / descriptor.name).write_text('[libraries]\nweb.wasm32 = "res://custom.wasm"\n')
+            with self.assertRaisesRegex(ValueError, "custom.wasm"):
+                self.exporter.stage_web_runtime(stage, native)
+            (stage / "custom.wasm").write_bytes(b"custom")
+            self.assertEqual({"custom.wasm"}, self.exporter.stage_web_runtime(stage, native))
+            self.assertEqual(b"custom", (stage / "custom.wasm").read_bytes())
+
+    def test_web_library_feature_tags_preserve_debug_and_release_overrides(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            descriptor = stage / "kas3.gdextension"
+            original = ('[libraries]\nweb.debug.wasm32 = "res://debug.wasm"\n'
+                        'wasm32.web.release = "release.wasm"\n[icons]\nweb = "res://icon.svg"\n')
+            descriptor.write_text(original)
+            for name in ("debug.wasm", "release.wasm"):
+                (stage / name).touch()
+            self.assertEqual({"debug.wasm", "release.wasm"}, self.exporter.stage_web_runtime(stage, stage))
+            self.assertEqual(original, descriptor.read_text())
+
     def test_repository_and_plugin_use_the_product_mark(self):
         logo = self.root / "src/main/resources/META-INF/pluginIcon.svg"
         self.assertIn("Kumikae AS3", logo.read_text())

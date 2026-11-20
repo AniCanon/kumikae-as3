@@ -4,7 +4,7 @@
   "description": "ActionScript 3 for Godot: errors as you type, go to definition, find references, hover and outline, from kas3c.",
   "version": "0.1.0",
   "private": true,
-  "engines": { "vscode": "^1.75.0" },
+  "engines": { "vscode": "^1.82.0" },
   "categories": ["Programming Languages"],
   "main": "./extension.js",
   "activationEvents": [],

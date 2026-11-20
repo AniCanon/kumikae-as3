@@ -1,4 +1,4 @@
-"""Stage and stream discovered AS3 engine test suites on iOS Simulator or Android Emulator."""
+"""Stage and stream discovered AS3 engine test suites on Web, iOS Simulator or Android Emulator."""
 import argparse
 import importlib.util
 import json
@@ -35,7 +35,7 @@ def stage_project(project_root, staged_root, case, filters):
                     ignore=shutil.ignore_patterns(".git", ".idea", ".run", ".godot", ".build", "build"))
     runner_dir = staged_root / "tests" / "kas3_runner"
     if runner_dir.exists():
-        raise ValueError("tests/kas3_runner is reserved for the generated mobile test scene.")
+        raise ValueError("tests/kas3_runner is reserved for the generated test scene.")
     runner_dir.mkdir(parents=True)
     for tier in _discovery.missing_framework_tiers(staged_root):
         shutil.copytree(_HERE / tier / "app", runner_dir / "app", dirs_exist_ok=True)
@@ -188,6 +188,28 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
         return simulator_log.run(udid, actual_bundle, case)
 
 
+def run_web(project, case, filters, preset, godot):
+    native, _, exporter = _kit_paths()
+    web = _load("kas3_web_game", exporter.with_name("web_game.py"))
+    browser = _load("kas3_web_runner", _HERE / "web_runner.py")
+    chrome = browser.browser()
+    if (native / "compiler").is_dir():
+        native = native / "compiler/tests/godot_project/bin"
+    with tempfile.TemporaryDirectory(prefix="kas3-web-tests-") as tmp:
+        stage = Path(tmp) / "game"
+        stage_project(project, stage, case, filters)
+        (stage / ".godot").mkdir()
+        (stage / ".godot/extension_list.cfg").write_text("res://kas3.gdextension\n")
+        cfg = stage / "export_presets.cfg"
+        exports = cfg.read_text()
+        group, name = _suite.select_preset(_suite.platform_presets(exports, "Web"), "Web", preset)
+        cfg.write_text(_suite.include_test_folder(exports, group, case["discover"]))
+        output = Path(tmp) / "export"
+        output.mkdir()
+        product = web.export_stage(stage, native, godot, name, output)
+        return browser.run(web, product, chrome, case["marker"])
+
+
 def run_android(project_root, case, filters, device, preset, sdk_path, godot):
     sdk = resolve_android_sdk(sdk_path)
     adb = sdk / ("platform-tools/adb.exe" if os.name == "nt" else "platform-tools/adb")
@@ -212,24 +234,15 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
         game_export.stage_game(stage, export_stage, android_runtime, android=True)
 
         exports = (export_stage / "export_presets.cfg").read_text()
-        groups = re.findall(r"(?m)^[ \t]*\[(preset\.\d+)\][ \t]*\r?$", exports)
-        matches = [
-            g
-            for g in groups
-            if _suite.setting(exports, g, "platform") == "Android"
-            and (not preset or _suite.setting(exports, g, "name") == preset)
-        ]
-        if len(matches) != 1:
-            raise ValueError("Choose one Android export preset with --preset.")
-        preset_name = _suite.setting(exports, matches[0], "name")
+        group, preset_name = _suite.select_preset(_suite.platform_presets(exports, "Android"), "Android", preset)
 
         # A test APK must be installable alongside the developer's game.
-        options = matches[0] + ".options"
+        options = group + ".options"
         package = _suite.setting(exports, options, "package/unique_name")
         if not re.fullmatch(r"[a-zA-Z][\w$]*(?:\.[a-zA-Z$][\w$]*)+", package, re.ASCII):
             raise ValueError("Set package/unique_name in the Android export preset before running tests.")
         cfg = _suite.setting(exports, options, "package/unique_name", package + ".tests")
-        cfg = _suite.include_test_folder(cfg, matches[0], case["discover"])
+        cfg = _suite.include_test_folder(cfg, group, case["discover"])
         (export_stage / "export_presets.cfg").write_text(cfg)
 
         apk = Path(tmp) / "tests.apk"
@@ -299,7 +312,7 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("runtime", choices=("ios-simulator", "android"))
+    parser.add_argument("runtime", choices=("ios-simulator", "android", "web"))
     parser.add_argument("project", type=Path)
     parser.add_argument("case_json", type=Path)
     parser.add_argument("--godot", default="godot")
@@ -310,6 +323,8 @@ def main():
     payload = json.loads(args.case_json.read_text())
     case = payload["case"]
     filters = payload.get("filters", [])
+    if args.runtime == "web":
+        return run_web(args.project.resolve(), case, filters, args.preset, args.godot)
     if args.runtime == "ios-simulator":
         return run_ios_simulator(args.project.resolve(), case, filters, args.device, args.preset, args.godot)
     return run_android(args.project.resolve(), case, filters, args.device, args.preset, args.android_sdk, args.godot)
