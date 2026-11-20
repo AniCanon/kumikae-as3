@@ -58,18 +58,16 @@ wasm_opt=${WASM_OPT:-}
 if [ -z "$wasm_opt" ]; then
 	if command -v wasm-opt >/dev/null 2>&1; then
 		wasm_opt=$(command -v wasm-opt)
-	elif command -v em++ >/dev/null 2>&1; then
-		em_dir=$(cd "$(dirname "$(realpath "$(command -v em++)")")" && pwd)
-		for candidate in "$em_dir/binaryen/bin/wasm-opt" "$em_dir/../binaryen/bin/wasm-opt"; do
-			if [ -x "$candidate" ]; then
-				wasm_opt=$candidate
-				break
-			fi
-		done
+	elif command -v em-config >/dev/null 2>&1; then
+		binaryen=$(em-config BINARYEN_ROOT)
+		if [ -x "$binaryen/bin/wasm-opt" ]; then
+			wasm_opt="$binaryen/bin/wasm-opt"
+		fi
 	fi
 fi
 
 if [ -n "$wasm_opt" ]; then
+	echo "Optimizing $output_name with $wasm_opt"
 	"$wasm_opt" -Oz \
 		--enable-bulk-memory --enable-sign-ext --enable-mutable-globals \
 		--enable-nontrapping-float-to-int --enable-exception-handling --enable-reference-types \

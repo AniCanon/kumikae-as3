@@ -109,9 +109,10 @@ omit that bookkeeping.
 (`KAS3_RUNTIME_ONLY=ON`, written to `bin/web/libkas3_godot.wasm`, registered under `web.wasm32` in
 `kas3.gdextension`). Because it omits the AS3 front end and Godot's embedded declaration tables, it loads
 the precompiled `res://.kas3/program.kas3` binary IR module that `AS3IOSExport` packs automatically during
-Godot's Web export (~620 KiB raw / ~193 KiB Brotli). Pass `--compiler` to `tests/build_web.sh` to build
-`bin/web/libkas3_godot_compiler.wasm` with the in-browser compiler and `web_reload` hot-reload C API
-(`kas3_web_reload`, `kas3_web_last_error`, `kas3_web_reset_sources`).
+Godot's Web export. The extension itself is ~628 KiB raw / ~194 KiB Brotli. Pass `--compiler` to `tests/build_web.sh` to build
+`bin/web/libkas3_godot_compiler.wasm` with the in-browser compiler and the `web_reload` hot-reload C API
+(`kas3_web_reload`, `kas3_web_last_error`, `kas3_web_reset_sources`). Select that binary with
+`web.wasm32 = "res://bin/web/libkas3_godot_compiler.wasm"` in the project descriptor.
 
 Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true` and
 `variant/thread_support=false`; scripts run on the interpreter in the browser without requiring

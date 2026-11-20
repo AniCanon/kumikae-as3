@@ -6,7 +6,7 @@
 #
 # Stock Godot 4.7 web_dlink_nothreads_release templates are ~42 MiB uncompressed because they include 3D,
 # 3D physics, XR, Navigation3D, GDScript, and other modules. Passing --2d trims those subsystems and builds
-# with optimize=size lto=full so the resulting template typically shrinks to ~12-16 MiB raw (~3-4 MiB Brotli).
+# with optimize=size lto=full. Measure the resulting export with the assets and modules your game uses.
 #
 # Needs Emscripten (emcc/em++) matching the Godot 4.7 Web template ABI and SCons on PATH.
 set -e
@@ -57,7 +57,6 @@ set -- \
 	optimize=size \
 	lto=full \
 	debug_symbols=no \
-	deprecated=no \
 	minizip=no \
 	module_gdscript_enabled=no \
 	module_openxr_enabled=no \
