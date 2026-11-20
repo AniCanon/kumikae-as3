@@ -28,7 +28,9 @@ For how the result looks to someone writing scripts, read
 ## What the generator decides
 
 - **Documentation.** ASDoc comments carry each available class summary or the first paragraph of a
-  member description. Godot reference tags use AS3 spelling for names. Entries with more text include
+  member description. Constructor help lists the documented forms with their AS3 parameter types.
+  References use the AS3 names for properties and constants. Settings keys keep their engine spelling
+  so they can be passed to `getSetting`. Inline links retain their destinations. Entries with more text include
   the URL of the full versioned reference. A plain API dump still generates declarations, but provides
   no engine descriptions.
 - **Names.** Methods, properties, signals and parameters are lowerCamel, with acronyms in capitals

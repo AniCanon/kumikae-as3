@@ -41,7 +41,7 @@ package godot {
 		public static const ZERO:Vector2;
 		/** One vector, a vector with all components set to 1. */
 		public static const ONE:Vector2;
-		/** Infinity vector, a vector with all components set to @GDScript.INF. */
+		/** Infinity vector, a vector with all components set to Infinity. */
 		public static const INF:Vector2;
 		/** Left unit vector. Represents the direction of left. */
 		public static const LEFT:Vector2;
@@ -55,9 +55,15 @@ package godot {
 		public var x:Number;
 		/** The vector's Y component. Also accessible by using the index position [1]. */
 		public var y:Number;
-		/** A 2D vector using floating-point coordinates.
+		/** Vector2() — Constructs a default-initialized Vector2 with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector2.html
+		 * Vector2(from:Vector2) — Constructs a Vector2 as a copy of the given Vector2.
+		 *
+		 * Vector2(from:Vector2i) — Constructs a new Vector2 from Vector2i.
+		 *
+		 * Vector2(x:Number, y:Number) — Constructs a new Vector2 from the given x and y.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector2.html#class-vector2-constructor-vector2
 		 */
 		public native function Vector2(x:* = null, y:Number = 0);
 		/** Returns this vector's angle with respect to the positive X axis, or (1, 0) vector, in radians.
@@ -80,9 +86,9 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector2.html#class-vector2-method-direction-to
 		 */
 		public native function directionTo(to:Vector2):Vector2;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector2):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector2.html#class-vector2-method-distance-squared-to
 		 */
@@ -135,9 +141,9 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector2.html#class-vector2-method-cubic-interpolate-in-time
 		 */
 		public native function cubicInterpolateInTime(b:Vector2, preA:Vector2, postB:Vector2, weight:Number, bT:Number, preAT:Number, postBT:Number):Vector2;
-		/** Returns the point at the given t on the Bézier curve defined by this vector and the given control1, control2, and end points. */
+		/** Returns the point at the given t on the Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by this vector and the given control1, control2, and end points. */
 		public native function bezierInterpolate(control1:Vector2, control2:Vector2, end:Vector2, t:Number):Vector2;
-		/** Returns the derivative at the given t on the Bézier curve defined by this vector and the given control1, control2, and end points. */
+		/** Returns the derivative at the given t on the Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by this vector and the given control1, control2, and end points. */
 		public native function bezierDerivative(control1:Vector2, control2:Vector2, end:Vector2, t:Number):Vector2;
 		/** Returns the axis of the vector's highest value. See AXIS_* constants. If all components are equal, this method returns AXIS_X. */
 		public native function maxAxisIndex():Int64;
@@ -262,9 +268,15 @@ package godot {
 		public var x:int;
 		/** The vector's Y component. Also accessible by using the index position [1]. */
 		public var y:int;
-		/** A 2D vector using integer coordinates.
+		/** Vector2i() — Constructs a default-initialized Vector2i with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector2i.html
+		 * Vector2i(from:Vector2i) — Constructs a Vector2i as a copy of the given Vector2i.
+		 *
+		 * Vector2i(from:Vector2) — Constructs a new Vector2i from the given Vector2 by truncating components' fractional parts (rounding towards zero). For a different behavior consider passing the result of Vector2.ceil, Vector2.floor or Vector2.round to this constructor instead.
+		 *
+		 * Vector2i(x:int, y:int) — Constructs a new Vector2i from the given x and y.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector2i.html#class-vector2i-constructor-vector2i
 		 */
 		public native function Vector2i(x:* = null, y:int = 0);
 		/** Returns the aspect ratio of this vector, the ratio of x to y. */
@@ -273,9 +285,9 @@ package godot {
 		public native function maxAxisIndex():int;
 		/** Returns the axis of the vector's lowest value. See AXIS_* constants. If all components are equal, this method returns AXIS_Y. */
 		public native function minAxisIndex():int;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector2i):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector2i.html#class-vector2i-method-distance-squared-to
 		 */
@@ -329,9 +341,17 @@ package godot {
 		public var size:Vector2;
 		/** The ending point. This is usually the bottom-right corner of the rectangle, and is equivalent to position + size. Setting this point affects the size. */
 		public var end:Vector2;
-		/** A 2D axis-aligned bounding box using floating-point coordinates.
+		/** Rect2() — Constructs a Rect2 with its position and size set to Vector2.ZERO.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_rect2.html
+		 * Rect2(from:Rect2) — Constructs a Rect2 as a copy of the given Rect2.
+		 *
+		 * Rect2(from:Rect2i) — Constructs a Rect2 from a Rect2i.
+		 *
+		 * Rect2(position:Vector2, size:Vector2) — Constructs a Rect2 by position and size.
+		 *
+		 * Rect2(x:Number, y:Number, width:Number, height:Number) — Constructs a Rect2 by setting its position to (x, y), and its size to (width, height).
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_rect2.html#class-rect2-constructor-rect2
 		 */
 		public native function Rect2(x:* = null, y:* = null, width:Number = 0, height:Number = 0);
 		/** Returns the center point of the rectangle. This is the same as position + (size / 2.0). */
@@ -402,9 +422,17 @@ package godot {
 		public var size:Vector2i;
 		/** The ending point. This is usually the bottom-right corner of the rectangle, and is equivalent to position + size. Setting this point affects the size. */
 		public var end:Vector2i;
-		/** A 2D axis-aligned bounding box using integer coordinates.
+		/** Rect2i() — Constructs a Rect2i with its position and size set to Vector2i.ZERO.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_rect2i.html
+		 * Rect2i(from:Rect2i) — Constructs a Rect2i as a copy of the given Rect2i.
+		 *
+		 * Rect2i(from:Rect2) — Constructs a Rect2i from a Rect2. The floating-point coordinates are truncated.
+		 *
+		 * Rect2i(position:Vector2i, size:Vector2i) — Constructs a Rect2i by position and size.
+		 *
+		 * Rect2i(x:int, y:int, width:int, height:int) — Constructs a Rect2i by setting its position to (x, y), and its size to (width, height).
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_rect2i.html#class-rect2i-constructor-rect2i
 		 */
 		public native function Rect2i(x:* = null, y:* = null, width:int = 0, height:int = 0);
 		/** Returns the center point of the rectangle. This is the same as position + (size / 2).
@@ -493,7 +521,7 @@ package godot {
 		public static const ZERO:Vector3;
 		/** One vector, a vector with all components set to 1. */
 		public static const ONE:Vector3;
-		/** Infinity vector, a vector with all components set to @GDScript.INF. */
+		/** Infinity vector, a vector with all components set to Infinity. */
 		public static const INF:Vector3;
 		/** Left unit vector. Represents the local direction of left, and the global direction of west. */
 		public static const LEFT:Vector3;
@@ -525,9 +553,15 @@ package godot {
 		public var y:Number;
 		/** The vector's Z component. Also accessible by using the index position [2]. */
 		public var z:Number;
-		/** A 3D vector using floating-point coordinates.
+		/** Vector3() — Constructs a default-initialized Vector3 with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector3.html
+		 * Vector3(from:Vector3) — Constructs a Vector3 as a copy of the given Vector3.
+		 *
+		 * Vector3(from:Vector3i) — Constructs a new Vector3 from Vector3i.
+		 *
+		 * Vector3(x:Number, y:Number, z:Number) — Returns a Vector3 with the given components.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector3.html#class-vector3-constructor-vector3
 		 */
 		public native function Vector3(x:* = null, y:Number = 0, z:Number = 0);
 		/** Returns the axis of the vector's lowest value. See AXIS_* constants. If all components are equal, this method returns AXIS_Z. */
@@ -540,9 +574,9 @@ package godot {
 		public native function signedAngleTo(to:Vector3, axis:Vector3):Number;
 		/** Returns the normalized vector pointing from this vector to to. This is equivalent to using (b - a).normalized(). */
 		public native function directionTo(to:Vector3):Vector3;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector3):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector3.html#class-vector3-method-distance-squared-to
 		 */
@@ -598,9 +632,9 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector3.html#class-vector3-method-cubic-interpolate-in-time
 		 */
 		public native function cubicInterpolateInTime(b:Vector3, preA:Vector3, postB:Vector3, weight:Number, bT:Number, preAT:Number, postBT:Number):Vector3;
-		/** Returns the point at the given t on the Bézier curve defined by this vector and the given control1, control2, and end points. */
+		/** Returns the point at the given t on the Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by this vector and the given control1, control2, and end points. */
 		public native function bezierInterpolate(control1:Vector3, control2:Vector3, end:Vector3, t:Number):Vector3;
-		/** Returns the derivative at the given t on the Bézier curve defined by this vector and the given control1, control2, and end points. */
+		/** Returns the derivative at the given t on the Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by this vector and the given control1, control2, and end points. */
 		public native function bezierDerivative(control1:Vector3, control2:Vector3, end:Vector3, t:Number):Vector3;
 		/** Returns a new vector moved toward to by the fixed delta amount. Will not go past the final value. */
 		public native function moveToward(to:Vector3, delta:Number):Vector3;
@@ -728,18 +762,24 @@ package godot {
 		public var y:int;
 		/** The vector's Z component. Also accessible by using the index position [2]. */
 		public var z:int;
-		/** A 3D vector using integer coordinates.
+		/** Vector3i() — Constructs a default-initialized Vector3i with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector3i.html
+		 * Vector3i(from:Vector3i) — Constructs a Vector3i as a copy of the given Vector3i.
+		 *
+		 * Vector3i(from:Vector3) — Constructs a new Vector3i from the given Vector3 by truncating components' fractional parts (rounding towards zero). For a different behavior consider passing the result of Vector3.ceil, Vector3.floor or Vector3.round to this constructor instead.
+		 *
+		 * Vector3i(x:int, y:int, z:int) — Returns a Vector3i with the given components.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector3i.html#class-vector3i-constructor-vector3i
 		 */
 		public native function Vector3i(x:* = null, y:int = 0, z:int = 0);
 		/** Returns the axis of the vector's lowest value. See AXIS_* constants. If all components are equal, this method returns AXIS_Z. */
 		public native function minAxisIndex():int;
 		/** Returns the axis of the vector's highest value. See AXIS_* constants. If all components are equal, this method returns AXIS_X. */
 		public native function maxAxisIndex():int;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector3i):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector3i.html#class-vector3i-method-distance-squared-to
 		 */
@@ -819,12 +859,20 @@ package godot {
 		public var y:Vector2;
 		/** The translation offset of this transform, and the column 2 of the matrix. In 2D space, this can be seen as the position. */
 		public var origin:Vector2;
-		/** A 2×3 matrix representing a 2D transformation.
+		/** Transform2D() — Constructs a Transform2D identical to IDENTITY.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_transform2d.html
+		 * Transform2D(from:Transform2D) — Constructs a Transform2D as a copy of the given Transform2D.
+		 *
+		 * Transform2D(rotation:Number, position:Vector2) — Constructs a Transform2D from a given angle (in radians) and position.
+		 *
+		 * Transform2D(rotation:Number, scale:Vector2, skew:Number, position:Vector2) — Constructs a Transform2D from a given angle (in radians), scale, skew (in radians), and position.
+		 *
+		 * Transform2D(xAxis:Vector2, yAxis:Vector2, origin:Vector2) — Constructs a Transform2D from 3 Vector2 values representing x, y, and the origin (the three matrix columns).
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_transform2d.html#class-transform2d-constructor-transform2d
 		 */
 		public native function Transform2D(rotation:* = null, scale:Vector2 = null, skew:* = null, position:Vector2 = null);
-		/** Returns the inverted version of this transform.
+		/** Returns the inverted version of this transform (https://en.wikipedia.org/wiki/Invertible_matrix).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_transform2d.html#class-transform2d-method-inverse
 		 */
@@ -877,7 +925,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_transform2d.html#class-transform2d-method-translated-local
 		 */
 		public native function translatedLocal(offset:Vector2):Transform2D;
-		/** Returns the determinant of this transform basis's matrix. For advanced math, this number can be used to determine a few attributes:
+		/** Returns the determinant (https://en.wikipedia.org/wiki/Determinant) of this transform basis's matrix. For advanced math, this number can be used to determine a few attributes:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_transform2d.html#class-transform2d-method-determinant
 		 */
@@ -944,7 +992,7 @@ package godot {
 		public static const ZERO:Vector4;
 		/** One vector, a vector with all components set to 1. */
 		public static const ONE:Vector4;
-		/** Infinity vector, a vector with all components set to @GDScript.INF. */
+		/** Infinity vector, a vector with all components set to Infinity. */
 		public static const INF:Vector4;
 		/** The vector's X component. Also accessible by using the index position [0]. */
 		public var x:Number;
@@ -954,9 +1002,15 @@ package godot {
 		public var z:Number;
 		/** The vector's W component. Also accessible by using the index position [3]. */
 		public var w:Number;
-		/** A 4D vector using floating-point coordinates.
+		/** Vector4() — Constructs a default-initialized Vector4 with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector4.html
+		 * Vector4(from:Vector4) — Constructs a Vector4 as a copy of the given Vector4.
+		 *
+		 * Vector4(from:Vector4i) — Constructs a new Vector4 from the given Vector4i.
+		 *
+		 * Vector4(x:Number, y:Number, z:Number, w:Number) — Returns a Vector4 with the given components.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector4.html#class-vector4-constructor-vector4
 		 */
 		public native function Vector4(x:* = null, y:Number = 0, z:Number = 0, w:Number = 0);
 		/** Returns the axis of the vector's lowest value. See AXIS_* constants. If all components are equal, this method returns AXIS_W. */
@@ -1010,9 +1064,9 @@ package godot {
 		public native function isNormalized():Boolean;
 		/** Returns the normalized vector pointing from this vector to to. This is equivalent to using (b - a).normalized(). */
 		public native function directionTo(to:Vector4):Vector4;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector4):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector4.html#class-vector4-method-distance-squared-to
 		 */
@@ -1093,9 +1147,15 @@ package godot {
 		public var z:int;
 		/** The vector's W component. Also accessible by using the index position [3]. */
 		public var w:int;
-		/** A 4D vector using integer coordinates.
+		/** Vector4i() — Constructs a default-initialized Vector4i with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_vector4i.html
+		 * Vector4i(from:Vector4i) — Constructs a Vector4i as a copy of the given Vector4i.
+		 *
+		 * Vector4i(from:Vector4) — Constructs a new Vector4i from the given Vector4 by truncating components' fractional parts (rounding towards zero). For a different behavior consider passing the result of Vector4.ceil, Vector4.floor or Vector4.round to this constructor instead.
+		 *
+		 * Vector4i(x:int, y:int, z:int, w:int) — Returns a Vector4i with the given components.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_vector4i.html#class-vector4i-constructor-vector4i
 		 */
 		public native function Vector4i(x:* = null, y:int = 0, z:int = 0, w:int = 0);
 		/** Returns the axis of the vector's lowest value. See AXIS_* constants. If all components are equal, this method returns AXIS_W. */
@@ -1129,9 +1189,9 @@ package godot {
 		public native function max(with_:Vector4i):Vector4i;
 		/** Returns the component-wise maximum of this and with_, equivalent to Vector4i(maxi(x, with), maxi(y, with), maxi(z, with), maxi(w, with)). */
 		public native function maxi(with_:int):Vector4i;
-		/** Returns the Euclidean distance between this vector and to. */
+		/** Returns the Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to. */
 		public native function distanceTo(to:Vector4i):Number;
-		/** Returns the squared Euclidean distance between this vector and to.
+		/** Returns the squared Euclidean distance (https://en.wikipedia.org/wiki/Euclidean_distance) between this vector and to.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_vector4i.html#class-vector4i-method-distance-squared-to
 		 */
@@ -1175,9 +1235,21 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_plane.html#class-plane-property-normal
 		 */
 		public var normal:Vector3;
-		/** A plane in Hessian normal form.
+		/** Plane() — Constructs a default-initialized Plane with all components set to 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_plane.html
+		 * Plane(from:Plane) — Constructs a Plane as a copy of the given Plane.
+		 *
+		 * Plane(normal:Vector3) — Creates a plane from the normal vector. The plane will intersect the origin.
+		 *
+		 * Plane(normal:Vector3, d:Number) — Creates a plane from the normal vector and the plane's distance from the origin.
+		 *
+		 * Plane(normal:Vector3, point:Vector3) — Creates a plane from the normal vector and a point on the plane.
+		 *
+		 * Plane(point1:Vector3, point2:Vector3, point3:Vector3) — Creates a plane from the three points, given in clockwise order.
+		 *
+		 * Plane(a:Number, b:Number, c:Number, d:Number) — Creates a plane from the four parameters. The three components of the resulting plane's normal are a, b and c, and the plane has a distance of d from the origin.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_plane.html#class-plane-constructor-plane
 		 */
 		public native function Plane(a:* = null, b:* = null, c:* = null, d:Number = 0);
 		/** Returns a copy of the plane, with normalized normal (so it's a unit vector). Returns Plane(0, 0, 0, 0) if normal can't be normalized (it has zero length). */
@@ -1253,9 +1325,19 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_quaternion.html#class-quaternion-property-w
 		 */
 		public var w:Number;
-		/** A unit quaternion used for representing 3D rotations.
+		/** Quaternion() — Constructs a Quaternion identical to IDENTITY.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_quaternion.html
+		 * Quaternion(from:Quaternion) — Constructs a Quaternion as a copy of the given Quaternion.
+		 *
+		 * Quaternion(from:Basis) — Constructs a Quaternion from the given rotation Basis.
+		 *
+		 * Quaternion(axis:Vector3, angle:Number) — Constructs a Quaternion representing rotation around the axis by the given angle, in radians. The axis must be a normalized vector.
+		 *
+		 * Quaternion(arcFrom:Vector3, arcTo:Vector3) — Constructs a Quaternion representing the shortest arc between arcFrom and arcTo. These can be imagined as two points intersecting a sphere's surface, with a radius of 1.0.
+		 *
+		 * Quaternion(x:Number, y:Number, z:Number, w:Number) — Constructs a Quaternion defined by the given values.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_quaternion.html#class-quaternion-constructor-quaternion
 		 */
 		public native function Quaternion(x:* = null, y:* = null, z:Number = 0, w:Number = 0);
 		/** Returns this quaternion's length, also called magnitude. */
@@ -1300,12 +1382,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_quaternion.html#class-quaternion-method-spherical-cubic-interpolate-in-time
 		 */
 		public native function sphericalCubicInterpolateInTime(b:Quaternion, preA:Quaternion, postB:Quaternion, weight:Number, bT:Number, preAT:Number, postBT:Number):Quaternion;
-		/** Returns this quaternion's rotation as a Vector3 of Euler angles, in radians.
+		/** Returns this quaternion's rotation as a Vector3 of Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_quaternion.html#class-quaternion-method-get-euler
 		 */
 		public native function getEuler(order:Int64 = 2):Vector3;
-		/** Constructs a new Quaternion from the given Vector3 of Euler angles, in radians. In Godot, Euler angles always use intrinsic order. This method always uses the intrinsic YXZ convention (EULER_ORDER_YXZ). */
+		/** Constructs a new Quaternion from the given Vector3 of Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians. In Godot, Euler angles always use intrinsic order. This method always uses the intrinsic YXZ convention (EulerOrder.YXZ). */
 		public static native function fromEuler(euler:Vector3):Quaternion;
 		/** Returns the rotation axis of the rotation represented by this quaternion. */
 		public native function getAxis():Vector3;
@@ -1334,9 +1416,13 @@ package godot {
 		public var size:Vector3;
 		/** The ending point. This is usually the corner on the top-right and back of the bounding box, and is equivalent to position + size. Setting this point affects the size. */
 		public var end:Vector3;
-		/** A 3D axis-aligned bounding box.
+		/** AABB() — Constructs an AABB with its position and size set to Vector3.ZERO.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_aabb.html
+		 * AABB(from:AABB) — Constructs an AABB as a copy of the given AABB.
+		 *
+		 * AABB(position:Vector3, size:Vector3) — Constructs an AABB by position and size.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_aabb.html#class-aabb-constructor-aabb
 		 */
 		public native function AABB(position:* = null, size:Vector3 = null);
 		/** Returns an AABB equivalent to this bounding box, with its width, height, and depth modified to be non-negative values.
@@ -1485,12 +1571,20 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-property-z
 		 */
 		public var z:Vector3;
-		/** A 3×3 matrix for representing 3D rotation and scale.
+		/** Basis() — Constructs a Basis identical to IDENTITY.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html
+		 * Basis(from:Basis) — Constructs a Basis as a copy of the given Basis.
+		 *
+		 * Basis(from:Quaternion) — Constructs a Basis that only represents rotation from the given Quaternion.
+		 *
+		 * Basis(axis:Vector3, angle:Number) — Constructs a Basis that only represents rotation, rotated around the axis by the given angle, in radians. The axis must be a normalized vector.
+		 *
+		 * Basis(xAxis:Vector3, yAxis:Vector3, zAxis:Vector3) — Constructs a Basis from 3 axis vectors. These are the columns of the basis matrix.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-constructor-basis
 		 */
 		public native function Basis(xAxis:* = null, yAxis:* = null, zAxis:Vector3 = null);
-		/** Returns the inverse of this basis's matrix. */
+		/** Returns the inverse of this basis's matrix (https://en.wikipedia.org/wiki/Invertible_matrix). */
 		public native function inverse():Basis;
 		/** Returns the transposed version of this basis. This turns the basis matrix's columns into rows, and its rows into columns.
 		 *
@@ -1502,7 +1596,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-orthonormalized
 		 */
 		public native function orthonormalized():Basis;
-		/** Returns the determinant of this basis's matrix. For advanced math, this number can be used to determine a few attributes:
+		/** Returns the determinant (https://en.wikipedia.org/wiki/Determinant) of this basis's matrix. For advanced math, this number can be used to determine a few attributes:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-determinant
 		 */
@@ -1527,7 +1621,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-get-scale
 		 */
 		public native function getScale():Vector3;
-		/** Returns this basis's rotation as a Vector3 of Euler angles, in radians. For the returned value:
+		/** Returns this basis's rotation as a Vector3 of Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians. For the returned value:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-get-euler
 		 */
@@ -1575,7 +1669,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-from-scale
 		 */
 		public static native function fromScale(scale:Vector3):Basis;
-		/** Constructs a new Basis that only represents rotation from the given Vector3 of Euler angles, in radians.
+		/** Constructs a new Basis that only represents rotation from the given Vector3 of Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_basis.html#class-basis-method-from-euler
 		 */
@@ -1616,12 +1710,20 @@ package godot {
 		public var basis:Basis;
 		/** The translation offset of this transform. In 3D space, this can be seen as the position. */
 		public var origin:Vector3;
-		/** A 3×4 matrix representing a 3D transformation.
+		/** Transform3D() — Constructs a Transform3D identical to IDENTITY.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_transform3d.html
+		 * Transform3D(from:Transform3D) — Constructs a Transform3D as a copy of the given Transform3D.
+		 *
+		 * Transform3D(basis:Basis, origin:Vector3) — Constructs a Transform3D from a Basis and Vector3.
+		 *
+		 * Transform3D(xAxis:Vector3, yAxis:Vector3, zAxis:Vector3, origin:Vector3) — Constructs a Transform3D from four Vector3 values (also called matrix columns).
+		 *
+		 * Transform3D(from:Projection) — Constructs a Transform3D from a Projection. Because Transform3D is a 3×4 matrix and Projection is a 4×4 matrix, this operation trims the last row of the projection matrix (from.x.w, from.y.w, from.z.w, and from.w.w are not included in the new transform).
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_transform3d.html#class-transform3d-constructor-transform3d
 		 */
 		public native function Transform3D(xAxis:* = null, yAxis:Vector3 = null, zAxis:Vector3 = null, origin:Vector3 = null);
-		/** Returns the inverted version of this transform. See also Basis.inverse.
+		/** Returns the inverted version of this transform (https://en.wikipedia.org/wiki/Invertible_matrix). See also Basis.inverse.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_transform3d.html#class-transform3d-method-inverse
 		 */
@@ -1716,9 +1818,15 @@ package godot {
 		public var z:Vector4;
 		/** The projection matrix's W vector (column 3). Equivalent to array index 3. */
 		public var w:Vector4;
-		/** A 4×4 matrix for 3D projective transformations.
+		/** Projection() — Constructs a default-initialized Projection identical to IDENTITY.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_projection.html
+		 * Projection(from:Projection) — Constructs a Projection as a copy of the given Projection.
+		 *
+		 * Projection(from:Transform3D) — Constructs a Projection as a copy of the given Transform3D.
+		 *
+		 * Projection(xAxis:Vector4, yAxis:Vector4, zAxis:Vector4, wAxis:Vector4) — Constructs a Projection from four Vector4 values (matrix columns).
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_projection.html#class-projection-constructor-projection
 		 */
 		public native function Projection(xAxis:* = null, yAxis:Vector4 = null, zAxis:Vector4 = null, wAxis:Vector4 = null);
 		/** Creates a new Projection that projects positions from a depth range of -1 to 1 to one that ranges from 0 to 1, and flips the projected positions vertically, according to flipY. */
@@ -2150,9 +2258,21 @@ package godot {
 		public var okHSLS:Number;
 		/** The OKHSL lightness of this color, on the range 0 to 1. */
 		public var okHSLL:Number;
-		/** A color represented in RGBA format.
+		/** Color() — Constructs a default Color from opaque black. This is the same as BLACK.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_color.html
+		 * Color(from:Color) — Constructs a Color as a copy of the given Color.
+		 *
+		 * Color(from:Color, alpha:Number) — Constructs a Color from the existing color, with a set to the given alpha value.
+		 *
+		 * Color(r:Number, g:Number, b:Number) — Constructs a Color from RGB values, typically between 0.0 and 1.0. a is set to 1.0.
+		 *
+		 * Color(r:Number, g:Number, b:Number, a:Number) — Constructs a Color from RGBA values, typically between 0.0 and 1.0.
+		 *
+		 * Color(code:String) — Constructs a Color either from an HTML color code or from a standardized color name. The supported color names are the same as the constants.
+		 *
+		 * Color(code:String, alpha:Number) — Constructs a Color either from an HTML color code or from a standardized color name, with alpha on the range of 0.0 to 1.0. The supported color names are the same as the constants.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-constructor-color
 		 */
 		public native function Color(r:* = null, g:Number = 0, b:Number = 0, a:Number = 0);
 		/** Returns the color converted to a 32-bit integer in ARGB format (each component is 8 bits). ARGB is more compatible with DirectX.
@@ -2222,12 +2342,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-get-luminance
 		 */
 		public native function getLuminance():Number;
-		/** Returns a copy of the color that uses linear encoding. This method requires the original color to be encoded using the nonlinear sRGB transfer function. See also linearToSrgb which performs the opposite operation.
+		/** Returns a copy of the color that uses linear encoding. This method requires the original color to be encoded using the nonlinear sRGB transfer function (https://en.wikipedia.org/wiki/SRGB). See also linearToSrgb which performs the opposite operation.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-srgb-to-linear
 		 */
 		public native function srgbToLinear():Color;
-		/** Returns a copy of the color that is encoded using the nonlinear sRGB transfer function. This method requires the original color to use linear encoding. See also srgbToLinear which performs the opposite operation.
+		/** Returns a copy of the color that is encoded using the nonlinear sRGB transfer function (https://en.wikipedia.org/wiki/SRGB). This method requires the original color to use linear encoding. See also srgbToLinear which performs the opposite operation.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-linear-to-srgb
 		 */
@@ -2259,12 +2379,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-from-string
 		 */
 		public static native function fromString(str:String, default_:Color):Color;
-		/** Constructs a color from an HSV profile. The hue (h), saturation (s), and value (v) are typically between 0.0 and 1.0.
+		/** Constructs a color from an HSV profile (https://en.wikipedia.org/wiki/HSL_and_HSV). The hue (h), saturation (s), and value (v) are typically between 0.0 and 1.0.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-from-hsv
 		 */
 		public static native function fromHSV(h:Number, s:Number, v:Number, alpha:Number = 1.0):Color;
-		/** Constructs a color from an OK HSL profile. The hue (h), saturation (s), and lightness (l) are typically between 0.0 and 1.0.
+		/** Constructs a color from an OK HSL profile (https://bottosson.github.io/posts/colorpicker/). The hue (h), saturation (s), and lightness (l) are typically between 0.0 and 1.0.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_color.html#class-color-method-from-ok-hsl
 		 */
@@ -2289,9 +2409,11 @@ package godot {
 	[Constructor(args="")]
 	[Constructor(args="RID")]
 	public final native class RID {
-		/** A handle for a Resource's unique identifier.
+		/** RID() — Constructs an empty RID with the invalid ID 0.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_rid.html
+		 * RID(from:RID) — Constructs an RID as a copy of the given RID.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_rid.html#class-rid-constructor-rid
 		 */
 		public native function RID(from:RID = null);
 		/** Returns true if the RID is not 0. */
@@ -2308,9 +2430,13 @@ package godot {
 	[Constructor(args="Signal")]
 	[Constructor(args="GodotObject,String")]
 	public final native class Signal {
-		/** A built-in type representing a signal of a GodotObject.
+		/** Signal() — Constructs an empty Signal with no object nor signal name bound.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_signal.html
+		 * Signal(from:Signal) — Constructs a Signal as a copy of the given Signal.
+		 *
+		 * Signal(object:GodotObject, signal:String) — Creates a Signal object referencing a signal named signal in the specified object.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_signal.html#class-signal-constructor-signal
 		 */
 		public native function Signal(object:* = null, signal:String = null);
 		/** Returns true if this Signal has no object and the signal name is empty. Equivalent to signal == Signal(). */
@@ -2346,9 +2472,13 @@ package godot {
 	[Constructor(args="GodotDictionary")]
 	[Constructor(args="GodotDictionary,Int64,String,*,Int64,String,*")]
 	public final native class GodotDictionary {
-		/** A built-in data structure that holds key-value pairs.
+		/** GodotDictionary() — Constructs an empty GodotDictionary.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_dictionary.html
+		 * GodotDictionary(from:GodotDictionary) — Returns the same dictionary as from. If you need a copy of the dictionary, use duplicate.
+		 *
+		 * GodotDictionary(base:GodotDictionary, keyType:Int64, keyClassName:String, keyScript:*, valueType:Int64, valueClassName:String, valueScript:*) — Creates a typed dictionary from the base dictionary. A typed dictionary can only contain keys and values of the given types, or that inherit from the given classes, as described by this constructor's parameters.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_dictionary.html#class-dictionary-constructor-dictionary
 		 */
 		public native function GodotDictionary(base:GodotDictionary = null, keyType:Int64 = 0, keyClassName:String = null, keyScript:* = null, valueType:Int64 = 0, valueClassName:String = null, valueScript:* = null);
 		/** Returns the number of entries in the dictionary. Empty dictionaries ({ }) always return 0. See also isEmpty. */
@@ -2434,13 +2564,13 @@ package godot {
 		public native function isSameTypedKey(dictionary:GodotDictionary):Boolean;
 		/** Returns true if the dictionary's values are typed the same as dictionary's values. */
 		public native function isSameTypedValue(dictionary:GodotDictionary):Boolean;
-		/** Returns the built-in * type of the typed dictionary's keys as a VariantType constant. If the keys are not typed, returns TYPE_NIL. See also isTypedKey. */
+		/** Returns the built-in * type of the typed dictionary's keys as a VariantType constant. If the keys are not typed, returns VariantType.NIL. See also isTypedKey. */
 		public native function getTypedKeyBuiltin():Int64;
-		/** Returns the built-in * type of the typed dictionary's values as a VariantType constant. If the values are not typed, returns TYPE_NIL. See also isTypedValue. */
+		/** Returns the built-in * type of the typed dictionary's values as a VariantType constant. If the values are not typed, returns VariantType.NIL. See also isTypedValue. */
 		public native function getTypedValueBuiltin():Int64;
-		/** Returns the built-in class name of the typed dictionary's keys, if the built-in * type is TYPE_OBJECT. Otherwise, returns an empty String. See also isTypedKey and GodotObject.getClass. */
+		/** Returns the built-in class name of the typed dictionary's keys, if the built-in * type is VariantType.OBJECT. Otherwise, returns an empty String. See also isTypedKey and GodotObject.getClass. */
 		public native function getTypedKeyClassName():String;
-		/** Returns the built-in class name of the typed dictionary's values, if the built-in * type is TYPE_OBJECT. Otherwise, returns an empty String. See also isTypedValue and GodotObject.getClass. */
+		/** Returns the built-in class name of the typed dictionary's values, if the built-in * type is VariantType.OBJECT. Otherwise, returns an empty String. See also isTypedValue and GodotObject.getClass. */
 		public native function getTypedValueClassName():String;
 		/** Returns the Script instance associated with this typed dictionary's keys, or null if it does not exist. See also isTypedKey. */
 		public native function getTypedKeyScript():*;
@@ -2478,9 +2608,33 @@ package godot {
 	[Constructor(args="PackedColorArray")]
 	[Constructor(args="PackedVector4Array")]
 	public final native class GodotArray {
-		/** A built-in data structure that holds a sequence of elements.
+		/** GodotArray() — Constructs an empty GodotArray.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_array.html
+		 * GodotArray(from:GodotArray) — Returns the same array as from. If you need a copy of the array, use duplicate.
+		 *
+		 * GodotArray(base:GodotArray, type:Int64, className:String, script:*) — Creates a typed array from the base array. A typed array can only contain elements of the given type, or that inherit from the given class, as described by this constructor's parameters:
+		 *
+		 * GodotArray(from:PackedByteArray) — Constructs an array from a PackedByteArray.
+		 *
+		 * GodotArray(from:PackedInt32Array) — Constructs an array from a PackedInt32Array.
+		 *
+		 * GodotArray(from:PackedInt64Array) — Constructs an array from a PackedInt64Array.
+		 *
+		 * GodotArray(from:PackedFloat32Array) — Constructs an array from a PackedFloat32Array.
+		 *
+		 * GodotArray(from:PackedFloat64Array) — Constructs an array from a PackedFloat64Array.
+		 *
+		 * GodotArray(from:PackedStringArray) — Constructs an array from a PackedStringArray.
+		 *
+		 * GodotArray(from:PackedVector2Array) — Constructs an array from a PackedVector2Array.
+		 *
+		 * GodotArray(from:PackedVector3Array) — Constructs an array from a PackedVector3Array.
+		 *
+		 * GodotArray(from:PackedColorArray) — Constructs an array from a PackedColorArray.
+		 *
+		 * GodotArray(from:PackedVector4Array) — Constructs an array from a PackedVector4Array.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_array.html#class-array-constructor-array
 		 */
 		public native function GodotArray(base:* = null, type:Int64 = 0, className:String = null, script:* = null);
 		/** Returns the number of elements in the array. Empty arrays ([]) always return 0. See also isEmpty. */
@@ -2608,12 +2762,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_array.html#class-array-method-shuffle
 		 */
 		public native function shuffle():void;
-		/** Returns the index of value in the sorted array. If it cannot be found, returns where value should be inserted to keep the array sorted. The algorithm used is binary search.
+		/** Returns the index of value in the sorted array. If it cannot be found, returns where value should be inserted to keep the array sorted. The algorithm used is binary search (https://en.wikipedia.org/wiki/Binary_search_algorithm).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_array.html#class-array-method-bsearch
 		 */
 		public native function bsearch(value:*, before:Boolean = true):Int64;
-		/** Returns the index of value in the sorted array. If it cannot be found, returns where value should be inserted to keep the array sorted (using func for the comparisons). The algorithm used is binary search.
+		/** Returns the index of value in the sorted array. If it cannot be found, returns where value should be inserted to keep the array sorted (using func for the comparisons). The algorithm used is binary search (https://en.wikipedia.org/wiki/Binary_search_algorithm).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_array.html#class-array-method-bsearch-custom
 		 */
@@ -2674,9 +2828,9 @@ package godot {
 		public native function isTyped():Boolean;
 		/** Returns true if this array is typed the same as the given array. See also isTyped. */
 		public native function isSameTyped(array:GodotArray):Boolean;
-		/** Returns the built-in * type of the typed array as a VariantType constant. If the array is not typed, returns TYPE_NIL. See also isTyped. */
+		/** Returns the built-in * type of the typed array as a VariantType constant. If the array is not typed, returns VariantType.NIL. See also isTyped. */
 		public native function getTypedBuiltin():Int64;
-		/** Returns the built-in class name of the typed array, if the built-in * type TYPE_OBJECT. Otherwise, returns an empty String. See also isTyped and GodotObject.getClass. */
+		/** Returns the built-in class name of the typed array, if the built-in * type VariantType.OBJECT. Otherwise, returns an empty String. See also isTyped and GodotObject.getClass. */
 		public native function getTypedClassName():String;
 		/** Returns the Script instance associated with this typed array, or null if it does not exist. See also isTyped. */
 		public native function getTypedScript():*;
@@ -2702,9 +2856,13 @@ package godot {
 	[Constructor(args="PackedByteArray")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedByteArray {
-		/** A packed array of bytes.
+		/** PackedByteArray() — Constructs an empty PackedByteArray.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedbytearray.html
+		 * PackedByteArray(from:PackedByteArray) — Constructs a PackedByteArray as a copy of the given PackedByteArray.
+		 *
+		 * PackedByteArray(from:GodotArray) — Constructs a new PackedByteArray. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedbytearray.html#class-packedbytearray-constructor-packedbytearray
 		 */
 		public native function PackedByteArray(from:* = null);
 		/** Returns the byte at the given index in the array. If index is out-of-bounds or negative, this method fails and returns 0.
@@ -2905,9 +3063,13 @@ package godot {
 	[Constructor(args="PackedInt32Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedInt32Array {
-		/** A packed array of 32-bit integers.
+		/** PackedInt32Array() — Constructs an empty PackedInt32Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedint32array.html
+		 * PackedInt32Array(from:PackedInt32Array) — Constructs a PackedInt32Array as a copy of the given PackedInt32Array.
+		 *
+		 * PackedInt32Array(from:GodotArray) — Constructs a new PackedInt32Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedint32array.html#class-packedint32array-constructor-packedint32array
 		 */
 		public native function PackedInt32Array(from:* = null);
 		/** Returns the 32-bit integer at the given index in the array. If index is out-of-bounds or negative, this method fails and returns 0.
@@ -2983,9 +3145,13 @@ package godot {
 	[Constructor(args="PackedInt64Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedInt64Array {
-		/** A packed array of 64-bit integers.
+		/** PackedInt64Array() — Constructs an empty PackedInt64Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedint64array.html
+		 * PackedInt64Array(from:PackedInt64Array) — Constructs a PackedInt64Array as a copy of the given PackedInt64Array.
+		 *
+		 * PackedInt64Array(from:GodotArray) — Constructs a new PackedInt64Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedint64array.html#class-packedint64array-constructor-packedint64array
 		 */
 		public native function PackedInt64Array(from:* = null);
 		/** Returns the 64-bit integer at the given index in the array. If index is out-of-bounds or negative, this method fails and returns 0.
@@ -3061,9 +3227,13 @@ package godot {
 	[Constructor(args="PackedFloat32Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedFloat32Array {
-		/** A packed array of 32-bit floating-point values.
+		/** PackedFloat32Array() — Constructs an empty PackedFloat32Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedfloat32array.html
+		 * PackedFloat32Array(from:PackedFloat32Array) — Constructs a PackedFloat32Array as a copy of the given PackedFloat32Array.
+		 *
+		 * PackedFloat32Array(from:GodotArray) — Constructs a new PackedFloat32Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedfloat32array.html#class-packedfloat32array-constructor-packedfloat32array
 		 */
 		public native function PackedFloat32Array(from:* = null);
 		/** Returns the 32-bit float at the given index in the array. If index is out-of-bounds or negative, this method fails and returns 0.0.
@@ -3157,9 +3327,13 @@ package godot {
 	[Constructor(args="PackedFloat64Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedFloat64Array {
-		/** A packed array of 64-bit floating-point values.
+		/** PackedFloat64Array() — Constructs an empty PackedFloat64Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedfloat64array.html
+		 * PackedFloat64Array(from:PackedFloat64Array) — Constructs a PackedFloat64Array as a copy of the given PackedFloat64Array.
+		 *
+		 * PackedFloat64Array(from:GodotArray) — Constructs a new PackedFloat64Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedfloat64array.html#class-packedfloat64array-constructor-packedfloat64array
 		 */
 		public native function PackedFloat64Array(from:* = null);
 		/** Returns the 64-bit float at the given index in the array. If index is out-of-bounds or negative, this method fails and returns 0.0.
@@ -3253,9 +3427,13 @@ package godot {
 	[Constructor(args="PackedStringArray")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedStringArray {
-		/** A packed array of Strings.
+		/** PackedStringArray() — Constructs an empty PackedStringArray.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedstringarray.html
+		 * PackedStringArray(from:PackedStringArray) — Constructs a PackedStringArray as a copy of the given PackedStringArray.
+		 *
+		 * PackedStringArray(from:GodotArray) — Constructs a new PackedStringArray. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedstringarray.html#class-packedstringarray-constructor-packedstringarray
 		 */
 		public native function PackedStringArray(from:* = null);
 		/** Returns the String at the given index in the array. If index is out-of-bounds or negative, this method fails and returns an empty string.
@@ -3329,9 +3507,13 @@ package godot {
 	[Constructor(args="PackedVector2Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedVector2Array {
-		/** A packed array of Vector2s.
+		/** PackedVector2Array() — Constructs an empty PackedVector2Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector2array.html
+		 * PackedVector2Array(from:PackedVector2Array) — Constructs a PackedVector2Array as a copy of the given PackedVector2Array.
+		 *
+		 * PackedVector2Array(from:GodotArray) — Constructs a new PackedVector2Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector2array.html#class-packedvector2array-constructor-packedvector2array
 		 */
 		public native function PackedVector2Array(from:* = null);
 		/** Returns the Vector2 at the given index in the array. If index is out-of-bounds or negative, this method fails and returns Vector2(0, 0).
@@ -3423,9 +3605,13 @@ package godot {
 	[Constructor(args="PackedVector3Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedVector3Array {
-		/** A packed array of Vector3s.
+		/** PackedVector3Array() — Constructs an empty PackedVector3Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector3array.html
+		 * PackedVector3Array(from:PackedVector3Array) — Constructs a PackedVector3Array as a copy of the given PackedVector3Array.
+		 *
+		 * PackedVector3Array(from:GodotArray) — Constructs a new PackedVector3Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector3array.html#class-packedvector3array-constructor-packedvector3array
 		 */
 		public native function PackedVector3Array(from:* = null);
 		/** Returns the Vector3 at the given index in the array. If index is out-of-bounds or negative, this method fails and returns Vector3(0, 0, 0).
@@ -3516,9 +3702,13 @@ package godot {
 	[Constructor(args="PackedColorArray")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedColorArray {
-		/** A packed array of Colors.
+		/** PackedColorArray() — Constructs an empty PackedColorArray.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedcolorarray.html
+		 * PackedColorArray(from:PackedColorArray) — Constructs a PackedColorArray as a copy of the given PackedColorArray.
+		 *
+		 * PackedColorArray(from:GodotArray) — Constructs a new PackedColorArray. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedcolorarray.html#class-packedcolorarray-constructor-packedcolorarray
 		 */
 		public native function PackedColorArray(from:* = null);
 		/** Returns the Color at the given index in the array. If index is out-of-bounds or negative, this method fails and returns Color(0, 0, 0, 1).
@@ -3591,9 +3781,13 @@ package godot {
 	[Constructor(args="PackedVector4Array")]
 	[Constructor(args="GodotArray")]
 	public final native class PackedVector4Array {
-		/** A packed array of Vector4s.
+		/** PackedVector4Array() — Constructs an empty PackedVector4Array.
 		 *
-		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector4array.html
+		 * PackedVector4Array(from:PackedVector4Array) — Constructs a PackedVector4Array as a copy of the given PackedVector4Array.
+		 *
+		 * PackedVector4Array(from:GodotArray) — Constructs a new PackedVector4Array. Optionally, you can pass in a generic GodotArray that will be converted.
+		 *
+		 * https://docs.godotengine.org/en/4.7/classes/class_packedvector4array.html#class-packedvector4array-constructor-packedvector4array
 		 */
 		public native function PackedVector4Array(from:* = null);
 		/** Returns the Vector4 at the given index in the array. If index is out-of-bounds or negative, this method fails and returns Vector4(0, 0, 0, 0).
@@ -4195,12 +4389,12 @@ package godot {
 	[GodotEnum(name="DiagonalMode", values="DIAGONAL_MODE_ALWAYS,DIAGONAL_MODE_NEVER,DIAGONAL_MODE_AT_LEAST_ONE_WALKABLE,DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES,DIAGONAL_MODE_MAX")]
 	[GodotEnum(name="CellShape", values="CELL_SHAPE_SQUARE,CELL_SHAPE_ISOMETRIC_RIGHT,CELL_SHAPE_ISOMETRIC_DOWN,CELL_SHAPE_MAX")]
 	public native class AStarGrid2D extends RefCounted {
-		/** The Euclidean heuristic to be used for the pathfinding using the following formula:
+		/** The Euclidean heuristic (https://en.wikipedia.org/wiki/Euclidean_distance) to be used for the pathfinding using the following formula:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_astargrid2d.html#class-astargrid2d-constant-heuristic-euclidean
 		 */
 		public static const HEURISTIC_EUCLIDEAN:int = 0;
-		/** The Manhattan heuristic to be used for the pathfinding using the following formula:
+		/** The Manhattan heuristic (https://en.wikipedia.org/wiki/Taxicab_geometry) to be used for the pathfinding using the following formula:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_astargrid2d.html#class-astargrid2d-constant-heuristic-manhattan
 		 */
@@ -4210,7 +4404,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_astargrid2d.html#class-astargrid2d-constant-heuristic-octile
 		 */
 		public static const HEURISTIC_OCTILE:int = 2;
-		/** The Chebyshev heuristic to be used for the pathfinding using the following formula:
+		/** The Chebyshev heuristic (https://en.wikipedia.org/wiki/Chebyshev_distance) to be used for the pathfinding using the following formula:
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_astargrid2d.html#class-astargrid2d-constant-heuristic-chebyshev
 		 */
@@ -4636,7 +4830,7 @@ package godot {
 		public final native function get processThreadMessages():int;
 		[Godot(value="bitfield:Node.ProcessThreadMessages")]
 		public final native function set processThreadMessages(value:int):void;
-		/** The physics interpolation mode to use for this node. Only effective if ProjectSettings.physics/common/physicsInterpolation or SceneTree.physicsInterpolation is true.
+		/** The physics interpolation mode to use for this node. Only effective if "physics/common/physics_interpolation" or SceneTree.physicsInterpolation is true.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_node.html#class-node-property-physics-interpolation-mode
 		 */
@@ -5149,12 +5343,12 @@ package godot {
 		public static const SCALING_3D_MODE_FSR:int = 1;
 		/** Use AMD FidelityFX Super Resolution 2.2 upscaling for the viewport's 3D buffer. The amount of scaling can be set using Viewport.scaling3DScale. Values less than 1.0 will result in the viewport being upscaled using FSR2. Values greater than 1.0 are not supported and bilinear downsampling will be used instead. A value of 1.0 will use FSR2 at native resolution as a TAA solution. */
 		public static const SCALING_3D_MODE_FSR2:int = 2;
-		/** Use the MetalFX spatial upscaler for the viewport's 3D buffer.
+		/** Use the MetalFX spatial upscaler (https://developer.apple.com/documentation/metalfx/mtlfxspatialscaler#overview) for the viewport's 3D buffer.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-constant-scaling-3d-mode-metalfx-spatial
 		 */
 		public static const SCALING_3D_MODE_METALFX_SPATIAL:int = 3;
-		/** Use the MetalFX temporal upscaler for the viewport's 3D buffer.
+		/** Use the MetalFX temporal upscaler (https://developer.apple.com/documentation/metalfx/mtlfxtemporalscaler#overview) for the viewport's 3D buffer.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-constant-scaling-3d-mode-metalfx-temporal
 		 */
@@ -5346,12 +5540,12 @@ package godot {
 		public static const DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST:int = 0;
 		/** The texture filter blends between the nearest 4 pixels. This makes the texture look smooth from up close, and grainy from a distance (due to mipmaps not being sampled). */
 		public static const DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR:int = 1;
-		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look smooth from up close, and smooth from a distance.
+		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look smooth from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-constant-default-canvas-item-texture-filter-linear-with-mipmaps
 		 */
 		public static const DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS:int = 2;
-		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look pixelated from up close, and smooth from a distance.
+		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look pixelated from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-constant-default-canvas-item-texture-filter-nearest-with-mipmaps
 		 */
@@ -5473,7 +5667,7 @@ package godot {
 		 */
 		public final native function get useDebanding():Boolean;
 		public final native function set useDebanding(value:Boolean):void;
-		/** If true, OccluderInstance3D nodes will be usable for occlusion culling in 3D for this viewport. For the root viewport, ProjectSettings.rendering/occlusionCulling/useOcclusionCulling must be set to true instead.
+		/** If true, OccluderInstance3D nodes will be usable for occlusion culling in 3D for this viewport. For the root viewport, "rendering/occlusion_culling/use_occlusion_culling" must be set to true instead.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-property-use-occlusion-culling
 		 */
@@ -5504,7 +5698,7 @@ package godot {
 		public final native function get scaling3DMode():int;
 		[Godot(value="enum:Viewport.Scaling3DMode")]
 		public final native function set scaling3DMode(value:int):void;
-		/** Scales the 3D render buffer based on the viewport size uses an image filter specified in ProjectSettings.rendering/scaling3d/mode to scale the output image to the full viewport size. Values lower than 1.0 can be used to speed up 3D rendering at the cost of quality (undersampling). Values greater than 1.0 are only valid for bilinear mode and can be used to improve 3D rendering quality at a high performance cost (supersampling). See also ProjectSettings.rendering/antiAliasing/quality/msaa3D for multi-sample antialiasing, which is significantly cheaper but only smooths the edges of polygons.
+		/** Scales the 3D render buffer based on the viewport size uses an image filter specified in "rendering/scaling_3d/mode" to scale the output image to the full viewport size. Values lower than 1.0 can be used to speed up 3D rendering at the cost of quality (undersampling). Values greater than 1.0 are only valid for bilinear mode and can be used to improve 3D rendering quality at a high performance cost (supersampling). See also "rendering/anti_aliasing/quality/msaa_3d" for multi-sample antialiasing, which is significantly cheaper but only smooths the edges of polygons.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_viewport.html#class-viewport-property-scaling-3d-scale
 		 */
@@ -6073,7 +6267,7 @@ package godot {
 		/** If true, the Window width is expanded to keep the title bar text fully visible. */
 		public final native function get keepTitleVisible():Boolean;
 		public final native function set keepTitleVisible(value:Boolean):void;
-		/** The content's base size in "virtual" pixels. Not to be confused with size, which sets the actual window's physical size in pixels. If set to a value greater than 0 and contentScaleMode is set to a value other than CONTENT_SCALE_MODE_DISABLED, the Window's content will be scaled when the window is resized to a different size. Higher values will make the content appear smaller, as it will be able to fit more of the project in view. On the root Window, this is set to match ProjectSettings.display/window/size/viewportWidth and ProjectSettings.display/window/size/viewportHeight by default.
+		/** The content's base size in "virtual" pixels. Not to be confused with size, which sets the actual window's physical size in pixels. If set to a value greater than 0 and contentScaleMode is set to a value other than CONTENT_SCALE_MODE_DISABLED, the Window's content will be scaled when the window is resized to a different size. Higher values will make the content appear smaller, as it will be able to fit more of the project in view. On the root Window, this is set to match "display/window/size/viewport_width" and "display/window/size/viewport_height" by default.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_window.html#class-window-property-content-scale-size
 		 */
@@ -6904,9 +7098,9 @@ package godot {
 	 */
 	[GodotEnum(name="RotationEditMode", values="ROTATION_EDIT_MODE_EULER,ROTATION_EDIT_MODE_QUATERNION,ROTATION_EDIT_MODE_BASIS")]
 	public native class Node3D extends Node {
-		/** The rotation is edited using a Vector3 in Euler angles. In Godot, Euler angles always use intrinsic order, meaning that rotation happens around the local axes of the object. */
+		/** The rotation is edited using a Vector3 in Euler angles (https://en.wikipedia.org/wiki/Euler_angles). In Godot, Euler angles always use intrinsic order, meaning that rotation happens around the local axes of the object. */
 		public static const ROTATION_EDIT_MODE_EULER:int = 0;
-		/** The rotation is edited using a Quaternion. Quaternions avoid gimbal lock and having to choose an order of rotation, but are less intuitive. Quaternion rotation is mostly the same as rotors in 3D geometric algebra, except that the numbers are labeled differently. */
+		/** The rotation is edited using a Quaternion. Quaternions avoid gimbal lock (https://docs.godotengine.org/en/4.7/tutorials/3d/using_transforms.html) and having to choose an order of rotation, but are less intuitive. Quaternion rotation is mostly the same as rotors in 3D geometric algebra, except that the numbers are labeled differently. */
 		public static const ROTATION_EDIT_MODE_QUATERNION:int = 1;
 		/** The rotation is edited using a Basis. In this mode, the raw basis's axes can be freely modified, but the scale property is not available. */
 		public static const ROTATION_EDIT_MODE_BASIS:int = 2;
@@ -6949,7 +7143,7 @@ package godot {
 		/** Position (translation) of this node in parent space (relative to the parent node). This is equivalent to the transform's Transform3D.origin. */
 		public final native function get position():Vector3;
 		public final native function set position(value:Vector3):void;
-		/** Rotation of this node as Euler angles, in radians and in parent space (relative to the parent node). This value is obtained from basis's rotation.
+		/** Rotation of this node as Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians and in parent space (relative to the parent node). This value is obtained from basis's rotation.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_node3d.html#class-node3d-property-rotation
 		 */
@@ -7001,7 +7195,7 @@ package godot {
 		 */
 		public final native function get globalBasis():Basis;
 		public final native function set globalBasis(value:Basis):void;
-		/** Global rotation of this node as Euler angles, in radians and in global space (relative to the world). This value is obtained from globalBasis's rotation.
+		/** Global rotation of this node as Euler angles (https://en.wikipedia.org/wiki/Euler_angles), in radians and in global space (relative to the world). This value is obtained from globalBasis's rotation.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_node3d.html#class-node3d-property-global-rotation
 		 */
@@ -7378,22 +7572,22 @@ package godot {
 		public static const TEXTURE_FILTER_NEAREST:int = 1;
 		/** The texture filter blends between the nearest 4 pixels. This makes the texture look smooth from up close, and grainy from a distance (due to mipmaps not being sampled). */
 		public static const TEXTURE_FILTER_LINEAR:int = 2;
-		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look pixelated from up close, and smooth from a distance.
+		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look pixelated from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-constant-texture-filter-nearest-with-mipmaps
 		 */
 		public static const TEXTURE_FILTER_NEAREST_WITH_MIPMAPS:int = 3;
-		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look smooth from up close, and smooth from a distance.
+		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look smooth from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-constant-texture-filter-linear-with-mipmaps
 		 */
 		public static const TEXTURE_FILTER_LINEAR_WITH_MIPMAPS:int = 4;
-		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-constant-texture-filter-nearest-with-mipmaps-anisotropic
 		 */
 		public static const TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC:int = 5;
-		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-constant-texture-filter-linear-with-mipmaps-anisotropic
 		 */
@@ -7742,7 +7936,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-method-get-world-2d
 		 */
 		public final native function getWorld2D():World2D;
-		/** Set the value of a shader uniform for this instance only (per-instance uniform). See also ShaderMaterial.setShaderParameter to assign a uniform on all instances using the same ShaderMaterial.
+		/** Set the value of a shader uniform for this instance only (per-instance uniform (https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/shading_language.html#per-instance-uniforms)). See also ShaderMaterial.setShaderParameter to assign a uniform on all instances using the same ShaderMaterial.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_canvasitem.html#class-canvasitem-method-set-instance-shader-parameter
 		 */
@@ -8515,7 +8709,7 @@ package godot {
 		public final native function get visibilityRangeFadeMode():int;
 		[Godot(value="enum:GeometryInstance3D.VisibilityRangeFadeMode")]
 		public final native function set visibilityRangeFadeMode(value:int):void;
-		/** Set the value of a shader uniform for this instance only (per-instance uniform). See also ShaderMaterial.setShaderParameter to assign a uniform on all instances using the same ShaderMaterial.
+		/** Set the value of a shader uniform for this instance only (per-instance uniform (https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/shading_language.html#per-instance-uniforms)). See also ShaderMaterial.setShaderParameter to assign a uniform on all instances using the same ShaderMaterial.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_geometryinstance3d.html#class-geometryinstance3d-method-set-instance-shader-parameter
 		 */
@@ -8545,7 +8739,7 @@ package godot {
 		public static const FLAG_MAX:int = 5;
 		/** This mode performs standard alpha blending. It can display translucent areas, but transparency sorting issues may be visible when multiple transparent materials are overlapping. */
 		public static const ALPHA_CUT_DISABLED:int = 0;
-		/** This mode only allows fully transparent or fully opaque pixels. Harsh edges will be visible unless some form of screen-space antialiasing is enabled (see ProjectSettings.rendering/antiAliasing/quality/screenSpaceAa). On the bright side, this mode doesn't suffer from transparency sorting issues when multiple transparent materials are overlapping. This mode is also known as alpha testing or 1-bit transparency. */
+		/** This mode only allows fully transparent or fully opaque pixels. Harsh edges will be visible unless some form of screen-space antialiasing is enabled (see "rendering/anti_aliasing/quality/screen_space_aa"). On the bright side, this mode doesn't suffer from transparency sorting issues when multiple transparent materials are overlapping. This mode is also known as alpha testing or 1-bit transparency. */
 		public static const ALPHA_CUT_DISCARD:int = 1;
 		/** This mode draws fully opaque pixels in the depth prepass. This is slower than ALPHA_CUT_DISABLED or ALPHA_CUT_DISCARD, but it allows displaying translucent areas and smooth edges while using proper sorting. */
 		public static const ALPHA_CUT_OPAQUE_PREPASS:int = 2;
@@ -8811,7 +9005,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_resource.html#class-resource-method-emit-changed
 		 */
 		public final native function emitChanged():void;
-		/** Duplicates this resource, returning a new resource with its exported or PROPERTY_USAGE_STORAGE properties copied from the original.
+		/** Duplicates this resource, returning a new resource with its exported or PropertyUsageFlags.STORAGE properties copied from the original.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_resource.html#class-resource-method-duplicate
 		 */
@@ -10175,7 +10369,7 @@ package godot {
 		public final native function get advanceMode():int;
 		[Godot(value="enum:AnimationNodeStateMachineTransition.AdvanceMode")]
 		public final native function set advanceMode(value:int):void;
-		/** Turn on auto advance when this condition is set. The provided name will become a boolean parameter on the AnimationTree that can be controlled from code (see Using AnimationTree). For example, if AnimationTree.treeRoot is an AnimationNodeStateMachine and advanceCondition is set to "idle":
+		/** Turn on auto advance when this condition is set. The provided name will become a boolean parameter on the AnimationTree that can be controlled from code (see Using AnimationTree (https://docs.godotengine.org/en/4.7/tutorials/animation/animation_tree.html#controlling-from-code)). For example, if AnimationTree.treeRoot is an AnimationNodeStateMachine and advanceCondition is set to "idle":
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_animationnodestatemachinetransition.html#class-animationnodestatemachinetransition-property-advance-condition
 		 */
@@ -10851,7 +11045,7 @@ package godot {
 		public static const PARAM_SHADOW_BLUR:int = 18;
 		/** Constant for accessing shadowTransmittanceBias. */
 		public static const PARAM_TRANSMITTANCE_BIAS:int = 19;
-		/** Constant for accessing lightIntensityLumens and lightIntensityLux. Only used when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is true. */
+		/** Constant for accessing lightIntensityLumens and lightIntensityLux. Only used when "rendering/lights_and_shadows/use_physical_light_units" is true. */
 		public static const PARAM_INTENSITY:int = 20;
 		/** Represents the size of the Param enum. */
 		public static const PARAM_MAX:int = 21;
@@ -10865,18 +11059,18 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_light3d.html#class-light3d-constant-bake-static
 		 */
 		public static const BAKE_STATIC:int = 1;
-		/** Light is taken into account in dynamic baking (VoxelGI and SDFGI (Environment.sdfgiEnabled)). The light can be moved around or modified with global illumination updating in real-time. The light's global illumination appearance will be slightly different compared to BAKE_STATIC. This has a greater performance cost compared to BAKE_STATIC. When using SDFGI, the update speed of dynamic lights is affected by ProjectSettings.rendering/globalIllumination/sdfgi/framesToUpdateLights.
+		/** Light is taken into account in dynamic baking (VoxelGI and SDFGI (Environment.sdfgiEnabled)). The light can be moved around or modified with global illumination updating in real-time. The light's global illumination appearance will be slightly different compared to BAKE_STATIC. This has a greater performance cost compared to BAKE_STATIC. When using SDFGI, the update speed of dynamic lights is affected by "rendering/global_illumination/sdfgi/frames_to_update_lights".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_light3d.html#class-light3d-constant-bake-dynamic
 		 */
 		public static const BAKE_DYNAMIC:int = 2;
-		/** Used by positional lights (OmniLight3D and SpotLight3D) when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is true. Sets the intensity of the light source measured in Lumens. Lumens are a measure of luminous flux, which is the total amount of visible light emitted by a light source per unit of time.
+		/** Used by positional lights (OmniLight3D and SpotLight3D) when "rendering/lights_and_shadows/use_physical_light_units" is true. Sets the intensity of the light source measured in Lumens. Lumens are a measure of luminous flux, which is the total amount of visible light emitted by a light source per unit of time.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_light3d.html#class-light3d-property-light-intensity-lumens
 		 */
 		public final native function get lightIntensityLumens():Number;
 		public final native function set lightIntensityLumens(value:Number):void;
-		/** Used by DirectionalLight3Ds when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is true. Sets the intensity of the light source measured in Lux. Lux is a measure of luminous flux per unit area, it is equal to one lumen per square meter. Lux is the measure of how much light hits a surface at a given time.
+		/** Used by DirectionalLight3Ds when "rendering/lights_and_shadows/use_physical_light_units" is true. Sets the intensity of the light source measured in Lux. Lux is a measure of luminous flux per unit area, it is equal to one lumen per square meter. Lux is the measure of how much light hits a surface at a given time.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_light3d.html#class-light3d-property-light-intensity-lux
 		 */
@@ -11510,13 +11704,13 @@ package godot {
 		public static const ANCHOR_END:int = 1;
 		/** Automatic layout direction, determined from the parent control layout direction. */
 		public static const LAYOUT_DIRECTION_INHERITED:int = 0;
-		/** Automatic layout direction, determined from the current locale. Right-to-left layout direction is automatically used for languages that require it such as Arabic and Hebrew, but only if a valid translation file is loaded for the given language (unless said language is configured as a fallback in ProjectSettings.internationalization/locale/fallback). For all other languages (or if no valid translation file is found by Godot), left-to-right layout direction is used. If using [TextServerFallback] (ProjectSettings.internationalization/rendering/textDriver), left-to-right layout direction is always used regardless of the language. Right-to-left layout direction can also be forced using ProjectSettings.internationalization/rendering/forceRightToLeftLayoutDirection. */
+		/** Automatic layout direction, determined from the current locale. Right-to-left layout direction is automatically used for languages that require it such as Arabic and Hebrew, but only if a valid translation file is loaded for the given language (unless said language is configured as a fallback in "internationalization/locale/fallback"). For all other languages (or if no valid translation file is found by Godot), left-to-right layout direction is used. If using [TextServerFallback] ("internationalization/rendering/text_driver"), left-to-right layout direction is always used regardless of the language. Right-to-left layout direction can also be forced using "internationalization/rendering/force_right_to_left_layout_direction". */
 		public static const LAYOUT_DIRECTION_APPLICATION_LOCALE:int = 1;
 		/** Left-to-right layout direction. */
 		public static const LAYOUT_DIRECTION_LTR:int = 2;
 		/** Right-to-left layout direction. */
 		public static const LAYOUT_DIRECTION_RTL:int = 3;
-		/** Automatic layout direction, determined from the system locale. Right-to-left layout direction is automatically used for languages that require it such as Arabic and Hebrew, but only if a valid translation file is loaded for the given language. For all other languages (or if no valid translation file is found by Godot), left-to-right layout direction is used. If using [TextServerFallback] (ProjectSettings.internationalization/rendering/textDriver), left-to-right layout direction is always used regardless of the language. */
+		/** Automatic layout direction, determined from the system locale. Right-to-left layout direction is automatically used for languages that require it such as Arabic and Hebrew, but only if a valid translation file is loaded for the given language. For all other languages (or if no valid translation file is found by Godot), left-to-right layout direction is used. If using [TextServerFallback] ("internationalization/rendering/text_driver"), left-to-right layout direction is always used regardless of the language. */
 		public static const LAYOUT_DIRECTION_SYSTEM_LOCALE:int = 4;
 		/** Represents the size of the LayoutDirection enum. */
 		public static const LAYOUT_DIRECTION_MAX:int = 5;
@@ -11759,7 +11953,7 @@ package godot {
 		/** Toggles if any text should automatically change to its translated version depending on the current locale. */
 		public final native function get autoTranslate():Boolean;
 		public final native function set autoTranslate(value:Boolean):void;
-		/** The default tooltip text. The tooltip appears when the user's mouse cursor stays idle over this control for a few moments, provided that the mouseFilter property is not MOUSE_FILTER_IGNORE. The time required for the tooltip to appear can be changed with the ProjectSettings.gui/timers/tooltipDelaySec setting.
+		/** The default tooltip text. The tooltip appears when the user's mouse cursor stays idle over this control for a few moments, provided that the mouseFilter property is not MOUSE_FILTER_IGNORE. The time required for the tooltip to appear can be changed with the "gui/timers/tooltip_delay_sec" setting.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_control.html#class-control-property-tooltip-text
 		 */
@@ -11773,25 +11967,25 @@ package godot {
 		public final native function get tooltipAutoTranslateMode():int;
 		[Godot(value="enum:Node.AutoTranslateMode")]
 		public final native function set tooltipAutoTranslateMode(value:int):void;
-		/** Tells Godot which node it should give focus to if the user presses the left arrow on the keyboard or left on a gamepad by default. You can change the key by editing the ProjectSettings.input/uiLeft input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the left of this one. */
+		/** Tells Godot which node it should give focus to if the user presses the left arrow on the keyboard or left on a gamepad by default. You can change the key by editing the "input/ui_left" input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the left of this one. */
 		public final native function get focusNeighborLeft():String;
 		public final native function set focusNeighborLeft(value:String):void;
-		/** Tells Godot which node it should give focus to if the user presses the top arrow on the keyboard or top on a gamepad by default. You can change the key by editing the ProjectSettings.input/uiUp input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the top of this one. */
+		/** Tells Godot which node it should give focus to if the user presses the top arrow on the keyboard or top on a gamepad by default. You can change the key by editing the "input/ui_up" input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the top of this one. */
 		public final native function get focusNeighborTop():String;
 		public final native function set focusNeighborTop(value:String):void;
-		/** Tells Godot which node it should give focus to if the user presses the right arrow on the keyboard or right on a gamepad by default. You can change the key by editing the ProjectSettings.input/uiRight input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the right of this one. */
+		/** Tells Godot which node it should give focus to if the user presses the right arrow on the keyboard or right on a gamepad by default. You can change the key by editing the "input/ui_right" input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the right of this one. */
 		public final native function get focusNeighborRight():String;
 		public final native function set focusNeighborRight(value:String):void;
-		/** Tells Godot which node it should give focus to if the user presses the down arrow on the keyboard or down on a gamepad by default. You can change the key by editing the ProjectSettings.input/uiDown input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the bottom of this one. */
+		/** Tells Godot which node it should give focus to if the user presses the down arrow on the keyboard or down on a gamepad by default. You can change the key by editing the "input/ui_down" input action. The node must be a Control. If this property is not set, Godot will give focus to the closest Control to the bottom of this one. */
 		public final native function get focusNeighborBottom():String;
 		public final native function set focusNeighborBottom(value:String):void;
-		/** Tells Godot which node it should give focus to if the user presses Tab on a keyboard by default. You can change the key by editing the ProjectSettings.input/uiFocusNext input action.
+		/** Tells Godot which node it should give focus to if the user presses Tab on a keyboard by default. You can change the key by editing the "input/ui_focus_next" input action.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_control.html#class-control-property-focus-next
 		 */
 		public final native function get focusNext():String;
 		public final native function set focusNext(value:String):void;
-		/** Tells Godot which node it should give focus to if the user presses Shift + Tab on a keyboard by default. You can change the key by editing the ProjectSettings.input/uiFocusPrev input action.
+		/** Tells Godot which node it should give focus to if the user presses Shift + Tab on a keyboard by default. You can change the key by editing the "input/ui_focus_prev" input action.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_control.html#class-control-property-focus-previous
 		 */
@@ -12960,7 +13154,7 @@ package godot {
 		/** The oversampling factor to use. Higher values result in better quality, but are more demanding on the CPU and may cause audio cracking if the CPU can't keep up. */
 		public final native function get oversampling():int;
 		public final native function set oversampling(value:int):void;
-		/** The size of the Fast Fourier transform buffer. Higher values smooth out the effect over time, but have greater latency. The effects of this higher latency are especially noticeable on audio signals that have sudden amplitude changes. */
+		/** The size of the Fast Fourier transform (https://en.wikipedia.org/wiki/Fast_Fourier_transform) buffer. Higher values smooth out the effect over time, but have greater latency. The effects of this higher latency are especially noticeable on audio signals that have sudden amplitude changes. */
 		[Godot(returns="enum:AudioEffectPitchShift.FFTSize")]
 		public final native function get fftSize():int;
 		[Godot(value="enum:AudioEffectPitchShift.FFTSize")]
@@ -13049,7 +13243,7 @@ package godot {
 		/** The length of the buffer to keep, in seconds. Higher values keep data around for longer, but require more memory. Value can range from 0.1 to 4. */
 		public final native function get bufferLength():Number;
 		public final native function set bufferLength(value:Number):void;
-		/** The size of the Fast Fourier transform buffer. Higher values smooth out the spectrum analysis over time, but have greater latency. The effects of this higher latency are especially noticeable with sudden amplitude changes. */
+		/** The size of the Fast Fourier transform (https://en.wikipedia.org/wiki/Fast_Fourier_transform) buffer. Higher values smooth out the spectrum analysis over time, but have greater latency. The effects of this higher latency are especially noticeable with sudden amplitude changes. */
 		[Godot(returns="enum:AudioEffectSpectrumAnalyzer.FFTSize")]
 		public final native function get fftSize():int;
 		[Godot(value="enum:AudioEffectSpectrumAnalyzer.FFTSize")]
@@ -13119,18 +13313,18 @@ package godot {
 	 */
 	[GodotEnum(name="DopplerTracking", values="DOPPLER_TRACKING_DISABLED,DOPPLER_TRACKING_IDLE_STEP,DOPPLER_TRACKING_PHYSICS_STEP")]
 	public native class AudioListener3D extends Node3D {
-		/** Disables Doppler effect simulation (default). */
+		/** Disables Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) simulation (default). */
 		public static const DOPPLER_TRACKING_DISABLED:int = 0;
-		/** Simulate Doppler effect by tracking positions of objects that are changed in _process. Changes in the relative velocity of this listener compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
+		/** Simulate Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) by tracking positions of objects that are changed in _process. Changes in the relative velocity of this listener compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
 		public static const DOPPLER_TRACKING_IDLE_STEP:int = 1;
-		/** Simulate Doppler effect by tracking positions of objects that are changed in _physics_process. Changes in the relative velocity of this listener compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
+		/** Simulate Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) by tracking positions of objects that are changed in _physics_process. Changes in the relative velocity of this listener compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
 		public static const DOPPLER_TRACKING_PHYSICS_STEP:int = 2;
 		/** Overrides the location sounds are heard from.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_audiolistener3d.html
 		 */
 		public native function AudioListener3D();
-		/** If not DOPPLER_TRACKING_DISABLED, this listener will simulate the Doppler effect for objects changed in particular _process methods.
+		/** If not DOPPLER_TRACKING_DISABLED, this listener will simulate the Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) for objects changed in particular _process methods.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_audiolistener3d.html#class-audiolistener3d-property-doppler-tracking
 		 */
@@ -13188,7 +13382,7 @@ package godot {
 		public static const SPEAKER_SURROUND_51:int = 2;
 		/** A 7.1 channel surround setup was detected. */
 		public static const SPEAKER_SURROUND_71:int = 3;
-		/** The playback will be considered of the type declared at ProjectSettings.audio/general/defaultPlaybackType. */
+		/** The playback will be considered of the type declared at "audio/general/default_playback_type". */
 		public static const PLAYBACK_TYPE_DEFAULT:int = 0;
 		/** Force the playback to be considered as a stream. */
 		public static const PLAYBACK_TYPE_STREAM:int = 1;
@@ -13303,7 +13497,7 @@ package godot {
 		public static native function getMixRate():Number;
 		/** Returns the sample rate at the input of the AudioServer. */
 		public static native function getInputMixRate():Number;
-		/** Returns the name of the current audio driver. The default usually depends on the operating system, but may be overridden via the --audio-driver command line argument. --headless also automatically sets the audio driver to Dummy. See also ProjectSettings.audio/driver/driver. */
+		/** Returns the name of the current audio driver. The default usually depends on the operating system, but may be overridden via the --audio-driver command line argument (https://docs.godotengine.org/en/4.7/tutorials/editor/command_line_tutorial.html). --headless also automatically sets the audio driver to Dummy. See also "audio/driver/driver". */
 		public static native function getDriverName():String;
 		/** Returns the names of all audio output devices detected on the system. */
 		public static native function getOutputDeviceList():PackedStringArray;
@@ -13311,7 +13505,7 @@ package godot {
 		public static native function getTimeToNextMix():Number;
 		/** Returns the relative time since the last mix occurred, in seconds. */
 		public static native function getTimeSinceLastMix():Number;
-		/** Returns the audio driver's effective output latency. This is based on ProjectSettings.audio/driver/outputLatency, but the exact returned value will differ depending on the operating system and audio driver.
+		/** Returns the audio driver's effective output latency. This is based on "audio/driver/output_latency", but the exact returned value will differ depending on the operating system and audio driver.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_audioserver.html#class-audioserver-method-get-output-latency
 		 */
@@ -13906,7 +14100,7 @@ package godot {
 		/** The maximum number of sounds this node can play at the same time. Playing additional sounds after this value is reached will cut off the oldest sounds. */
 		public final native function get maxPolyphony():int;
 		public final native function set maxPolyphony(value:int):void;
-		/** Scales the panning strength for this node by multiplying the base ProjectSettings.audio/general/2dPanningStrength with this factor. Higher values will pan audio from left to right more dramatically than lower values. */
+		/** Scales the panning strength for this node by multiplying the base "audio/general/2d_panning_strength" with this factor. Higher values will pan audio from left to right more dramatically than lower values. */
 		public final native function get panningStrength():Number;
 		public final native function set panningStrength(value:Number):void;
 		/** Bus on which this audio is playing.
@@ -14005,7 +14199,7 @@ package godot {
 		/** The maximum number of sounds this node can play at the same time. Playing additional sounds after this value is reached will cut off the oldest sounds. */
 		public final native function get maxPolyphony():int;
 		public final native function set maxPolyphony(value:int):void;
-		/** Scales the panning strength for this node by multiplying the base ProjectSettings.audio/general/3dPanningStrength by this factor. If the product is 0.0 then stereo panning is disabled and the volume is the same for all channels. If the product is 1.0 then one of the channels will be muted when the sound is located exactly to the left (or right) of the listener.
+		/** Scales the panning strength for this node by multiplying the base "audio/general/3d_panning_strength" by this factor. If the product is 0.0 then stereo panning is disabled and the volume is the same for all channels. If the product is 1.0 then one of the channels will be muted when the sound is located exactly to the left (or right) of the listener.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d-property-panning-strength
 		 */
@@ -14328,7 +14522,7 @@ package godot {
 		public static const FORMAT_16_BITS:int = 1;
 		/** Audio is lossily compressed as IMA ADPCM. */
 		public static const FORMAT_IMA_ADPCM:int = 2;
-		/** Audio is lossily compressed as Quite OK Audio. */
+		/** Audio is lossily compressed as Quite OK Audio (https://qoaformat.org/). */
 		public static const FORMAT_QOA:int = 3;
 		/** Audio does not loop. */
 		public static const LOOP_DISABLED:int = 0;
@@ -14660,13 +14854,13 @@ package godot {
 		public static const TEXTURE_FILTER_NEAREST:int = 0;
 		/** The texture filter blends between the nearest 4 pixels. This makes the texture look smooth from up close, and grainy from a distance (due to mipmaps not being sampled). */
 		public static const TEXTURE_FILTER_LINEAR:int = 1;
-		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look pixelated from up close, and smooth from a distance. */
+		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look pixelated from up close, and smooth from a distance. */
 		public static const TEXTURE_FILTER_NEAREST_WITH_MIPMAPS:int = 2;
-		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look smooth from up close, and smooth from a distance. */
+		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look smooth from up close, and smooth from a distance. */
 		public static const TEXTURE_FILTER_LINEAR_WITH_MIPMAPS:int = 3;
-		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC:int = 4;
-		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC:int = 5;
 		/** Represents the size of the TextureFilter enum. */
 		public static const TEXTURE_FILTER_MAX:int = 6;
@@ -14968,7 +15162,7 @@ package godot {
 		/** If true, the object will not be affected by fog (neither volumetric nor depth fog). This is useful for unshaded or transparent materials (e.g. particles), which without this setting will be affected even if fully transparent. */
 		public final native function get disableFog():Boolean;
 		public final native function set disableFog(value:Boolean):void;
-		/** If true, disables specular occlusion even if ProjectSettings.rendering/reflections/specularOcclusion/enabled is false. */
+		/** If true, disables specular occlusion even if "rendering/reflections/specular_occlusion/enabled" is false. */
 		public final native function get disableSpecularOcclusion():Boolean;
 		public final native function set disableSpecularOcclusion(value:Boolean):void;
 		/** If true, the vertex color is used as albedo color. */
@@ -15041,7 +15235,7 @@ package godot {
 		/** Multiplier for emitted light. See emissionEnabled. */
 		public final native function get emissionEnergyMultiplier():Number;
 		public final native function set emissionEnergyMultiplier(value:Number):void;
-		/** Luminance of emitted light, measured in nits (candela per square meter). Only available when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is enabled. The default is roughly equivalent to an indoor lightbulb. */
+		/** Luminance of emitted light, measured in nits (candela per square meter). Only available when "rendering/lights_and_shadows/use_physical_light_units" is enabled. The default is roughly equivalent to an indoor lightbulb. */
 		public final native function get emissionIntensity():Number;
 		public final native function set emissionIntensity(value:Number):void;
 		/** Sets how emission interacts with emissionTexture. Can either add or multiply. */
@@ -15183,13 +15377,13 @@ package godot {
 		 */
 		public final native function get heightmapFlipTexture():Boolean;
 		public final native function set heightmapFlipTexture(value:Boolean):void;
-		/** If true, subsurface scattering is enabled. Emulates light that penetrates an object's surface, is scattered, and then emerges. Subsurface scattering quality is controlled by ProjectSettings.rendering/environment/subsurfaceScattering/subsurfaceScatteringQuality.
+		/** If true, subsurface scattering is enabled. Emulates light that penetrates an object's surface, is scattered, and then emerges. Subsurface scattering quality is controlled by "rendering/environment/subsurface_scattering/subsurface_scattering_quality".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_basematerial3d.html#class-basematerial3d-property-subsurf-scatter-enabled
 		 */
 		public final native function get subsurfScatterEnabled():Boolean;
 		public final native function set subsurfScatterEnabled(value:Boolean):void;
-		/** The strength of the subsurface scattering effect. The depth of the effect is also controlled by ProjectSettings.rendering/environment/subsurfaceScattering/subsurfaceScatteringScale, which is set globally. */
+		/** The strength of the subsurface scattering effect. The depth of the effect is also controlled by "rendering/environment/subsurface_scattering/subsurface_scattering_scale", which is set globally. */
 		public final native function get subsurfScatterStrength():Number;
 		public final native function set subsurfScatterStrength(value:Number):void;
 		/** If true, subsurface scattering will use a special mode optimized for the color and density of human skin, such as boosting the intensity of the red channel in subsurface scattering. */
@@ -16865,7 +17059,7 @@ package godot {
 		 */
 		public final native function get collisionLayer():uint;
 		public final native function set collisionLayer(value:uint):void;
-		/** The physics layers this CSG shape scans for collisions. Only effective if useCollision is true. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers this CSG shape scans for collisions. Only effective if useCollision is true. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The priority used to solve colliding when occurring penetration. Only effective if useCollision is true. The higher the priority is, the lower the penetration into the object will be. This can for example be used to prevent the player from breaking through the boundaries of a level. */
@@ -17339,11 +17533,11 @@ package godot {
 		public static const KEEP_WIDTH:int = 0;
 		/** Preserves the vertical aspect ratio; also known as Hor+ scaling. This is usually the best option for projects running in landscape mode, as wider aspect ratios will automatically benefit from a wider horizontal FOV. */
 		public static const KEEP_HEIGHT:int = 1;
-		/** Disables Doppler effect simulation (default). */
+		/** Disables Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) simulation (default). */
 		public static const DOPPLER_TRACKING_DISABLED:int = 0;
-		/** Simulate Doppler effect by tracking positions of objects that are changed in _process. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
+		/** Simulate Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) by tracking positions of objects that are changed in _process. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
 		public static const DOPPLER_TRACKING_IDLE_STEP:int = 1;
-		/** Simulate Doppler effect by tracking positions of objects that are changed in _physics_process. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
+		/** Simulate Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) by tracking positions of objects that are changed in _physics_process. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's AudioStreamPlayer3D.pitchScale). */
 		public static const DOPPLER_TRACKING_PHYSICS_STEP:int = 2;
 		/** Camera node, displays from a point of view.
 		 *
@@ -17376,7 +17570,7 @@ package godot {
 		/** The vertical (Y) offset of the camera viewport. */
 		public final native function get vOffset():Number;
 		public final native function set vOffset(value:Number):void;
-		/** If not DOPPLER_TRACKING_DISABLED, this camera will simulate the Doppler effect for objects changed in particular _process methods.
+		/** If not DOPPLER_TRACKING_DISABLED, this camera will simulate the Doppler effect (https://en.wikipedia.org/wiki/Doppler_effect) for objects changed in particular _process methods.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_camera3d.html#class-camera3d-property-doppler-tracking
 		 */
@@ -17404,7 +17598,7 @@ package godot {
 		/** The camera's size in meters measured as the diameter of the width or height, depending on keepAspect. Only applicable in orthogonal and frustum modes. */
 		public final native function get size():Number;
 		public final native function set size(value:Number):void;
-		/** The camera's frustum offset. This can be changed from the default to create "tilted frustum" effects such as Y-shearing.
+		/** The camera's frustum offset. This can be changed from the default to create "tilted frustum" effects such as Y-shearing (https://zdoom.org/wiki/Y-shearing).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_camera3d.html#class-camera3d-property-frustum-offset
 		 */
@@ -17427,7 +17621,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_camera3d.html#class-camera3d-method-unproject-position
 		 */
 		public final native function unprojectPosition(worldPoint:Vector3):Vector2;
-		/** Returns true if the given position is behind the camera (the blue part of the linked diagram). See this diagram for an overview of position query methods.
+		/** Returns true if the given position is behind the camera (the blue part of the linked diagram). See this diagram (https://raw.githubusercontent.com/godotengine/godot-docs/master/img/camera3d_position_frustum.png) for an overview of position query methods.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_camera3d.html#class-camera3d-method-is-position-behind
 		 */
@@ -17454,7 +17648,7 @@ package godot {
 		/** Returns the camera's frustum planes in world space units as an array of Planes in the following order: near, far, left, top, right, bottom. Not to be confused with frustumOffset. */
 		[Godot(returns="Array[Plane]")]
 		public final native function getFrustum():GodotArray;
-		/** Returns true if the given position is inside the camera's frustum (the green part of the linked diagram). See this diagram for an overview of position query methods. */
+		/** Returns true if the given position is inside the camera's frustum (the green part of the linked diagram). See this diagram (https://raw.githubusercontent.com/godotengine/godot-docs/master/img/camera3d_position_frustum.png) for an overview of position query methods. */
 		public final native function isPositionInFrustum(worldPoint:Vector3):Boolean;
 		/** Returns the camera's RID from the RenderingServer. */
 		public final native function getCameraRID():RID;
@@ -17673,7 +17867,7 @@ package godot {
 	public native class CameraServer extends GodotObject {
 		/** The RGBA camera image. */
 		public static const FEED_RGBA_IMAGE:int = 0;
-		/** The YCbCr camera image. */
+		/** The YCbCr (https://en.wikipedia.org/wiki/YCbCr) camera image. */
 		public static const FEED_YCBCR_IMAGE:int = 0;
 		/** The Y component camera image. */
 		public static const FEED_Y_IMAGE:int = 0;
@@ -18706,7 +18900,7 @@ package godot {
 		/** If true, all wrapped lines are indented to the same amount as the unwrapped line. */
 		public final native function get indentWrappedLines():Boolean;
 		public final native function set indentWrappedLines(value:Boolean):void;
-		/** If true, ProjectSettings.input/uiTextIndent input Tab character, otherwise it moves keyboard focus to the next Control in the scene. */
+		/** If true, "input/ui_text_indent" input Tab character, otherwise it moves keyboard focus to the next Control in the scene. */
 		public final native function get tabInputMode():Boolean;
 		public final native function set tabInputMode(value:Boolean):void;
 		/** If true, the native virtual keyboard is enabled on platforms that support it. */
@@ -18849,17 +19043,17 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_textedit.html#class-textedit-private-method-paste-primary-clipboard
 		 */
 		public native function _pastePrimaryClipboard(caretIndex:int):void;
-		/** Returns true if the user has text in the Input Method Editor (IME). */
+		/** Returns true if the user has text in the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME). */
 		public final native function hasImeText():Boolean;
-		/** Closes the Input Method Editor (IME) if it is open. Any text in the IME will be lost. */
+		/** Closes the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME) if it is open. Any text in the IME will be lost. */
 		public final native function cancelIme():void;
-		/** Applies text from the Input Method Editor (IME) to each caret and closes the IME if it is open. */
+		/** Applies text from the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME) to each caret and closes the IME if it is open. */
 		public final native function applyIme():void;
 		/** Sets the tab size for the TextEdit to use. */
 		public final native function setTabSize(size:int):void;
 		/** Returns the TextEdit's' tab size. */
 		public final native function getTabSize():int;
-		/** If true, enables overtype mode. In this mode, typing overrides existing text instead of inserting text. The ProjectSettings.input/uiTextToggleInsertMode action toggles overtype mode. See isOvertypeModeEnabled. */
+		/** If true, enables overtype mode. In this mode, typing overrides existing text instead of inserting text. The "input/ui_text_toggle_insert_mode" action toggles overtype mode. See isOvertypeModeEnabled. */
 		public final native function setOvertypeModeEnabled(enabled:Boolean):void;
 		/** Returns true if overtype mode is enabled. See setOvertypeModeEnabled. */
 		public final native function isOvertypeModeEnabled():Boolean;
@@ -19331,7 +19525,7 @@ package godot {
 		public final native function get delimiterComments():GodotArray;
 		[Godot(value="Array[String]")]
 		public final native function set delimiterComments(value:GodotArray):void;
-		/** If true, the ProjectSettings.input/uiTextCompletionQuery action requests code completion. To handle it, see _requestCodeCompletion or codeCompletionRequested. */
+		/** If true, the "input/ui_text_completion_query" action requests code completion. To handle it, see _requestCodeCompletion or codeCompletionRequested. */
 		public final native function get codeCompletionEnabled():Boolean;
 		public final native function set codeCompletionEnabled(value:Boolean):void;
 		/** Sets prefixes that will trigger code completion. */
@@ -19373,7 +19567,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_codeedit.html#class-codeedit-signal-symbol-validate
 		 */
 		public final native function get symbolValidate():Signal;
-		/** Emitted when the user hovers over a symbol. Unlike Control.mouseEntered, this signal is not emitted immediately, but when the cursor is over the symbol for ProjectSettings.gui/timers/tooltipDelaySec seconds.
+		/** Emitted when the user hovers over a symbol. Unlike Control.mouseEntered, this signal is not emitted immediately, but when the cursor is over the symbol for "gui/timers/tooltip_delay_sec" seconds.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_codeedit.html#class-codeedit-signal-symbol-hovered
 		 */
@@ -19388,11 +19582,11 @@ package godot {
 		 */
 		[Godot(candidates="Array[GodotDictionary]", returns="Array[GodotDictionary]")]
 		public native function _filterCodeCompletionCandidates(candidates:GodotArray):GodotArray;
-		/** If there is no selection, indentation is inserted at the caret. Otherwise, the selected lines are indented like indentLines. Equivalent to the ProjectSettings.input/uiTextIndent action. The indentation characters used depend on indentUseSpaces and indentSize. */
+		/** If there is no selection, indentation is inserted at the caret. Otherwise, the selected lines are indented like indentLines. Equivalent to the "input/ui_text_indent" action. The indentation characters used depend on indentUseSpaces and indentSize. */
 		public final native function doIndent():void;
 		/** Indents all lines that are selected or have a caret on them. Uses spaces or a tab depending on indentUseSpaces. See unindentLines. */
 		public final native function indentLines():void;
-		/** Unindents all lines that are selected or have a caret on them. Uses spaces or a tab depending on indentUseSpaces. Equivalent to the ProjectSettings.input/uiTextDedent action. See indentLines. */
+		/** Unindents all lines that are selected or have a caret on them. Uses spaces or a tab depending on indentUseSpaces. Equivalent to the "input/ui_text_dedent" action. See indentLines. */
 		public final native function unindentLines():void;
 		/** Converts the indents of lines between fromLine and toLine to tabs or spaces as set by indentUseSpaces.
 		 *
@@ -20681,7 +20875,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_crypto.html#class-crypto-method-decrypt
 		 */
 		public final native function decrypt(key:CryptoKey, ciphertext:PackedByteArray):PackedByteArray;
-		/** Generates an HMAC digest of msg using key. The hashType parameter is the hashing algorithm that is used for the inner and outer hashes.
+		/** Generates an HMAC (https://en.wikipedia.org/wiki/HMAC) digest of msg using key. The hashType parameter is the hashing algorithm that is used for the inner and outer hashes.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_crypto.html#class-crypto-method-hmac-digest
 		 */
@@ -21724,7 +21918,7 @@ package godot {
 		public static const FEATURE_CUSTOM_CURSOR_SHAPE:int = 8;
 		/** Display server supports spawning text dialogs using the operating system's native look-and-feel. See dialogShow. Windows, macOS */
 		public static const FEATURE_NATIVE_DIALOG:int = 9;
-		/** Display server supports Input Method Editor, which is commonly used for inputting Chinese/Japanese/Korean text. This is handled by the operating system, rather than by Godot. Windows, macOS, Linux (X11) */
+		/** Display server supports Input Method Editor (https://en.wikipedia.org/wiki/Input_method), which is commonly used for inputting Chinese/Japanese/Korean text. This is handled by the operating system, rather than by Godot. Windows, macOS, Linux (X11) */
 		public static const FEATURE_IME:int = 10;
 		/** Display server supports windows can use per-pixel transparency to make windows behind them partially or fully visible. Windows, macOS, Linux (X11/Wayland), Android */
 		public static const FEATURE_WINDOW_TRANSPARENCY:int = 11;
@@ -22685,12 +22879,12 @@ package godot {
 		public static native function clipboardHas():Boolean;
 		/** Returns true if there is an image content on the user's clipboard. */
 		public static native function clipboardHasImage():Boolean;
-		/** Sets the user's primary clipboard content to the given string. This is the clipboard that is set when the user selects text in any application, rather than when pressing Ctrl + C. The clipboard data can then be pasted by clicking the middle mouse button in any application that supports the primary clipboard mechanism.
+		/** Sets the user's primary (https://unix.stackexchange.com/questions/139191/whats-the-difference-between-primary-selection-and-clipboard-buffer) clipboard content to the given string. This is the clipboard that is set when the user selects text in any application, rather than when pressing Ctrl + C. The clipboard data can then be pasted by clicking the middle mouse button in any application that supports the primary clipboard mechanism.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-clipboard-set-primary
 		 */
 		public static native function clipboardSetPrimary(clipboardPrimary:String):void;
-		/** Returns the user's primary clipboard as a string if possible. This is the clipboard that is set when the user selects text in any application, rather than when pressing Ctrl + C. The clipboard data can then be pasted by clicking the middle mouse button in any application that supports the primary clipboard mechanism.
+		/** Returns the user's primary (https://unix.stackexchange.com/questions/139191/whats-the-difference-between-primary-selection-and-clipboard-buffer) clipboard as a string if possible. This is the clipboard that is set when the user selects text in any application, rather than when pressing Ctrl + C. The clipboard data can then be pasted by clicking the middle mouse button in any application that supports the primary clipboard mechanism.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-clipboard-get-primary
 		 */
@@ -22748,7 +22942,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-screen-get-scale
 		 */
 		public static native function screenGetScale(screen:int = -1):Number;
-		/** Returns true if touch events are available (Android or iOS), the capability is detected on the Web platform or if ProjectSettings.inputDevices/pointing/emulateTouchFromMouse is true. */
+		/** Returns true if touch events are available (Android or iOS), the capability is detected on the Web platform or if "input_devices/pointing/emulate_touch_from_mouse" is true. */
 		public static native function isTouchscreenAvailable():Boolean;
 		/** Returns the greatest scale factor of all screens. See also screenGetScale.
 		 *
@@ -22953,11 +23147,11 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-window-set-exclusive
 		 */
 		public static native function windowSetExclusive(windowID:int, exclusive:Boolean):void;
-		/** Sets whether Input Method Editor should be enabled for the window specified by windowID. See also windowSetImePosition. */
+		/** Sets whether Input Method Editor (https://en.wikipedia.org/wiki/Input_method) should be enabled for the window specified by windowID. See also windowSetImePosition. */
 		public static native function windowSetImeActive(active:Boolean, windowID:int = 0):void;
-		/** Sets the position of the Input Method Editor popup for the specified windowID. Only effective if windowSetImeActive was set to true for the specified windowID. */
+		/** Sets the position of the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) popup for the specified windowID. Only effective if windowSetImeActive was set to true for the specified windowID. */
 		public static native function windowSetImePosition(position:Vector2i, windowID:int = 0):void;
-		/** Sets the V-Sync mode of the given window. See also ProjectSettings.display/window/vsync/vsyncMode.
+		/** Sets the V-Sync mode of the given window. See also "display/window/vsync/vsync_mode".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-window-set-vsync-mode
 		 */
@@ -23218,12 +23412,12 @@ package godot {
 		public static native function accessibilityUpdateSetBackgroundColor(id:RID, color:Color):void;
 		/** Sets element foreground color. */
 		public static native function accessibilityUpdateSetForegroundColor(id:RID, color:Color):void;
-		/** Returns the text selection in the Input Method Editor composition string, with the Vector2i's x component being the caret position and y being the length of the selection.
+		/** Returns the text selection in the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) composition string, with the Vector2i's x component being the caret position and y being the length of the selection.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-ime-get-selection
 		 */
 		public static native function imeGetSelection():Vector2i;
-		/** Returns the composition string contained within the Input Method Editor window.
+		/** Returns the composition string contained within the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) window.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-ime-get-text
 		 */
@@ -23263,7 +23457,7 @@ package godot {
 		 */
 		[Godot(shape="enum:DisplayServer.CursorShape")]
 		public static native function cursorSetCustomImage(cursor:Resource, shape:int = 0, hotspot:Vector2 = null):void;
-		/** Returns true if positions of OK and Cancel buttons are swapped in dialogs. This is enabled by default on Windows to follow interface conventions, and be toggled by changing ProjectSettings.gui/common/swapCancelOk.
+		/** Returns true if positions of OK and Cancel buttons are swapped in dialogs. This is enabled by default on Windows to follow interface conventions, and be toggled by changing "gui/common/swap_cancel_ok".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-get-swap-cancel-ok
 		 */
@@ -23418,7 +23612,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_displayserver.html#class-displayserver-method-tablet-set-current-driver
 		 */
 		public static native function tabletSetCurrentDriver(name:String):void;
-		/** Returns true if the window background can be made transparent. This method returns false if ProjectSettings.display/window/perPixelTransparency/allowed is set to false, or if transparency is not supported by the renderer or OS compositor. */
+		/** Returns true if the window background can be made transparent. This method returns false if "display/window/per_pixel_transparency/allowed" is set to false, or if transparency is not supported by the renderer or OS compositor. */
 		public static native function isWindowTransparencyAvailable():Boolean;
 		/** Registers a GodotObject which represents an additional output that will be rendered too, beyond normal windows. The GodotObject is only used as an identifier, which can be later passed to unregisterAdditionalOutput.
 		 *
@@ -23490,7 +23684,7 @@ package godot {
 		/** Re-calculates the mipmaps for this texture on demand. */
 		public final native function generateMipmaps():void;
 	}
-	/** A wrapper class for an ENetHost.
+	/** A wrapper class for an ENetHost (http://enet.bespin.org/group__host.html).
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_enetconnection.html
 	 */
@@ -23502,11 +23696,11 @@ package godot {
 		public static const COMPRESS_NONE:int = 0;
 		/** ENet's built-in range encoding. Works well on small packets, but is not the most efficient algorithm on packets larger than 4 KB. */
 		public static const COMPRESS_RANGE_CODER:int = 1;
-		/** FastLZ compression. This option uses less CPU resources compared to COMPRESS_ZLIB, at the expense of using more bandwidth. */
+		/** FastLZ (https://fastlz.org/) compression. This option uses less CPU resources compared to COMPRESS_ZLIB, at the expense of using more bandwidth. */
 		public static const COMPRESS_FASTLZ:int = 2;
-		/** Zlib compression. This option uses less bandwidth compared to COMPRESS_FASTLZ, at the expense of using more CPU resources. */
+		/** Zlib (https://www.zlib.net/) compression. This option uses less bandwidth compared to COMPRESS_FASTLZ, at the expense of using more CPU resources. */
 		public static const COMPRESS_ZLIB:int = 3;
-		/** Zstandard compression. Note that this algorithm is not very efficient on packets smaller than 4 KB. Therefore, it's recommended to use other compression algorithms in most cases. */
+		/** Zstandard (https://facebook.github.io/zstd/) compression. Note that this algorithm is not very efficient on packets smaller than 4 KB. Therefore, it's recommended to use other compression algorithms in most cases. */
 		public static const COMPRESS_ZSTD:int = 4;
 		/** An error occurred during service. You will likely need to destroy the host and recreate it. */
 		public static const EVENT_ERROR:int = -1;
@@ -23526,7 +23720,7 @@ package godot {
 		public static const HOST_TOTAL_RECEIVED_DATA:int = 2;
 		/** Total UDP packets received. */
 		public static const HOST_TOTAL_RECEIVED_PACKETS:int = 3;
-		/** A wrapper class for an ENetHost.
+		/** A wrapper class for an ENetHost (http://enet.bespin.org/group__host.html).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_enetconnection.html
 		 */
@@ -23703,22 +23897,22 @@ package godot {
 		/** Returns true if the server can act as a relay in the current configuration. That is, if the higher level MultiplayerAPI should notify connected clients of other peers, and implement a relay protocol to allow communication between them. */
 		public final native function isServerRelaySupported():Boolean;
 	}
-	/** A MultiplayerPeer implementation using the ENet library.
+	/** A MultiplayerPeer implementation using the ENet (http://enet.bespin.org/index.html) library.
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_enetmultiplayerpeer.html
 	 */
 	public native class ENetMultiplayerPeer extends MultiplayerPeer {
-		/** A MultiplayerPeer implementation using the ENet library.
+		/** A MultiplayerPeer implementation using the ENet (http://enet.bespin.org/index.html) library.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_enetmultiplayerpeer.html
 		 */
 		public native function ENetMultiplayerPeer();
 		/** The underlying ENetConnection created after createClient and createServer. */
 		public final native function get host():ENetConnection;
-		/** Create server that listens to connections via port. The port needs to be an available, unused port between 0 and 65535. Note that ports below 1024 are privileged and may require elevated permissions depending on the platform. To change the interface the server listens on, use setBindIP. The default IP is the wildcard "*", which listens on all available interfaces. maxClients is the maximum number of clients that are allowed at once, any number up to 4095 may be used, although the achievable number of simultaneous clients may be far lower and depends on the application. For additional details on the bandwidth parameters, see createClient. Returns OK if a server was created, ERR_ALREADY_IN_USE if this ENetMultiplayerPeer instance already has an open connection (in which case you need to call MultiplayerPeer.close first) or ERR_CANT_CREATE if the server could not be created. */
+		/** Create server that listens to connections via port. The port needs to be an available, unused port between 0 and 65535. Note that ports below 1024 are privileged and may require elevated permissions depending on the platform. To change the interface the server listens on, use setBindIP. The default IP is the wildcard "*", which listens on all available interfaces. maxClients is the maximum number of clients that are allowed at once, any number up to 4095 may be used, although the achievable number of simultaneous clients may be far lower and depends on the application. For additional details on the bandwidth parameters, see createClient. Returns GodotError.OK if a server was created, GodotError.ERR_ALREADY_IN_USE if this ENetMultiplayerPeer instance already has an open connection (in which case you need to call MultiplayerPeer.close first) or GodotError.ERR_CANT_CREATE if the server could not be created. */
 		[Godot(returns="enum:GodotError")]
 		public final native function createServer(port:int, maxClients:int = 32, maxChannels:int = 0, inBandwidth:int = 0, outBandwidth:int = 0):int;
-		/** Create client that connects to a server at address using specified port. The given address needs to be either a fully qualified domain name (e.g. "www.example.com") or an IP address in IPv4 or IPv6 format (e.g. "192.168.1.1"). The port is the port the server is listening on. The channelCount parameter can be used to specify the number of ENet channels allocated for the connection. The inBandwidth and outBandwidth parameters can be used to limit the incoming and outgoing bandwidth to the given number of bytes per second. The default of 0 means unlimited bandwidth. Note that ENet will strategically drop packets on specific sides of a connection between peers to ensure the peer's bandwidth is not overwhelmed. The bandwidth parameters also determine the window size of a connection which limits the amount of reliable packets that may be in transit at any given time. Returns OK if a client was created, ERR_ALREADY_IN_USE if this ENetMultiplayerPeer instance already has an open connection (in which case you need to call MultiplayerPeer.close first) or ERR_CANT_CREATE if the client could not be created. If localPort is specified, the client will also listen to the given port; this is useful for some NAT traversal techniques. */
+		/** Create client that connects to a server at address using specified port. The given address needs to be either a fully qualified domain name (e.g. "www.example.com") or an IP address in IPv4 or IPv6 format (e.g. "192.168.1.1"). The port is the port the server is listening on. The channelCount parameter can be used to specify the number of ENet channels allocated for the connection. The inBandwidth and outBandwidth parameters can be used to limit the incoming and outgoing bandwidth to the given number of bytes per second. The default of 0 means unlimited bandwidth. Note that ENet will strategically drop packets on specific sides of a connection between peers to ensure the peer's bandwidth is not overwhelmed. The bandwidth parameters also determine the window size of a connection which limits the amount of reliable packets that may be in transit at any given time. Returns GodotError.OK if a client was created, GodotError.ERR_ALREADY_IN_USE if this ENetMultiplayerPeer instance already has an open connection (in which case you need to call MultiplayerPeer.close first) or GodotError.ERR_CANT_CREATE if the client could not be created. If localPort is specified, the client will also listen to the given port; this is useful for some NAT traversal techniques. */
 		[Godot(returns="enum:GodotError")]
 		public final native function createClient(address:String, port:int, channelCount:int = 0, inBandwidth:int = 0, outBandwidth:int = 0, localPort:int = 0):int;
 		/** Initialize this MultiplayerPeer in mesh mode. The provided uniqueID will be used as the local peer network unique ID once assigned as the MultiplayerAPI.multiplayerPeer. In the mesh configuration you will need to set up each new peer manually using ENetConnection before calling addMeshPeer. While this technique is more advanced, it allows for better control over the connection process (e.g. when dealing with NAT punch-through) and for better distribution of the network load (which would otherwise be more taxing on the server). */
@@ -23735,7 +23929,7 @@ package godot {
 		/** Returns the ENetPacketPeer associated to the given id. */
 		public final native function getPeer(id:int):ENetPacketPeer;
 	}
-	/** A wrapper class for an ENetPeer.
+	/** A wrapper class for an ENetPeer (http://enet.bespin.org/group__peer.html).
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_enetpacketpeer.html
 	 */
@@ -24056,13 +24250,13 @@ package godot {
 		/** If true, the dock can be closed with the Close button in the context popup. Docks with global enabled are always closable. */
 		public final native function get closable():Boolean;
 		public final native function set closable(value:Boolean):void;
-		/** The icon for the dock, as a name from the EditorIcons theme type in the editor theme. You can find the list of available icons here. */
+		/** The icon for the dock, as a name from the EditorIcons theme type in the editor theme. You can find the list of available icons here (https://godot-editor-icons.github.io/). */
 		public final native function get iconName():String;
 		public final native function set iconName(value:String):void;
 		/** The icon for the dock, as a texture. If specified, it will override iconName. */
 		public final native function get dockIcon():Texture2D;
 		public final native function set dockIcon(value:Texture2D):void;
-		/** If true, the dock will always display an icon, regardless of EditorSettings.interface/editor/docks/dockTabStyle or EditorSettings.interface/editor/docks/bottomDockTabStyle. */
+		/** If true, the dock will always display an icon, regardless of "interface/editor/docks/dock_tab_style" or "interface/editor/docks/bottom_dock_tab_style". */
 		public final native function get forceShowIcon():Boolean;
 		public final native function set forceShowIcon(value:Boolean):void;
 		/** The color of the dock tab's title. If its alpha is 0.0, the default font color will be used. */
@@ -24123,11 +24317,11 @@ package godot {
 		public static const EXPORT_MESSAGE_WARNING:int = 2;
 		/** Message type for error messages that must be addressed and fail the export. */
 		public static const EXPORT_MESSAGE_ERROR:int = 3;
-		/** Flag is set if the remotely debugged project is expected to use the remote file system. If set, genExportFlags will append --remote-fs and --remote-fs-password (if EditorSettings.filesystem/fileServer/password is defined) command line arguments to the returned list. */
+		/** Flag is set if the remotely debugged project is expected to use the remote file system. If set, genExportFlags will append --remote-fs and --remote-fs-password (if "filesystem/file_server/password" is defined) command line arguments to the returned list. */
 		public static const DEBUG_FLAG_DUMB_CLIENT:int = 1;
 		/** Flag is set if remote debug is enabled. If set, genExportFlags will append --remote-debug and --breakpoints (if breakpoints are selected in the script editor or added by the plugin) command line arguments to the returned list. */
 		public static const DEBUG_FLAG_REMOTE_DEBUG:int = 2;
-		/** Flag is set if remotely debugged project is running on the localhost. If set, genExportFlags will use localhost instead of EditorSettings.network/debug/remoteHost as remote debugger host. */
+		/** Flag is set if remotely debugged project is running on the localhost. If set, genExportFlags will use localhost instead of "network/debug/remote_host" as remote debugger host. */
 		public static const DEBUG_FLAG_REMOTE_DEBUG_LOCALHOST:int = 4;
 		/** Flag is set if the "Visible Collision Shapes" remote debug option is enabled. If set, genExportFlags will append the --debug-collisions command line argument to the returned list. */
 		public static const DEBUG_FLAG_VIEW_COLLISIONS:int = 8;
@@ -24611,7 +24805,7 @@ package godot {
 		public final native function getIncludeFilter():String;
 		/** Returns file filters to exclude during export. */
 		public final native function getExcludeFilter():String;
-		/** Returns a comma-separated list of custom features added to this preset, as a string. See Feature tags in the documentation for more information. */
+		/** Returns a comma-separated list of custom features added to this preset, as a string. See Feature tags (https://docs.godotengine.org/en/4.7/tutorials/export/feature_tags.html) in the documentation for more information. */
 		public final native function getCustomFeatures():String;
 		/** Returns the list of packs on which to base a patch export on. */
 		public final native function getPatches():PackedStringArray;
@@ -24632,7 +24826,7 @@ package godot {
 		public final native function getScriptExportMode():int;
 		/** Returns export option value or value of environment variable if it is set. */
 		public final native function getOrEnv(name:String, envVar:String):*;
-		/** Returns the preset's version number, or fall back to the ProjectSettings.application/config/version project setting if set to an empty string.
+		/** Returns the preset's version number, or fall back to the "application/config/version" project setting if set to an empty string.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_editorexportpreset.html#class-editorexportpreset-method-get-version
 		 */
@@ -25122,7 +25316,7 @@ package godot {
 		/** Gets the options and default values for the preset at this index. Returns an Array of Dictionaries with the following keys: name, default_value, property_hint (optional), hint_string (optional), usage (optional). */
 		[Godot(returns="Array[GodotDictionary]")]
 		public native function _getImportOptions(path:String, presetIndex:int):GodotArray;
-		/** Gets the extension used to save this resource in the .godot/imported directory (see ProjectSettings.application/config/useHiddenProjectDataDirectory). */
+		/** Gets the extension used to save this resource in the .godot/imported directory (see "application/config/use_hidden_project_data_directory"). */
 		public native function _getSaveExtension():String;
 		/** Gets the Godot resource type associated with this loader. e.g. "Mesh" or "Animation". */
 		public native function _getResourceType():String;
@@ -25541,14 +25735,14 @@ package godot {
 		public static native function getEditedSceneRoot():Node;
 		/** Makes node root of the currently opened scene. Only works if the scene is empty. If the node is a scene instance, an inheriting scene will be created. */
 		public static native function addRootNode(node:Node):void;
-		/** Saves the currently active scene. Returns either OK or ERR_CANT_CREATE. */
+		/** Saves the currently active scene. Returns either GodotError.OK or GodotError.ERR_CANT_CREATE. */
 		[Godot(returns="enum:GodotError")]
 		public static native function saveScene():int;
 		/** Saves the currently active scene as a file at path. */
 		public static native function saveSceneAs(path:String, withPreview:Boolean = true):void;
 		/** Saves all opened scenes in the editor. */
 		public static native function saveAllScenes():void;
-		/** Closes the currently active scene, discarding any pending changes in the process. Returns OK on success or ERR_DOES_NOT_EXIST if there is no scene to close. */
+		/** Closes the currently active scene, discarding any pending changes in the process. Returns GodotError.OK on success or GodotError.ERR_DOES_NOT_EXIST if there is no scene to close. */
 		[Godot(returns="enum:GodotError")]
 		public static native function closeScene():int;
 		/** Marks the current scene tab as unsaved. */
@@ -26374,7 +26568,7 @@ package godot {
 		public static const IMPORT_ANIMATION:int = 2;
 		/** Unused flag (this has no effect when enabled). */
 		public static const IMPORT_FAIL_ON_MISSING_DEPENDENCIES:int = 4;
-		/** If true, generate vertex tangents using Mikktspace if the input meshes don't have tangent data. When possible, it's recommended to let the 3D modeling software generate tangents on export instead of relying on this option. Tangents are required for correct display of normal and height maps, along with any material/shader features that require tangents.
+		/** If true, generate vertex tangents using Mikktspace (http://www.mikktspace.com/) if the input meshes don't have tangent data. When possible, it's recommended to let the 3D modeling software generate tangents on export instead of relying on this option. Tangents are required for correct display of normal and height maps, along with any material/shader features that require tangents.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_editorsceneformatimporter.html#class-editorsceneformatimporter-constant-import-generate-tangent-arrays
 		 */
@@ -26733,7 +26927,7 @@ package godot {
 		/** If true, the slider and up/down arrows are hidden. */
 		public final native function get hideSlider():Boolean;
 		public final native function set hideSlider(value:Boolean):void;
-		/** If true, the EditorSpinSlider is considered to be editing an integer value. If false, the EditorSpinSlider is considered to be editing a floating-point value. This is used to determine whether a slider should be drawn by default. The slider is only drawn for floats; integers use up-down arrows similar to SpinBox instead, unless controlState is set to CONTROL_STATE_PREFER_SLIDER. It will also use EditorSettings.interface/inspector/integerDragSpeed instead of EditorSettings.interface/inspector/floatDragSpeed if the slider is available. */
+		/** If true, the EditorSpinSlider is considered to be editing an integer value. If false, the EditorSpinSlider is considered to be editing a floating-point value. This is used to determine whether a slider should be drawn by default. The slider is only drawn for floats; integers use up-down arrows similar to SpinBox instead, unless controlState is set to CONTROL_STATE_PREFER_SLIDER. It will also use "interface/inspector/integer_drag_speed" instead of "interface/inspector/float_drag_speed" if the slider is available. */
 		public final native function get editingInteger():Boolean;
 		public final native function set editingInteger(value:Boolean):void;
 		/** If true, changing via dragging is applied only at the end of the input (for example, when the user releases a mouse button). */
@@ -27004,13 +27198,13 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_engine.html
 		 */
 		public native function Engine();
-		/** If false, stops printing error and warning messages to the console and editor Output log. This can be used to hide error and warning messages during unit test suite runs. This property is equivalent to the ProjectSettings.application/run/disableStderr project setting.
+		/** If false, stops printing error and warning messages to the console and editor Output log. This can be used to hide error and warning messages during unit test suite runs. This property is equivalent to the "application/run/disable_stderr" project setting.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_engine.html#class-engine-property-print-error-messages
 		 */
 		public static native function get printErrorMessages():Boolean;
 		public static native function set printErrorMessages(value:Boolean):void;
-		/** If false, stops printing messages (for example using print) to the console, log files, and editor Output log. This property is equivalent to the ProjectSettings.application/run/disableStdout project setting.
+		/** If false, stops printing messages (for example using print) to the console, log files, and editor Output log. This property is equivalent to the "application/run/disable_stdout" project setting.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_engine.html#class-engine-property-print-to-stdout
 		 */
@@ -27090,7 +27284,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_engine.html#class-engine-method-get-donor-info
 		 */
 		public static native function getDonorInfo():GodotDictionary;
-		/** Returns a GodotDictionary of licenses used by Godot and included third party components. Each entry is a license name (such as "Expat") and its associated text. */
+		/** Returns a GodotDictionary of licenses used by Godot and included third party components. Each entry is a license name (such as "Expat (https://en.wikipedia.org/wiki/MIT_License#Ambiguity_and_variants)") and its associated text. */
 		public static native function getLicenseInfo():GodotDictionary;
 		/** Returns the full Godot license text. */
 		public static native function getLicenseText():String;
@@ -27149,7 +27343,7 @@ package godot {
 		public static native function isEditorHint():Boolean;
 		/** Returns true if the engine is running embedded in the editor. This is useful to prevent attempting to update window mode or window flags that are not supported when running the project embedded in the editor. */
 		public static native function isEmbeddedInEditor():Boolean;
-		/** Returns the path to the MovieWriter's output file, or an empty string if the engine wasn't started in Movie Maker mode. The default path can be changed in ProjectSettings.editor/movieWriter/movieFile. */
+		/** Returns the path to the MovieWriter's output file, or an empty string if the engine wasn't started in Movie Maker mode. The default path can be changed in "editor/movie_writer/movie_file". */
 		public static native function getWriteMoviePath():String;
 	}
 	/** Exposes the internal debugger.
@@ -27244,7 +27438,7 @@ package godot {
 	[GodotEnum(name="FogMode", values="FOG_MODE_EXPONENTIAL,FOG_MODE_DEPTH")]
 	[GodotEnum(name="SDFGIYScale", values="SDFGI_Y_SCALE_50_PERCENT,SDFGI_Y_SCALE_75_PERCENT,SDFGI_Y_SCALE_100_PERCENT")]
 	public native class Environment extends Resource {
-		/** Clears the background using the clear color defined in ProjectSettings.rendering/environment/defaults/defaultClearColor. */
+		/** Clears the background using the clear color defined in "rendering/environment/defaults/default_clear_color". */
 		public static const BG_CLEAR_COLOR:int = 0;
 		/** Clears the background using a custom clear color. */
 		public static const BG_COLOR:int = 1;
@@ -27330,7 +27524,7 @@ package godot {
 		/** Multiplier for background energy. Increase to make background brighter, decrease to make background dimmer. */
 		public final native function get backgroundEnergyMultiplier():Number;
 		public final native function set backgroundEnergyMultiplier(value:Number):void;
-		/** Luminance of background measured in nits (candela per square meter). Only used when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is enabled. The default value is roughly equivalent to the sky at midday. */
+		/** Luminance of background measured in nits (candela per square meter). Only used when "rendering/lights_and_shadows/use_physical_light_units" is enabled. The default value is roughly equivalent to the sky at midday. */
 		public final native function get backgroundIntensity():Number;
 		public final native function set backgroundIntensity(value:Number):void;
 		/** The maximum layer ID to display. Only effective when using the BG_CANVAS background mode. */
@@ -27651,7 +27845,7 @@ package godot {
 		/** The direction of scattered light as it goes through the volumetric fog. A value close to 1.0 means almost all light is scattered forward. A value close to 0.0 means light is scattered equally in all directions. A value close to -1.0 means light is scattered mostly backward. Fog and mist scatter light slightly forward, while smoke scatters light equally in all directions. */
 		public final native function get volumetricFogAnisotropy():Number;
 		public final native function set volumetricFogAnisotropy(value:Number):void;
-		/** The distance over which the volumetric fog is computed. Increase to compute fog over a greater range, decrease to add more detail when a long range is not needed. For best quality fog, keep this as low as possible. See also ProjectSettings.rendering/environment/volumetricFog/volumeDepth. */
+		/** The distance over which the volumetric fog is computed. Increase to compute fog over a greater range, decrease to add more detail when a long range is not needed. For best quality fog, keep this as low as possible. See also "rendering/environment/volumetric_fog/volume_depth". */
 		public final native function get volumetricFogLength():Number;
 		public final native function set volumetricFogLength(value:Number):void;
 		/** The distribution of size down the length of the froxel buffer. A higher value compresses the froxels closer to the camera and places more detail closer to the camera. */
@@ -27784,7 +27978,7 @@ package godot {
 		public static const VISIBILITY_MODE_INCLUDE_OPTIONAL:int = 1;
 		/** If the scene contains any non-visible nodes, do not include them in the export. This is the same as the behavior in Godot 4.4 and earlier. Downside: Invisible nodes will not exist in the exported file. */
 		public static const VISIBILITY_MODE_EXCLUDE:int = 2;
-		/** If true, generate vertex tangents using Mikktspace if the input meshes don't have tangent data. When possible, it's recommended to let the 3D modeling software generate tangents on export instead of relying on this option. Tangents are required for correct display of normal and height maps, along with any material/shader features that require tangents.
+		/** If true, generate vertex tangents using Mikktspace (http://www.mikktspace.com/) if the input meshes don't have tangent data. When possible, it's recommended to let the 3D modeling software generate tangents on export instead of relying on this option. Tangents are required for correct display of normal and height maps, along with any material/shader features that require tangents.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_gltfdocument.html#class-gltfdocument-constant-import-flag-generate-tangent-arrays
 		 */
@@ -28293,15 +28487,15 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_fileaccess.html#class-fileaccess-constant-write-read
 		 */
 		public static const WRITE_READ:int = 7;
-		/** Uses the FastLZ compression method. */
+		/** Uses the FastLZ (https://fastlz.org/) compression method. */
 		public static const COMPRESSION_FASTLZ:int = 0;
-		/** Uses the DEFLATE compression method. */
+		/** Uses the DEFLATE (https://en.wikipedia.org/wiki/DEFLATE) compression method. */
 		public static const COMPRESSION_DEFLATE:int = 1;
-		/** Uses the Zstandard compression method. */
+		/** Uses the Zstandard (https://facebook.github.io/zstd/) compression method. */
 		public static const COMPRESSION_ZSTD:int = 2;
-		/** Uses the gzip compression method. */
+		/** Uses the gzip (https://www.gzip.org/) compression method. */
 		public static const COMPRESSION_GZIP:int = 3;
-		/** Uses the brotli compression method (only decompression is supported). */
+		/** Uses the brotli (https://github.com/google/brotli) compression method (only decompression is supported). */
 		public static const COMPRESSION_BROTLI:int = 4;
 		/** Read for owner bit. */
 		public static const UNIX_READ_OWNER:int = 256;
@@ -28327,7 +28521,7 @@ package godot {
 		public static const UNIX_SET_GROUP_ID:int = 1024;
 		/** Restricted deletion (sticky) bit. */
 		public static const UNIX_RESTRICTED_DELETE:int = 512;
-		/** If true, the file is read with big-endian endianness. If false, the file is read with little-endian endianness. If in doubt, leave this to false as most files are written with little-endian endianness.
+		/** If true, the file is read with big-endian endianness (https://en.wikipedia.org/wiki/Endianness). If false, the file is read with little-endian endianness. If in doubt, leave this to false as most files are written with little-endian endianness.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_fileaccess.html#class-fileaccess-property-big-endian
 		 */
@@ -28722,7 +28916,7 @@ package godot {
 		/** The hardness of the edges of the FogVolume. A higher value will result in softer edges, while a lower value will result in harder edges. */
 		public final native function get edgeFade():Number;
 		public final native function set edgeFade(value:Number):void;
-		/** The 3D texture that is used to scale the density of the FogVolume. This can be used to vary fog density within the FogVolume with any kind of static pattern. For animated effects, consider using a custom fog shader. */
+		/** The 3D texture that is used to scale the density of the FogVolume. This can be used to vary fog density within the FogVolume with any kind of static pattern. For animated effects, consider using a custom fog shader (https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/fog_shader.html). */
 		public final native function get densityTexture():Texture3D;
 		public final native function set densityTexture(value:Texture3D):void;
 	}
@@ -28899,7 +29093,7 @@ package godot {
 		/** Returns the amount of spacing for the given spacing type. */
 		[Godot(spacing="enum:TextServer.SpacingType")]
 		public final native function getSpacing(spacing:int):int;
-		/** Returns a set of OpenType feature tags. More info: OpenType feature tags. */
+		/** Returns a set of OpenType feature tags. More info: OpenType feature tags (https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags). */
 		public final native function getOpentypeFeatures():GodotDictionary;
 		/** Sets LRU cache capacity for draw_* methods. */
 		public final native function setCacheCapacity(singleLine:int, multiLine:int):void;
@@ -28961,13 +29155,13 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_font.html#class-font-method-get-supported-chars
 		 */
 		public final native function getSupportedChars():String;
-		/** Returns true if the font supports the given language (as a ISO 639 code). */
+		/** Returns true if the font supports the given language (as a ISO 639 (https://en.wikipedia.org/wiki/ISO_639-1) code). */
 		public final native function isLanguageSupported(language:String):Boolean;
-		/** Returns true if the font supports the given script (as a ISO 15924 code). */
+		/** Returns true if the font supports the given script (as a ISO 15924 (https://en.wikipedia.org/wiki/ISO_15924) code). */
 		public final native function isScriptSupported(script:String):Boolean;
 		/** Returns list of OpenType features supported by font. */
 		public final native function getSupportedFeatureList():GodotDictionary;
-		/** Returns list of supported variation coordinates, each coordinate is returned as tag: Vector3i(min_value,max_value,default_value).
+		/** Returns list of supported variation coordinates (https://docs.microsoft.com/en-us/typography/opentype/spec/dvaraxisreg), each coordinate is returned as tag: Vector3i(min_value,max_value,default_value).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_font.html#class-font-method-get-supported-variation-list
 		 */
@@ -29242,7 +29436,7 @@ package godot {
 		/** Base font used to create a variation. If not set, default Theme font is used. */
 		public final native function get baseFont():Font;
 		public final native function set baseFont(value:Font):void;
-		/** Font OpenType variation coordinates. More info: OpenType variation tags.
+		/** Font OpenType variation coordinates. More info: OpenType variation tags (https://docs.microsoft.com/en-us/typography/opentype/spec/dvaraxisreg).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_fontvariation.html#class-fontvariation-property-variation-opentype
 		 */
@@ -29263,7 +29457,7 @@ package godot {
 		 */
 		public final native function get variationTransform():Transform2D;
 		public final native function set variationTransform(value:Transform2D):void;
-		/** A set of OpenType feature tags. More info: OpenType feature tags. */
+		/** A set of OpenType feature tags. More info: OpenType feature tags (https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags). */
 		public final native function get opentypeFeatures():GodotDictionary;
 		public final native function set opentypeFeatures(value:GodotDictionary):void;
 		/** Extra spacing between graphical glyphs. */
@@ -29754,10 +29948,10 @@ package godot {
 		/** The stride, in bytes, between interleaved data. If -1, this buffer view is not interleaved. */
 		public final native function get byteStride():Int64;
 		public final native function set byteStride(value:Int64):void;
-		/** true if the GLTFBufferView's OpenGL GPU buffer type is an ELEMENT_ARRAY_BUFFER used for vertex indices (integer constant 34963). false if the buffer type is any other value. See Buffers, BufferViews, and Accessors for possible values. This property is set on import and used on export. */
+		/** true if the GLTFBufferView's OpenGL GPU buffer type is an ELEMENT_ARRAY_BUFFER used for vertex indices (integer constant 34963). false if the buffer type is any other value. See Buffers, BufferViews, and Accessors (https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_005_BuffersBufferViewsAccessors.md) for possible values. This property is set on import and used on export. */
 		public final native function get indices():Boolean;
 		public final native function set indices(value:Boolean):void;
-		/** true if the GLTFBufferView's OpenGL GPU buffer type is an ARRAY_BUFFER used for vertex attributes (integer constant 34962). false if the buffer type is any other value. See Buffers, BufferViews, and Accessors for possible values. This property is set on import and used on export. */
+		/** true if the GLTFBufferView's OpenGL GPU buffer type is an ARRAY_BUFFER used for vertex attributes (integer constant 34962). false if the buffer type is any other value. See Buffers, BufferViews, and Accessors (https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_005_BuffersBufferViewsAccessors.md) for possible values. This property is set on import and used on export. */
 		public final native function get vertexAttributes():Boolean;
 		public final native function set vertexAttributes(value:Boolean):void;
 		/** Loads the buffer view data from the buffer referenced by this buffer view in the given GLTFState. Interleaved data with a byte stride is not yet supported by this method. The data is returned as a PackedByteArray. */
@@ -30349,7 +30543,7 @@ package godot {
 	public native class GLTFTexture extends Resource {
 		/** GLTFTexture represents a texture in a glTF file. */
 		public native function GLTFTexture();
-		/** The index of the image associated with this texture, see GLTFState.getImages. If -1, then this texture does not have an image assigned. */
+		/** The index of the image associated with this texture, see GLTFState.images. If -1, then this texture does not have an image assigned. */
 		public final native function get srcImage():int;
 		public final native function set srcImage(value:int):void;
 		/** ID of the texture sampler to use when sampling the image. If -1, then the default texture sampler is used (linear filtering, and repeat wrapping in both axes). */
@@ -31182,7 +31376,7 @@ package godot {
 		public static native function offsetPolyline(polyline:PackedVector2Array, delta:Number, joinType:int = 0, endType:int = 3):GodotArray;
 		/** Given an array of Vector2s representing tiles, builds an atlas. The returned dictionary has two keys: points is a PackedVector2Array that specifies the positions of each tile, size contains the overall size of the whole atlas as Vector2i. */
 		public static native function makeAtlas(sizes:PackedVector2Array):GodotDictionary;
-		/** Returns the Bresenham line between the from and to points. A Bresenham line is a series of pixels that draws a line and is always 1-pixel thick on every row and column of the drawing (never more, never less).
+		/** Returns the Bresenham line (https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm) between the from and to points. A Bresenham line is a series of pixels that draws a line and is always 1-pixel thick on every row and column of the drawing (never more, never less).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_geometry2d.html#class-geometry2d-method-bresenham-line
 		 */
@@ -31279,7 +31473,7 @@ package godot {
 		public static const GRADIENT_COLOR_SPACE_SRGB:int = 0;
 		/** Linear sRGB color space. */
 		public static const GRADIENT_COLOR_SPACE_LINEAR_SRGB:int = 1;
-		/** Oklab color space. This color space provides a smooth and uniform-looking transition between colors. */
+		/** Oklab (https://bottosson.github.io/posts/oklab/) color space. This color space provides a smooth and uniform-looking transition between colors. */
 		public static const GRADIENT_COLOR_SPACE_OKLAB:int = 2;
 		/** A color transition.
 		 *
@@ -31913,7 +32107,7 @@ package godot {
 		 */
 		public final native function get collisionLayer():uint;
 		public final native function set collisionLayer(value:uint):void;
-		/** The physics layers this GridMap detects collisions in. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers this GridMap detects collisions in. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The priority used to solve colliding when occurring penetration. The higher the priority is, the lower the penetration into the object will be. This can for example be used to prevent the player from breaking through the boundaries of a level. */
@@ -32851,68 +33045,68 @@ package godot {
 		public static const FORMAT_RGBAH:int = 15;
 		/** A special OpenGL texture format where the three color components have 9 bits of precision and all three share a single 5-bit exponent. */
 		public static const FORMAT_RGBE9995:int = 16;
-		/** The S3TC texture format that uses Block Compression 1, and is the smallest variation of S3TC, only providing 1 bit of alpha and color data being premultiplied with alpha.
+		/** The S3TC (https://en.wikipedia.org/wiki/S3_Texture_Compression) texture format that uses Block Compression 1, and is the smallest variation of S3TC, only providing 1 bit of alpha and color data being premultiplied with alpha.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-dxt1
 		 */
 		public static const FORMAT_DXT1:int = 17;
-		/** The S3TC texture format that uses Block Compression 2, and color data is interpreted as not having been premultiplied by alpha. Well suited for images with sharp alpha transitions between translucent and opaque areas.
+		/** The S3TC (https://en.wikipedia.org/wiki/S3_Texture_Compression) texture format that uses Block Compression 2, and color data is interpreted as not having been premultiplied by alpha. Well suited for images with sharp alpha transitions between translucent and opaque areas.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-dxt3
 		 */
 		public static const FORMAT_DXT3:int = 18;
-		/** The S3TC texture format also known as Block Compression 3 or BC3 that contains 64 bits of alpha channel data followed by 64 bits of DXT1-encoded color data. Color data is not premultiplied by alpha, same as DXT3. DXT5 generally produces superior results for transparent gradients compared to DXT3.
+		/** The S3TC (https://en.wikipedia.org/wiki/S3_Texture_Compression) texture format also known as Block Compression 3 or BC3 that contains 64 bits of alpha channel data followed by 64 bits of DXT1-encoded color data. Color data is not premultiplied by alpha, same as DXT3. DXT5 generally produces superior results for transparent gradients compared to DXT3.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-dxt5
 		 */
 		public static const FORMAT_DXT5:int = 19;
-		/** Texture format that uses Red Green Texture Compression, normalizing the red channel data using the same compression algorithm that DXT5 uses for the alpha channel. */
+		/** Texture format that uses Red Green Texture Compression (https://www.khronos.org/opengl/wiki/Red_Green_Texture_Compression), normalizing the red channel data using the same compression algorithm that DXT5 uses for the alpha channel. */
 		public static const FORMAT_RGTC_R:int = 20;
-		/** Texture format that uses Red Green Texture Compression, normalizing the red and green channel data using the same compression algorithm that DXT5 uses for the alpha channel. */
+		/** Texture format that uses Red Green Texture Compression (https://www.khronos.org/opengl/wiki/Red_Green_Texture_Compression), normalizing the red and green channel data using the same compression algorithm that DXT5 uses for the alpha channel. */
 		public static const FORMAT_RGTC_RG:int = 21;
-		/** Texture format that uses BPTC compression with unsigned normalized RGBA components.
+		/** Texture format that uses BPTC (https://www.khronos.org/opengl/wiki/BPTC_Texture_Compression) compression with unsigned normalized RGBA components.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-bptc-rgba
 		 */
 		public static const FORMAT_BPTC_RGBA:int = 22;
-		/** Texture format that uses BPTC compression with signed floating-point RGB components. */
+		/** Texture format that uses BPTC (https://www.khronos.org/opengl/wiki/BPTC_Texture_Compression) compression with signed floating-point RGB components. */
 		public static const FORMAT_BPTC_RGBF:int = 23;
-		/** Texture format that uses BPTC compression with unsigned floating-point RGB components. */
+		/** Texture format that uses BPTC (https://www.khronos.org/opengl/wiki/BPTC_Texture_Compression) compression with unsigned floating-point RGB components. */
 		public static const FORMAT_BPTC_RGBFU:int = 24;
-		/** Ericsson Texture Compression format 1, also referred to as "ETC1", and is part of the OpenGL ES graphics standard. This format cannot store an alpha channel. */
+		/** Ericsson Texture Compression format 1 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC1), also referred to as "ETC1", and is part of the OpenGL ES graphics standard. This format cannot store an alpha channel. */
 		public static const FORMAT_ETC:int = 25;
-		/** Ericsson Texture Compression format 2 (R11_EAC variant), which provides one channel of unsigned data. */
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (R11_EAC variant), which provides one channel of unsigned data. */
 		public static const FORMAT_ETC2_R11:int = 26;
-		/** Ericsson Texture Compression format 2 (SIGNED_R11_EAC variant), which provides one channel of signed data. */
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (SIGNED_R11_EAC variant), which provides one channel of signed data. */
 		public static const FORMAT_ETC2_R11S:int = 27;
-		/** Ericsson Texture Compression format 2 (RG11_EAC variant), which provides two channels of unsigned data. */
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (RG11_EAC variant), which provides two channels of unsigned data. */
 		public static const FORMAT_ETC2_RG11:int = 28;
-		/** Ericsson Texture Compression format 2 (SIGNED_RG11_EAC variant), which provides two channels of signed data. */
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (SIGNED_RG11_EAC variant), which provides two channels of signed data. */
 		public static const FORMAT_ETC2_RG11S:int = 29;
-		/** Ericsson Texture Compression format 2 (RGB8 variant), which is a follow-up of ETC1 and compresses RGB888 data.
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (RGB8 variant), which is a follow-up of ETC1 and compresses RGB888 data.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-etc2-rgb8
 		 */
 		public static const FORMAT_ETC2_RGB8:int = 30;
-		/** Ericsson Texture Compression format 2 (RGBA8variant), which compresses RGBA8888 data with full alpha support.
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (RGBA8variant), which compresses RGBA8888 data with full alpha support.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-etc2-rgba8
 		 */
 		public static const FORMAT_ETC2_RGBA8:int = 31;
-		/** Ericsson Texture Compression format 2 (RGB8_PUNCHTHROUGH_ALPHA1 variant), which compresses RGBA data to make alpha either fully transparent or fully opaque.
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (RGB8_PUNCHTHROUGH_ALPHA1 variant), which compresses RGBA data to make alpha either fully transparent or fully opaque.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-constant-format-etc2-rgb8a1
 		 */
 		public static const FORMAT_ETC2_RGB8A1:int = 32;
-		/** Ericsson Texture Compression format 2 (RGBA8 variant), which compresses RA data and interprets it as two channels (red and green). See also FORMAT_ETC2_RGBA8. */
+		/** Ericsson Texture Compression format 2 (https://en.wikipedia.org/wiki/Ericsson_Texture_Compression#ETC2_and_EAC) (RGBA8 variant), which compresses RA data and interprets it as two channels (red and green). See also FORMAT_ETC2_RGBA8. */
 		public static const FORMAT_ETC2_RA_AS_RG:int = 33;
-		/** The S3TC texture format also known as Block Compression 3 or BC3, which compresses RA data and interprets it as two channels (red and green). See also FORMAT_DXT5. */
+		/** The S3TC (https://en.wikipedia.org/wiki/S3_Texture_Compression) texture format also known as Block Compression 3 or BC3, which compresses RA data and interprets it as two channels (red and green). See also FORMAT_DXT5. */
 		public static const FORMAT_DXT5_RA_AS_RG:int = 34;
-		/** Adaptive Scalable Texture Compression. This implements the 4×4 (high quality) mode. */
+		/** Adaptive Scalable Texture Compression (https://en.wikipedia.org/wiki/Adaptive_scalable_texture_compression). This implements the 4×4 (high quality) mode. */
 		public static const FORMAT_ASTC_4x4:int = 35;
 		/** Same format as FORMAT_ASTC_4x4, but with the hint to let the GPU know it is used for HDR. */
 		public static const FORMAT_ASTC_4x4_HDR:int = 36;
-		/** Adaptive Scalable Texture Compression. This implements the 8×8 (low quality) mode. */
+		/** Adaptive Scalable Texture Compression (https://en.wikipedia.org/wiki/Adaptive_scalable_texture_compression). This implements the 8×8 (low quality) mode. */
 		public static const FORMAT_ASTC_8x8:int = 37;
 		/** Same format as FORMAT_ASTC_8x8, but with the hint to let the GPU know it is used for HDR. */
 		public static const FORMAT_ASTC_8x8_HDR:int = 38;
@@ -33084,7 +33278,7 @@ package godot {
 		public final native function setData(width:int, height:int, useMipmaps:Boolean, format:int, data:PackedByteArray):void;
 		/** Returns true if the image has no data. */
 		public final native function isEmpty():Boolean;
-		/** Loads an image from file path. See Supported image formats for a list of supported image formats and limitations.
+		/** Loads an image from file path. See Supported image formats (https://docs.godotengine.org/en/4.7/tutorials/assets_pipeline/importing_images.html#supported-image-formats) for a list of supported image formats and limitations.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-load
 		 */
@@ -33108,7 +33302,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-save-jpg-to-buffer
 		 */
 		public final native function saveJpgToBuffer(quality:Number = 0.75):PackedByteArray;
-		/** Saves the image as an EXR file to path. If grayscale is true and the image has only one channel, it will be saved explicitly as monochrome rather than one red channel. Set colorImage to true when saving a color image, such as a screenshot. Negative values will be included when colorImage is false, which may be useful for saving raw floating point data such as a lightmap that includes negative light information. Color component values in the resulting EXR file will not exceed maxLinearValue if maxLinearValue is not negative. This function will return ERR_UNAVAILABLE if Godot was compiled without the TinyEXR module.
+		/** Saves the image as an EXR file to path. If grayscale is true and the image has only one channel, it will be saved explicitly as monochrome rather than one red channel. Set colorImage to true when saving a color image, such as a screenshot. Negative values will be included when colorImage is false, which may be useful for saving raw floating point data such as a lightmap that includes negative light information. Color component values in the resulting EXR file will not exceed maxLinearValue if maxLinearValue is not negative. This function will return GodotError.ERR_UNAVAILABLE if Godot was compiled without the TinyEXR module.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-save-exr
 		 */
@@ -33119,7 +33313,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-save-exr-to-buffer
 		 */
 		public final native function saveExrToBuffer(grayscale:Boolean = false, colorImage:Boolean = false, maxLinearValue:Number = -1.0):PackedByteArray;
-		/** Saves the image as a DDS (DirectDraw Surface) file to path. DDS is a container format that can store textures in various compression formats, such as DXT1, DXT5, or BC7. This function will return ERR_UNAVAILABLE if Godot was compiled without the DDS module.
+		/** Saves the image as a DDS (DirectDraw Surface) file to path. DDS is a container format that can store textures in various compression formats, such as DXT1, DXT5, or BC7. This function will return GodotError.ERR_UNAVAILABLE if Godot was compiled without the DDS module.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-save-dds
 		 */
@@ -33161,7 +33355,7 @@ package godot {
 		 */
 		[Godot(mode="enum:Image.CompressMode", channels="enum:Image.UsedChannels", astcFormat="enum:Image.ASTCFormat", returns="enum:GodotError")]
 		public final native function compressFromChannels(mode:int, channels:int, astcFormat:int = 0):int;
-		/** Decompresses the image if it is VRAM-compressed in a supported format. This increases memory utilization, but allows modifying the image. Returns OK if the format is supported, otherwise ERR_UNAVAILABLE. All VRAM-compressed formats supported by Godot can be decompressed with this method, except FORMAT_ETC2_R11S, FORMAT_ETC2_RG11S, and FORMAT_ETC2_RGB8A1. */
+		/** Decompresses the image if it is VRAM-compressed in a supported format. This increases memory utilization, but allows modifying the image. Returns GodotError.OK if the format is supported, otherwise GodotError.ERR_UNAVAILABLE. All VRAM-compressed formats supported by Godot can be decompressed with this method, except FORMAT_ETC2_R11S, FORMAT_ETC2_RG11S, and FORMAT_ETC2_RGB8A1. */
 		[Godot(returns="enum:GodotError")]
 		public final native function decompress():int;
 		/** Returns true if the image is compressed. */
@@ -33257,7 +33451,7 @@ package godot {
 		 */
 		[Godot(returns="enum:GodotError")]
 		public final native function loadBmpFromBuffer(buffer:PackedByteArray):int;
-		/** Loads an image from the binary contents of a KTX file. Unlike most image formats, KTX can store VRAM-compressed data and embed mipmaps.
+		/** Loads an image from the binary contents of a KTX (https://github.com/KhronosGroup/KTX-Software) file. Unlike most image formats, KTX can store VRAM-compressed data and embed mipmaps.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_image.html#class-image-method-load-ktx-from-buffer
 		 */
@@ -33575,10 +33769,10 @@ package godot {
 		 */
 		public static native function get useAccumulatedInput():Boolean;
 		public static native function set useAccumulatedInput(value:Boolean):void;
-		/** If true, sends mouse input events when tapping or swiping on the touchscreen. See also ProjectSettings.inputDevices/pointing/emulateMouseFromTouch. */
+		/** If true, sends mouse input events when tapping or swiping on the touchscreen. See also "input_devices/pointing/emulate_mouse_from_touch". */
 		public static native function get emulateMouseFromTouch():Boolean;
 		public static native function set emulateMouseFromTouch(value:Boolean):void;
-		/** If true, sends touch input events when clicking or dragging the mouse. See also ProjectSettings.inputDevices/pointing/emulateTouchFromMouse. */
+		/** If true, sends touch input events when clicking or dragging the mouse. See also "input_devices/pointing/emulate_touch_from_mouse". */
 		public static native function get emulateTouchFromMouse():Boolean;
 		public static native function set emulateTouchFromMouse(value:Boolean):void;
 		/** If true, joypad input (including motion sensors) and LED light changes will be ignored and joypad vibration will be stopped when the application is not focused. */
@@ -33677,7 +33871,7 @@ package godot {
 		/** Returns the current value of the joypad axis at index axis. */
 		[Godot(axis="enum:JoyAxis")]
 		public static native function getJoyAxis(device:int, axis:int):Number;
-		/** Returns the name of the joypad at the specified device index, e.g. PS4 Controller. Godot uses the SDL2 game controller database to determine gamepad names. */
+		/** Returns the name of the joypad at the specified device index, e.g. PS4 Controller. Godot uses the SDL2 game controller database (https://github.com/gabomdq/SDL_GameControllerDB) to determine gamepad names. */
 		public static native function getJoyName(device:int):String;
 		/** Returns an SDL-compatible device GUID on platforms that use gamepad remapping, e.g. 030000004c050000c405000000010000. Returns an empty string if it cannot be found. Godot uses SDL's internal mappings, supplemented by community-contributed mappings, to determine gamepad names and mappings based on this GUID.
 		 *
@@ -33689,7 +33883,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_input.html#class-input-method-get-joy-info
 		 */
 		public static native function getJoyInfo(device:int):GodotDictionary;
-		/** Queries whether an input device should be ignored or not. Devices can be ignored by setting the environment variable SDL_GAMECONTROLLER_IGNORE_DEVICES. Read the SDL documentation for more information.
+		/** Queries whether an input device should be ignored or not. Devices can be ignored by setting the environment variable SDL_GAMECONTROLLER_IGNORE_DEVICES. Read the SDL documentation (https://wiki.libsdl.org/SDL2) for more information.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_input.html#class-input-method-should-ignore-device
 		 */
@@ -33893,7 +34087,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_input.html#class-input-method-parse-input-event
 		 */
 		public static native function parseInputEvent(event:InputEvent):void;
-		/** Sends all input events which are in the current buffer to the game loop. These events may have been buffered as a result of accumulated input (useAccumulatedInput) or agile input flushing (ProjectSettings.inputDevices/buffering/agileEventFlushing).
+		/** Sends all input events which are in the current buffer to the game loop. These events may have been buffered as a result of accumulated input (useAccumulatedInput) or agile input flushing ("input_devices/buffering/agile_event_flushing").
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_input.html#class-input-method-flush-buffered-events
 		 */
@@ -34207,10 +34401,10 @@ package godot {
 		 */
 		public final native function get pressure():int;
 		public final native function set pressure(value:int):void;
-		/** The unique number of the controller, if message is MIDI_MESSAGE_CONTROL_CHANGE, otherwise this is 0. This value can be used to identify sliders for volume, balance, and panning, as well as switches and pedals on the MIDI device. See the General MIDI specification for a small list. */
+		/** The unique number of the controller, if message is MIDIMessage.CONTROL_CHANGE, otherwise this is 0. This value can be used to identify sliders for volume, balance, and panning, as well as switches and pedals on the MIDI device. See the General MIDI specification (https://en.wikipedia.org/wiki/General_MIDI#Controller_events) for a small list. */
 		public final native function get controllerNumber():int;
 		public final native function set controllerNumber(value:int):void;
-		/** The value applied to the controller. If message is MIDI_MESSAGE_CONTROL_CHANGE, this value ranges from 0 to 127, otherwise it is 0. See also controllerValue. */
+		/** The value applied to the controller. If message is MIDIMessage.CONTROL_CHANGE, this value ranges from 0 to 127, otherwise it is 0. See also controllerValue. */
 		public final native function get controllerValue():int;
 		public final native function set controllerValue(value:int):void;
 	}
@@ -34929,7 +35123,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_javascriptbridge.html#class-javascriptbridge-method-create-callback
 		 */
 		public static native function createCallback(callable:Function):JavaScriptObject;
-		/** Returns true if the given javascriptObject is of type ArrayBuffer, DataView, or one of the many typed array objects. */
+		/** Returns true if the given javascriptObject is of type ArrayBuffer (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer), DataView (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView), or one of the many typed array objects (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray). */
 		public static native function isJsBuffer(javascriptObject:JavaScriptObject):Boolean;
 		/** Returns a copy of javascriptBuffer's contents as a PackedByteArray. See also isJsBuffer. */
 		public static native function jsBufferToPackedByteArray(javascriptBuffer:JavaScriptObject):PackedByteArray;
@@ -35204,7 +35398,7 @@ package godot {
 		public static const FLAG_MAX:int = 4;
 		/** This mode performs standard alpha blending. It can display translucent areas, but transparency sorting issues may be visible when multiple transparent materials are overlapping. GeometryInstance3D.castShadow has no effect when this transparency mode is used; the Label3D will never cast shadows. */
 		public static const ALPHA_CUT_DISABLED:int = 0;
-		/** This mode only allows fully transparent or fully opaque pixels. Harsh edges will be visible unless some form of screen-space antialiasing is enabled (see ProjectSettings.rendering/antiAliasing/quality/screenSpaceAa). This mode is also known as alpha testing or 1-bit transparency.
+		/** This mode only allows fully transparent or fully opaque pixels. Harsh edges will be visible unless some form of screen-space antialiasing is enabled (see "rendering/anti_aliasing/quality/screen_space_aa"). This mode is also known as alpha testing or 1-bit transparency.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_label3d.html#class-label3d-constant-alpha-cut-discard
 		 */
@@ -35468,13 +35662,13 @@ package godot {
 	[GodotEnum(name="BakeError", values="BAKE_ERROR_OK,BAKE_ERROR_NO_SCENE_ROOT,BAKE_ERROR_FOREIGN_DATA,BAKE_ERROR_NO_LIGHTMAPPER,BAKE_ERROR_NO_SAVE_PATH,BAKE_ERROR_NO_MESHES,BAKE_ERROR_MESHES_INVALID,BAKE_ERROR_CANT_CREATE_IMAGE,BAKE_ERROR_USER_ABORTED,BAKE_ERROR_TEXTURE_SIZE_TOO_SMALL,BAKE_ERROR_LIGHTMAP_TOO_SMALL,BAKE_ERROR_ATLAS_TOO_SMALL")]
 	[GodotEnum(name="EnvironmentMode", values="ENVIRONMENT_MODE_DISABLED,ENVIRONMENT_MODE_SCENE,ENVIRONMENT_MODE_CUSTOM_SKY,ENVIRONMENT_MODE_CUSTOM_COLOR")]
 	public native class LightmapGI extends VisualInstance3D {
-		/** Low bake quality (fastest bake times). The quality of this preset can be adjusted by changing ProjectSettings.rendering/lightmapping/bakeQuality/lowQualityRayCount and ProjectSettings.rendering/lightmapping/bakeQuality/lowQualityProbeRayCount. */
+		/** Low bake quality (fastest bake times). The quality of this preset can be adjusted by changing "rendering/lightmapping/bake_quality/low_quality_ray_count" and "rendering/lightmapping/bake_quality/low_quality_probe_ray_count". */
 		public static const BAKE_QUALITY_LOW:int = 0;
-		/** Medium bake quality (fast bake times). The quality of this preset can be adjusted by changing ProjectSettings.rendering/lightmapping/bakeQuality/mediumQualityRayCount and ProjectSettings.rendering/lightmapping/bakeQuality/mediumQualityProbeRayCount. */
+		/** Medium bake quality (fast bake times). The quality of this preset can be adjusted by changing "rendering/lightmapping/bake_quality/medium_quality_ray_count" and "rendering/lightmapping/bake_quality/medium_quality_probe_ray_count". */
 		public static const BAKE_QUALITY_MEDIUM:int = 1;
-		/** High bake quality (slow bake times). The quality of this preset can be adjusted by changing ProjectSettings.rendering/lightmapping/bakeQuality/highQualityRayCount and ProjectSettings.rendering/lightmapping/bakeQuality/highQualityProbeRayCount. */
+		/** High bake quality (slow bake times). The quality of this preset can be adjusted by changing "rendering/lightmapping/bake_quality/high_quality_ray_count" and "rendering/lightmapping/bake_quality/high_quality_probe_ray_count". */
 		public static const BAKE_QUALITY_HIGH:int = 2;
-		/** Highest bake quality (slowest bake times). The quality of this preset can be adjusted by changing ProjectSettings.rendering/lightmapping/bakeQuality/ultraQualityRayCount and ProjectSettings.rendering/lightmapping/bakeQuality/ultraQualityProbeRayCount. */
+		/** Highest bake quality (slowest bake times). The quality of this preset can be adjusted by changing "rendering/lightmapping/bake_quality/ultra_quality_ray_count" and "rendering/lightmapping/bake_quality/ultra_quality_probe_ray_count". */
 		public static const BAKE_QUALITY_ULTRA:int = 3;
 		/** Don't generate lightmap probes for lighting dynamic objects. */
 		public static const GENERATE_PROBES_DISABLED:int = 0;
@@ -35581,10 +35775,10 @@ package godot {
 		/** If true, uses a GPU-based denoising algorithm on the generated lightmap. This eliminates most noise within the generated lightmap at the cost of longer bake times. File sizes are generally not impacted significantly by the use of a denoiser, although lossless compression may do a better job at compressing a denoised image. */
 		public final native function get useDenoiser():Boolean;
 		public final native function set useDenoiser(value:Boolean):void;
-		/** The strength of denoising step applied to the generated lightmaps. Only effective if useDenoiser is true and ProjectSettings.rendering/lightmapping/denoising/denoiser is set to JNLM. */
+		/** The strength of denoising step applied to the generated lightmaps. Only effective if useDenoiser is true and "rendering/lightmapping/denoising/denoiser" is set to JNLM. */
 		public final native function get denoiserStrength():Number;
 		public final native function set denoiserStrength(value:Number):void;
-		/** The distance in pixels from which the denoiser samples. Lower values preserve more details, but may give blotchy results if the lightmap quality is not high enough. Only effective if useDenoiser is true and ProjectSettings.rendering/lightmapping/denoising/denoiser is set to JNLM. */
+		/** The distance in pixels from which the denoiser samples. Lower values preserve more details, but may give blotchy results if the lightmap quality is not high enough. Only effective if useDenoiser is true and "rendering/lightmapping/denoising/denoiser" is set to JNLM. */
 		public final native function get denoiserRange():int;
 		public final native function set denoiserRange(value:int):void;
 		/** The bias to use when computing shadows. Increasing bias can fix shadow acne on the resulting baked lightmap, but can introduce peter-panning (shadows not connecting to their casters). Real-time Light3D shadows are not affected by this bias property. */
@@ -36098,11 +36292,11 @@ package godot {
 		public final native function get textSubmitted():Signal;
 		/** Emitted when the LineEdit switches in or out of edit mode. */
 		public final native function get editingToggled():Signal;
-		/** Returns true if the user has text in the Input Method Editor (IME). */
+		/** Returns true if the user has text in the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME). */
 		public final native function hasImeText():Boolean;
-		/** Closes the Input Method Editor (IME) if it is open. Any text in the IME will be lost. */
+		/** Closes the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME) if it is open. Any text in the IME will be lost. */
 		public final native function cancelIme():void;
-		/** Applies text from the Input Method Editor (IME) and closes the IME if it is open. */
+		/** Applies text from the Input Method Editor (https://en.wikipedia.org/wiki/Input_method) (IME) and closes the IME if it is open. */
 		public final native function applyIme():void;
 		/** Allows entering edit mode whether the LineEdit is focused or not. If hideFocus is true, the focused state will not be shown (see Control.grabFocus).
 		 *
@@ -36189,7 +36383,7 @@ package godot {
 		public final native function get underline():int;
 		[Godot(value="enum:LinkButton.UnderlineMode")]
 		public final native function set underline(value:int):void;
-		/** The URI for this LinkButton. If set to a valid URI, pressing the button opens the URI using the operating system's default program for the protocol (via OS.shellOpen). HTTP and HTTPS URLs open the default web browser.
+		/** The URI (https://en.wikipedia.org/wiki/Uniform_Resource_Identifier) for this LinkButton. If set to a valid URI, pressing the button opens the URI using the operating system's default program for the protocol (via OS.shellOpen). HTTP and HTTPS URLs open the default web browser.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_linkbutton.html#class-linkbutton-property-uri
 		 */
@@ -37252,7 +37446,7 @@ package godot {
 		public native function _handlesFile(path:String):Boolean;
 		/** Returns the list of supported filename extensions for movies written with this MovieWriter. */
 		public native function _getSupportedExtensions():PackedStringArray;
-		/** Called once before the engine starts writing video and audio data. movieSize is the width and height of the video to save. fps is the number of frames per second specified in the project settings or using the --fixed-fps <fps> command line argument. */
+		/** Called once before the engine starts writing video and audio data. movieSize is the width and height of the video to save. fps is the number of frames per second specified in the project settings or using the --fixed-fps <fps> command line argument (https://docs.godotengine.org/en/4.7/tutorials/editor/command_line_tutorial.html). */
 		[Godot(returns="enum:GodotError")]
 		public native function _writeBegin(movieSize:Vector2i, fps:uint, basePath:String):int;
 		/** Called when the engine finishes writing. This occurs when the engine quits by pressing the window manager's close button, or when SceneTree.quit is called.
@@ -38750,7 +38944,7 @@ package godot {
 		public final native function setCollisionMaskValue(layerNumber:int, value:Boolean):void;
 		/** Returns whether or not the specified layer of the geometryCollisionMask is enabled, given a layerNumber between 1 and 32. */
 		public final native function getCollisionMaskValue(layerNumber:int):Boolean;
-		/** Adds a polygon using the indices of the vertices you get when calling getVertices. */
+		/** Adds a polygon using the indices of the vertices you get when calling vertices. */
 		public final native function addPolygon(polygon:PackedInt32Array):void;
 		/** Returns the number of polygons in the navigation mesh. */
 		public final native function getPolygonCount():int;
@@ -39330,7 +39524,7 @@ package godot {
 		/** The position offset applied to the bakingRect Rect2. */
 		public final native function get bakingRectOffset():Vector2;
 		public final native function set bakingRectOffset(value:Vector2):void;
-		/** Adds a polygon using the indices of the vertices you get when calling getVertices. */
+		/** Adds a polygon using the indices of the vertices you get when calling vertices. */
 		public final native function addPolygon(polygon:PackedInt32Array):void;
 		/** Returns the count of all polygons. */
 		public final native function getPolygonCount():int;
@@ -40714,7 +40908,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-get-locale
 		 */
 		public static native function getLocale():String;
-		/** Returns the host OS locale's 2 or 3-letter language code as a string which should be consistent on all platforms. This is equivalent to extracting the language part of the getLocale string.
+		/** Returns the host OS locale's 2 or 3-letter language code (https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) as a string which should be consistent on all platforms. This is equivalent to extracting the language part of the getLocale string.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-get-locale-language
 		 */
@@ -40726,7 +40920,7 @@ package godot {
 		public static native function getModelName():String;
 		/** Returns true if the user:// file system is persistent, that is, its state is the same after a player quits and starts the game again. Relevant to the Web platform, where this persistence may be unavailable. */
 		public static native function isUserfsPersistent():Boolean;
-		/** Returns true if the engine was executed with the --verbose or -v command line argument, or if ProjectSettings.debug/settings/stdout/verboseStdout is true. See also printVerbose. */
+		/** Returns true if the engine was executed with the --verbose or -v command line argument, or if "debug/settings/stdout/verbose_stdout" is true. See also printVerbose. */
 		public static native function isStdoutVerbose():Boolean;
 		/** Returns true if the Godot binary used to run the project is a debug export template, or when running in the editor.
 		 *
@@ -40748,7 +40942,7 @@ package godot {
 		 */
 		[Godot(returns="enum:GodotError")]
 		public static native function moveToTrash(path:String):int;
-		/** Returns the absolute directory path where user data is written (the user:// directory in Godot). The path depends on the project name and ProjectSettings.application/config/useCustomUserDir.
+		/** Returns the absolute directory path where user data is written (the user:// directory in Godot). The path depends on the project name and "application/config/use_custom_user_dir".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-get-user-data-dir
 		 */
@@ -40803,7 +40997,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-set-use-file-access-save-and-swap
 		 */
 		public static native function setUseFileAccessSaveAndSwap(enabled:Boolean):void;
-		/** Assigns the given name to the current thread. Returns ERR_UNAVAILABLE if unavailable on the current platform. */
+		/** Assigns the given name to the current thread. Returns GodotError.ERR_UNAVAILABLE if unavailable on the current platform. */
 		[Godot(returns="enum:GodotError")]
 		public static native function setThreadName(name:String):int;
 		/** Returns the ID of the current thread. This can be used in logs to ease debugging of multi-threaded applications.
@@ -40816,7 +41010,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-get-main-thread-id
 		 */
 		public static native function getMainThreadID():Int64;
-		/** Returns true if the feature for the given feature tag is supported in the currently running instance, depending on the platform, build, etc. Can be used to check whether you're currently running a debug build, on a certain platform or arch, etc. Refer to the Feature Tags documentation for more details.
+		/** Returns true if the feature for the given feature tag is supported in the currently running instance, depending on the platform, build, etc. Can be used to check whether you're currently running a debug build, on a certain platform or arch, etc. Refer to the Feature Tags (https://docs.godotengine.org/en/4.7/tutorials/export/feature_tags.html) documentation for more details.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_os.html#class-os-method-has-feature
 		 */
@@ -40997,15 +41191,15 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrapiextension.html
 		 */
 		public native function OpenXRAPIExtension();
-		/** Returns the version of OpenXR that was initialized. Only valid after the OpenXR instance has been created. See XR_MAKE_VERSION for how the version is calculated. */
+		/** Returns the version of OpenXR that was initialized. Only valid after the OpenXR instance has been created. See XR_MAKE_VERSION (https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html#XR_MAKE_VERSION) for how the version is calculated. */
 		public final native function getOpenxrVersion():Int64;
-		/** Returns the XrInstance created during the initialization of the OpenXR API. */
+		/** Returns the XrInstance (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrInstance.html) created during the initialization of the OpenXR API. */
 		public final native function getInstance():Int64;
-		/** Returns the ID of the system, which is an XrSystemId cast to an integer. */
+		/** Returns the ID of the system, which is an XrSystemId (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrSystemId.html) cast to an integer. */
 		public final native function getSystemID():Int64;
-		/** Returns the OpenXR session, which is an XrSession cast to an integer. */
+		/** Returns the OpenXR session, which is an XrSession (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrSession.html) cast to an integer. */
 		public final native function getSession():Int64;
-		/** Returns true if the provided XrResult (cast to an integer) is successful. Otherwise returns false and prints the XrResult converted to a string, with the specified additional information. */
+		/** Returns true if the provided XrResult (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrResult.html) (cast to an integer) is successful. Otherwise returns false and prints the XrResult (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrResult.html) converted to a string, with the specified additional information. */
 		public final native function xrResult(result:Int64, format:String, args:GodotArray):Boolean;
 		/** Returns true if OpenXR is enabled. */
 		public static native function openxrIsEnabled(checkRunInEditor:Boolean):Boolean;
@@ -41014,7 +41208,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrapiextension.html#class-openxrapiextension-method-get-instance-proc-addr
 		 */
 		public final native function getInstanceProcAddr(name:String):Int64;
-		/** Returns an error string for the given XrResult. */
+		/** Returns an error string for the given XrResult (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrResult.html). */
 		public final native function getErrorString(result:Int64):String;
 		/** Returns the name of the specified swapchain format. */
 		public final native function getSwapchainFormatName(swapchainFormat:Int64):String;
@@ -41028,13 +41222,13 @@ package godot {
 		public final native function insertDebugLabel(labelName:String):void;
 		/** Returns the number of views. It is usually two, one for each eye, but may differ with different view configurations. */
 		public final native function getViewCount():uint;
-		/** Returns the view configuration type, which is an XrViewConfigurationType cast to an integer. */
+		/** Returns the view configuration type, which is an XrViewConfigurationType (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrViewConfigurationType.html) cast to an integer. */
 		public final native function getViewConfiguration():Int64;
 		/** Returns true if OpenXR is initialized. */
 		public final native function isInitialized():Boolean;
-		/** Returns true if OpenXR is running (xrBeginSession was successfully called and the swapchains were created). */
+		/** Returns true if OpenXR is running (xrBeginSession (https://registry.khronos.org/OpenXR/specs/1.0/man/html/xrBeginSession.html) was successfully called and the swapchains were created). */
 		public final native function isRunning():Boolean;
-		/** Returns the play space, which is an XrSpace cast to an integer. */
+		/** Returns the play space, which is an XrSpace (https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrSpace.html) cast to an integer. */
 		public final native function getPlaySpace():Int64;
 		/** Returns the predicted display timing for the current frame. */
 		public final native function getPredictedDisplayTime():Int64;
@@ -41537,7 +41731,7 @@ package godot {
 		 */
 		public final native function registerExtensionWrapper():void;
 	}
-	/** Wraps the XR_KHR_android_thread_settings extension.
+	/** Wraps the XR_KHR_android_thread_settings (https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html#XR_KHR_android_thread_settings) extension.
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_openxrandroidthreadsettingsextension.html
 	 */
@@ -41551,7 +41745,7 @@ package godot {
 		public static const THREAD_TYPE_RENDERER_MAIN:int = 2;
 		/** Hints to the XR runtime that the thread is doing background graphics device tasks. */
 		public static const THREAD_TYPE_RENDERER_WORKER:int = 3;
-		/** Wraps the XR_KHR_android_thread_settings extension.
+		/** Wraps the XR_KHR_android_thread_settings (https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html#XR_KHR_android_thread_settings) extension.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrandroidthreadsettingsextension.html
 		 */
@@ -42685,19 +42879,19 @@ package godot {
 		public final native function getPersistenceContextHandle(persistenceContext:RID):Int64;
 		/** Frees a persistence context previously created with createPersistenceContext. */
 		public final native function freePersistenceContext(persistenceContext:RID):void;
-		/** Creates a new anchor that will be tracked by the XR runtime. The transform should be a transform in the local space of your XROrigin3D node. If spatialContext is not specified the default will be used, this requires ProjectSettings.xr/openxr/extensions/spatialEntity/enableBuiltinAnchorDetection to be set. The returned tracker will track the location in case our reference space changes.
+		/** Creates a new anchor that will be tracked by the XR runtime. The transform should be a transform in the local space of your XROrigin3D node. If spatialContext is not specified the default will be used, this requires "xr/openxr/extensions/spatial_entity/enable_builtin_anchor_detection" to be set. The returned tracker will track the location in case our reference space changes.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrspatialanchorcapability.html#class-openxrspatialanchorcapability-method-create-new-anchor
 		 */
 		public final native function createNewAnchor(transform:Transform3D, spatialContext:RID = null, next:OpenXRStructureBase = null):OpenXRAnchorTracker;
 		/** Remove an anchor previously created with createNewAnchor. If this anchor was persistent you must first call unpersistAnchor and await its callback. */
 		public final native function removeAnchor(anchorTracker:OpenXRAnchorTracker):void;
-		/** Changes this anchor into a persistent anchor. This means its location will be stored on the device and the anchor will be restored the next time your application starts. If persistenceContext is not specified the default will be used, this requires ProjectSettings.xr/openxr/extensions/spatialEntity/enableBuiltinAnchorDetection to be set.
+		/** Changes this anchor into a persistent anchor. This means its location will be stored on the device and the anchor will be restored the next time your application starts. If persistenceContext is not specified the default will be used, this requires "xr/openxr/extensions/spatial_entity/enable_builtin_anchor_detection" to be set.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrspatialanchorcapability.html#class-openxrspatialanchorcapability-method-persist-anchor
 		 */
 		public final native function persistAnchor(anchorTracker:OpenXRAnchorTracker, persistenceContext:RID = null, userCallback:Function = null):OpenXRFutureResult;
-		/** Removes the persistent data from this anchor. The runtime will not recreate the anchor when your application restarts. If persistenceContext is not specified the default will be used, this requires ProjectSettings.xr/openxr/extensions/spatialEntity/enabled to be set.
+		/** Removes the persistent data from this anchor. The runtime will not recreate the anchor when your application restarts. If persistenceContext is not specified the default will be used, this requires "xr/openxr/extensions/spatial_entity/enabled" to be set.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_openxrspatialanchorcapability.html#class-openxrspatialanchorcapability-method-unpersist-anchor
 		 */
@@ -43365,7 +43559,7 @@ package godot {
 		/** The locale of the translation. */
 		public final native function get locale():String;
 		public final native function set locale(value:String):void;
-		/** The plural rules string to enforce. See GNU gettext for examples and more info.
+		/** The plural rules string to enforce. See GNU gettext (https://www.gnu.org/software/gettext/manual/html_node/Plural-forms.html) for examples and more info.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_translation.html#class-translation-property-plural-rules-override
 		 */
@@ -43465,7 +43659,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_optionbutton.html#class-optionbutton-signal-item-selected
 		 */
 		public final native function get itemSelected():Signal;
-		/** Emitted when the user navigates to an item using the ProjectSettings.input/uiUp or ProjectSettings.input/uiDown input actions. The index of the item focused is passed as argument. */
+		/** Emitted when the user navigates to an item using the "input/ui_up" or "input/ui_down" input actions. The index of the item focused is passed as argument. */
 		public final native function get itemFocused():Signal;
 		/** Adds an item, with text label and (optionally) id. If no id is passed, the item index will be used as the item's ID. New items are appended at the end.
 		 *
@@ -44534,7 +44728,7 @@ package godot {
 		/** A Curve3D describing the path. */
 		public final native function get curve():Curve3D;
 		public final native function set curve(value:Curve3D):void;
-		/** The custom color used to draw the path in the editor. If set to Color.BLACK (as by default), the color set in ProjectSettings.debug/shapes/paths/geometryColor is used. */
+		/** The custom color used to draw the path in the editor. If set to Color.BLACK (as by default), the color set in "debug/shapes/paths/geometry_color" is used. */
 		public final native function get debugCustomColor():Color;
 		public final native function set debugCustomColor(value:Color):void;
 		/** Emitted when the curve changes. */
@@ -44853,7 +45047,7 @@ package godot {
 		 */
 		public final native function get physicsMaterialOverride():PhysicsMaterial;
 		public final native function set physicsMaterialOverride(value:PhysicsMaterial):void;
-		/** Multiplies the gravity applied to the body. The body's gravity is calculated from the ProjectSettings.physics/2d/defaultGravity project setting and/or any additional gravity vector applied by Area2Ds. */
+		/** Multiplies the gravity applied to the body. The body's gravity is calculated from the "physics/2d/default_gravity" project setting and/or any additional gravity vector applied by Area2Ds. */
 		public final native function get gravityScale():Number;
 		public final native function set gravityScale(value:Number):void;
 		/** Defines the way the body's center of mass is set. */
@@ -44930,7 +45124,7 @@ package godot {
 		public final native function get linearDampMode():int;
 		[Godot(value="enum:RigidBody2D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
-		/** Damps the body's movement. By default, the body will use the ProjectSettings.physics/2d/defaultLinearDamp setting or any value override set by an Area2D the body is in. Depending on linearDampMode, you can set linearDamp to be added to or to replace the body's damping value.
+		/** Damps the body's movement. By default, the body will use the "physics/2d/default_linear_damp" setting or any value override set by an Area2D the body is in. Depending on linearDampMode, you can set linearDamp to be added to or to replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_rigidbody2d.html#class-rigidbody2d-property-linear-damp
 		 */
@@ -44944,7 +45138,7 @@ package godot {
 		public final native function get angularDampMode():int;
 		[Godot(value="enum:RigidBody2D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
-		/** Damps the body's rotation. By default, the body will use the ProjectSettings.physics/2d/defaultAngularDamp setting or any value override set by an Area2D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
+		/** Damps the body's rotation. By default, the body will use the "physics/2d/default_angular_damp" setting or any value override set by an Area2D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_rigidbody2d.html#class-rigidbody2d-property-angular-damp
 		 */
@@ -45132,7 +45326,7 @@ package godot {
 		 */
 		public final native function get bounce():Number;
 		public final native function set bounce(value:Number):void;
-		/** This is multiplied by ProjectSettings.physics/3d/defaultGravity to produce this body's gravity. For example, a value of 1.0 will apply normal gravity, 2.0 will apply double the gravity, and 0.5 will apply half the gravity to this body. */
+		/** This is multiplied by "physics/3d/default_gravity" to produce this body's gravity. For example, a value of 1.0 will apply normal gravity, 2.0 will apply double the gravity, and 0.5 will apply half the gravity to this body. */
 		public final native function get gravityScale():Number;
 		public final native function set gravityScale(value:Number):void;
 		/** If true, the standard force integration (like gravity or damping) will be disabled for this body. Other than collision response, the body will only move as determined by the _integrateForces method, if that virtual method is overridden.
@@ -45146,7 +45340,7 @@ package godot {
 		public final native function get linearDampMode():int;
 		[Godot(value="enum:PhysicalBone3D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
-		/** Damps the body's movement. By default, the body will use ProjectSettings.physics/3d/defaultLinearDamp or any value override set by an Area3D the body is in. Depending on linearDampMode, linearDamp may be added to or replace the body's damping value.
+		/** Damps the body's movement. By default, the body will use "physics/3d/default_linear_damp" or any value override set by an Area3D the body is in. Depending on linearDampMode, linearDamp may be added to or replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_physicalbone3d.html#class-physicalbone3d-property-linear-damp
 		 */
@@ -45157,7 +45351,7 @@ package godot {
 		public final native function get angularDampMode():int;
 		[Godot(value="enum:PhysicalBone3D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
-		/** Damps the body's rotation. By default, the body will use the ProjectSettings.physics/3d/defaultAngularDamp project setting or any value override set by an Area3D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
+		/** Damps the body's rotation. By default, the body will use the "physics/3d/default_angular_damp" project setting or any value override set by an Area3D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_physicalbone3d.html#class-physicalbone3d-property-angular-damp
 		 */
@@ -45232,19 +45426,19 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_physicalskymaterial.html
 		 */
 		public native function PhysicalSkyMaterial();
-		/** Controls the strength of the Rayleigh scattering. Rayleigh scattering results from light colliding with small particles. It is responsible for the blue color of the sky. */
+		/** Controls the strength of the Rayleigh scattering (https://en.wikipedia.org/wiki/Rayleigh_scattering). Rayleigh scattering results from light colliding with small particles. It is responsible for the blue color of the sky. */
 		public final native function get rayleighCoefficient():Number;
 		public final native function set rayleighCoefficient(value:Number):void;
-		/** Controls the Color of the Rayleigh scattering. While not physically accurate, this allows for the creation of alien-looking planets. For example, setting this to a red Color results in a Mars-looking atmosphere with a corresponding blue sunset. */
+		/** Controls the Color of the Rayleigh scattering (https://en.wikipedia.org/wiki/Rayleigh_scattering). While not physically accurate, this allows for the creation of alien-looking planets. For example, setting this to a red Color results in a Mars-looking atmosphere with a corresponding blue sunset. */
 		public final native function get rayleighColor():Color;
 		public final native function set rayleighColor(value:Color):void;
-		/** Controls the strength of Mie scattering for the sky. Mie scattering results from light colliding with larger particles (like water). On earth, Mie scattering results in a whitish color around the sun and horizon. */
+		/** Controls the strength of Mie scattering (https://en.wikipedia.org/wiki/Mie_scattering) for the sky. Mie scattering results from light colliding with larger particles (like water). On earth, Mie scattering results in a whitish color around the sun and horizon. */
 		public final native function get mieCoefficient():Number;
 		public final native function set mieCoefficient(value:Number):void;
-		/** Controls the direction of the Mie scattering. A value of 1 means that when light hits a particle it's passing through straight forward. A value of -1 means that all light is scatter backwards. */
+		/** Controls the direction of the Mie scattering (https://en.wikipedia.org/wiki/Mie_scattering). A value of 1 means that when light hits a particle it's passing through straight forward. A value of -1 means that all light is scatter backwards. */
 		public final native function get mieEccentricity():Number;
 		public final native function set mieEccentricity(value:Number):void;
-		/** Controls the Color of the Mie scattering effect. While not physically accurate, this allows for the creation of alien-looking planets. */
+		/** Controls the Color of the Mie scattering (https://en.wikipedia.org/wiki/Mie_scattering) effect. While not physically accurate, this allows for the creation of alien-looking planets. */
 		public final native function get mieColor():Color;
 		public final native function set mieColor(value:Color):void;
 		/** Sets the thickness of the atmosphere. High turbidity creates a foggy-looking atmosphere, while a low turbidity results in a clearer atmosphere. */
@@ -45861,7 +46055,7 @@ package godot {
 		 */
 		public final native function get canvasInstanceID():Int64;
 		public final native function set canvasInstanceID(value:Int64):void;
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject2D.getRID to get the RID associated with a CollisionObject2D-derived node.
@@ -45892,7 +46086,7 @@ package godot {
 		/** The position being queried for, in global coordinates. */
 		public final native function get position():Vector3;
 		public final native function set position(value:Vector3):void;
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject3D.getRID to get the RID associated with a CollisionObject3D-derived node.
@@ -45926,7 +46120,7 @@ package godot {
 		/** The ending point of the ray being queried for, in global coordinates. */
 		public final native function get to():Vector2;
 		public final native function set to(value:Vector2):void;
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject2D.getRID to get the RID associated with a CollisionObject2D-derived node.
@@ -45969,7 +46163,7 @@ package godot {
 		/** The ending point of the ray being queried for, in global coordinates. */
 		public final native function get to():Vector3;
 		public final native function set to(value:Vector3):void;
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject3D.getRID to get the RID associated with a CollisionObject3D-derived node.
@@ -46022,23 +46216,23 @@ package godot {
 	[Singleton]
 	[Abstract]
 	public native class PhysicsServer2D extends GodotObject {
-		/** Constant to set/get the maximum distance a pair of bodies has to move before their collision status has to be recalculated. The default value of this parameter is ProjectSettings.physics/2d/solver/contactRecycleRadius. */
+		/** Constant to set/get the maximum distance a pair of bodies has to move before their collision status has to be recalculated. The default value of this parameter is "physics/2d/solver/contact_recycle_radius". */
 		public static const SPACE_PARAM_CONTACT_RECYCLE_RADIUS:int = 0;
-		/** Constant to set/get the maximum distance a shape can be from another before they are considered separated and the contact is discarded. The default value of this parameter is ProjectSettings.physics/2d/solver/contactMaxSeparation. */
+		/** Constant to set/get the maximum distance a shape can be from another before they are considered separated and the contact is discarded. The default value of this parameter is "physics/2d/solver/contact_max_separation". */
 		public static const SPACE_PARAM_CONTACT_MAX_SEPARATION:int = 1;
-		/** Constant to set/get the maximum distance a shape can penetrate another shape before it is considered a collision. The default value of this parameter is ProjectSettings.physics/2d/solver/contactMaxAllowedPenetration. */
+		/** Constant to set/get the maximum distance a shape can penetrate another shape before it is considered a collision. The default value of this parameter is "physics/2d/solver/contact_max_allowed_penetration". */
 		public static const SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION:int = 2;
-		/** Constant to set/get the default solver bias for all physics contacts. A solver bias is a factor controlling how much two objects "rebound", after overlapping, to avoid leaving them in that state because of numerical imprecision. The default value of this parameter is ProjectSettings.physics/2d/solver/defaultContactBias. */
+		/** Constant to set/get the default solver bias for all physics contacts. A solver bias is a factor controlling how much two objects "rebound", after overlapping, to avoid leaving them in that state because of numerical imprecision. The default value of this parameter is "physics/2d/solver/default_contact_bias". */
 		public static const SPACE_PARAM_CONTACT_DEFAULT_BIAS:int = 3;
-		/** Constant to set/get the threshold linear velocity of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after the time given. The default value of this parameter is ProjectSettings.physics/2d/sleepThresholdLinear. */
+		/** Constant to set/get the threshold linear velocity of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after the time given. The default value of this parameter is "physics/2d/sleep_threshold_linear". */
 		public static const SPACE_PARAM_BODY_LINEAR_VELOCITY_SLEEP_THRESHOLD:int = 4;
-		/** Constant to set/get the threshold angular velocity of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after the time given. The default value of this parameter is ProjectSettings.physics/2d/sleepThresholdAngular. */
+		/** Constant to set/get the threshold angular velocity of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after the time given. The default value of this parameter is "physics/2d/sleep_threshold_angular". */
 		public static const SPACE_PARAM_BODY_ANGULAR_VELOCITY_SLEEP_THRESHOLD:int = 5;
-		/** Constant to set/get the maximum time of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after this time. The default value of this parameter is ProjectSettings.physics/2d/timeBeforeSleep. */
+		/** Constant to set/get the maximum time of activity. A body marked as potentially inactive for both linear and angular velocity will be put to sleep after this time. The default value of this parameter is "physics/2d/time_before_sleep". */
 		public static const SPACE_PARAM_BODY_TIME_TO_SLEEP:int = 6;
-		/** Constant to set/get the default solver bias for all physics constraints. A solver bias is a factor controlling how much two objects "rebound", after violating a constraint, to avoid leaving them in that state because of numerical imprecision. The default value of this parameter is ProjectSettings.physics/2d/solver/defaultConstraintBias. */
+		/** Constant to set/get the default solver bias for all physics constraints. A solver bias is a factor controlling how much two objects "rebound", after violating a constraint, to avoid leaving them in that state because of numerical imprecision. The default value of this parameter is "physics/2d/solver/default_constraint_bias". */
 		public static const SPACE_PARAM_CONSTRAINT_DEFAULT_BIAS:int = 7;
-		/** Constant to set/get the number of solver iterations for all contacts and constraints. The greater the number of iterations, the more accurate the collisions will be. However, a greater number of iterations requires more CPU power, which can decrease performance. The default value of this parameter is ProjectSettings.physics/2d/solver/solverIterations. */
+		/** Constant to set/get the number of solver iterations for all contacts and constraints. The greater the number of iterations, the more accurate the collisions will be. However, a greater number of iterations requires more CPU power, which can decrease performance. The default value of this parameter is "physics/2d/solver/solver_iterations". */
 		public static const SPACE_PARAM_SOLVER_ITERATIONS:int = 8;
 		/** This is the constant for creating world boundary shapes. A world boundary shape is an infinite line with an origin point, and a normal. Thus, it can be used for front/behind checks. */
 		public static const SHAPE_WORLD_BOUNDARY:int = 0;
@@ -48099,7 +48293,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_physicsshapequeryparameters2d.html
 		 */
 		public native function PhysicsShapeQueryParameters2D();
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject2D.getRID to get the RID associated with a CollisionObject2D-derived node.
@@ -48145,7 +48339,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_physicsshapequeryparameters3d.html
 		 */
 		public native function PhysicsShapeQueryParameters3D();
-		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks in the documentation for more information. */
+		/** The physics layers the query will detect (as a bitmask). By default, all collision layers are detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The list of object RIDs that will be excluded from collisions. Use CollisionObject3D.getRID to get the RID associated with a CollisionObject3D-derived node.
@@ -48761,7 +48955,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_popupmenu.html#class-popupmenu-signal-id-pressed
 		 */
 		public final native function get idPressed():Signal;
-		/** Emitted when the user navigated to an item of some id using the ProjectSettings.input/uiUp or ProjectSettings.input/uiDown input action. */
+		/** Emitted when the user navigated to an item of some id using the "input/ui_up" or "input/ui_down" input action. */
 		public final native function get idFocused():Signal;
 		/** Emitted when an item of some index is pressed. Also emitted when its accelerator is activated on macOS. */
 		public final native function get indexPressed():Signal;
@@ -49239,7 +49433,7 @@ package godot {
 		public static native function clear(name:String):void;
 		/** Returns the localized path (starting with res://) corresponding to the absolute, native OS path. See also globalizePath. */
 		public static native function localizePath(path:String):String;
-		/** Returns the absolute, native OS path corresponding to the localized path (starting with res:// or user://). The returned path will vary depending on the operating system and user preferences. See File paths in Godot projects to see what those paths convert to. See also localizePath.
+		/** Returns the absolute, native OS path corresponding to the localized path (starting with res:// or user://). The returned path will vary depending on the operating system and user preferences. See File paths in Godot projects (https://docs.godotengine.org/en/4.7/tutorials/io/data_paths.html) to see what those paths convert to. See also localizePath.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_projectsettings.html#class-projectsettings-method-globalize-path
 		 */
@@ -49664,7 +49858,7 @@ package godot {
 		public final native function get sampleCount():int;
 		[Godot(value="enum:RenderingDevice.TextureSamples")]
 		public final native function set sampleCount(value:int):void;
-		/** If true, enables per-sample shading which replaces MSAA by SSAA. This provides higher quality antialiasing that works with transparent (alpha scissor) edges. This has a very high performance cost. See also minSampleShading. See the per-sample shading Vulkan documentation for more details. */
+		/** If true, enables per-sample shading which replaces MSAA by SSAA. This provides higher quality antialiasing that works with transparent (alpha scissor) edges. This has a very high performance cost. See also minSampleShading. See the per-sample shading Vulkan documentation (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#primsrast-sampleshading) for more details. */
 		public final native function get enableSampleShading():Boolean;
 		public final native function set enableSampleShading(value:Boolean):void;
 		/** The multiplier of sampleCount that determines how many samples are performed for each fragment. Must be between 0.0 and 1.0 (inclusive). Only effective if enableSampleShading is true. If minSampleShading is 1.0, fragment invocation must only read from the coverage index sample. Tile image access must not be used if enableSampleShading is not 1.0. */
@@ -49676,7 +49870,7 @@ package godot {
 		/** If true, alpha is forced to either 0.0 or 1.0. This allows hardening the edges of antialiased alpha transparencies. Only relevant if enableAlphaToCoverage is true. */
 		public final native function get enableAlphaToOne():Boolean;
 		public final native function set enableAlphaToOne(value:Boolean):void;
-		/** The sample mask array. See the sample mask Vulkan documentation for more details. */
+		/** The sample mask array. See the sample mask Vulkan documentation (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#fragops-samplemask) for more details. */
 		[Godot(returns="Array[int]")]
 		public final native function get sampleMasks():GodotArray;
 		[Godot(value="Array[int]")]
@@ -50185,7 +50379,7 @@ package godot {
 		public final native function randi():uint;
 		/** Returns a pseudo-random float between 0.0 and 1.0 (inclusive). */
 		public final native function randf():Number;
-		/** Returns a normally-distributed, pseudo-random floating-point number from the specified mean and a standard deviation. This is also known as a Gaussian distribution.
+		/** Returns a normally-distributed (https://en.wikipedia.org/wiki/Normal_distribution), pseudo-random floating-point number from the specified mean and a standard deviation. This is also known as a Gaussian distribution.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_randomnumbergenerator.html#class-randomnumbergenerator-method-randfn
 		 */
@@ -50221,7 +50415,7 @@ package godot {
 		/** The ray's destination point, relative to this raycast's Node2D.position. */
 		public final native function get targetPosition():Vector2;
 		public final native function set targetPosition(value:Vector2):void;
-		/** The ray's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks in the documentation for more information. */
+		/** The ray's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** If true, the ray will detect a hit when starting inside shapes. In this case the collision normal will be Vector2(0, 0). Does not affect concave polygon shapes. */
@@ -50296,7 +50490,7 @@ package godot {
 		/** The ray's destination point, relative to this raycast's Node3D.position. */
 		public final native function get targetPosition():Vector3;
 		public final native function set targetPosition(value:Vector3):void;
-		/** The ray's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks in the documentation for more information. */
+		/** The ray's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** If true, the ray will detect a hit when starting inside shapes. In this case the collision normal will be Vector3(0, 0, 0). Does not affect shapes with no volume like concave polygon or heightmap. */
@@ -50501,7 +50695,7 @@ package godot {
 		public static native function createFromString(pattern:String, showError:Boolean = true):RegEx;
 		/** This method resets the state of the object, as if it was freshly created. Namely, it unassigns the regular expression of this object. */
 		public final native function clear():void;
-		/** Compiles and assign the search pattern to use. Returns OK if the compilation is successful. If compilation fails, returns FAILED and when showError is true, details are printed to standard output. */
+		/** Compiles and assign the search pattern to use. Returns GodotError.OK if the compilation is successful. If compilation fails, returns GodotError.FAILED and when showError is true, details are printed to standard output. */
 		[Godot(returns="enum:GodotError")]
 		public final native function compile(pattern:String, showError:Boolean = true):int;
 		/** Searches the text for the compiled pattern. Returns a RegExMatch container of the first matching result if found, otherwise null.
@@ -50946,7 +51140,7 @@ package godot {
 		public static const DEVICE_TYPE_DISCRETE_GPU:int = 2;
 		/** Rendering device is an emulated GPU in a virtual environment. This is typically much slower than the host GPU, which means the expected performance level on a dedicated GPU will be roughly equivalent to DEVICE_TYPE_INTEGRATED_GPU. Virtual machine GPU passthrough (such as VFIO) will not report the device type as DEVICE_TYPE_VIRTUAL_GPU. Instead, the host GPU's device type will be reported as if the GPU was not emulated. */
 		public static const DEVICE_TYPE_VIRTUAL_GPU:int = 3;
-		/** Rendering device is provided by software emulation (such as Lavapipe or SwiftShader). This is the slowest kind of rendering device available; it's typically much slower than DEVICE_TYPE_INTEGRATED_GPU. */
+		/** Rendering device is provided by software emulation (such as Lavapipe or SwiftShader (https://github.com/google/swiftshader)). This is the slowest kind of rendering device available; it's typically much slower than DEVICE_TYPE_INTEGRATED_GPU. */
 		public static const DEVICE_TYPE_CPU:int = 4;
 		/** Represents the size of the DeviceType enum. */
 		public static const DEVICE_TYPE_MAX:int = 5;
@@ -51531,9 +51725,9 @@ package godot {
 		public static const TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT:int = 4;
 		/** Texture can be used as a depth/stencil resolve attachment in a framebuffer. */
 		public static const TEXTURE_USAGE_DEPTH_RESOLVE_ATTACHMENT_BIT:int = 4096;
-		/** Texture can be used as a storage image. */
+		/** Texture can be used as a storage image (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#descriptorsets-storageimage). */
 		public static const TEXTURE_USAGE_STORAGE_BIT:int = 8;
-		/** Texture can be used as a storage image with support for atomic operations. */
+		/** Texture can be used as a storage image (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#descriptorsets-storageimage) with support for atomic operations. */
 		public static const TEXTURE_USAGE_STORAGE_ATOMIC_BIT:int = 16;
 		/** Texture can be read back on the CPU using textureGetData faster than without this bit, since it is always kept in the system memory. */
 		public static const TEXTURE_USAGE_CPU_READ_BIT:int = 32;
@@ -51543,7 +51737,7 @@ package godot {
 		public static const TEXTURE_USAGE_CAN_COPY_FROM_BIT:int = 128;
 		/** Texture can be a destination for textureCopy. */
 		public static const TEXTURE_USAGE_CAN_COPY_TO_BIT:int = 256;
-		/** Texture can be used as a input attachment in a framebuffer. */
+		/** Texture can be used as a input attachment (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#descriptorsets-inputattachment) in a framebuffer. */
 		public static const TEXTURE_USAGE_INPUT_ATTACHMENT_BIT:int = 512;
 		/** Return the sampled value as-is. */
 		public static const TEXTURE_SWIZZLE_IDENTITY:int = 0;
@@ -51656,7 +51850,7 @@ package godot {
 		public static const UNIFORM_TYPE_IMAGE_BUFFER:int = 6;
 		/** Uniform buffer uniform. */
 		public static const UNIFORM_TYPE_UNIFORM_BUFFER:int = 7;
-		/** Storage buffer uniform. */
+		/** Storage buffer (https://vkguide.dev/docs/chapter-4/storage_buffers/) uniform. */
 		public static const UNIFORM_TYPE_STORAGE_BUFFER:int = 8;
 		/** Input attachment uniform. */
 		public static const UNIFORM_TYPE_INPUT_ATTACHMENT:int = 9;
@@ -51678,28 +51872,28 @@ package godot {
 		public static const RENDER_PRIMITIVE_POINTS:int = 0;
 		/** Line list rendering primitive. Lines are drawn separated from each other. */
 		public static const RENDER_PRIMITIVE_LINES:int = 1;
-		/** Line list rendering primitive with adjacency.
+		/** Line list rendering primitive with adjacency. (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#drawing-line-lists-with-adjacency)
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-render-primitive-lines-with-adjacency
 		 */
 		public static const RENDER_PRIMITIVE_LINES_WITH_ADJACENCY:int = 2;
 		/** Line strip rendering primitive. Lines drawn are connected to the previous vertex. */
 		public static const RENDER_PRIMITIVE_LINESTRIPS:int = 3;
-		/** Line strip rendering primitive with adjacency.
+		/** Line strip rendering primitive with adjacency. (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#drawing-line-strips-with-adjacency)
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-render-primitive-linestrips-with-adjacency
 		 */
 		public static const RENDER_PRIMITIVE_LINESTRIPS_WITH_ADJACENCY:int = 4;
 		/** Triangle list rendering primitive. Triangles are drawn separated from each other. */
 		public static const RENDER_PRIMITIVE_TRIANGLES:int = 5;
-		/** Triangle list rendering primitive with adjacency.
+		/** Triangle list rendering primitive with adjacency. (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#drawing-triangle-lists-with-adjacency)
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-render-primitive-triangles-with-adjacency
 		 */
 		public static const RENDER_PRIMITIVE_TRIANGLES_WITH_ADJACENCY:int = 6;
 		/** Triangle strip rendering primitive. Triangles drawn are connected to the previous triangle. */
 		public static const RENDER_PRIMITIVE_TRIANGLE_STRIPS:int = 7;
-		/** Triangle strip rendering primitive with adjacency.
+		/** Triangle strip rendering primitive with adjacency. (https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#drawing-triangle-strips-with-adjacency)
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-render-primitive-triangle-strips-with-ajacency
 		 */
@@ -51955,7 +52149,7 @@ package godot {
 		public static const LIMIT_MAX_TEXTURES_PER_UNIFORM_SET:int = 2;
 		/** Maximum number of samplers that can be used per uniform set. */
 		public static const LIMIT_MAX_SAMPLERS_PER_UNIFORM_SET:int = 3;
-		/** Maximum number of storage buffers per uniform set. */
+		/** Maximum number of storage buffers (https://vkguide.dev/docs/chapter-4/storage_buffers/) per uniform set. */
 		public static const LIMIT_MAX_STORAGE_BUFFERS_PER_UNIFORM_SET:int = 4;
 		/** Maximum number of storage images per uniform set. */
 		public static const LIMIT_MAX_STORAGE_IMAGES_PER_UNIFORM_SET:int = 5;
@@ -51981,7 +52175,7 @@ package godot {
 		public static const LIMIT_MAX_TEXTURES_PER_SHADER_STAGE:int = 15;
 		/** Maximum number of samplers per shader stage. */
 		public static const LIMIT_MAX_SAMPLERS_PER_SHADER_STAGE:int = 16;
-		/** Maximum number of storage buffers per shader stage. */
+		/** Maximum number of storage buffers (https://vkguide.dev/docs/chapter-4/storage_buffers/) per shader stage. */
 		public static const LIMIT_MAX_STORAGE_BUFFERS_PER_SHADER_STAGE:int = 17;
 		/** Maximum number of storage images per shader stage. */
 		public static const LIMIT_MAX_STORAGE_IMAGES_PER_SHADER_STAGE:int = 18;
@@ -52021,12 +52215,12 @@ package godot {
 		public static const LIMIT_MAX_VIEWPORT_DIMENSIONS_X:int = 35;
 		/** Maximum viewport height (in pixels). */
 		public static const LIMIT_MAX_VIEWPORT_DIMENSIONS_Y:int = 36;
-		/** Returns the smallest value for ProjectSettings.rendering/scaling3d/scale when using the MetalFX temporal upscaler.
+		/** Returns the smallest value for "rendering/scaling_3d/scale" when using the MetalFX temporal upscaler.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-limit-metalfx-temporal-scaler-min-scale
 		 */
 		public static const LIMIT_METALFX_TEMPORAL_SCALER_MIN_SCALE:int = 46;
-		/** Returns the largest value for ProjectSettings.rendering/scaling3d/scale when using the MetalFX temporal upscaler.
+		/** Returns the largest value for "rendering/scaling_3d/scale" when using the MetalFX temporal upscaler.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-constant-limit-metalfx-temporal-scaler-max-scale
 		 */
@@ -52298,7 +52492,7 @@ package godot {
 		 */
 		[Godot(creationBits="bitfield:RenderingDevice.BufferCreationBits")]
 		public final native function uniformBufferCreate(sizeBytes:uint, data:PackedByteArray = null, creationBits:int = 0):RID;
-		/** Creates a storage buffer with the specified data and usage. It can be accessed with the RID that is returned.
+		/** Creates a storage buffer (https://vkguide.dev/docs/chapter-4/storage_buffers/) with the specified data and usage. It can be accessed with the RID that is returned.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-method-storage-buffer-create
 		 */
@@ -52565,12 +52759,12 @@ package godot {
 		public final native function fullBarrier():void;
 		/** Create a new local RenderingDevice. This is most useful for performing compute operations on the GPU independently from the rest of the engine. */
 		public final native function createLocalDevice():RenderingDevice;
-		/** Sets the resource name for id to name. This is used for debugging with third-party tools such as RenderDoc.
+		/** Sets the resource name for id to name. This is used for debugging with third-party tools such as RenderDoc (https://renderdoc.org/).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-method-set-resource-name
 		 */
 		public final native function setResourceName(id:RID, name:String):void;
-		/** Create a command buffer debug label region that can be displayed in third-party tools such as RenderDoc. All regions must be ended with a drawCommandEndLabel call. When viewed from the linear series of submissions to a single queue, calls to drawCommandBeginLabel and drawCommandEndLabel must be matched and balanced.
+		/** Create a command buffer debug label region that can be displayed in third-party tools such as RenderDoc (https://renderdoc.org/). All regions must be ended with a drawCommandEndLabel call. When viewed from the linear series of submissions to a single queue, calls to drawCommandBeginLabel and drawCommandEndLabel must be matched and balanced.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingdevice.html#class-renderingdevice-method-draw-command-begin-label
 		 */
@@ -52585,7 +52779,7 @@ package godot {
 		public final native function getDeviceName():String;
 		/** Returns the universally unique identifier for the pipeline cache. This is used to cache shader files on disk, which avoids shader recompilations on subsequent engine runs. This UUID varies depending on the graphics card model, but also the driver version. Therefore, updating graphics drivers will invalidate the shader cache. */
 		public final native function getDevicePipelineCacheUuid():String;
-		/** Returns the memory usage in bytes corresponding to the given type. When using Vulkan, these statistics are calculated by Vulkan Memory Allocator. */
+		/** Returns the memory usage in bytes corresponding to the given type. When using Vulkan, these statistics are calculated by Vulkan Memory Allocator (https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator). */
 		[Godot(type="enum:RenderingDevice.MemoryType")]
 		public final native function getMemoryUsage(type:int):Int64;
 		/** Returns the unique identifier of the driver resource for the specified rid. Some driver resource types ignore the specified rid. index is always ignored but must be specified anyway. */
@@ -52935,9 +53129,9 @@ package godot {
 		public static const LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS:int = 2;
 		/** Linear filter for light projectors (use for non-pixel art light projectors). Isotropic mipmaps are used for rendering, which means light projectors at a distance will look smooth but blurry. This has roughly the same performance cost as not using mipmaps. */
 		public static const LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS:int = 3;
-		/** Nearest-neighbor filter for light projectors (use for pixel art light projectors). Anisotropic mipmaps are used for rendering, which means light projectors at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** Nearest-neighbor filter for light projectors (use for pixel art light projectors). Anisotropic mipmaps are used for rendering, which means light projectors at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS_ANISOTROPIC:int = 4;
-		/** Linear filter for light projectors (use for non-pixel art light projectors). Anisotropic mipmaps are used for rendering, which means light projectors at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** Linear filter for light projectors (use for non-pixel art light projectors). Anisotropic mipmaps are used for rendering, which means light projectors at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC:int = 5;
 		/** Directional (sun/moon) light (see DirectionalLight3D). */
 		public static const LIGHT_DIRECTIONAL:int = 0;
@@ -52986,7 +53180,7 @@ package godot {
 		/** Blurs the edges of the shadow. Can be used to hide pixel artifacts in low resolution shadow maps. A high value can make shadows appear grainy and can cause other unwanted artifacts. Try to keep as near default as possible. */
 		public static const LIGHT_PARAM_SHADOW_BLUR:int = 18;
 		public static const LIGHT_PARAM_TRANSMITTANCE_BIAS:int = 19;
-		/** Constant representing the intensity of the light, measured in Lumens when dealing with a SpotLight3D or OmniLight3D, or measured in Lux with a DirectionalLight3D. Only used when ProjectSettings.rendering/lightsAndShadows/usePhysicalLightUnits is true. */
+		/** Constant representing the intensity of the light, measured in Lumens when dealing with a SpotLight3D or OmniLight3D, or measured in Lux with a DirectionalLight3D. Only used when "rendering/lights_and_shadows/use_physical_light_units" is true. */
 		public static const LIGHT_PARAM_INTENSITY:int = 20;
 		/** Represents the size of the LightParam enum. */
 		public static const LIGHT_PARAM_MAX:int = 21;
@@ -52994,7 +53188,7 @@ package godot {
 		public static const LIGHT_BAKE_DISABLED:int = 0;
 		/** Light is taken into account in static baking (VoxelGI, LightmapGI, SDFGI (Environment.sdfgiEnabled)). The light can be moved around or modified, but its global illumination will not update in real-time. This is suitable for subtle changes (such as flickering torches), but generally not large changes such as toggling a light on and off. */
 		public static const LIGHT_BAKE_STATIC:int = 1;
-		/** Light is taken into account in dynamic baking (VoxelGI and SDFGI (Environment.sdfgiEnabled) only). The light can be moved around or modified with global illumination updating in real-time. The light's global illumination appearance will be slightly different compared to LIGHT_BAKE_STATIC. This has a greater performance cost compared to LIGHT_BAKE_STATIC. When using SDFGI, the update speed of dynamic lights is affected by ProjectSettings.rendering/globalIllumination/sdfgi/framesToUpdateLights. */
+		/** Light is taken into account in dynamic baking (VoxelGI and SDFGI (Environment.sdfgiEnabled) only). The light can be moved around or modified with global illumination updating in real-time. The light's global illumination appearance will be slightly different compared to LIGHT_BAKE_STATIC. This has a greater performance cost compared to LIGHT_BAKE_STATIC. When using SDFGI, the update speed of dynamic lights is affected by "rendering/global_illumination/sdfgi/frames_to_update_lights". */
 		public static const LIGHT_BAKE_DYNAMIC:int = 2;
 		/** Use a dual paraboloid shadow map for omni lights. */
 		public static const LIGHT_OMNI_SHADOW_DUAL_PARABOLOID:int = 0;
@@ -53057,9 +53251,9 @@ package godot {
 		public static const DECAL_FILTER_NEAREST_MIPMAPS:int = 2;
 		/** Linear filter for decals (use for non-pixel art decals). Isotropic mipmaps are used for rendering, which means decals at a distance will look smooth but blurry. This has roughly the same performance cost as not using mipmaps. */
 		public static const DECAL_FILTER_LINEAR_MIPMAPS:int = 3;
-		/** Nearest-neighbor filter for decals (use for pixel art decals). Anisotropic mipmaps are used for rendering, which means decals at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** Nearest-neighbor filter for decals (use for pixel art decals). Anisotropic mipmaps are used for rendering, which means decals at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const DECAL_FILTER_NEAREST_MIPMAPS_ANISOTROPIC:int = 4;
-		/** Linear filter for decals (use for non-pixel art decals). Anisotropic mipmaps are used for rendering, which means decals at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel. */
+		/** Linear filter for decals (use for non-pixel art decals). Anisotropic mipmaps are used for rendering, which means decals at a distance will look smooth and sharp when viewed from oblique angles. This looks better compared to isotropic mipmaps, but is slower. The level of anisotropic filtering is defined by "rendering/textures/default_filters/anisotropic_filtering_level". */
 		public static const DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC:int = 5;
 		/** Low VoxelGI rendering quality using 4 cones. */
 		public static const VOXEL_GI_QUALITY_LOW:int = 0;
@@ -53396,11 +53590,11 @@ package godot {
 		public static const VIEWPORT_VRS_UPDATE_MAX:int = 3;
 		/** Automatically selects the appropriate process mode based on your sky shader. If your shader uses TIME or POSITION, this will use SKY_MODE_REALTIME. If your shader uses any of the LIGHT_* variables or any custom uniforms, this uses SKY_MODE_INCREMENTAL. Otherwise, this defaults to SKY_MODE_QUALITY. */
 		public static const SKY_MODE_AUTOMATIC:int = 0;
-		/** Uses high quality importance sampling to process the radiance map. In general, this results in much higher quality than SKY_MODE_REALTIME but takes much longer to generate. This should not be used if you plan on changing the sky at runtime. If you are finding that the reflection is not blurry enough and is showing sparkles or fireflies, try increasing ProjectSettings.rendering/reflections/skyReflections/ggxSamples. */
+		/** Uses high quality importance sampling to process the radiance map. In general, this results in much higher quality than SKY_MODE_REALTIME but takes much longer to generate. This should not be used if you plan on changing the sky at runtime. If you are finding that the reflection is not blurry enough and is showing sparkles or fireflies, try increasing "rendering/reflections/sky_reflections/ggx_samples". */
 		public static const SKY_MODE_QUALITY:int = 1;
-		/** Uses the same high quality importance sampling to process the radiance map as SKY_MODE_QUALITY, but updates over several frames. The number of frames is determined by ProjectSettings.rendering/reflections/skyReflections/roughnessLayers. Use this when you need highest quality radiance maps, but have a sky that updates slowly. */
+		/** Uses the same high quality importance sampling to process the radiance map as SKY_MODE_QUALITY, but updates over several frames. The number of frames is determined by "rendering/reflections/sky_reflections/roughness_layers". Use this when you need highest quality radiance maps, but have a sky that updates slowly. */
 		public static const SKY_MODE_INCREMENTAL:int = 2;
-		/** Uses the fast filtering algorithm to process the radiance map. In general this results in lower quality, but substantially faster run times. If you need better quality, but still need to update the sky every frame, consider turning on ProjectSettings.rendering/reflections/skyReflections/fastFilterHighQuality.
+		/** Uses the fast filtering algorithm to process the radiance map. In general this results in lower quality, but substantially faster run times. If you need better quality, but still need to update the sky every frame, consider turning on "rendering/reflections/sky_reflections/fast_filter_high_quality".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-constant-sky-mode-realtime
 		 */
@@ -53668,22 +53862,22 @@ package godot {
 		public static const CANVAS_ITEM_TEXTURE_FILTER_NEAREST:int = 1;
 		/** The texture filter blends between the nearest 4 pixels. This makes the texture look smooth from up close, and grainy from a distance (due to mipmaps not being sampled). */
 		public static const CANVAS_ITEM_TEXTURE_FILTER_LINEAR:int = 2;
-		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look pixelated from up close, and smooth from a distance.
+		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look pixelated from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-constant-canvas-item-texture-filter-nearest-with-mipmaps
 		 */
 		public static const CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS:int = 3;
-		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look smooth from up close, and smooth from a distance.
+		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look smooth from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-constant-canvas-item-texture-filter-linear-with-mipmaps
 		 */
 		public static const CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS:int = 4;
-		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-constant-canvas-item-texture-filter-nearest-with-mipmaps-anisotropic
 		 */
 		public static const CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC:int = 5;
-		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-constant-canvas-item-texture-filter-linear-with-mipmaps-anisotropic
 		 */
@@ -54292,13 +54486,13 @@ package godot {
 		public static native function lightProjectorsSetFilter(filter:int):void;
 		/** Toggles whether a bicubic filter should be used when lightmaps are sampled. This smoothens their appearance at a performance cost. */
 		public static native function lightmapsSetBicubicFilter(enable:Boolean):void;
-		/** Sets the filter quality for omni and spot light shadows in 3D. See also ProjectSettings.rendering/lightsAndShadows/positionalShadow/softShadowFilterQuality. This parameter is global and cannot be set on a per-viewport basis. */
+		/** Sets the filter quality for omni and spot light shadows in 3D. See also "rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality". This parameter is global and cannot be set on a per-viewport basis. */
 		[Godot(quality="enum:RenderingServer.ShadowQuality")]
 		public static native function positionalSoftShadowFilterSetQuality(quality:int):void;
-		/** Sets the filter quality for directional light shadows in 3D. See also ProjectSettings.rendering/lightsAndShadows/directionalShadow/softShadowFilterQuality. This parameter is global and cannot be set on a per-viewport basis. */
+		/** Sets the filter quality for directional light shadows in 3D. See also "rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality". This parameter is global and cannot be set on a per-viewport basis. */
 		[Godot(quality="enum:RenderingServer.ShadowQuality")]
 		public static native function directionalSoftShadowFilterSetQuality(quality:int):void;
-		/** Sets the size of the directional light shadows in 3D. See also ProjectSettings.rendering/lightsAndShadows/directionalShadow/size. This parameter is global and cannot be set on a per-viewport basis. */
+		/** Sets the size of the directional light shadows in 3D. See also "rendering/lights_and_shadows/directional_shadow/size". This parameter is global and cannot be set on a per-viewport basis. */
 		public static native function directionalShadowAtlasSetSize(size:int, is16bits:Boolean):void;
 		/** Creates a reflection probe and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all reflection_probe_* RenderingServer functions.
 		 *
@@ -54366,7 +54560,7 @@ package godot {
 		/** Sets the texture filter mode to use when rendering decals. This parameter is global and cannot be set on a per-decal basis. */
 		[Godot(filter="enum:RenderingServer.DecalFilter")]
 		public static native function decalsSetFilter(filter:int):void;
-		/** If halfResolution is true, renders VoxelGI and SDFGI (Environment.sdfgiEnabled) buffers at halved resolution on each axis (e.g. 960×540 when the viewport size is 1920×1080). This improves performance significantly when VoxelGI or SDFGI is enabled, at the cost of artifacts that may be visible on polygon edges. The loss in quality becomes less noticeable as the viewport resolution increases. LightmapGI rendering is not affected by this setting. Equivalent to ProjectSettings.rendering/globalIllumination/gi/useHalfResolution. */
+		/** If halfResolution is true, renders VoxelGI and SDFGI (Environment.sdfgiEnabled) buffers at halved resolution on each axis (e.g. 960×540 when the viewport size is 1920×1080). This improves performance significantly when VoxelGI or SDFGI is enabled, at the cost of artifacts that may be visible on polygon edges. The loss in quality becomes less noticeable as the viewport resolution increases. LightmapGI rendering is not affected by this setting. Equivalent to "rendering/global_illumination/gi/use_half_resolution". */
 		public static native function giSetUseHalfResolution(halfResolution:Boolean):void;
 		/** Creates a new voxel-based global illumination object and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all voxel_gi_* RenderingServer functions.
 		 *
@@ -54403,7 +54597,7 @@ package godot {
 		public static native function voxelGiSetInterior(voxelGi:RID, enable:Boolean):void;
 		/** Sets the VoxelGIData.useTwoBounces value to use on the specified voxelGi's RID. */
 		public static native function voxelGiSetUseTwoBounces(voxelGi:RID, enable:Boolean):void;
-		/** Sets the ProjectSettings.rendering/globalIllumination/voxelGi/quality value to use when rendering. This parameter is global and cannot be set on a per-VoxelGI basis. */
+		/** Sets the "rendering/global_illumination/voxel_gi/quality" value to use when rendering. This parameter is global and cannot be set on a per-VoxelGI basis. */
 		[Godot(quality="enum:RenderingServer.VoxelGIQuality")]
 		public static native function voxelGiSetQuality(quality:int):void;
 		/** Creates a new lightmap global illumination instance and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all lightmap_* RenderingServer functions.
@@ -54421,7 +54615,7 @@ package godot {
 		public static native function lightmapSetProbeCaptureData(lightmap:RID, points:PackedVector3Array, pointSh:PackedColorArray, tetrahedra:PackedInt32Array, bspTree:PackedInt32Array):void;
 		/** Returns the local space positions of each lightmap probe capture point. Keep in mind the lightmap instance may have a non-zero transform, which will affect the position of the probe capture points. See also lightmapSetProbeCaptureData. */
 		public static native function lightmapGetProbeCapturePoints(lightmap:RID):PackedVector3Array;
-		/** Returns the L0, L1, and L2 spherical harmonics data for each lightmap probe capture point. This is specified as 9 Color values per probe, which means the size of the returned data is always 9 times the number of probe points. See also lightmapSetProbeCaptureData. */
+		/** Returns the L0, L1, and L2 spherical harmonics (https://en.wikipedia.org/wiki/Spherical_harmonics) data for each lightmap probe capture point. This is specified as 9 Color values per probe, which means the size of the returned data is always 9 times the number of probe points. See also lightmapSetProbeCaptureData. */
 		public static native function lightmapGetProbeCaptureSh(lightmap:RID):PackedColorArray;
 		/** Returns the tetrahedralization data used for interpolating between lightmap probe capture points. Each tetrahedron is specified as a series of 4 numbers, each being an index into the probe capture points array returned by lightmapGetProbeCapturePoints. See also lightmapSetProbeCaptureData. */
 		public static native function lightmapGetProbeCaptureTetrahedra(lightmap:RID):PackedInt32Array;
@@ -54429,7 +54623,7 @@ package godot {
 		public static native function lightmapGetProbeCaptureBspTree(lightmap:RID):PackedInt32Array;
 		/** Used to inform the renderer what exposure normalization value was used while baking the lightmap. This value will be used and modulated at run time to ensure that the lightmap maintains a consistent level of exposure even if the scene-wide exposure normalization is changed at run time. For more information see cameraAttributesSetExposure. */
 		public static native function lightmapSetBakedExposureNormalization(lightmap:RID, bakedExposure:Number):void;
-		/** The framerate-independent update speed when representing dynamic object lighting from LightmapProbes. Higher values make dynamic object lighting update faster. Higher values can prevent fast-moving objects from having "outdated" indirect lighting displayed on them, at the cost of possible flickering when an object moves from a bright area to a shaded area. See also ProjectSettings.rendering/lightmapping/probeCapture/updateSpeed. */
+		/** The framerate-independent update speed when representing dynamic object lighting from LightmapProbes. Higher values make dynamic object lighting update faster. Higher values can prevent fast-moving objects from having "outdated" indirect lighting displayed on them, at the cost of possible flickering when an object moves from a bright area to a shaded area. See also "rendering/lightmapping/probe_capture/update_speed". */
 		public static native function lightmapSetProbeCaptureUpdateSpeed(speed:Number):void;
 		/** Creates a GPU-based particle system and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all particles_* RenderingServer functions.
 		 *
@@ -54632,7 +54826,7 @@ package godot {
 		public static native function viewportSetScaling3DScale(viewport:RID, scale:Number):void;
 		/** Determines how sharp the upscaled image will be when using the FSR upscaling mode. Sharpness halves with every whole number. Values go from 0.0 (sharpest) to 2.0. Values above 2.0 won't make a visible difference. */
 		public static native function viewportSetFsrSharpness(viewport:RID, sharpness:Number):void;
-		/** Affects the final texture sharpness by reading from a lower or higher mipmap (also called "texture LOD bias"). Negative values make mipmapped textures sharper but grainier when viewed at a distance, while positive values make mipmapped textures blurrier (even when up close). To get sharper textures at a distance without introducing too much graininess, set this between -0.75 and 0.0. Enabling temporal antialiasing (ProjectSettings.rendering/antiAliasing/quality/useTAA) can help reduce the graininess visible when using negative mipmap bias.
+		/** Affects the final texture sharpness by reading from a lower or higher mipmap (also called "texture LOD bias"). Negative values make mipmapped textures sharper but grainier when viewed at a distance, while positive values make mipmapped textures blurrier (even when up close). To get sharper textures at a distance without introducing too much graininess, set this between -0.75 and 0.0. Enabling temporal antialiasing ("rendering/anti_aliasing/quality/use_taa") can help reduce the graininess visible when using negative mipmap bias.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-viewport-set-texture-mipmap-bias
 		 */
@@ -54674,9 +54868,9 @@ package godot {
 		public static native function viewportAttachCanvas(viewport:RID, canvas:RID):void;
 		/** Detaches a viewport from a canvas. */
 		public static native function viewportRemoveCanvas(viewport:RID, canvas:RID):void;
-		/** If true, canvas item transforms (i.e. origin position) are snapped to the nearest pixel when rendering. This can lead to a crisper appearance at the cost of less smooth movement, especially when Camera2D smoothing is enabled. Equivalent to ProjectSettings.rendering/2d/snap/snap2DTransformsToPixel. */
+		/** If true, canvas item transforms (i.e. origin position) are snapped to the nearest pixel when rendering. This can lead to a crisper appearance at the cost of less smooth movement, especially when Camera2D smoothing is enabled. Equivalent to "rendering/2d/snap/snap_2d_transforms_to_pixel". */
 		public static native function viewportSetSnap2DTransformsToPixel(viewport:RID, enabled:Boolean):void;
-		/** If true, canvas item vertices (i.e. polygon points) are snapped to the nearest pixel when rendering. This can lead to a crisper appearance at the cost of less smooth movement, especially when Camera2D smoothing is enabled. Equivalent to ProjectSettings.rendering/2d/snap/snap2DVerticesToPixel. */
+		/** If true, canvas item vertices (i.e. polygon points) are snapped to the nearest pixel when rendering. This can lead to a crisper appearance at the cost of less smooth movement, especially when Camera2D smoothing is enabled. Equivalent to "rendering/2d/snap/snap_2d_vertices_to_pixel". */
 		public static native function viewportSetSnap2DVerticesToPixel(viewport:RID, enabled:Boolean):void;
 		/** Sets the default texture filtering mode for the specified viewport RID. */
 		[Godot(filter="enum:RenderingServer.CanvasItemTextureFilter")]
@@ -54695,7 +54889,7 @@ package godot {
 		public static native function viewportSetTransparentBackground(viewport:RID, enabled:Boolean):void;
 		/** Sets the viewport's global transformation matrix. */
 		public static native function viewportSetGlobalCanvasTransform(viewport:RID, transform:Transform2D):void;
-		/** Sets the viewport's 2D signed distance field ProjectSettings.rendering/2d/sdf/oversize and ProjectSettings.rendering/2d/sdf/scale. This is used when sampling the signed distance field in CanvasItem shaders as well as GPUParticles2D collision. This is not used by SDFGI in 3D rendering. */
+		/** Sets the viewport's 2D signed distance field "rendering/2d/sdf/oversize" and "rendering/2d/sdf/scale". This is used when sampling the signed distance field in CanvasItem shaders as well as GPUParticles2D collision. This is not used by SDFGI in 3D rendering. */
 		[Godot(oversize="enum:RenderingServer.ViewportSDFOversize", scale="enum:RenderingServer.ViewportSDFScale")]
 		public static native function viewportSetSDFOversizeAndScale(viewport:RID, oversize:int, scale:int):void;
 		/** Sets the size of the shadow atlas's images (used for omni and spot lights) on the viewport specified by the viewport RID. The value is rounded up to the nearest power of 2. If use16Bits is true, use 16 bits for the omni/spot shadow depth map. Enabling this results in shadows having less precision and may result in shadow acne, but can lead to performance improvements on some devices.
@@ -54705,10 +54899,10 @@ package godot {
 		public static native function viewportSetPositionalShadowAtlasSize(viewport:RID, size:int, use16Bits:Boolean = false):void;
 		/** Sets the number of subdivisions to use in the specified shadow atlas quadrant for omni and spot shadows. See also Viewport.setPositionalShadowAtlasQuadrantSubdiv. */
 		public static native function viewportSetPositionalShadowAtlasQuadrantSubdivision(viewport:RID, quadrant:int, subdivision:int):void;
-		/** Sets the multisample antialiasing mode for 3D on the specified viewport RID. Equivalent to ProjectSettings.rendering/antiAliasing/quality/msaa3D or Viewport.msaa3D. */
+		/** Sets the multisample antialiasing mode for 3D on the specified viewport RID. Equivalent to "rendering/anti_aliasing/quality/msaa_3d" or Viewport.msaa3D. */
 		[Godot(msaa="enum:RenderingServer.ViewportMSAA")]
 		public static native function viewportSetMSAA3D(viewport:RID, msaa:int):void;
-		/** Sets the multisample antialiasing mode for 2D/Canvas on the specified viewport RID. Equivalent to ProjectSettings.rendering/antiAliasing/quality/msaa2D or Viewport.msaa2D. */
+		/** Sets the multisample antialiasing mode for 2D/Canvas on the specified viewport RID. Equivalent to "rendering/anti_aliasing/quality/msaa_2d" or Viewport.msaa2D. */
 		[Godot(msaa="enum:RenderingServer.ViewportMSAA")]
 		public static native function viewportSetMSAA2D(viewport:RID, msaa:int):void;
 		/** If true, 2D rendering will use a high dynamic range (HDR) RGBA16 format framebuffer. Additionally, 2D rendering will be performed on linear values and will be converted using the appropriate transfer function immediately before blitting to the screen (if the Viewport is attached to the screen).
@@ -54716,18 +54910,18 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-viewport-set-use-hdr-2d
 		 */
 		public static native function viewportSetUseHDR2D(viewport:RID, enabled:Boolean):void;
-		/** Sets the viewport's screen-space antialiasing mode. Equivalent to ProjectSettings.rendering/antiAliasing/quality/screenSpaceAa or Viewport.screenSpaceAa. */
+		/** Sets the viewport's screen-space antialiasing mode. Equivalent to "rendering/anti_aliasing/quality/screen_space_aa" or Viewport.screenSpaceAa. */
 		[Godot(mode="enum:RenderingServer.ViewportScreenSpaceAA")]
 		public static native function viewportSetScreenSpaceAa(viewport:RID, mode:int):void;
-		/** If true, use temporal antialiasing. Equivalent to ProjectSettings.rendering/antiAliasing/quality/useTAA or Viewport.useTAA. */
+		/** If true, use temporal antialiasing. Equivalent to "rendering/anti_aliasing/quality/use_taa" or Viewport.useTAA. */
 		public static native function viewportSetUseTAA(viewport:RID, enable:Boolean):void;
-		/** Equivalent to Viewport.useDebanding. See also ProjectSettings.rendering/antiAliasing/quality/useDebanding. */
+		/** Equivalent to Viewport.useDebanding. See also "rendering/anti_aliasing/quality/use_debanding". */
 		public static native function viewportSetUseDebanding(viewport:RID, enable:Boolean):void;
-		/** If true, enables occlusion culling on the specified viewport. Equivalent to ProjectSettings.rendering/occlusionCulling/useOcclusionCulling. */
+		/** If true, enables occlusion culling on the specified viewport. Equivalent to "rendering/occlusion_culling/use_occlusion_culling". */
 		public static native function viewportSetUseOcclusionCulling(viewport:RID, enable:Boolean):void;
-		/** Sets the ProjectSettings.rendering/occlusionCulling/occlusionRaysPerThread to use for occlusion culling. This parameter is global and cannot be set on a per-viewport basis. */
+		/** Sets the "rendering/occlusion_culling/occlusion_rays_per_thread" to use for occlusion culling. This parameter is global and cannot be set on a per-viewport basis. */
 		public static native function viewportSetOcclusionRaysPerThread(raysPerThread:int):void;
-		/** Sets the ProjectSettings.rendering/occlusionCulling/bvhBuildQuality to use for occlusion culling. This parameter is global and cannot be set on a per-viewport basis. */
+		/** Sets the "rendering/occlusion_culling/bvh_build_quality" to use for occlusion culling. This parameter is global and cannot be set on a per-viewport basis. */
 		[Godot(quality="enum:RenderingServer.ViewportOcclusionCullingBuildQuality")]
 		public static native function viewportSetOcclusionCullingBuildQuality(quality:int):void;
 		/** Returns a statistic about the rendering engine which can be used for performance profiling. This is separated into render pass types, each of them having the same infos you can query (different passes will return different values).
@@ -54751,7 +54945,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-viewport-get-measured-render-time-gpu
 		 */
 		public static native function viewportGetMeasuredRenderTimeGPU(viewport:RID):Number;
-		/** Sets the Variable Rate Shading (VRS) mode for the viewport. If the GPU does not support VRS, this property is ignored. Equivalent to ProjectSettings.rendering/vrs/mode. */
+		/** Sets the Variable Rate Shading (VRS) mode for the viewport. If the GPU does not support VRS, this property is ignored. Equivalent to "rendering/vrs/mode". */
 		[Godot(mode="enum:RenderingServer.ViewportVRSMode")]
 		public static native function viewportSetVrsMode(viewport:RID, mode:int):void;
 		/** Sets the update mode for Variable Rate Shading (VRS) for the viewport. VRS requires the input texture to be converted to the format usable by the VRS method supported by the hardware. The update mode defines how often this happens. If the GPU does not support VRS, or VRS is not enabled, this property is ignored.
@@ -54760,7 +54954,7 @@ package godot {
 		 */
 		[Godot(mode="enum:RenderingServer.ViewportVRSUpdateMode")]
 		public static native function viewportSetVrsUpdateMode(viewport:RID, mode:int):void;
-		/** The texture to use when the VRS mode is set to RenderingServer.VIEWPORT_VRS_TEXTURE. Equivalent to ProjectSettings.rendering/vrs/texture. */
+		/** The texture to use when the VRS mode is set to RenderingServer.VIEWPORT_VRS_TEXTURE. Equivalent to "rendering/vrs/texture". */
 		public static native function viewportSetVrsTexture(viewport:RID, texture:RID):void;
 		/** Creates an empty sky and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all sky_* RenderingServer functions.
 		 *
@@ -54849,7 +55043,7 @@ package godot {
 		public static native function environmentSetSdfgi(env:RID, enable:Boolean, cascades:int, minCellSize:Number, yScale:int, useOcclusion:Boolean, bounceFeedback:Number, readSky:Boolean, energy:Number, normalBias:Number, probeBias:Number):void;
 		/** Sets the variables to be used with the volumetric fog post-process effect. See Environment for more details. */
 		public static native function environmentSetVolumetricFog(env:RID, enable:Boolean, density:Number, albedo:Color, emission:Color, emissionEnergy:Number, anisotropy:Number, length:Number, detailSpread:Number, giInject:Number, temporalReprojection:Boolean, temporalReprojectionAmount:Number, ambientInject:Number, skyAffect:Number):void;
-		/** If enable is true, enables bicubic upscaling for glow which improves quality at the cost of performance. Equivalent to ProjectSettings.rendering/environment/glow/upscaleMode.
+		/** If enable is true, enables bicubic upscaling for glow which improves quality at the cost of performance. Equivalent to "rendering/environment/glow/upscale_mode".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-environment-glow-set-use-bicubic-upscale
 		 */
@@ -54864,13 +55058,13 @@ package godot {
 		/** Sets the quality level of the screen-space indirect lighting (SSIL) post-process effect. See Environment for more details. */
 		[Godot(quality="enum:RenderingServer.EnvironmentSSILQuality")]
 		public static native function environmentSetSSILQuality(quality:int, halfSize:Boolean, adaptiveTarget:Number, blurPasses:int, fadeoutFrom:Number, fadeoutTo:Number):void;
-		/** Sets the number of rays to throw per frame when computing signed distance field global illumination. Equivalent to ProjectSettings.rendering/globalIllumination/sdfgi/probeRayCount. */
+		/** Sets the number of rays to throw per frame when computing signed distance field global illumination. Equivalent to "rendering/global_illumination/sdfgi/probe_ray_count". */
 		[Godot(rayCount="enum:RenderingServer.EnvironmentSDFGIRayCount")]
 		public static native function environmentSetSdfgiRayCount(rayCount:int):void;
-		/** Sets the number of frames to use for converging signed distance field global illumination. Equivalent to ProjectSettings.rendering/globalIllumination/sdfgi/framesToConverge. */
+		/** Sets the number of frames to use for converging signed distance field global illumination. Equivalent to "rendering/global_illumination/sdfgi/frames_to_converge". */
 		[Godot(frames="enum:RenderingServer.EnvironmentSDFGIFramesToConverge")]
 		public static native function environmentSetSdfgiFramesToConverge(frames:int):void;
-		/** Sets the update speed for dynamic lights' indirect lighting when computing signed distance field global illumination. Equivalent to ProjectSettings.rendering/globalIllumination/sdfgi/framesToUpdateLights. */
+		/** Sets the update speed for dynamic lights' indirect lighting when computing signed distance field global illumination. Equivalent to "rendering/global_illumination/sdfgi/frames_to_update_lights". */
 		[Godot(frames="enum:RenderingServer.EnvironmentSDFGIFramesToUpdateLight")]
 		public static native function environmentSetSdfgiFramesToUpdateLight(frames:int):void;
 		/** Sets the resolution of the volumetric fog's froxel buffer. size is modified by the screen's aspect ratio and then used to set the width and height of the buffer. While depth is directly used to set the depth of the buffer. */
@@ -54882,12 +55076,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-environment-bake-panorama
 		 */
 		public static native function environmentBakePanorama(environment:RID, bakeIrradiance:Boolean, size:Vector2i):Image;
-		/** Sets the screen-space roughness limiter parameters, such as whether it should be enabled and its thresholds. Equivalent to ProjectSettings.rendering/antiAliasing/screenSpaceRoughnessLimiter/enabled, ProjectSettings.rendering/antiAliasing/screenSpaceRoughnessLimiter/amount and ProjectSettings.rendering/antiAliasing/screenSpaceRoughnessLimiter/limit. */
+		/** Sets the screen-space roughness limiter parameters, such as whether it should be enabled and its thresholds. Equivalent to "rendering/anti_aliasing/screen_space_roughness_limiter/enabled", "rendering/anti_aliasing/screen_space_roughness_limiter/amount" and "rendering/anti_aliasing/screen_space_roughness_limiter/limit". */
 		public static native function screenSpaceRoughnessLimiterSetActive(enable:Boolean, amount:Number, limit:Number):void;
-		/** Sets ProjectSettings.rendering/environment/subsurfaceScattering/subsurfaceScatteringQuality to use when rendering materials that have subsurface scattering enabled. */
+		/** Sets "rendering/environment/subsurface_scattering/subsurface_scattering_quality" to use when rendering materials that have subsurface scattering enabled. */
 		[Godot(quality="enum:RenderingServer.SubSurfaceScatteringQuality")]
 		public static native function subSurfaceScatteringSetQuality(quality:int):void;
-		/** Sets the ProjectSettings.rendering/environment/subsurfaceScattering/subsurfaceScatteringScale and ProjectSettings.rendering/environment/subsurfaceScattering/subsurfaceScatteringDepthScale to use when rendering materials that have subsurface scattering enabled. */
+		/** Sets the "rendering/environment/subsurface_scattering/subsurface_scattering_scale" and "rendering/environment/subsurface_scattering/subsurface_scattering_depth_scale" to use when rendering materials that have subsurface scattering enabled. */
 		public static native function subSurfaceScatteringSetScale(scale:Number, depthScale:Number):void;
 		/** Creates a camera attributes object and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all camera_attributes_ RenderingServer functions.
 		 *
@@ -55076,7 +55270,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_renderingserver.html#class-renderingserver-method-canvas-item-set-clip
 		 */
 		public static native function canvasItemSetClip(item:RID, clip:Boolean):void;
-		/** If enabled is true, enables multichannel signed distance field rendering mode for the canvas item specified by the item RID. This is meant to be used for font rendering, or with specially generated images using msdfgen. */
+		/** If enabled is true, enables multichannel signed distance field rendering mode for the canvas item specified by the item RID. This is meant to be used for font rendering, or with specially generated images using msdfgen (https://github.com/Chlumsky/msdfgen). */
 		public static native function canvasItemSetDistanceFieldMode(item:RID, enabled:Boolean):void;
 		/** If useCustomRect is true, sets the custom visibility rectangle (used for culling) to rect for the canvas item specified by item. Setting a custom visibility rect can reduce CPU load when drawing lots of 2D instances. If useCustomRect is false, automatically computes a visibility rectangle based on the canvas item's draw commands. */
 		public static native function canvasItemSetCustomRect(item:RID, useCustomRect:Boolean, rect:Rect2 = null):void;
@@ -55288,7 +55482,7 @@ package godot {
 		/** Sets an occluder polygon's cull mode. */
 		[Godot(mode="enum:RenderingServer.CanvasOccluderPolygonCullMode")]
 		public static native function canvasOccluderPolygonSetCullMode(occluderPolygon:RID, mode:int):void;
-		/** Sets the ProjectSettings.rendering/2d/shadowAtlas/size to use for Light2D shadow rendering (in pixels). The value is rounded up to the nearest power of 2. */
+		/** Sets the "rendering/2d/shadow_atlas/size" to use for Light2D shadow rendering (in pixels). The value is rounded up to the nearest power of 2. */
 		public static native function canvasSetShadowTextureSize(size:int):void;
 		/** Creates a new global shader uniform.
 		 *
@@ -55493,7 +55687,7 @@ package godot {
 		 */
 		[Godot(returns="enum:GodotError")]
 		public native function _save(resource:Resource, path:String, flags:uint):int;
-		/** Sets a new UID for the resource at the given path. Returns OK on success, or a GodotError constant in case of failure. */
+		/** Sets a new UID for the resource at the given path. Returns GodotError.OK on success, or a GodotError constant in case of failure. */
 		[Godot(returns="enum:GodotError")]
 		public native function _setUID(path:String, uid:Int64):int;
 		/** Returns whether the given resource object can be saved by this saver. */
@@ -56489,7 +56683,7 @@ package godot {
 		 */
 		public final native function get physicsMaterialOverride():PhysicsMaterial;
 		public final native function set physicsMaterialOverride(value:PhysicsMaterial):void;
-		/** This is multiplied by ProjectSettings.physics/3d/defaultGravity to produce this body's gravity. For example, a value of 1.0 will apply normal gravity, 2.0 will apply double the gravity, and 0.5 will apply half the gravity to this body. */
+		/** This is multiplied by "physics/3d/default_gravity" to produce this body's gravity. For example, a value of 1.0 will apply normal gravity, 2.0 will apply double the gravity, and 0.5 will apply half the gravity to this body. */
 		public final native function get gravityScale():Number;
 		public final native function set gravityScale(value:Number):void;
 		/** Defines the way the body's center of mass is set. */
@@ -56564,7 +56758,7 @@ package godot {
 		public final native function get linearDampMode():int;
 		[Godot(value="enum:RigidBody3D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
-		/** Damps the body's movement. By default, the body will use the ProjectSettings.physics/3d/defaultLinearDamp project setting or any value override set by an Area3D the body is in. Depending on linearDampMode, you can set linearDamp to be added to or to replace the body's damping value.
+		/** Damps the body's movement. By default, the body will use the "physics/3d/default_linear_damp" project setting or any value override set by an Area3D the body is in. Depending on linearDampMode, you can set linearDamp to be added to or to replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_rigidbody3d.html#class-rigidbody3d-property-linear-damp
 		 */
@@ -56578,7 +56772,7 @@ package godot {
 		public final native function get angularDampMode():int;
 		[Godot(value="enum:RigidBody3D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
-		/** Damps the body's rotation. By default, the body will use the ProjectSettings.physics/3d/defaultAngularDamp project setting or any value override set by an Area3D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
+		/** Damps the body's rotation. By default, the body will use the "physics/3d/default_angular_damp" project setting or any value override set by an Area3D the body is in. Depending on angularDampMode, you can set angularDamp to be added to or to replace the body's damping value.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_rigidbody3d.html#class-rigidbody3d-property-angular-damp
 		 */
@@ -56972,7 +57166,7 @@ package godot {
 		 */
 		public final native function get currentScene():Node;
 		public final native function set currentScene(value:Node):void;
-		/** The tree's root Window. This is top-most Node of the scene tree, and is always present. An absolute String always starts from this node. Children of the root node may include the loaded currentScene, as well as any AutoLoad configured in the Project Settings.
+		/** The tree's root Window. This is top-most Node of the scene tree, and is always present. An absolute String always starts from this node. Children of the root node may include the loaded currentScene, as well as any AutoLoad (https://docs.godotengine.org/en/4.7/tutorials/scripting/singletons_autoload.html) configured in the Project Settings.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_scenetree.html#class-scenetree-property-root
 		 */
@@ -57057,7 +57251,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_scenetree.html#class-scenetree-method-call-group
 		 */
 		public final native function callGroup(group:String, method:String, ...rest):void;
-		/** Calls GodotObject.notification with the given notification to all nodes inside this tree added to the group. See also Godot notifications and callGroup and setGroup.
+		/** Calls GodotObject.notification with the given notification to all nodes inside this tree added to the group. See also Godot notifications (https://docs.godotengine.org/en/4.7/tutorials/best_practices/godot_notifications.html) and callGroup and setGroup.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_scenetree.html#class-scenetree-method-notify-group
 		 */
@@ -57235,7 +57429,7 @@ package godot {
 		public final native function getOpenScripts():GodotArray;
 		/** Opens the script create dialog. The script will extend baseName. The file extension can be omitted from basePath. It will be added based on the selected scripting language. */
 		public final native function openScriptCreateDialog(baseName:String, basePath:String):void;
-		/** Reloads all currently opened files. This should be used when opened files are changed outside of the script editor. The user may be prompted to resolve file conflicts, see EditorSettings.textEditor/behavior/files/autoReloadScriptsOnExternalChange. */
+		/** Reloads all currently opened files. This should be used when opened files are changed outside of the script editor. The user may be prompted to resolve file conflicts, see "text_editor/behavior/files/auto_reload_scripts_on_external_change". */
 		public final native function reloadOpenFiles():void;
 		/** Opens help for the given topic. The topic is an encoded string that controls which class, method, constant, signal, annotation, property, or theme item should be focused.
 		 *
@@ -57665,7 +57859,7 @@ package godot {
 		/** The number of intersections can be limited with this parameter, to reduce the processing time. */
 		public final native function get maxResults():int;
 		public final native function set maxResults(value:int):void;
-		/** The shape's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks in the documentation for more information. */
+		/** The shape's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** Returns the complete collision information from the collision sweep. The data returned is the same as in the PhysicsDirectSpaceState2D.getRestInfo method. */
@@ -57748,7 +57942,7 @@ package godot {
 		/** The number of intersections can be limited with this parameter, to reduce the processing time. */
 		public final native function get maxResults():int;
 		public final native function set maxResults(value:int):void;
-		/** The shape's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks in the documentation for more information. */
+		/** The shape's collision mask. Only objects in at least one collision layer enabled in the mask will be detected. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** Returns the complete collision information from the collision sweep. The data returned is the same as in the PhysicsDirectSpaceState3D.getRestInfo method. */
@@ -58648,11 +58842,11 @@ package godot {
 		public static const RADIANCE_SIZE_MAX:int = 7;
 		/** Automatically selects the appropriate process mode based on your sky shader. If your shader uses TIME or POSITION, this will use PROCESS_MODE_REALTIME. If your shader uses any of the LIGHT_* variables or any custom uniforms, this uses PROCESS_MODE_INCREMENTAL. Otherwise, this defaults to PROCESS_MODE_QUALITY. */
 		public static const PROCESS_MODE_AUTOMATIC:int = 0;
-		/** Uses high quality importance sampling to process the radiance map. In general, this results in much higher quality than PROCESS_MODE_REALTIME but takes much longer to generate. This should not be used if you plan on changing the sky at runtime. If you are finding that the reflection is not blurry enough and is showing sparkles or fireflies, try increasing ProjectSettings.rendering/reflections/skyReflections/ggxSamples. */
+		/** Uses high quality importance sampling to process the radiance map. In general, this results in much higher quality than PROCESS_MODE_REALTIME but takes much longer to generate. This should not be used if you plan on changing the sky at runtime. If you are finding that the reflection is not blurry enough and is showing sparkles or fireflies, try increasing "rendering/reflections/sky_reflections/ggx_samples". */
 		public static const PROCESS_MODE_QUALITY:int = 1;
-		/** Uses the same high quality importance sampling to process the radiance map as PROCESS_MODE_QUALITY, but updates over several frames. The number of frames is determined by ProjectSettings.rendering/reflections/skyReflections/roughnessLayers. Use this when you need highest quality radiance maps, but have a sky that updates slowly. */
+		/** Uses the same high quality importance sampling to process the radiance map as PROCESS_MODE_QUALITY, but updates over several frames. The number of frames is determined by "rendering/reflections/sky_reflections/roughness_layers". Use this when you need highest quality radiance maps, but have a sky that updates slowly. */
 		public static const PROCESS_MODE_INCREMENTAL:int = 2;
-		/** Uses the fast filtering algorithm to process the radiance map. In general this results in lower quality, but substantially faster run times. If you need better quality, but still need to update the sky every frame, consider turning on ProjectSettings.rendering/reflections/skyReflections/fastFilterHighQuality.
+		/** Uses the fast filtering algorithm to process the radiance map. In general this results in lower quality, but substantially faster run times. If you need better quality, but still need to update the sky every frame, consider turning on "rendering/reflections/sky_reflections/fast_filter_high_quality".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_sky.html#class-sky-constant-process-mode-realtime
 		 */
@@ -59049,7 +59243,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_springarm3d.html
 		 */
 		public native function SpringArm3D();
-		/** The layers against which the collision check will be done. See Collision layers and masks in the documentation for more information. */
+		/** The layers against which the collision check will be done. See Collision layers and masks (https://docs.godotengine.org/en/4.7/tutorials/physics/physics_introduction.html#collision-layers-and-masks) in the documentation for more information. */
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		/** The Shape3D to use for the SpringArm3D.
@@ -59809,7 +60003,7 @@ package godot {
 		 */
 		[Godot(returns="enum:GodotError")]
 		public final native function bind(port:int, host:String = "*"):int;
-		/** Connects to the specified host:port pair. A hostname will be resolved if valid. Returns OK on success. */
+		/** Connects to the specified host:port pair. A hostname will be resolved if valid. Returns GodotError.OK on success. */
 		[Godot(returns="enum:GodotError")]
 		public final native function connectToHost(host:String, port:int):int;
 		/** Returns the IP of this peer. */
@@ -59818,7 +60012,7 @@ package godot {
 		public final native function getConnectedPort():int;
 		/** Returns the local port to which this peer is bound. */
 		public final native function getLocalPort():int;
-		/** If enabled is true, packets will be sent immediately. If enabled is false (the default), packet transfers will be delayed and combined using Nagle's algorithm.
+		/** If enabled is true, packets will be sent immediately. If enabled is false (the default), packet transfers will be delayed and combined using Nagle's algorithm (https://en.wikipedia.org/wiki/Nagle%27s_algorithm).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_streampeertcp.html#class-streampeertcp-method-set-no-delay
 		 */
@@ -59877,7 +60071,7 @@ package godot {
 		 */
 		[Godot(returns="enum:GodotError")]
 		public final native function bind(path:String):int;
-		/** Connects to the specified UNIX Domain Socket path. Returns OK on success. */
+		/** Connects to the specified UNIX Domain Socket path. Returns GodotError.OK on success. */
 		[Godot(returns="enum:GodotError")]
 		public final native function connectToHost(path:String):int;
 		/** Returns the socket path of this peer. */
@@ -61447,7 +61641,7 @@ package godot {
 		public static const FEATURE_USE_SUPPORT_DATA:int = 4096;
 		/** TextServer supports UAX #31 identifier validation, see isValidIdentifier. */
 		public static const FEATURE_UNICODE_IDENTIFIERS:int = 8192;
-		/** TextServer supports Unicode Technical Report #36 and Unicode Technical Standard #39 based spoof detection features. */
+		/** TextServer supports Unicode Technical Report #36 (https://unicode.org/reports/tr36/) and Unicode Technical Standard #39 (https://unicode.org/reports/tr39/) based spoof detection features. */
 		public static const FEATURE_UNICODE_SECURITY:int = 16384;
 		/** Contour point is on the curve. */
 		public static const CONTOUR_CURVE_TAG_ON:int = 1;
@@ -61821,7 +62015,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_textserver.html#class-textserver-method-font-draw-glyph-outline
 		 */
 		public final native function fontDrawGlyphOutline(fontRID:RID, canvas:RID, size:Int64, outlineSize:Int64, pos:Vector2, index:Int64, color:Color = null, oversampling:Number = 0.0):void;
-		/** Returns true if the font supports the given language (as a ISO 639 code). */
+		/** Returns true if the font supports the given language (as a ISO 639 (https://en.wikipedia.org/wiki/ISO_639-1) code). */
 		public final native function fontIsLanguageSupported(fontRID:RID, language:String):Boolean;
 		/** Adds override for fontIsLanguageSupported. */
 		public final native function fontSetLanguageSupportOverride(fontRID:RID, language:String, supported:Boolean):void;
@@ -61831,7 +62025,7 @@ package godot {
 		public final native function fontRemoveLanguageSupportOverride(fontRID:RID, language:String):void;
 		/** Returns list of language support overrides. */
 		public final native function fontGetLanguageSupportOverrides(fontRID:RID):PackedStringArray;
-		/** Returns true if the font supports the given script (as a ISO 15924 code). */
+		/** Returns true if the font supports the given script (as a ISO 15924 (https://en.wikipedia.org/wiki/ISO_15924) code). */
 		public final native function fontIsScriptSupported(fontRID:RID, script:String):Boolean;
 		/** Adds override for fontIsScriptSupported. */
 		public final native function fontSetScriptSupportOverride(fontRID:RID, script:String, supported:Boolean):void;
@@ -62428,7 +62622,7 @@ package godot {
 		public native function _fontDrawGlyph(fontRID:RID, canvas:RID, size:Int64, pos:Vector2, index:Int64, color:Color, oversampling:Number):void;
 		/** Draws single glyph outline of size outlineSize into a canvas item at the position, using fontRID at the size size. If oversampling is greater than zero, it is used as font oversampling factor, otherwise viewport oversampling settings are used. */
 		public native function _fontDrawGlyphOutline(fontRID:RID, canvas:RID, size:Int64, outlineSize:Int64, pos:Vector2, index:Int64, color:Color, oversampling:Number):void;
-		/** Returns true if the font supports the given language (as a ISO 639 code). */
+		/** Returns true if the font supports the given language (as a ISO 639 (https://en.wikipedia.org/wiki/ISO_639-1) code). */
 		public native function _fontIsLanguageSupported(fontRID:RID, language:String):Boolean;
 		/** Adds override for _fontIsLanguageSupported. */
 		public native function _fontSetLanguageSupportOverride(fontRID:RID, language:String, supported:Boolean):void;
@@ -62438,7 +62632,7 @@ package godot {
 		public native function _fontRemoveLanguageSupportOverride(fontRID:RID, language:String):void;
 		/** Returns list of language support overrides. */
 		public native function _fontGetLanguageSupportOverrides(fontRID:RID):PackedStringArray;
-		/** Returns true if the font supports the given script (as a ISO 15924 code). */
+		/** Returns true if the font supports the given script (as a ISO 15924 (https://en.wikipedia.org/wiki/ISO_15924) code). */
 		public native function _fontIsScriptSupported(fontRID:RID, script:String):Boolean;
 		/** Adds override for _fontIsScriptSupported. */
 		public native function _fontSetScriptSupportOverride(fontRID:RID, script:String, supported:Boolean):void;
@@ -64623,7 +64817,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_time.html#class-time-method-get-time-zone-from-system
 		 */
 		public static native function getTimeZoneFromSystem():GodotDictionary;
-		/** Returns the current Unix timestamp in seconds based on the system time in UTC. This method is implemented by the operating system and always returns the time in UTC. The Unix timestamp is the number of seconds passed since 1970-01-01 at 00:00:00, the Unix epoch.
+		/** Returns the current Unix timestamp in seconds based on the system time in UTC. This method is implemented by the operating system and always returns the time in UTC. The Unix timestamp is the number of seconds passed since 1970-01-01 at 00:00:00, the Unix epoch (https://en.wikipedia.org/wiki/Unix_time).
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_time.html#class-time-method-get-unix-time-from-system
 		 */
@@ -64890,7 +65084,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_translationserver.html
 		 */
 		public native function TranslationServer();
-		/** If true, enables the use of pseudolocalization on the main translation domain. See ProjectSettings.internationalization/pseudolocalization/usePseudolocalization for details. */
+		/** If true, enables the use of pseudolocalization on the main translation domain. See "internationalization/pseudolocalization/use_pseudolocalization" for details. */
 		public static native function get pseudolocalizationEnabled():Boolean;
 		public static native function set pseudolocalizationEnabled(value:Boolean):void;
 		/** The TranslationServer singleton as an object. */
@@ -65121,7 +65315,7 @@ package godot {
 		public final native function get customPopupEdited():Signal;
 		/** Emitted when an item is double-clicked, or selected with a ui_accept input event (e.g. using Enter or Space on the keyboard). */
 		public final native function get itemActivated():Signal;
-		/** Emitted when a column's title is clicked with either MOUSE_BUTTON_LEFT or MOUSE_BUTTON_RIGHT. */
+		/** Emitted when a column's title is clicked with either MouseButton.LEFT or MouseButton.RIGHT. */
 		public final native function get columnTitleClicked():Signal;
 		/** Emitted when a left mouse button click does not select any item. */
 		public final native function get nothingSelected():Signal;
@@ -67354,22 +67548,22 @@ package godot {
 		public static const FILTER_NEAREST:int = 1;
 		/** The texture filter blends between the nearest 4 pixels. This makes the texture look smooth from up close, and grainy from a distance (due to mipmaps not being sampled). */
 		public static const FILTER_LINEAR:int = 2;
-		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look pixelated from up close, and smooth from a distance.
+		/** The texture filter reads from the nearest pixel and blends between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look pixelated from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_visualshadernodetextureparameter.html#class-visualshadernodetextureparameter-constant-filter-nearest-mipmap
 		 */
 		public static const FILTER_NEAREST_MIPMAP:int = 3;
-		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true). This makes the texture look smooth from up close, and smooth from a distance.
+		/** The texture filter blends between the nearest 4 pixels and between the nearest 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true). This makes the texture look smooth from up close, and smooth from a distance.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_visualshadernodetextureparameter.html#class-visualshadernodetextureparameter-constant-filter-linear-mipmap
 		 */
 		public static const FILTER_LINEAR_MIPMAP:int = 4;
-		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter reads from the nearest pixel and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look pixelated from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_visualshadernodetextureparameter.html#class-visualshadernodetextureparameter-constant-filter-nearest-mipmap-anisotropic
 		 */
 		public static const FILTER_NEAREST_MIPMAP_ANISOTROPIC:int = 5;
-		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if ProjectSettings.rendering/textures/defaultFilters/useNearestMipmapFilter is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting ProjectSettings.rendering/textures/defaultFilters/anisotropicFilteringLevel.
+		/** The texture filter blends between the nearest 4 pixels and blends between 2 mipmaps (or uses the nearest mipmap if "rendering/textures/default_filters/use_nearest_mipmap_filter" is true) based on the angle between the surface and the camera view. This makes the texture look smooth from up close, and smooth from a distance. Anisotropic filtering improves texture quality on surfaces that are almost in line with the camera, but is slightly slower. The anisotropic filtering level can be changed by adjusting "rendering/textures/default_filters/anisotropic_filtering_level".
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_visualshadernodetextureparameter.html#class-visualshadernodetextureparameter-constant-filter-linear-mipmap-anisotropic
 		 */
@@ -72043,7 +72237,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-key-modifier-mask
 		 */
 		public static const MODIFIER_MASK:int = 2130706432;
-		/** Automatically remapped to KEY_META on macOS and KEY_CTRL on other platforms, this mask is never set in the actual events, and should be used for key mapping only. */
+		/** Automatically remapped to Key.META on macOS and Key.CTRL on other platforms, this mask is never set in the actual events, and should be used for key mapping only. */
 		public static const MASK_CMD_OR_CTRL:int = 16777216;
 		/** Shift key mask. */
 		public static const MASK_SHIFT:int = 33554432;
@@ -72204,11 +72398,11 @@ package godot {
 		public static const NOTE_ON:int = 9;
 		/** MIDI message sent to indicate a change in pressure while a note is being pressed down, also called aftertouch. */
 		public static const AFTERTOUCH:int = 10;
-		/** MIDI message sent when a controller value changes. In a MIDI device, a controller is any input that doesn't play notes. These may include sliders for volume, balance, and panning, as well as switches and pedals. See the General MIDI specification for a small list. */
+		/** MIDI message sent when a controller value changes. In a MIDI device, a controller is any input that doesn't play notes. These may include sliders for volume, balance, and panning, as well as switches and pedals. See the General MIDI specification (https://en.wikipedia.org/wiki/General_MIDI#Controller_events) for a small list. */
 		public static const CONTROL_CHANGE:int = 11;
 		/** MIDI message sent when the MIDI device changes its current instrument (also called program or preset). */
 		public static const PROGRAM_CHANGE:int = 12;
-		/** MIDI message sent to indicate a change in pressure for the whole channel. Some MIDI devices may send this instead of MIDI_MESSAGE_AFTERTOUCH. */
+		/** MIDI message sent to indicate a change in pressure for the whole channel. Some MIDI devices may send this instead of MIDIMessage.AFTERTOUCH. */
 		public static const CHANNEL_PRESSURE:int = 13;
 		/** MIDI message sent when the value of the pitch bender changes, usually a wheel on the MIDI device. */
 		public static const PITCH_BEND:int = 14;
@@ -72217,7 +72411,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-midi-message-system-exclusive
 		 */
 		public static const SYSTEM_EXCLUSIVE:int = 240;
-		/** MIDI message sent every quarter frame to keep connected MIDI devices synchronized. Related to MIDI_MESSAGE_TIMING_CLOCK.
+		/** MIDI message sent every quarter frame to keep connected MIDI devices synchronized. Related to MIDIMessage.TIMING_CLOCK.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-midi-message-quarter-frame
 		 */
@@ -72234,7 +72428,7 @@ package godot {
 		public static const SONG_SELECT:int = 243;
 		/** MIDI message sent to request a tuning calibration. Used on analog synthesizers. Most modern MIDI devices do not need this message. */
 		public static const TUNE_REQUEST:int = 246;
-		/** MIDI message sent 24 times after MIDI_MESSAGE_QUARTER_FRAME, to keep connected MIDI devices synchronized. */
+		/** MIDI message sent 24 times after MIDIMessage.QUARTER_FRAME, to keep connected MIDI devices synchronized. */
 		public static const TIMING_CLOCK:int = 248;
 		/** MIDI message sent to start the current sequence or song from the beginning. */
 		public static const START:int = 250;
@@ -72249,7 +72443,7 @@ package godot {
 	}
 	[Abstract]
 	public final native class GodotError {
-		/** Methods that return GodotError return OK when no error occurred.
+		/** Methods that return GodotError return GodotError.OK when no error occurred.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-ok
 		 */
@@ -72356,7 +72550,7 @@ package godot {
 	}
 	[Abstract]
 	public final native class PropertyHint {
-		/** The property has no hint for the editor. However, the hint string is still read, which can be used to specify a suffix for a property that has no range limit (see PROPERTY_HINT_RANGE's description). */
+		/** The property has no hint for the editor. However, the hint string is still read, which can be used to specify a suffix for a property that has no range limit (see PropertyHint.RANGE's description). */
 		public static const NONE:int = 0;
 		/** Hints that an int, Number, or packed/typed GodotArray property containing int or Number types should be within a range specified via the hint string "min,max" or "min,max,step". The hint string can optionally include "or_greater" and/or "or_less" to allow manual input going respectively above the max or below the min values.
 		 *
@@ -72368,12 +72562,12 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-property-hint-enum
 		 */
 		public static const ENUM:int = 2;
-		/** Hints that a String or String property can be an enumerated value to pick in a list specified via a hint string such as "Hello,Something,Else". See PROPERTY_HINT_ENUM for details.
+		/** Hints that a String or String property can be an enumerated value to pick in a list specified via a hint string such as "Hello,Something,Else". See PropertyHint.ENUM for details.
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-property-hint-enum-suggestion
 		 */
 		public static const ENUM_SUGGESTION:int = 3;
-		/** Hints that a Number property should be edited using a curve editor showing an exponential easing function. The hint string can include "attenuation" to flip the curve horizontally and/or "positive_only" to exclude in/out easing and limit values to be greater than or equal to zero. This displays differently to a property that uses PROPERTY_HINT_RANGE with the "exp" keyword, as it's edited with a slider instead of a curve editor. */
+		/** Hints that a Number property should be edited using a curve editor showing an exponential easing function. The hint string can include "attenuation" to flip the curve horizontally and/or "positive_only" to exclude in/out easing and limit values to be greater than or equal to zero. This displays differently to a property that uses PropertyHint.RANGE with the "exp" keyword, as it's edited with a slider instead of a curve editor. */
 		public static const EXP_EASING:int = 4;
 		/** Hints that a vector property should allow its components to be linked. For example, this allows Vector2.x and Vector2.y to be edited together. This hint is supported on Vector2, Vector2i, Vector3, Vector3i, Vector4, and Vector4i. The hint string can be used to specify a suffix indicating each value's unit with the "suffix:px/s" syntax. */
 		public static const LINK:int = 5;
@@ -72396,7 +72590,7 @@ package godot {
 		public static const LAYERS_3D_NAVIGATION:int = 12;
 		/** Hints that an integer property is a bitmask using the optionally named avoidance layers. */
 		public static const LAYERS_AVOIDANCE:int = 37;
-		/** Hints that a String property is a path to a file. Editing it will show a file dialog for picking the path. The hint string can be a set of filters with wildcards like "*.png,*.jpg". By default the file will be stored as UID whenever available. You can use ResourceUID methods to convert it back to path. For storing a raw path, use PROPERTY_HINT_FILE_PATH. */
+		/** Hints that a String property is a path to a file. Editing it will show a file dialog for picking the path. The hint string can be a set of filters with wildcards like "*.png,*.jpg". By default the file will be stored as UID whenever available. You can use ResourceUID methods to convert it back to path. For storing a raw path, use PropertyHint.FILE_PATH. */
 		public static const FILE:int = 13;
 		/** Hints that a String property is a path to a directory. Editing it will show a file dialog for picking the path. */
 		public static const DIR:int = 14;
@@ -72473,7 +72667,7 @@ package godot {
 		 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-constant-property-hint-input-name
 		 */
 		public static const INPUT_NAME:int = 43;
-		/** Like PROPERTY_HINT_FILE, but the property is stored as a raw path, not UID. That means the reference will be broken if you move the file. Consider using PROPERTY_HINT_FILE when possible. */
+		/** Like PropertyHint.FILE, but the property is stored as a raw path, not UID. That means the reference will be broken if you move the file. Consider using PropertyHint.FILE when possible. */
 		public static const FILE_PATH:int = 44;
 		/** Represents the size of the PropertyHint enum. */
 		public static const MAX:int = 45;
@@ -72504,7 +72698,7 @@ package godot {
 		public static const NO_INSTANCE_STATE:int = 1024;
 		/** Editing the property prompts the user for restarting the editor. */
 		public static const RESTART_IF_CHANGED:int = 2048;
-		/** The property is a script variable. PROPERTY_USAGE_SCRIPT_VARIABLE can be used to distinguish between exported script variables from built-in variables (which don't have this usage flag). By default, PROPERTY_USAGE_SCRIPT_VARIABLE is not applied to variables that are created by overriding GodotObject._getPropertyList in a script. */
+		/** The property is a script variable. PropertyUsageFlags.SCRIPT_VARIABLE can be used to distinguish between exported script variables from built-in variables (which don't have this usage flag). By default, PropertyUsageFlags.SCRIPT_VARIABLE is not applied to variables that are created by overriding GodotObject._getPropertyList in a script. */
 		public static const SCRIPT_VARIABLE:int = 4096;
 		/** The property value of type GodotObject will be stored even if its value is null. */
 		public static const STORE_IF_NULL:int = 8192;
@@ -72885,7 +73079,7 @@ package godot {
 	 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-method-pow
 	 */
 	public native function pow(base:Number, exp:Number):Number;
-	/** Returns the natural logarithm of x (base e, with e being approximately 2.71828). This is the amount of time needed to reach a certain level of continuous growth.
+	/** Returns the natural logarithm (https://en.wikipedia.org/wiki/Natural_logarithm) of x (base e (https://en.wikipedia.org/wiki/E_(mathematical_constant)), with e being approximately 2.71828). This is the amount of time needed to reach a certain level of continuous growth.
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-method-log
 	 */
@@ -72943,9 +73137,9 @@ package godot {
 	 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-method-cubic-interpolate-angle-in-time
 	 */
 	public native function cubicInterpolateAngleInTime(from:Number, to:Number, pre:Number, post:Number, weight:Number, toT:Number, preT:Number, postT:Number):Number;
-	/** Returns the point at the given t on a one-dimensional Bézier curve defined by the given control1, control2, and end points. */
+	/** Returns the point at the given t on a one-dimensional Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by the given control1, control2, and end points. */
 	public native function bezierInterpolate(start:Number, control1:Number, control2:Number, end:Number, t:Number):Number;
-	/** Returns the derivative at the given t on a one-dimensional Bézier curve defined by the given control1, control2, and end points. */
+	/** Returns the derivative at the given t on a one-dimensional Bézier curve (https://en.wikipedia.org/wiki/B%C3%A9zier_curve) defined by the given control1, control2, and end points. */
 	public native function bezierDerivative(start:Number, control1:Number, control2:Number, end:Number, t:Number):Number;
 	/** Returns the difference between the two angles (in radians), in the range of [-PI, +PI]. When from and to are opposite, returns -PI if from is smaller than to, or PI otherwise. */
 	public native function angleDifference(from:Number, to:Number):Number;
@@ -73091,7 +73285,7 @@ package godot {
 	 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-method-randf-range
 	 */
 	public native function randfRange(from:Number, to:Number):Number;
-	/** Returns a normally-distributed, pseudo-random floating-point value from the specified mean and a standard deviation. This is also known as a Gaussian distribution.
+	/** Returns a normally-distributed (https://en.wikipedia.org/wiki/Normal_distribution), pseudo-random floating-point value from the specified mean and a standard deviation. This is also known as a Gaussian distribution.
 	 *
 	 * https://docs.godotengine.org/en/4.7/classes/class_@globalscope.html#class-globalscope-method-randfn
 	 */

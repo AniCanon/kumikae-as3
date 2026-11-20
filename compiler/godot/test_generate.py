@@ -70,6 +70,47 @@ class Fixture(unittest.TestCase):
         self.assertIn("/** A scene object. */", text)
         self.assertIn("/** Finds path on a GodotObject. See VariantType, getNode and * /. */", text)
 
+    def test_docs_keep_literal_setting_keys(self):
+        api = fixture()
+        entry = api["utility_functions"][0]
+        entry["description"] = ("Read [member ProjectSettings.physics/3d/default_gravity] or "
+                                "[member EditorSettings.interface/editor/display_scale].")
+        self.assertIn('Read "physics/3d/default_gravity" or "interface/editor/display_scale".',
+                      generate.generate(api))
+
+    def test_docs_reference_the_declared_constants_and_properties(self):
+        api = fixture()
+        node = next(c for c in api["classes"] if c["name"] == "Node")
+        base = next(c for c in api["classes"] if c["name"] == "Object")
+        base["constants"].append({"name": "KEY_ESCAPE", "value": 12})
+        node["brief_description"] = ("See [constant OK], [constant KEY_ESCAPE], [constant @GlobalScope.KEY_ESCAPE], "
+                                     "[method Node.get_name], [method set_owner], [method Control.get_anchor], and [constant @GDScript.INF].")
+        self.assertIn("See GodotError.OK, GodotObject.KEY_ESCAPE, Key.ESCAPE, "
+                      "Node.name, owner, Control.getAnchor, and Infinity.", generate.generate(api))
+
+    def test_constructor_docs_describe_each_documented_form(self):
+        api = fixture()
+        vector = next(c for c in api["builtin_classes"] if c["name"] == "Vector2")
+        vector["brief_description"] = "A vector."
+        vector["constructors"][0]["description"] = "Initializes both components to zero."
+        vector["constructors"][2]["description"] = "Uses [param x] and [param y] as the coordinates."
+        text = generate.generate(api)
+        constructor = text.index("public native function Vector2(")
+        comment = text[text.rindex("/**", 0, constructor):constructor]
+        self.assertIn("Vector2() — Initializes both components to zero.", comment)
+        self.assertIn("Vector2(x:Number, y:Number) — Uses x and y as the coordinates.", comment)
+
+    def test_docs_preserve_inline_links_and_literal_code(self):
+        api = fixture()
+        api["header"].update(version_major=4, version_minor=7)
+        node = next(c for c in api["classes"] if c["name"] == "Node")
+        node["brief_description"] = ("See [url=$DOCS_URL/tutorials/example.html]the [code]node[/code] guide[/url] "
+                                     "and [url=https://example.org/diagram]diagram[/url]. "
+                                     "The literal tag is [code][url=address]label[/url][/code].")
+        self.assertIn("See the node guide (https://docs.godotengine.org/en/4.7/tutorials/example.html) "
+                      "and diagram (https://example.org/diagram). The literal tag is [url=address]label[/url].",
+                      generate.generate(api))
+
     def test_long_descriptions_link_to_the_original_member(self):
         api = fixture()
         api["header"].update(version_major=4, version_minor=7)

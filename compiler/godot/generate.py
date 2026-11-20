@@ -199,10 +199,29 @@ def wide(values):
     return any(not is_int32(value["value"]) for value in values)
 
 
+def folded_accessors(entry):
+    """Godot methods emitted only as properties. An accessor that also takes an index stays a method."""
+    methods = {method["name"]: method for method in entry.get("methods", [])}
+    folded = {}
+    for prop in entry.get("properties", []):
+        for role, arity in (("getter", 0), ("setter", 1)):
+            name = prop.get(role)
+            if not name:
+                continue
+            if name in methods:
+                if len(methods[name].get("arguments", [])) != arity:
+                    continue
+            elif "index" in prop:
+                continue
+            folded[name] = naming.member(prop["name"])
+    return folded
+
+
 class Generator:
     def __init__(self, api):
         self.api = api
-        self.docs = asdoc.Documentation(api, AS3_STANDS_FOR)
+        self.accessor_names = {c["name"]: folded_accessors(c) for c in api["classes"]}
+        self.docs = asdoc.Documentation(api, AS3_STANDS_FOR, self.accessor_names)
         self.classes = {entry["name"]: entry for entry in api["classes"]}
         self.builtins = {entry["name"]: entry for entry in api["builtin_classes"]
                          if entry["name"] not in AS3_STANDS_FOR}
@@ -471,8 +490,6 @@ class Generator:
             out.extend(self.docs.comment(entry, owner))
             out.append("public native function %s();" % as3_name)
 
-        own_methods = {method["name"]: method for method in entry.get("methods", [])}
-        hidden = set()
         for prop in entry.get("properties", []):
             where = "%s.%s" % (owner, prop["name"])
             name = naming.member(prop["name"])
@@ -486,11 +503,6 @@ class Generator:
                 as3, note = self.type(described["return_value"]["type"], described["return_value"].get("meta"), where)
             else:
                 as3, note = self.type(prop["type"], None, where)
-            # An accessor that takes an index serves several properties and stays a method.
-            if getter in own_methods and not own_methods[getter].get("arguments"):
-                hidden.add(getter)
-            if setter in own_methods and len(own_methods[setter].get("arguments", [])) == 1:
-                hidden.add(setter)
             out.extend(self.docs.comment(prop, owner, "property"))
             if getter:
                 if note:
@@ -515,7 +527,7 @@ class Generator:
             out.append("public static native function get singleton():%s;" % as3_name)
 
         for method in methods:
-            if method["name"] in hidden or (owner, method["name"]) in AS3_HAS_METHOD | LISTEN_BY_NAME:
+            if method["name"] in self.accessor_names[owner] or (owner, method["name"]) in AS3_HAS_METHOD | LISTEN_BY_NAME:
                 continue
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
@@ -622,7 +634,17 @@ class Generator:
             self.godot_names["%s.%s" % (as3_name, name)] += " field " + member["type"]
             out.extend(self.docs.comment(member, owner, "property"))
             out.append("public var %s:%s;" % (name, self.type(member["type"], None, owner + "." + name)[0]))
-        out.extend(self.docs.comment(entry, owner))
+        if any(form.get("description") for form in entry["constructors"]):
+            forms = []
+            for form in entry["constructors"]:
+                parameters = self.parameters(form.get("arguments", []), False, owner + " constructor", [])
+                signature = "%s(%s)" % (as3_name, parameters)
+                description = self.docs.summary(form.get("description", ""), owner)
+                forms.append(signature + " — " + description if description else signature)
+            forms.append(self.docs.url(owner, "constructor", owner))
+            out.extend(asdoc.block(forms))
+        else:
+            out.extend(self.docs.comment(entry, owner))
         out.append(self.constructor(entry, as3_name))
         for method in entry.get("methods", []):
             if owner == "Signal" and method["name"] in SIGNAL_REPLACED:
