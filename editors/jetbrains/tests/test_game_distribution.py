@@ -59,8 +59,20 @@ class GameDistributionTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "custom.wasm"):
                 self.exporter.stage_web_runtime(stage, native)
             (stage / "custom.wasm").write_bytes(b"custom")
-            self.assertEqual("custom.wasm", self.exporter.stage_web_runtime(stage, native))
+            self.assertEqual({"custom.wasm"}, self.exporter.stage_web_runtime(stage, native))
             self.assertEqual(b"custom", (stage / "custom.wasm").read_bytes())
+
+    def test_web_library_feature_tags_preserve_debug_and_release_overrides(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            descriptor = stage / "kas3.gdextension"
+            original = ('[libraries]\nweb.debug.wasm32 = "res://debug.wasm"\n'
+                        'wasm32.web.release = "release.wasm"\n[icons]\nweb = "res://icon.svg"\n')
+            descriptor.write_text(original)
+            for name in ("debug.wasm", "release.wasm"):
+                (stage / name).touch()
+            self.assertEqual({"debug.wasm", "release.wasm"}, self.exporter.stage_web_runtime(stage, stage))
+            self.assertEqual(original, descriptor.read_text())
 
     def test_repository_and_plugin_use_the_product_mark(self):
         logo = self.root / "src/main/resources/META-INF/pluginIcon.svg"

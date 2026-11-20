@@ -97,12 +97,13 @@ def main():
     if args.command == "run":
         device = device_for(args.target, args.ios_device if args.target == "ios-simulator" else args.android_device)
     preset = preset_for(project, args.target, args.preset)
+    if args.command == "run" and args.target == "web":
+        from web_game import run
+        run(project, KIT, godot, preset)
+        return 0
     product = build(KIT, project, args.target, preset, godot)
     print(product, flush=True)
-    if args.command == "run" and args.target == "web":
-        from web_game import preview
-        preview(product)
-    elif args.command == "run":
+    if args.command == "run":
         from device_lease import device_lease
         with device_lease(device):
             launch_mobile(project, args.target, device, product)

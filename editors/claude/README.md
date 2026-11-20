@@ -29,7 +29,7 @@ or testing on it. Set `ANDROID_HOME` for a nonstandard SDK location.
 | `/kumikae:new MyGame` | Create a playable Coin Dash starter with export presets, the game runtime and a gameplay test. Open the new folder in Claude Code. |
 | `/kumikae:doctor` | Create a temporary starter and run its physics and HUD test through the local Godot runtime. |
 | `/kumikae:build desktop` | Export a debug game and print its artifact path. Other targets are `ios-simulator`, `android` and `web`. |
-| `/kumikae:run web` | Export the game and open a local preview in your default browser. Stop the command to close the server. |
+| `/kumikae:run web` | Export the game and open a local preview in your default browser. Stop the command to close the server and discard the temporary export. Use `build web` to keep the files. |
 | `/kumikae:run desktop` | Play the desktop project in Godot. On mobile, build, install and launch on the selected destination. |
 | `/kumikae:test all --case Gameplay::CoinPickupTest::pickupUpdatesHud` | Run the same discovered AS3 case in desktop Godot, iOS Simulator, Android emulator and headless Chromium. Report each result and exit nonzero if any target failed or was unavailable. |
 

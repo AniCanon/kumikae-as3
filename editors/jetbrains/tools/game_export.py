@@ -129,26 +129,31 @@ def validate_web_preset(stage, preset):
 def stage_web_runtime(stage, native):
     descriptor = stage / "kas3.gdextension"
     text = descriptor.read_text()
-    relative = "bin/web/libkas3_godot.wasm"
-    entry = re.search(r'(?m)^[ \t]*web(?:\.wasm32)?[ \t]*=[ \t]*"res://([^"]+)"', text)
-    if entry:
-        relative = entry[1]
-    destination = (stage / relative).resolve()
-    if not destination.is_relative_to(stage.resolve()):
-        raise ValueError("The Web runtime must be inside the project.")
-    bundled = native / "web/libkas3_godot.wasm"
-    if relative == "bin/web/libkas3_godot.wasm" and bundled.is_file():
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(bundled, destination)
-    if not destination.is_file():
-        raise ValueError(f"Missing Web AS3 runtime at {relative}. Install the Kumikae Web kit.")
-    if not entry:
-        text, count = re.subn(r"(?m)^\[libraries\][ \t]*$", '[libraries]\nweb.wasm32 = "res://' + relative + '"',
-                              text, count=1)
-        if not count:
-            raise ValueError("The AS3 extension descriptor needs a libraries section.")
-        descriptor.write_text(text)
-    return destination.name
+    libraries = re.search(r"(?ms)^\[libraries\][ \t]*\n(.*?)(?=^\[|\Z)", text)
+    if not libraries:
+        raise ValueError("The AS3 extension descriptor needs a libraries section.")
+    paths = {value.removeprefix("res://") for tags, value in
+             re.findall(r'(?m)^[ \t]*([\w.-]+)[ \t]*=[ \t]*"([^"]+)"', libraries[1])
+             if "web" in tags.split(".")}
+    standard = "bin/web/libkas3_godot.wasm"
+    if not paths:
+        paths.add(standard)
+        start = libraries.start(1)
+        descriptor.write_text(text[:start] + f'web.wasm32 = "res://{standard}"\n' + text[start:])
+    available = set()
+    for relative in paths:
+        destination = (stage / relative).resolve()
+        if not destination.is_relative_to(stage.resolve()):
+            raise ValueError("The Web runtime must be inside the project.")
+        bundled = native / "web/libkas3_godot.wasm"
+        if relative == standard and bundled.is_file():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bundled, destination)
+        if destination.is_file():
+            available.add(destination.name)
+    if not available:
+        raise ValueError("Missing Web AS3 runtime at " + ", ".join(sorted(paths)) + ". Install the Kumikae Web kit.")
+    return available
 
 
 def stage_ios_runtime(stage, native):
@@ -201,11 +206,12 @@ def export(project, destination, godot, native, presets, keys=None, private_file
                 host = native / name
                 if host.is_file() and (stage / "bin" / name).is_file():
                     shutil.copy2(host, stage / "bin" / name)
-        web_library = stage_web_runtime(stage, native) if "Web" in platforms else None
+        web_libraries = stage_web_runtime(stage, native) if "Web" in platforms else set()
         if "iOS" in platforms:
             stage_ios_runtime(stage, native)
         base = [godot, "--headless", "--path", str(stage)]
-        subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
+        if platforms != {"Web"}:
+            subprocess.run(base + ["--editor", "--quit-after", "120", "--max-fps", "60"], check=True, timeout=180)
         output = Path(tempfile.mkdtemp(prefix="Game-exports-", dir=destination))
         print(f"Export directory: {output}", flush=True)
         failed = []
@@ -234,7 +240,7 @@ def export(project, destination, godot, native, presets, keys=None, private_file
                 failed.append(f"{label} ({error})")
                 continue
             produced = product(artifact, preset)
-            if preset["platform"] == "Web" and not (subdir / web_library).is_file():
+            if preset["platform"] == "Web" and not any((subdir / name).is_file() for name in web_libraries):
                 failed.append(f"{label} (enable GDExtension support in the Web preset)")
             elif not produced:
                 failed.append(label)

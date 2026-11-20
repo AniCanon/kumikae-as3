@@ -3,6 +3,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import shutil
+import signal
 import sys
 import tempfile
 import webbrowser
@@ -13,14 +14,19 @@ import game_export
 
 def export_stage(stage, native, godot, preset, output):
     game_export.validate_web_preset(stage, preset)
-    library = game_export.stage_web_runtime(stage, native)
-    base = [godot, "--headless", "--path", str(stage)]
-    game_export.run_export(base + ["--import"])
+    libraries = game_export.stage_web_runtime(stage, native)
     product = output / "index.html"
-    game_export.run_export(base + ["--export-debug", preset, str(product)])
-    if not product.is_file() or not (output / library).is_file():
+    game_export.run_export([godot, "--headless", "--path", str(stage), "--export-debug", preset, str(product)])
+    if not product.is_file() or not any((output / name).is_file() for name in libraries):
         raise ValueError("Missing Web AS3 runtime in the export. Enable GDExtension support and disable threads in the Web preset.")
     return product
+
+
+def export_project(project, native, godot, preset, output):
+    with tempfile.TemporaryDirectory(prefix="kumikae-web-") as tmp:
+        stage = Path(tmp) / "game"
+        game_export.stage_game(project, stage, None)
+        return export_stage(stage, native, godot, preset, output)
 
 
 def build(project, native, godot, preset):
@@ -28,10 +34,7 @@ def build(project, native, godot, preset):
     base.mkdir(parents=True, exist_ok=True)
     output = Path(tempfile.mkdtemp(dir=base, prefix="web-"))
     try:
-        with tempfile.TemporaryDirectory(prefix="kumikae-web-") as tmp:
-            stage = Path(tmp) / "game"
-            game_export.stage_game(project, stage, None)
-            return export_stage(stage, native, godot, preset, output)
+        return export_project(project, native, godot, preset, output)
     except BaseException:
         shutil.rmtree(output)
         raise
@@ -59,9 +62,21 @@ def preview(product):
             return
 
 
+def run(project, native, godot, preset):
+    def stop(signum, frame):
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, stop)
+    try:
+        with tempfile.TemporaryDirectory(prefix="kumikae-preview-") as output:
+            preview(export_project(project, native, godot, preset, Path(output)))
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
 if __name__ == "__main__":
     try:
         project, native, godot, preset = sys.argv[1:]
-        preview(build(Path(project), Path(native), godot, preset))
+        run(Path(project), Path(native), godot, preset)
     except (ValueError, OSError) as error:
         sys.exit(str(error))

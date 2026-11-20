@@ -107,7 +107,7 @@ Edit a script while the game runs and save. The game takes the new code and keep
 
 Select **Web** in the project wizard or choose **Run > Add Game Target… > Web** in an existing game.
 Select its run configuration and press **Run**. The plugin builds the selected Godot preset, serves the
-export on localhost and opens the URL in your default browser. **Stop** closes the preview server.
+export on localhost and opens the URL in your default browser. **Stop** closes the preview server and removes the temporary export.
 Install the matching Godot Web export templates and use a plugin kit with the WebAssembly runtime.
 For an existing preset, enable **Extensions Support**, disable **Thread Support**, and include `*.as`.
 Use **Export Game** to create a release build for hosting.
