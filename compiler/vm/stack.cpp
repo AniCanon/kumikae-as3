@@ -2,7 +2,9 @@
 
 #include <cstdlib>
 
-#ifndef _WIN32
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/stack.h>
+#elif !defined(_WIN32)
 #include <pthread.h>
 #endif
 
@@ -21,7 +23,10 @@ struct Bounds {
 
 Bounds bounds_of_thread() {
 	Bounds bounds;
-#if defined(__APPLE__)
+#if defined(__EMSCRIPTEN__)
+	bounds.end = emscripten_stack_get_end();
+	bounds.size = emscripten_stack_get_base() - bounds.end;
+#elif defined(__APPLE__)
 	const pthread_t self = pthread_self();
 	bounds.size = pthread_get_stacksize_np(self);
 	bounds.end = reinterpret_cast<uintptr_t>(pthread_get_stackaddr_np(self)) - bounds.size;
@@ -45,7 +50,7 @@ struct Started {
 	void *data;
 };
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 void *run_started(void *p_started) {
 	Started *started = static_cast<Started *>(p_started);
 	started->run(started->data);
@@ -74,7 +79,7 @@ uintptr_t stack_floor() {
 }
 
 bool run_with_stack(size_t p_bytes, void (*p_run)(void *), void *p_data) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 	pthread_attr_t attributes;
 	pthread_t thread;
 	if (pthread_attr_init(&attributes) != 0) {

@@ -1,6 +1,6 @@
 #include "ios_export.h"
 
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 #include "play_build.h"
 #include "play_cache.h"
 #include "sources.h"

@@ -15,6 +15,16 @@ if(KAS3_SANITIZE)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
+option(KAS3_WEB_THREADS "Build the Web Godot extension with pthreads" OFF)
+if(EMSCRIPTEN)
+    # Every static library linked into a Web GDExtension side module must match godot-cpp's side-module ABI,
+    # and hide internal symbols so only GDE_EXPORT entry points are resolved dynamically against Godot.
+    add_compile_options(-sSIDE_MODULE=1 -sSUPPORT_LONGJMP=wasm -fvisibility=hidden)
+    if(KAS3_WEB_THREADS)
+        add_compile_options(-sUSE_PTHREADS=1)
+    endif()
+endif()
+
 # The front end must be loadable into the Godot editor, which is built without exceptions or RTTI.
 file(GLOB KAS3_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
@@ -106,6 +116,9 @@ set(KAS3_GODOT_CPP "" CACHE PATH "A godot-cpp checkout; empty to leave the Godot
 if(KAS3_GODOT_CPP)
     set(GODOTCPP_API_VERSION "4.7" CACHE STRING "" FORCE)
     set(GODOTCPP_TARGET "template_release" CACHE STRING "" FORCE)
+    if(EMSCRIPTEN)
+        set(GODOTCPP_THREADS ${KAS3_WEB_THREADS} CACHE BOOL "" FORCE)
+    endif()
     add_subdirectory(${KAS3_GODOT_CPP} ${CMAKE_CURRENT_BINARY_DIR}/godot-cpp EXCLUDE_FROM_ALL)
     file(GLOB KAS3_GODOT_SOURCES CONFIGURE_DEPENDS godot_ext/*.cpp)
     # What Play builds a project's program library from is carried by the extension: the headers generated
@@ -134,9 +147,26 @@ if(KAS3_GODOT_CPP)
     set_target_properties(kas3_godot PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
+    if(EMSCRIPTEN)
+        # Godot looks up the entry point by name; host pages look up the web hot-reload C API.
+        target_link_options(kas3_godot PRIVATE -sSIDE_MODULE=2
+            -Wl,--export=kas3_godot_init
+            -Wl,--export=kas3_web_reload
+            -Wl,--export=kas3_web_last_error
+            -Wl,--export=kas3_web_reset_sources)
+        set_target_properties(kas3_godot PROPERTIES SUFFIX ".wasm")
+    endif()
 endif()
 
 enable_testing()
+if(EMSCRIPTEN)
+    add_executable(test_web_runtime tests/web_runtime.cpp)
+    target_link_libraries(test_web_runtime PRIVATE kas3vm)
+    if(KAS3_WEB_THREADS)
+        target_link_options(test_web_runtime PRIVATE -pthread)
+    endif()
+    add_test(NAME web_runtime COMMAND test_web_runtime)
+endif()
 file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)

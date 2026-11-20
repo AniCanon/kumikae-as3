@@ -30,6 +30,30 @@ class PluginTest(unittest.TestCase):
             self.assertNotEqual(0, run.returncode)
             self.assertIn("already exists", run.stderr)
 
+    def test_starter_web_preset_matches_the_runtime(self):
+        for has_web in (False, True):
+            with self.subTest(has_web=has_web), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                native = root / "native"
+                native.mkdir()
+                for name in ("kas3c", "libkas3_godot.dylib"):
+                    (native / name).touch()
+                wasm = Path("web/libkas3_godot.wasm")
+                if has_web:
+                    (native / wasm.parent).mkdir()
+                    (native / wasm).write_bytes(b"test runtime")
+                market = root / "market"
+                subprocess.run([sys.executable, "-I", PLUGIN / "package.py", native, market], check=True)
+                game = root / "game"
+                subprocess.run([market / "plugins/kumikae/bin/kumikae", "new", game], check=True, capture_output=True)
+                presets = (game / "export_presets.cfg").read_text()
+                self.assertIn('platform="Android"', presets)
+                self.assertEqual(has_web, 'platform="Web"' in presets)
+                self.assertEqual(has_web, "web.wasm32" in (game / "kas3.gdextension").read_text())
+                self.assertEqual(has_web, (game / "bin" / wasm).is_file())
+                if has_web:
+                    self.assertEqual(b"test runtime", (game / "bin" / wasm).read_bytes())
+
     def test_relocated_package_runs_its_own_compiler_from_a_game(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

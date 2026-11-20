@@ -66,3 +66,5 @@ The destination must be new. Packaging copies the compiler, runtimes and Simulat
 in the native kit, and the test runner, export helpers and starter from this checkout. Use the same
 release for the native binaries and source. The resulting marketplace can be moved or installed on
 another supported Mac. LSP and desktop development need only the macOS portion of the kit.
+When the kit contains `web/libkas3_godot.wasm`, new games include the library and a **Web** preset
+for exporting from Godot. A desktop-only kit omits that preset.

@@ -3,6 +3,8 @@
 
 #include "names.h"
 
+#include <algorithm>
+
 namespace kas3 {
 namespace backend_cpp {
 

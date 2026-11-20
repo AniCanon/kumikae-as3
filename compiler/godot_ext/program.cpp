@@ -8,6 +8,7 @@
 #include "play_build.h"
 #include "script.h"
 #include "sources.h"
+#include "web_reload.h"
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -73,9 +74,14 @@ bool compile_scripts(std::vector<std::string> files, const String &root, ir::Mod
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	for (const std::string &path : files) {
+		const std::string res_path = project_path(path, root);
+		if (const std::string *overridden = web_source_override(res_path)) {
+			compilation.add(res_path, *overridden);
+			continue;
+		}
 		// Read through Godot: in an exported game the project is inside a pack, not in a folder.
 		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
-		compilation.add(project_path(path, root), std::string(source.get_data(), (size_t)source.length()));
+		compilation.add(res_path, std::string(source.get_data(), (size_t)source.length()));
 	}
 	for (const std::string &path : extra) {
 		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
@@ -107,7 +113,11 @@ static uint32_t time_limit() {
 // objects are constructed with is remembered, so that a reload can update them in place, whichever way the
 // scripts run. An exported game pays nothing for it.
 static bool remembers() {
+#if defined(__EMSCRIPTEN__)
+	return true;
+#else
 	return OS::get_singleton()->is_debug_build();
+#endif
 }
 
 static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
@@ -282,6 +292,16 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
+	reload_with_errors(nullptr);
+}
+
+bool Project::reload_with_errors(std::string *r_errors) {
+	if (program && program->valid_ && program->running()) {
+		if (r_errors) {
+			*r_errors = "cannot reload while a script is running";
+		}
+		return false;
+	}
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -289,8 +309,12 @@ void Project::reload() {
 		AS3Script::refresh_all();
 		if (program->valid_) {
 			UtilityFunctions::print("ActionScript: the scripts were loaded.");
+			return true;
 		}
-		return;
+		if (r_errors) {
+			*r_errors = "scripts failed to load";
+		}
+		return false;
 	}
 	auto module = std::make_unique<ir::Module>();
 	std::string errors;
@@ -298,7 +322,10 @@ void Project::reload() {
 	if (!compile_project(module.get(), &errors, &count)) {
 		UtilityFunctions::push_error(String("ActionScript: the scripts have errors and were not reloaded. The game carries on with the ones it had.\n") +
 				String::utf8(errors.c_str()));
-		return;
+		if (r_errors) {
+			*r_errors = std::move(errors);
+		}
+		return false;
 	}
 	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	Moved moved;
@@ -307,7 +334,10 @@ void Project::reload() {
 	// laid out as the interpreter's and are moved as they are (vm/reload.h).
 	const bool was_native = program->native_ != nullptr;
 	if (!move_onto(program->interpreter(), *program->module_, program->host_, module.get(), &fresh, &moved)) {
-		return;
+		if (r_errors) {
+			*r_errors = "an active class was removed; restart the game to apply this change";
+		}
+		return false;
 	}
 	loads_++;
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
@@ -347,6 +377,7 @@ void Project::reload() {
 	Restart restart;
 	restart.scenes = refresh_scenes();
 	kas3::restart_scene(restart);
+	return true;
 }
 
 void Project::restart_scene() {

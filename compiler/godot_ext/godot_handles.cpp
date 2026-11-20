@@ -1,5 +1,6 @@
 #include "godot_calls.h"
 
+#include "any.h"
 #include "callable.h"
 #include "program.h"
 #include "handles.h"
@@ -23,8 +24,9 @@ static std::vector<void *> &spare_handles() {
 
 static constexpr size_t SPARE_HANDLES = 4096; // The most kept; more are freed.
 
-// An untyped value keeps its tag in the low bits of a handle's address: the head keeps it sixteen bytes apart.
-static_assert(sizeof(rt::HandleHead) % 16 == 0 && __STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16, "a handle is sixteen bytes aligned");
+// The Variant after the head must retain the allocator's alignment for boxing into an untyped value.
+static_assert(sizeof(rt::HandleHead) % vm::any::POINTER_ALIGNMENT == 0 &&
+		__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= vm::any::POINTER_ALIGNMENT);
 
 void *handle_memory() {
 	std::vector<void *> &spare = spare_handles();

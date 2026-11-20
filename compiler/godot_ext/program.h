@@ -76,6 +76,8 @@ public:
 	// moved the same way onto the interpreter, which runs the new code from then on, and says so: native
 	// code is not reloaded in a running game, and the library of the new code is built for the next run.
 	static void reload();
+	// Same as reload(), returning false with diagnostics when scripts fail to compile or move.
+	static bool reload_with_errors(std::string *r_errors);
 	// The same, asked for now (the language's reload_scripts(), Godot's debugger): refused while AS3 runs.
 	static void reload_now();
 	// The running scene started again from its file, asked for by a person (the language's restart_scene()):

@@ -373,6 +373,19 @@ teams Xcode has cached on this Mac. If your team is missing, click **Open Xcode*
 - The Rider plugin's [iOS Simulator run configuration](../editors/jetbrains/README.md#run-on-ios-or-android)
   installs and launches the app, and passes `KAS3_SOURCE_DIR` so that hot reload works in the Simulator.
 
+## Web (WebAssembly)
+
+Godot 4.7's Web export runs ActionScript 3 games in the browser via a WebAssembly GDExtension side module
+(`web.wasm32` in `kas3.gdextension`).
+
+- Build the Web extension once with Emscripten (`emcmake` / `emcc`):
+  `compiler/tests/build_web.sh <path to godot-cpp>`. This writes `bin/web/libkas3_godot.wasm`.
+- Configure a Godot **Web** export preset with **Extensions Support** enabled (`variant/extensions_support=true`),
+  **Thread Support** disabled (`variant/thread_support=false`), and `include_filter="*.as"`.
+- Export with `godot --headless --path <project> --export-release "Web" <out>/index.html` and serve over HTTP.
+  Because thread support is off, the export runs on standard static hosts without `SharedArrayBuffer` headers.
+  Web exports currently run on the interpreter.
+
 ## Limits
 
 The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're most likely to meet:

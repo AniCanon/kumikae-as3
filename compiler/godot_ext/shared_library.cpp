@@ -15,6 +15,8 @@ std::string SharedLibrary::file_name(const std::string &p_name) {
 	return p_name + ".dll";
 #elif defined(__APPLE__)
 	return "lib" + p_name + ".dylib";
+#elif defined(__EMSCRIPTEN__)
+	return "lib" + p_name + ".wasm";
 #else
 	return "lib" + p_name + ".so";
 #endif

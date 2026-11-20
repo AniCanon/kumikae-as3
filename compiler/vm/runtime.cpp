@@ -155,10 +155,10 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	// Half as much again, so that a run of pushes copies each element a bounded number of times.
 	const uint64_t grown = (uint64_t)p_vector->capacity + p_vector->capacity / 2;
 	const uint64_t capacity = grown > p_capacity ? grown : (uint64_t)p_capacity;
-	if (capacity > UINT32_MAX) {
+	const size_t size = place_size(p_vector);
+	if (capacity > UINT32_MAX || capacity > SIZE_MAX / size) {
 		return false;
 	}
-	const size_t size = place_size(p_vector);
 	void *memory = allocation_fails() ? nullptr : std::realloc(p_vector->places, capacity * size);
 	if (!memory) {
 		return false;
