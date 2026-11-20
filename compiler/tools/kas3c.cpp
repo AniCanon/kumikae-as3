@@ -19,6 +19,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 static const char *const USAGE =
@@ -281,13 +282,28 @@ static int run_run(int p_argc, char **p_argv) {
 	return ok ? 0 : 1;
 }
 
-static bool write_file(const std::filesystem::path &p_path, const std::string &p_text) {
+static bool write_file(const std::filesystem::path &p_path, std::string_view p_text) {
 	std::FILE *file = std::fopen(p_path.string().c_str(), "wb");
 	if (!file) {
 		return false;
 	}
 	const bool written = std::fwrite(p_text.data(), 1, p_text.size(), file) == p_text.size();
 	return std::fclose(file) == 0 && written;
+}
+
+// The editor opens a script resource by its project path, regardless of the compiler's working directory.
+static std::string resource_path(const std::string &p_path) {
+	std::error_code error;
+	const auto file = std::filesystem::absolute(p_path, error).lexically_normal();
+	for (auto dir = file.parent_path(); !error && !dir.empty(); dir = dir.parent_path()) {
+		if (std::filesystem::exists(dir / "project.godot", error)) {
+			return "res://" + file.lexically_relative(dir).generic_string();
+		}
+		if (dir == dir.root_path()) {
+			break;
+		}
+	}
+	return p_path;
 }
 
 static int run_pack(int p_argc, char **p_argv) {
@@ -311,19 +327,21 @@ static int run_pack(int p_argc, char **p_argv) {
 	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status, true)) {
 		return status;
 	}
+	if (std::find(rest.begin(), rest.end(), std::string_view("--godot")) != rest.end()) {
+		const std::unordered_set<std::string_view> inputs(rest.begin() + 2, rest.end());
+		for (std::string &path : module.files) {
+			if (inputs.count(path)) {
+				path = resource_path(path);
+			}
+		}
+	}
 	const std::vector<uint8_t> bytes = kas3::ir::write_binary(module);
 	const std::filesystem::path destination(output);
 	std::error_code failed;
 	if (!destination.parent_path().empty()) {
 		std::filesystem::create_directories(destination.parent_path(), failed);
 	}
-	std::FILE *file = failed ? nullptr : std::fopen(destination.string().c_str(), "wb");
-	if (!file) {
-		std::fprintf(stderr, "kas3c: cannot write %s\n", output);
-		return 2;
-	}
-	const bool ok = std::fwrite(bytes.data(), 1, bytes.size(), file) == bytes.size() && std::fclose(file) == 0;
-	if (!ok) {
+	if (failed || !write_file(destination, std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()))) {
 		std::fprintf(stderr, "kas3c: cannot write %s\n", output);
 		return 2;
 	}

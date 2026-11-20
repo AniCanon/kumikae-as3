@@ -322,6 +322,18 @@ with tempfile.TemporaryDirectory() as pack_dir:
     result = run("pack", "--godot", empty, "-o", packed)
     check("pack --godot", result.returncode == 0 and result.stderr == "" and os.path.isfile(packed) and
           open(packed, "rb").read(4) == b"KAS3", repr(result.stderr[:200]))
+    # A script resource is attached by its res:// path, even when the pack command is passed an absolute path.
+    with open(os.path.join(pack_dir, "project.godot"), "w") as project:
+        project.write("config_version=5\n")
+    script = os.path.join(pack_dir, "src", "Empty.as")
+    os.mkdir(os.path.dirname(script))
+    with open(empty) as source, open(script, "w") as staged:
+        staged.write(source.read())
+    result = run("pack", "--godot", script, "-o", packed)
+    with open(packed, "rb") as module:
+        data = module.read()
+    check("packed project paths match Godot resources", result.returncode == 0 and b"res://src/Empty.as" in data
+          and os.fsencode(pack_dir) not in data)
     result = run("pack", "--godot", empty)
     check("pack requires -o", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
 
