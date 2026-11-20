@@ -130,7 +130,7 @@ The [roadmap](docs/roadmap.md) has the detail and the known limits.
 | [`compiler/`](compiler/README.md) | The compiler, the interpreter, the C++ backend, the Godot extension and the language server, with their tests. |
 | [`editors/`](editors/README.md) | The Rider plugin and the VS Code client. |
 | [`testing/`](testing/README.md) | The AS3 testing library and its runner. |
-| [`examples/`](examples/coin-dash/README.md) | A small game written in AS3. |
+| [`examples/`](examples/coin-dash/README.md) | Coin Dash, a playable 30-second rooftop score attack written in ActionScript 3. |
 | [`docs/`](docs/README.md) | The language, using AS3 in Godot, how it works, performance, hot reload and the roadmap. |
 
 To change the code, start with [CONTRIBUTING.md](CONTRIBUTING.md).
