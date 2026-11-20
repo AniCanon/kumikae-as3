@@ -29,7 +29,7 @@ tree that `src/` gives.
 | `ir_codes.h` | What the codes in some operations' operands mean, such as which `Math` or `String` function |
 | `ir_module.h` | A module: classes, fields, functions, handlers, globals |
 | `ir_print.cpp` | The text form that `kas3c ir` prints and the golden files hold |
-| `ir_binary` | Compact binary codec (`write_binary` / `read_binary`) for precompiled `.kas3` modules |
+| `ir_binary` | Binary codec for project-built `.kas3` modules. On load it checks record sizes and table references before passing the module to the interpreter |
 | `ir_compare.cpp` | What changed between two builds that a reload alone wouldn't show |
 | `ir_chain.cpp` | Whether a class's constructor chain depends only on its arguments and on constants, so that a reload can run it again for a live object |
 | `ir_reach.h` | What an instruction calls, and the code reached from a function |

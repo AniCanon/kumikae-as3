@@ -170,9 +170,26 @@ static void test_rejects_corrupt_or_truncated_modules() {
 	}
 }
 
+static void test_rejects_invalid_references() {
+	ir::Module original;
+	CHECK(lower_files({ { "A.as", "package { public class A { public function A() { trace(42); } } }" } }, false, &original));
+	ir::Module decoded;
+	const auto invalid = [&](const ir::Module &module) {
+		const auto bytes = ir::write_binary(module);
+		return ir::read_binary(bytes.data(), bytes.size(), &decoded).has_value();
+	};
+	ir::Module broken = original;
+	broken.functions.front().code.front() = { ir::Op::Jump, ir::NONE, 0, 0, 0 };
+	CHECK(invalid(broken));
+	broken = original;
+	broken.classes.front().constructor = static_cast<uint32_t>(broken.functions.size());
+	CHECK(invalid(broken));
+}
+
 int main() {
 	test_round_trip_program_and_execution();
 	test_round_trip_godot_script_metadata();
 	test_rejects_corrupt_or_truncated_modules();
+	test_rejects_invalid_references();
 	return check::finish();
 }

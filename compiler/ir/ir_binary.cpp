@@ -1,7 +1,7 @@
 #include "ir_binary.h"
+#include "ir_binary_check.h"
 
 #include <cstring>
-#include <limits>
 #include <utility>
 
 namespace kas3 {
@@ -195,16 +195,16 @@ class Reader {
 		return false;
 	}
 
-	bool check_count(uint32_t p_count) {
-		// Every serialized element consumes at least one byte, so no count can exceed the bytes left.
-		return p_count <= size_ - at_ ? true : fail("truncated binary IR module");
-	}
 
 public:
 	Reader(const uint8_t *p_data, size_t p_size) : data_(p_data), size_(p_size) {}
 
 	const std::string &error() const { return error_; }
 	bool at_end() const { return at_ == size_; }
+
+	bool check_count(uint32_t p_count, size_t p_min_bytes = 1) {
+		return p_count <= (size_ - at_) / p_min_bytes || fail("truncated binary IR module");
+	}
 
 	bool byte(uint8_t *r_out) {
 		if (at_ >= size_) {
@@ -381,7 +381,7 @@ public:
 		r_out->built_in = (bits & 32u) != 0;
 		r_out->counted = (bits & 64u) != 0;
 		r_out->is_interface = (bits & 128u) != 0;
-		if (!u32(&count) || !check_count(count)) {
+		if (!u32(&count) || !check_count(count, 6)) {
 			return false;
 		}
 		r_out->fields.resize(count);
@@ -390,7 +390,7 @@ public:
 				return false;
 			}
 		}
-		if (!u32_list(&r_out->methods) || !u32(&count) || !check_count(count)) {
+		if (!u32_list(&r_out->methods) || !u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
 		r_out->named_methods.resize(count);
@@ -400,7 +400,7 @@ public:
 			}
 		}
 		if (!u32(&r_out->constructor) || !u32(&r_out->static_init) || !u32(&r_out->to_string) ||
-				!text(&r_out->native_base) || !u32(&count) || !check_count(count)) {
+				!text(&r_out->native_base) || !u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
 		r_out->virtuals.resize(count);
@@ -424,7 +424,7 @@ public:
 		r_out->is_public = (bits & 2u) != 0;
 		r_out->rest = (bits & 4u) != 0;
 		r_out->takes_extra = (bits & 8u) != 0;
-		if (!u32(&count) || !check_count(count)) {
+		if (!u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
 		r_out->virtual_receivers.resize(count);
@@ -442,7 +442,7 @@ public:
 				return false;
 			}
 		}
-		if (!u32(&count) || !check_count(count)) {
+		if (!u32(&count) || !check_count(count, 5)) {
 			return false;
 		}
 		r_out->code.resize(count);
@@ -463,7 +463,7 @@ public:
 				return false;
 			}
 		}
-		if (!u32(&count) || !check_count(count)) {
+		if (!u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
 		r_out->locals.resize(count);
@@ -472,7 +472,7 @@ public:
 				return false;
 			}
 		}
-		if (!u32(&count) || !check_count(count)) {
+		if (!u32(&count) || !check_count(count, 6)) {
 			return false;
 		}
 		r_out->handlers.resize(count);
@@ -486,31 +486,16 @@ public:
 	}
 };
 
-bool write_module_indices(Writer &r_w, const Module &p_m) {
-	for (uint32_t id : { p_m.entry_class, p_m.error_class, p_m.type_error_class, p_m.range_error_class,
-				 p_m.argument_error_class, p_m.function_class, p_m.class_class, p_m.library_function, p_m.array_class,
-				 p_m.object_class, p_m.dictionary_class, p_m.equal_operator, p_m.add_operator, p_m.less_operator,
-				 p_m.less_equal_operator, p_m.greater_operator, p_m.greater_equal_operator, p_m.subtract_operator,
-				 p_m.multiply_operator, p_m.divide_operator, p_m.modulo_operator, p_m.negate_operator,
-				 p_m.reference_error_class, p_m.regexp_class, p_m.date_class, p_m.syntax_error_class, p_m.uri_error_class }) {
-		r_w.u32(id);
-	}
-	return true;
-}
-
-bool read_module_indices(Reader &r_r, Module &r_m) {
-	for (uint32_t *slot : { &r_m.entry_class, &r_m.error_class, &r_m.type_error_class, &r_m.range_error_class,
-				 &r_m.argument_error_class, &r_m.function_class, &r_m.class_class, &r_m.library_function, &r_m.array_class,
-				 &r_m.object_class, &r_m.dictionary_class, &r_m.equal_operator, &r_m.add_operator, &r_m.less_operator,
-				 &r_m.less_equal_operator, &r_m.greater_operator, &r_m.greater_equal_operator, &r_m.subtract_operator,
-				 &r_m.multiply_operator, &r_m.divide_operator, &r_m.modulo_operator, &r_m.negate_operator,
-				 &r_m.reference_error_class, &r_m.regexp_class, &r_m.date_class, &r_m.syntax_error_class, &r_m.uri_error_class }) {
-		if (!r_r.u32(slot)) {
-			return false;
-		}
-	}
-	return true;
-}
+// Field order is part of version 1 of the on-disk format.
+constexpr uint32_t Module::*MODULE_INDICES[] = {
+	&Module::entry_class, &Module::error_class, &Module::type_error_class, &Module::range_error_class,
+	&Module::argument_error_class, &Module::function_class, &Module::class_class, &Module::library_function,
+	&Module::array_class, &Module::object_class, &Module::dictionary_class, &Module::equal_operator, &Module::add_operator,
+	&Module::less_operator, &Module::less_equal_operator, &Module::greater_operator, &Module::greater_equal_operator,
+	&Module::subtract_operator, &Module::multiply_operator, &Module::divide_operator, &Module::modulo_operator,
+	&Module::negate_operator, &Module::reference_error_class, &Module::regexp_class, &Module::date_class,
+	&Module::syntax_error_class, &Module::uri_error_class
+};
 
 } // namespace
 
@@ -560,7 +545,9 @@ std::vector<uint8_t> write_binary(const Module &p_module) {
 	}
 	w.u32_list(p_module.initializers);
 	w.text_list(p_module.interface_methods);
-	write_module_indices(w, p_module);
+	for (auto field : MODULE_INDICES) {
+		w.u32(p_module.*field);
+	}
 	return w.take();
 }
 
@@ -578,8 +565,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	}
 	Module module;
 	uint32_t count = 0;
-	if (!r.text_list(&module.files) || !r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.text_list(&module.files) || !r.u32(&count) || !r.check_count(count, 1)) {
+		return r.error();
 	}
 	module.lines.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -587,8 +574,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.u32(&count) || !r.check_count(count, 18)) {
+		return r.error();
 	}
 	module.classes.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -596,8 +583,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.u32(&count) || !r.check_count(count, 17)) {
+		return r.error();
 	}
 	module.functions.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -605,8 +592,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.u32(&count) || !r.check_count(count, 5)) {
+		return r.error();
 	}
 	module.globals.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -619,8 +606,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 		g.is_public = (bits & 2u) != 0;
 		g.is_const = (bits & 4u) != 0;
 	}
-	if (!r.text_list(&module.strings) || !r.u32(&count) || count > p_size / 8) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.text_list(&module.strings) || !r.u32(&count) || !r.check_count(count, 8)) {
+		return r.error();
 	}
 	module.numbers.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -628,8 +615,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.u32(&count) || !r.check_count(count, 1)) {
+		return r.error();
 	}
 	module.wides.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -637,8 +624,8 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32(&count) || count > p_size) {
-		return r.error().empty() ? "truncated binary IR module" : r.error();
+	if (!r.u32(&count) || !r.check_count(count, 5)) {
+		return r.error();
 	}
 	module.engine_names.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
@@ -647,11 +634,19 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 			return r.error();
 		}
 	}
-	if (!r.u32_list(&module.initializers) || !r.text_list(&module.interface_methods) || !read_module_indices(r, module)) {
+	if (!r.u32_list(&module.initializers) || !r.text_list(&module.interface_methods)) {
 		return r.error();
+	}
+	for (auto field : MODULE_INDICES) {
+		if (!r.u32(&(module.*field))) {
+			return r.error();
+		}
 	}
 	if (!r.at_end()) {
 		return std::string("trailing bytes in binary IR module");
+	}
+	if (!binary_references_valid(module)) {
+		return std::string("invalid reference in binary IR module");
 	}
 	*r_module = std::move(module);
 	return std::nullopt;
