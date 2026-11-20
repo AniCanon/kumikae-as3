@@ -1,0 +1,111 @@
+#!/usr/bin/env -S python3 -I
+"""Kumikae game tools for a standalone Godot project."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import uuid
+
+BIN = Path(__file__).resolve().parent
+KIT = BIN.parent / "kit"
+TARGETS = ("desktop", "ios-simulator", "android")
+
+
+def options():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("lsp")
+    commands.add_parser("doctor")
+    commands.add_parser("new").add_argument("directory", type=Path)
+    for name in ("build", "run", "test"):
+        cmd = commands.add_parser(name)
+        cmd.add_argument("target", choices=(*TARGETS, "all") if name == "test" else TARGETS)
+        cmd.add_argument("--project", type=Path, default=Path.cwd())
+        cmd.add_argument("--preset")
+        if name != "build":
+            cmd.add_argument("--ios-device")
+            cmd.add_argument("--android-device")
+        if name == "test":
+            cmd.add_argument("--case", help="Manifest target or target::suite::method")
+    return parser.parse_args()
+
+
+def new_game(destination):
+    destination = Path(os.path.abspath(destination))
+    if os.path.lexists(destination):
+        raise ValueError(f"{destination} already exists")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=destination.parent) as tmp:
+        game = Path(tmp) / "game"
+        shutil.copytree(KIT / "starter", game)
+        # Persist one identity in the presets. Moving the project keeps its identity.
+        slug = re.sub("[^a-z0-9]", "", destination.name.lower())[:32]
+        identifier = f"org.kumikae.game{slug}.p{uuid.uuid4().hex}"
+        presets = game / "export_presets.cfg"
+        presets.write_text(re.sub(r'(?m)^((?:application/bundle_identifier|package/unique_name)=)"[^"]*"',
+                                   lambda match: match[1] + json.dumps(identifier), presets.read_text()))
+        settings = game / "project.godot"
+        settings.write_text(re.sub(r"(?m)^config/name=.*$", lambda _: "config/name=" + json.dumps(destination.name),
+                                    settings.read_text()))
+        (game / "bin").mkdir()
+        shutil.copy2(KIT / "libkas3_godot.dylib", game / "bin")
+        for tier in ("as3", "godot"):
+            shutil.copytree(KIT / "testing" / tier / "app", game / "tests/framework/app", dirs_exist_ok=True)
+        destination.mkdir()
+        game.rename(destination)
+    print(destination.resolve())
+
+
+def main():
+    args = options()
+    if args.command == "new":
+        new_game(args.directory)
+        return 0
+    if args.command not in ("doctor", "lsp"):
+        project = args.project.resolve()
+        if not (project / "project.godot").is_file():
+            raise ValueError(f"No project.godot in {project}")
+    if not (KIT / "kas3c").is_file():
+        raise ValueError("Missing compiler. Use the packaged Kumikae plugin.")
+    if args.command == "lsp":
+        os.execv(KIT / "kas3c", [str(KIT / "kas3c"), "lsp"])
+    sys.path[:0] = [str(BIN), str(KIT / "testing"), str(KIT / "tools")]
+    godot = shutil.which(os.environ.get("KAS3_GODOT", "godot"))
+    if not godot:
+        raise ValueError("Set KAS3_GODOT to the Godot 4.7 executable.")
+    from verification import import_project, verify
+    if args.command == "doctor":
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = Path(tmp) / "probe"
+            new_game(probe)
+            return verify(KIT, probe, godot, ("desktop",))
+    if args.command == "test":
+        targets = TARGETS if args.target == "all" else (args.target,)
+        return verify(KIT, project, godot, targets, args.case, args.preset, args.ios_device, args.android_device)
+    from game import build, device_for, launch_mobile, preset_for
+    if args.command == "run" and args.target == "desktop":
+        import_project(project, godot)
+        os.execv(godot, [godot, "--path", str(project)])
+    device = ""
+    if args.command == "run":
+        device = device_for(args.target, args.ios_device if args.target == "ios-simulator" else args.android_device)
+    preset = preset_for(project, args.target, args.preset)
+    product = build(KIT, project, args.target, preset, godot)
+    print(product, flush=True)
+    if args.command == "run":
+        from device_lease import device_lease
+        with device_lease(device):
+            launch_mobile(project, args.target, device, product)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        sys.exit(str(error))

@@ -291,3 +291,8 @@ compiler/build/kas3c run testing/tests/fixtures/LibraryTest.as testing/tests/fix
 
 The second command runs a fixture that records a failing case on purpose and checks that the suite carries
 on. Its last line is `PASS framework lifecycle`.
+
+Use `--runtime godot`, `--runtime ios-simulator` or `--runtime android` to run a discovered fixture
+on that target. The manifest and the case ID stay the same. The CLI rejects a manual command target
+when a runtime override is requested. Add `--require-pass` to fail a verification run in which
+every selected case was ignored.

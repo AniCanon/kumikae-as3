@@ -13,7 +13,6 @@ import sys
 import tempfile
 import threading
 import time
-import zipfile
 
 _HERE = Path(__file__).resolve().parent
 
@@ -29,37 +28,17 @@ _discovery = _load("kas3_mobile_discovery", _HERE / "discovery.py")
 _suite = _load("kas3_mobile_suite", _HERE / "simulator_suite.py")
 
 
-def _hardlink_or_copy(src, dst):
-    try:
-        os.link(src, dst)
-    except OSError:
-        shutil.copy2(src, dst)
-
-
 def stage_project(project_root, staged_root, case, filters):
     """Copy the project to staged_root and inject the generated TestRunner scene inside tests/."""
-    excluded = {".git", ".idea", ".run", ".godot", ".build", "build"}
-    for entry in project_root.iterdir():
-        if entry.name in excluded:
-            continue
-        target = staged_root / entry.name
-        if entry.is_dir():
-            shutil.copytree(
-                entry,
-                target,
-                symlinks=True,
-                copy_function=_hardlink_or_copy,
-                ignore=shutil.ignore_patterns(".git", ".godot", ".build", "build"),
-            )
-        else:
-            _hardlink_or_copy(entry, target)
-
+    # Exporters rewrite files in place. The stage must own every file it can modify.
+    shutil.copytree(project_root, staged_root, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(".git", ".idea", ".run", ".godot", ".build", "build"))
     runner_dir = staged_root / "tests" / "kas3_runner"
-    runner_dir.mkdir(parents=True, exist_ok=True)
-    for tier in ("as3", "godot"):
-        src_pkg = _HERE / tier / "app"
-        if src_pkg.is_dir():
-            shutil.copytree(src_pkg, runner_dir / "app", dirs_exist_ok=True)
+    if runner_dir.exists():
+        raise ValueError("tests/kas3_runner is reserved for the generated mobile test scene.")
+    runner_dir.mkdir(parents=True)
+    for tier in _discovery.missing_framework_tiers(staged_root):
+        shutil.copytree(_HERE / tier / "app", runner_dir / "app", dirs_exist_ok=True)
 
     _discovery.godot_entry(runner_dir, case, filters=filters)
     # The scene uses res://tests/kas3_runner/Kas3EngineDriver.as directly; remove the desktop GDScript bootstrap.
@@ -77,15 +56,13 @@ def stage_project(project_root, staged_root, case, filters):
     game_path = staged_root / "project.godot"
     game_text = game_path.read_text()
     game_text = _suite.setting(game_text, "application", "run/main_scene", scene_path)
-    # Unlink first so a hardlinked project.godot never mutates the user's original file.
-    game_path.unlink()
     game_path.write_text(game_text)
     return scene_path
 
 
-def resolve_ios_device(device=""):
+def resolve_ios_device(device="", require_booted=False):
     chosen = (device or os.environ.get("KAS3_TEST_DEVICE", "")).strip()
-    if chosen:
+    if chosen and not require_booted:
         return chosen
     result = subprocess.run(["xcrun", "simctl", "list", "devices", "booted", "-j"], capture_output=True, text=True, timeout=30)
     if result.returncode:
@@ -93,10 +70,14 @@ def resolve_ios_device(device=""):
     data = json.loads(result.stdout or "{}")
     booted = [
         item["udid"]
-        for devices in data.get("devices", {}).values()
+        for runtime, devices in data.get("devices", {}).items() if ".iOS-" in runtime
         for item in devices
         if item.get("state") == "Booted" and item.get("udid")
     ]
+    if chosen:
+        if chosen not in booted:
+            raise ValueError("Select a booted iOS Simulator with --ios-device.")
+        return chosen
     if len(booted) == 1:
         return booted[0]
     if not booted:
@@ -150,24 +131,6 @@ def _kit_paths():
     return native_root, build, export_mod
 
 
-def _stream_process(command, env=None, on_terminate=None):
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)
-    try:
-        for line in proc.stdout:
-            sys.stdout.write(line)
-            sys.stdout.flush()
-        return proc.wait()
-    finally:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-        if on_terminate is not None:
-            on_terminate()
-
-
 def run_ios_simulator(project_root, case, filters, device, preset, godot):
     udid = resolve_ios_device(device)
     native_root, build_script, _ = _kit_paths()
@@ -193,7 +156,7 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
                 "/bin/sh",
                 str(build_script),
                 str(stage),
-                str(project_root / ".godot/ios-tests"),
+                str(Path(tmp) / "ios-build"),
                 godot,
                 str(template.resolve()),
                 str(ios_library.resolve()),
@@ -221,14 +184,8 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
         if install.returncode:
             raise ValueError((install.stderr or install.stdout or "Failed to install iOS test app.").strip())
 
-        return _stream_process(
-            ["xcrun", "simctl", "launch", "--console", udid, actual_bundle],
-            on_terminate=lambda: subprocess.run(
-                ["xcrun", "simctl", "terminate", udid, actual_bundle],
-                capture_output=True,
-                timeout=15,
-            ),
-        )
+        simulator_log = _load("kas3_simulator_log", _HERE / "simulator_log.py")
+        return simulator_log.run(udid, actual_bundle, case)
 
 
 def run_android(project_root, case, filters, device, preset, sdk_path, godot):
@@ -243,14 +200,9 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
     if "arm64-v8a" not in abi.strip().split(","):
         raise ValueError("Select an ARM64 Android device or emulator.")
 
-    versions = [p for p in (sdk / "build-tools").glob("*/aapt") if re.fullmatch(r"\d+(\.\d+)*", p.parent.name)]
-    if not versions:
-        raise ValueError("Install Android SDK Build Tools to inspect the exported test APK.")
-    aapt = max(versions, key=lambda p: tuple(map(int, p.parent.name.split("."))))
-
-    android_runtime = native_root / "android"
-    if not android_runtime.is_dir():
-        android_runtime = native_root / "compiler/build-android-arm64/out"
+    android_runtime = native_root / "android/arm64-v8a/libkas3_godot.so"
+    if not android_runtime.is_file():
+        android_runtime = native_root / "compiler/build-android-arm64/out/libkas3_godot.so"
 
     with tempfile.TemporaryDirectory(prefix="kas3-android-tests-") as tmp:
         stage = Path(tmp) / "staged"
@@ -271,6 +223,15 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
             raise ValueError("Choose one Android export preset with --preset.")
         preset_name = _suite.setting(exports, matches[0], "name")
 
+        # A test APK must be installable alongside the developer's game.
+        options = matches[0] + ".options"
+        package = _suite.setting(exports, options, "package/unique_name")
+        if not re.fullmatch(r"[a-zA-Z][\w$]*(?:\.[a-zA-Z$][\w$]*)+", package, re.ASCII):
+            raise ValueError("Set package/unique_name in the Android export preset before running tests.")
+        cfg = _suite.setting(exports, options, "package/unique_name", package + ".tests")
+        cfg = _suite.include_test_folder(cfg, matches[0], case["discover"])
+        (export_stage / "export_presets.cfg").write_text(cfg)
+
         apk = Path(tmp) / "tests.apk"
         env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
         subprocess.run(
@@ -285,42 +246,18 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
             check=True,
             timeout=900,
         )
-        with zipfile.ZipFile(apk) as archive:
-            if not any(item.startswith("lib/arm64-v8a/") and "kas3" in item for item in archive.namelist()):
-                raise ValueError("The selected Android preset did not export the ARM64 AS3 runtime.")
+        android_package = _load("kas3_android_package", _HERE / "android_package.py")
+        connection = [str(adb), "-s", serial]
+        package, component = android_package.install(sdk, connection, apk, android_run)
 
-        badging = subprocess.check_output([str(aapt), "dump", "badging", str(apk)], text=True, timeout=30)
-        package, activity = android_run.launch_activity(badging)
-        android_run.install([str(adb), "-s", serial], apk)
-        if activity:
-            component = package + "/" + activity
-        else:
-            resolved = subprocess.check_output(
-                [
-                    str(adb),
-                    "-s",
-                    serial,
-                    "shell",
-                    "cmd",
-                    "package",
-                    "resolve-activity",
-                    "--brief",
-                    "-a",
-                    "android.intent.action.MAIN",
-                    "-c",
-                    "android.intent.category.LAUNCHER",
-                    package,
-                ],
-                text=True,
-                timeout=30,
-            ).splitlines()
-            component = resolved[-1].strip() if resolved else ""
-        if not component.startswith(package + "/"):
-            raise ValueError("Android could not resolve a launcher for " + package)
-
-        subprocess.run([str(adb), "-s", serial, "logcat", "-c"], check=False, timeout=15)
+        shell = [str(adb), "-s", serial, "shell"]
+        packages = subprocess.check_output([*shell, "pm", "list", "packages", "--user", "current", "-U", package], text=True, timeout=15)
+        uid = re.search(r"(?m)^package:" + re.escape(package) + r"\s+uid:(\d+)$", packages)
+        if not uid:
+            raise ValueError("Could not identify the installed Android test package.")
+        since = subprocess.check_output([*shell, "date", "+%s.%N"], text=True, timeout=15).strip()
         logcat = subprocess.Popen(
-            [str(adb), "-s", serial, "logcat", "-v", "raw", "-s", "Godot:I", "Godot:W", "Godot:E"],
+            [str(adb), "-s", serial, "logcat", "-T", since, "--uid=" + uid[1], "-v", "raw", "-s", "godot:I"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -340,13 +277,7 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
 
         watcher = threading.Thread(target=watch_pid, daemon=True)
         try:
-            start = subprocess.check_output(
-                [str(adb), "-s", serial, "shell", "am", "start", "-W", "-n", component],
-                text=True,
-                timeout=60,
-            )
-            if "Status: ok" not in start:
-                raise ValueError("Android could not launch the test application.")
+            android_package.launch(connection, component)
             watcher.start()
             for line in logcat.stdout:
                 sys.stdout.write(line)

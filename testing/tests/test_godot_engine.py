@@ -166,3 +166,11 @@ class GodotEngineTest(unittest.TestCase):
             )
             self.assertEqual(0, single.returncode, single.stdout + single.stderr)
             self.assertIn("AS3 tests: 1 passed, 0 failed", single.stdout)
+
+            skipped = subprocess.run(
+                [sys.executable, "-I", str(RUNNER), str(manifest), "--compiler", COMPILER, "--godot", GODOT,
+                 "--case", "Engine::qa.SceneIntegrationTest::skippedEngineTest", "--require-pass"],
+                capture_output=True, text=True, timeout=60,
+            )
+            self.assertEqual(1, skipped.returncode, skipped.stdout + skipped.stderr)
+            self.assertIn("0 passed, 0 failed, 1 ignored", skipped.stdout)

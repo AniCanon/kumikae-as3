@@ -1,9 +1,23 @@
 """Discover fixture methods in the compiler's syntax tree and generate CLI or Godot Suite drivers."""
 from collections import defaultdict
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
+
+
+def missing_framework_tiers(root):
+    """Find framework tiers the runner must supply, skipping generated Godot and build folders."""
+    missing = {"TestCase.as": "as3", "EngineTestRunner.as": "godot"}
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d != "build"]
+        if Path(folder).parts[-4:] == ("app", "anicanon", "kumikae", "testing"):
+            for name in files:
+                missing.pop(name, None)
+        if not missing:
+            break
+    return missing.values()
 
 
 def _valid_method(item, label, class_name, require_static=False):

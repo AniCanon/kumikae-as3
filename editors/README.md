@@ -6,6 +6,7 @@ This page shows how to set up an editor for ActionScript 3. Editing works throug
 | Editor | What you get | Set it up |
 |---|---|---|
 | Rider, IntelliJ IDEA | Language support, a project wizard, run configurations, a test runner, settings and scene editors, and a Game Devices panel | [Rider and IntelliJ IDEA](#rider-and-intellij-idea) |
+| Claude Code | Language support, game builds, launches and gameplay tests | [Claude Code](claude/README.md) |
 | VS Code | Language support and syntax coloring | [VS Code](#vs-code) |
 | Any editor with a Language Server Protocol client | Language support | [Other editors](#other-editors) |
 

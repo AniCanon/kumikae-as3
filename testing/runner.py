@@ -414,13 +414,7 @@ def _count_planned_cases(tests):
 def _godot_env(root, temp_dir, native):
     here = Path(__file__).resolve().parent
     extra_dirs = [str(temp_dir.resolve())]
-    framework = root / "tests" / "framework" / "app" / "anicanon" / "kumikae" / "testing"
-    if not (framework / "TestCase.as").is_file():
-        extra_dirs.append(str((here / "as3").resolve()))
-    if not (framework / "EngineTestRunner.as").is_file():
-        godot_lib = here / "godot"
-        if godot_lib.is_dir():
-            extra_dirs.append(str(godot_lib.resolve()))
+    extra_dirs.extend(str((here / tier).resolve()) for tier in _discovery.missing_framework_tiers(root))
     env = dict(os.environ)
     env["KAS3_TESTS"] = "1"
     env["KAS3_NATIVE_PLAY"] = "1" if native else "0"
@@ -439,9 +433,12 @@ def main():
     parser.add_argument("--godot", default="godot")
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--require-pass", action="store_true", help="Fail if no test actually passed")
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--device", default="")
     parser.add_argument("--preset", default="")
+    parser.add_argument("--runtime", choices=("godot", "ios-simulator", "android"),
+                        help="Run the selected discovery fixtures on this engine target")
     parser.add_argument("--android-sdk", default="")
     args = parser.parse_args()
     root = args.manifest.resolve().parent
@@ -452,6 +449,10 @@ def main():
         for index, target in enumerate(registered):
             if selected_names and target["name"] not in selected_names:
                 continue
+            if args.runtime:
+                if "discover" not in target:
+                    raise ValueError("--runtime requires a discovery target. Select one with --case.")
+                target = dict(target, runtime=args.runtime)
             if "discover" in target:
                 manifest["tests"][index] = _discovery.expand_target(root, target, args.compiler)
                 _mapping.validate(manifest["tests"][index])
@@ -568,7 +569,7 @@ def main():
         if ignored:
             summary_line += f", {ignored} ignored"
         print(summary_line, flush=True)
-        return int(failures != 0)
+        return int(failures != 0 or (args.require_pass and passes == 0))
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         print("AS3 test runner error: " + str(error), file=sys.stderr)
         return 1

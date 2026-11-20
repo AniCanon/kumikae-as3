@@ -10,8 +10,10 @@ class SuiteExportTest(unittest.TestCase):
         spec.loader.exec_module(suite)
         game = '[application]\nconfig/name="Other Game"\nrun/main_scene="uid://abc"\n'
         exports = '[preset.3]\nname="QA"\nplatform="iOS"\n[preset.3.options]\napplication/bundle_identifier="org.test.new-id"\n'
+        exports = exports.replace('platform="iOS"', 'platform="iOS"\nexclude_filter="tests/*,private/**"')
         main, cfg, section, identifier = suite.prepare(game, exports, "QA", "res://tests/full.tscn")
         self.assertIn('config/name="Other Game Tests"', main)
+        self.assertIn('exclude_filter="private/**"', cfg)
         self.assertIn('run/main_scene="res://tests/full.tscn"', main)
         self.assertEqual(("preset.3", "org.test.new-id.tests"), (section, identifier))
         self.assertIn('application/bundle_identifier="org.test.new-id.tests"', cfg)

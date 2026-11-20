@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -62,6 +63,9 @@ class MobileRunnerTest(unittest.TestCase):
             )
             staged = Path(tmp) / "staged"
             staged.mkdir()
+            for tier in ("as3", "godot"):
+                shutil.copytree(ROOT / tier / "app", project / "tests/vendor/app", dirs_exist_ok=True)
+            original = (project / "tests/SampleTest.as").read_text()
             scene = mobile.stage_project(project, staged, target, ["qa.SampleTest::runsOnDevice"])
 
             self.assertEqual("res://tests/kas3_runner/TestRunner.tscn", scene)
@@ -70,6 +74,8 @@ class MobileRunnerTest(unittest.TestCase):
             self.assertIn('Suite.only.push("qa.SampleTest::runsOnDevice")', (staged / "tests/kas3_runner/Kas3EngineDriver.as").read_text())
             self.assertFalse((staged / "tests/kas3_runner/run_tests.gd").exists())
 
+            (staged / "tests/SampleTest.as").write_text(original + "\n")
+            self.assertEqual(original, (project / "tests/SampleTest.as").read_text())
             as_files = sorted(str(p) for p in staged.rglob("*.as"))
             check = subprocess.run([COMPILER, "check", *as_files], capture_output=True, text=True)
             self.assertEqual(0, check.returncode, check.stdout + check.stderr)
@@ -87,11 +93,16 @@ class MobileRunnerTest(unittest.TestCase):
                     "version": 1,
                     "tests": [{"name": "Phone", "discover": "tests", "runtime": "android"}],
                 }))
-                listed = subprocess.run(
-                    [sys.executable, "-I", str(ROOT / "runner.py"), str(manifest), "--compiler", COMPILER, "--list"],
-                    capture_output=True, text=True,
-                )
-                self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
-                rows = json.loads(listed.stdout)
-                self.assertEqual("android", rows[0]["runtime"])
-                self.assertEqual(["ok"], [c["method"] for c in rows[0]["cases"]])
+                cmd = [sys.executable, "-I", str(ROOT / "runner.py"), str(manifest), "--compiler", COMPILER, "--list"]
+                for args, runtime in (([], "android"), (["--runtime", "godot"], "godot")):
+                    listed = subprocess.run(cmd + args, capture_output=True, text=True)
+                    self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+                    rows = json.loads(listed.stdout)
+                    self.assertEqual(runtime, rows[0]["runtime"])
+                    self.assertEqual(["ok"], [c["method"] for c in rows[0]["cases"]])
+                manifest.write_text(json.dumps({"version": 1, "tests": [
+                    {"name": "Manual", "command": ["echo", "DONE"], "marker": "DONE"}
+                ]}))
+                invalid = subprocess.run(cmd + ["--runtime", "godot"], capture_output=True, text=True)
+                self.assertEqual(1, invalid.returncode)
+                self.assertIn("requires a discovery target", invalid.stderr)
