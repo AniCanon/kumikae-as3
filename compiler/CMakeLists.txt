@@ -148,8 +148,12 @@ if(KAS3_GODOT_CPP)
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
     if(EMSCRIPTEN)
-        # Godot looks up the entry point by name. All other live code is reachable from it.
-        target_link_options(kas3_godot PRIVATE -sSIDE_MODULE=2 -Wl,--export=kas3_godot_init)
+        # Godot looks up the entry point by name; host pages look up the web hot-reload C API.
+        target_link_options(kas3_godot PRIVATE -sSIDE_MODULE=2
+            -Wl,--export=kas3_godot_init
+            -Wl,--export=kas3_web_reload
+            -Wl,--export=kas3_web_last_error
+            -Wl,--export=kas3_web_reset_sources)
         set_target_properties(kas3_godot PROPERTIES SUFFIX ".wasm")
     endif()
 endif()

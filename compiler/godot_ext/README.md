@@ -40,6 +40,7 @@ nothing differently for the editor, so one library serves both.
 | `godot_untyped.cpp`, `godot_collections.cpp` | Untyped values to and from `Variant`, and AS3 collections handed to Godot |
 | `callable`, `bound_method.h` | A method as a Godot callable |
 | `restart.cpp` | What a reload reports, and restarting the running scene |
+| `web_reload` | In-browser source overrides and `kas3_web_reload` C API for WebAssembly hot reload |
 | `native_program`, `shared_library` | [The program library](#the-program-library): found, loaded, checked, and given what it needs from Godot |
 | `play_build`, `play_cache.h`, `toolchain.h` | [Building the program library on Play](#building-on-play) |
 
@@ -108,7 +109,9 @@ WebAssembly GDExtension side module (`bin/web/libkas3_godot.wasm`, registered un
 `kas3.gdextension`). Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true`
 and `variant/thread_support=false`; scripts run on the interpreter in the browser without requiring
 `SharedArrayBuffer` headers. The release link removes unused code and retains the entry point Godot
-loads by name. Native ahead-of-time WebAssembly program libraries are future work.
+loads by name plus `web_reload`'s `kas3_web_reload`, `kas3_web_last_error`, and `kas3_web_reset_sources`
+C API so a host page can edit `.as` sources and hot-reload running scripts in place. Native ahead-of-time
+WebAssembly program libraries are future work.
 
 ## The program library
 
