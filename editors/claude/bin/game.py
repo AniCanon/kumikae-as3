@@ -11,20 +11,16 @@ import android_package
 import android_run
 import game_export
 from mobile_runner import resolve_android_sdk, resolve_ios_device
-from simulator_suite import setting
+from simulator_suite import platform_presets, select_preset
 
 PLATFORMS = {"desktop": "macOS", "ios-simulator": "iOS", "android": "Android", "web": "Web"}
 
 
 def preset_for(project, target, requested):
     cfg = (project / "export_presets.cfg").read_text()
-    names = [setting(cfg, group, "name") for group in re.findall(r"(?m)^\[(preset\.\d+)\]\s*$", cfg)
-             if setting(cfg, group, "platform") == PLATFORMS[target]]
-    if requested and requested in names:
-        return requested
-    if requested or len(names) != 1:
-        raise ValueError(f"Choose one {PLATFORMS[target]} export preset with --preset. Available presets: {names}")
-    return names[0]
+    platform = PLATFORMS[target]
+    _, name = select_preset(platform_presets(cfg, platform), platform, requested)
+    return name
 
 
 def device_for(target, device):

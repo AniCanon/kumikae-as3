@@ -16,6 +16,14 @@ class TargetsTest(unittest.TestCase):
         self.assertEqual("Web", game.preset_for(ROOT / "examples/coin-dash", "web", None))
         self.assertEqual("", game.device_for("web", None))
 
+    def test_duplicate_requested_web_preset_is_ambiguous(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder)
+            config = '[preset.0]\nname="Browser"\nplatform="Web"\n'
+            (project / "export_presets.cfg").write_text(config + config.replace("preset.0", "preset.1"))
+            with self.assertRaisesRegex(ValueError, "Choose one Web"):
+                game.preset_for(project, "web", "Browser")
+
     def test_unknown_preset_reports_available_names(self):
         project = ROOT / "examples/coin-dash"
         self.assertEqual("Desktop", game.preset_for(project, "desktop", None))

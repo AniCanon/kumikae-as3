@@ -188,19 +188,6 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
         return simulator_log.run(udid, actual_bundle, case)
 
 
-def preset_group(exports, platform, preset):
-    groups = re.findall(r"(?m)^[ \t]*\[(preset\.\d+)\][ \t]*\r?$", exports)
-    matches = [
-        g
-        for g in groups
-        if _suite.setting(exports, g, "platform") == platform
-        and (not preset or _suite.setting(exports, g, "name") == preset)
-    ]
-    if len(matches) != 1:
-        raise ValueError(f"Choose one {platform} export preset with --preset.")
-    return matches[0]
-
-
 def run_web(project, case, filters, preset, godot):
     native, _, exporter = _kit_paths()
     web = _load("kas3_web_game", exporter.with_name("web_game.py"))
@@ -215,11 +202,11 @@ def run_web(project, case, filters, preset, godot):
         (stage / ".godot/extension_list.cfg").write_text("res://kas3.gdextension\n")
         cfg = stage / "export_presets.cfg"
         exports = cfg.read_text()
-        group = preset_group(exports, "Web", preset)
+        group, name = _suite.select_preset(_suite.platform_presets(exports, "Web"), "Web", preset)
         cfg.write_text(_suite.include_test_folder(exports, group, case["discover"]))
         output = Path(tmp) / "export"
         output.mkdir()
-        product = web.export_stage(stage, native, godot, _suite.setting(exports, group, "name"), output)
+        product = web.export_stage(stage, native, godot, name, output)
         return browser.run(web, product, chrome, case["marker"])
 
 
@@ -247,8 +234,7 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
         game_export.stage_game(stage, export_stage, android_runtime, android=True)
 
         exports = (export_stage / "export_presets.cfg").read_text()
-        group = preset_group(exports, "Android", preset)
-        preset_name = _suite.setting(exports, group, "name")
+        group, preset_name = _suite.select_preset(_suite.platform_presets(exports, "Android"), "Android", preset)
 
         # A test APK must be installable alongside the developer's game.
         options = group + ".options"

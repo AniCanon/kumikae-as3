@@ -16,10 +16,14 @@ def section(text, name):
     return header.end(), header.end() + next_header.start() if next_header else len(text)
 
 
+def string_entry(body, key):
+    return re.search(r"(?m)^[ \t]*" + re.escape(key) + r'[ \t]*=[ \t]*("(?:[^"\\]|\\.)*")', body)
+
+
 def setting(text, group, key, replacement=None):
     start, end = section(text, group)
     body = text[start:end]
-    entry = re.search(r"(?m)^[ \t]*" + re.escape(key) + r'[ \t]*=[ \t]*("(?:[^"\\]|\\.)*")', body)
+    entry = string_entry(body, key)
     if replacement is None:
         return json.loads(entry[1]) if entry else ""
     value = json.dumps(replacement, ensure_ascii=False)
@@ -36,21 +40,35 @@ def include_test_folder(exports, group, folder="tests"):
     return setting(exports, group, "exclude_filter", ",".join(kept))
 
 
-def prepare(game, exports, preset, scene):
-    groups = re.findall(r"(?m)^[ \t]*\[(preset\.\d+)\][ \t]*\r?$", exports)
-    matches = [g for g in groups if setting(exports, g, "platform") == "iOS"
-               and (not preset or setting(exports, g, "name") == preset)]
+def platform_presets(exports, platform):
+    sections = re.split(r"(?m)^[ \t]*\[([^\]\r\n]+)\][ \t]*\r?$", exports)
+    presets = {}
+    for group, body in zip(sections[1::2], sections[2::2]):
+        if re.fullmatch(r"preset\.\d+", group):
+            target = string_entry(body, "platform")
+            if target and json.loads(target[1]) == platform:
+                name = string_entry(body, "name")
+                if name:
+                    presets[group] = json.loads(name[1])
+    return presets
+
+
+def select_preset(presets, platform, requested):
+    matches = [(group, name) for group, name in presets.items() if not requested or requested == name]
     if len(matches) != 1:
-        raise ValueError("Choose one iOS export preset with --preset.")
-    group = matches[0]
+        raise ValueError(f"Choose one {platform} export preset with --preset. Available presets: {list(presets.values())}")
+    return matches[0]
+
+
+def prepare(game, exports, preset, scene):
+    presets = platform_presets(exports, "iOS")
+    group, _ = select_preset(presets, "iOS", preset)
     options = group + ".options"
     identifier = setting(exports, options, "application/bundle_identifier")
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9.-]+", identifier):
         raise ValueError("The selected iOS preset needs a valid bundle identifier.")
     bundle = identifier + ".tests"
-    for other in groups:
-        if setting(exports, other, "platform") != "iOS":
-            continue
+    for other in presets:
         try:
             other_bundle = setting(exports, other + ".options", "application/bundle_identifier")
         except ValueError:
