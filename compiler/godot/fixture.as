@@ -36,11 +36,17 @@ package godot {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function emit(...rest):void;
 		public native function getObjectID():Int64;
+		/** Registers a listener. Set deferred to true to call it at the end of the frame. */
 		public native function add(listener:Function, deferred:Boolean = false):void;
+		/** Registers a listener that is removed after its first call. */
 		public native function addOnce(listener:Function, deferred:Boolean = false):void;
+		/** Disconnects the given listener. */
 		public native function remove(listener:Function):void;
+		/** Disconnects the listeners registered by the script for this signal. */
 		public native function removeAll():void;
+		/** Returns whether this listener is connected. */
 		public native function has(listener:Function):Boolean;
+		/** The number of listeners that removeAll would disconnect. */
 		public native function get numListeners():int;
 	}
 	[Operators]
@@ -74,14 +80,22 @@ package godot {
 		public final native function call(method:String, ...rest):*;
 		public final native function getInstanceID():Int64;
 		public final native function isClass(class_:String):Boolean;
+		/** Receives an engine notification. The what argument identifies the notification. */
 		public native function _notification(what:int):void;
+		/** Returns the value of a custom property when Godot reads it. */
 		public native function _get(property:String):*;
+		/** Handles a write to a custom property. Return true if the write was handled. */
 		public native function _set(property:String, value:*):Boolean;
+		/** Returns dictionaries describing the extra properties exposed by this object. */
 		[Godot(returns="Array[GodotDictionary]")]
 		public native function _getPropertyList():GodotArray;
+		/** Adjusts a property description before Godot exposes it in the inspector. */
 		public native function _validateProperty(property:GodotDictionary):void;
+		/** Returns whether the named property can revert to a custom default. */
 		public native function _propertyCanRevert(property:String):Boolean;
+		/** Returns the custom default value for the named property. */
 		public native function _propertyGetRevert(property:String):*;
+		/** Releases the object immediately. References to it become invalid. */
 		public final native function free():void;
 	}
 	[GodotEnum(name="ProcessMode", values="PROCESS_MODE_INHERIT,PROCESS_MODE_ALWAYS")]
@@ -146,6 +160,7 @@ package godot {
 		public static native function get mouseMode():Int64;
 		public static native function set mouseMode(value:Int64):void;
 		public static native function get joyConnectionChanged():Signal;
+		/** The Input singleton as an object. */
 		public static native function get singleton():Input;
 		public static native function isActionPressed(action:String, exactMatch:Boolean = false):Boolean;
 		public static native function getTicks():Int64;

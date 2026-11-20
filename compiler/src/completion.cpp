@@ -1,30 +1,14 @@
 // What could be written at a place in a file: the language server's completion.
 #include "query.h"
 
+#include "completion_keywords.h"
+
 #include <algorithm>
 #include <cctype>
 #include <iterator>
 #include <unordered_set>
 
 namespace kas3 {
-
-namespace {
-
-constexpr std::string_view IN_FUNCTION[] = {
-	"var", "const", "if", "else", "for", "for each", "each", "in", "while", "do", "return", "break", "continue", "switch", "case",
-	"default", "new", "null", "true", "false", "is", "as", "typeof", "function", "throw", "try", "catch", "finally",
-	"super", "delete", "void",
-};
-constexpr std::string_view IN_CLASS[] = {
-	"public", "private", "protected", "internal", "static", "override", "final", "function", "var", "const", "native",
-	"import", "get", "set",
-};
-constexpr std::string_view IN_FILE[] = {
-	"package", "import", "public", "internal", "class", "interface", "extends", "implements", "function", "var",
-	"const", "final", "dynamic",
-};
-
-} // namespace
 
 bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	if (p_name.size() < p_prefix.size()) {
@@ -63,11 +47,12 @@ class Completer {
 	}
 
 	template <size_t N>
-	void offer_keywords(const std::string_view (&p_words)[N]) {
-		for (std::string_view word : p_words) {
+	void offer_keywords(const completion_keywords::Keyword (&p_words)[N]) {
+		for (const auto &[word, description] : p_words) {
 			if (starts_with_any_case(word, prefix_) && seen_.insert(word).second) {
 				Completion item;
 				item.name = std::string(word);
+				item.documentation = description;
 				item.is_keyword = true;
 				found_.push_back(std::move(item));
 			}
@@ -405,13 +390,14 @@ class Completer {
 		}
 		offer_definitions(false);
 		put_parameter_name_first();
-		offer_keywords(IN_FUNCTION);
+		offer_keywords(completion_keywords::IN_FUNCTION);
 		queries_.statement_templates(unit_, offset_, found_);
 		// Typing a keyword can turn a recovery gap into a known statement start.
 		incomplete_ |= prefix_.empty();
 		if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
 			Completion item;
 			item.name = "this";
+			item.documentation = "The current instance of the class.";
 			item.is_keyword = true;
 			found_.push_back(std::move(item));
 		}
@@ -460,9 +446,9 @@ public:
 					return std::move(found_);
 				}
 			}
-			offer_keywords(IN_CLASS);
+			offer_keywords(completion_keywords::IN_CLASS);
 		} else {
-			offer_keywords(IN_FILE);
+			offer_keywords(completion_keywords::IN_FILE);
 		}
 		return std::move(found_);
 	}

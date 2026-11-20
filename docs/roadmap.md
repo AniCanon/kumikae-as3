@@ -70,7 +70,8 @@ state of the project changes.
 ### Editors and tools
 
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
-  hover and outline. A change to a million-line project is checked in milliseconds.
+  hover and outline. Completion includes Godot reference summaries, AS3 library and keyword descriptions,
+  and ASDoc from the project. A change to a million-line project is checked in milliseconds.
 - **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
   for desktop, Web, iOS and Android, automatic Godot preset setup for new run targets, a Devices panel, and a live test runner that opens failed assertions,
   comparison diffs, compiler diagnostics and Godot script errors at their source.

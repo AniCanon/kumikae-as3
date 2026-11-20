@@ -17,6 +17,7 @@ For how the result looks to someone writing scripts, read
 | Files | Job |
 |---|---|
 | `generate.py` | The rules, one for each kind of thing Godot describes |
+| `asdoc.py` | Formats reference summaries and links to longer entries for the editor |
 | `naming.py` | Godot's names to AS3's: `get_node` to `getNode` |
 | `godot.as`, `godot_names.txt` | Generated. Never edit them by hand |
 | `runtime_names.py` | Extracts the names used for dynamic signal access and the signal emission method bind from the generated name table |
@@ -26,6 +27,10 @@ For how the result looks to someone writing scripts, read
 
 ## What the generator decides
 
+- **Documentation.** ASDoc comments carry each available class summary or the first paragraph of a
+  member description. Godot reference tags use AS3 spelling for names. Entries with more text include
+  the URL of the full versioned reference. A plain API dump still generates declarations, but provides
+  no engine descriptions.
 - **Names.** Methods, properties, signals and parameters are lowerCamel, with acronyms in capitals
   (`getAABB`). A name AS3 reserves gets a trailing underscore. Five class names that AS3 already uses get
   a `Godot` prefix, such as `GodotObject`. A getter and a setter become one property.
@@ -80,10 +85,10 @@ A `-` stands for a part that's missing. Types are Godot's, as its description wr
 
 ## Regenerate for a Godot version
 
-1. Write Godot's API description:
+1. Write Godot's API description **with documentation**:
 
    ```sh
-   godot --headless --dump-extension-api
+   godot --headless --dump-extension-api-with-docs
    ```
 
 2. Run the generator on it:

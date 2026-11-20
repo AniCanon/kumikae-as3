@@ -253,6 +253,43 @@ if messages:
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
 
+# Documentation travels with the selected declaration, including across metadata and a comment-only edit.
+source = """package { import godot.*; public class Main extends Node {
+    /** Move one tile.
+     * @param steps Number of tiles.
+     */
+    [Example] public function moveTile(steps:int):void {}
+    /* Ordinary comment. */ public var moveSpeed:int;
+    public function run():void { moveTile(1); queueFree(); var list:Array; list.push(1); }
+} }"""
+body = source.splitlines()[6]
+
+
+def at_word(number, method, word, offset):
+    return request(number, "textDocument/" + method, {"textDocument": {"uri": URI},
+                   "position": {"line": 6, "character": body.index(word) + offset}})
+
+
+code, messages, errors = session(START + opened(source) + at_word(2, "completion", "moveTile", 4) +
+    at_word(3, "hover", "moveTile", 4) + at_word(4, "signatureHelp", "moveTile", 9) +
+    at_word(5, "completion", "queueFree", 5) + at_word(6, "completion", "push", 3) +
+    changed(source.replace("Move one tile.", "Move two tiles.")) + at_word(7, "completion", "moveTile", 4) + END)
+replies = {m["id"]: m.get("result") for m in messages or [] if "id" in m}
+
+
+def item_docs(number, label):
+    items = replies[number]["items"]
+    return next(item.get("documentation", "") for item in items if item["label"] == label)
+
+
+check("ASDoc completion", item_docs(2, "moveTile") == "Move one tile.\n@param steps Number of tiles.")
+check("ordinary comment omitted", not item_docs(2, "moveSpeed"))
+check("ASDoc hover", "Move one tile." in replies[3]["contents"]["value"])
+check("ASDoc signature help", "Number of tiles." in replies[4]["signatures"][0].get("documentation", ""))
+check("Godot completion docs", "frame" in item_docs(5, "queueFree"))
+check("AS3 built-in completion docs", "length" in item_docs(6, "push"))
+check("edited ASDoc", "Move two tiles." in item_docs(7, "moveTile"))
+
 # An override's whole declaration, over the transport, with Godot's API loaded.
 override_text = "package { import godot.*; public class Main extends Node2D {\noverride _pro\n} }"
 code, messages, errors = session(start + opened(override_text) +

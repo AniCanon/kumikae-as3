@@ -80,6 +80,7 @@ std::optional<SignatureHelp> Queries::signature_help(const Unit &p_unit, uint32_
 	}
 	SignatureHelp help;
 	help.label = describe(decl->symbol);
+	help.documentation = documentation(decl->symbol);
 	for (const Parameter &parameter : decl->parameters) {
 		help.parameters.push_back(parameter_text(*decl->symbol->unit, parameter));
 	}

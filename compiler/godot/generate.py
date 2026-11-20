@@ -2,7 +2,7 @@
 
 Usage: generate.py <extension_api.json> <out.as> [<names.txt>]
 
-The input is Godot's own API description (`godot --dump-extension-api`). The output is one declaration
+The input is Godot's own API description (`godot --dump-extension-api-with-docs`). The output is one declaration
 file: `native` classes and functions with no bodies, which the compiler reads to learn which names exist.
 The naming rules are in naming.py.
 
@@ -17,6 +17,7 @@ import os
 import re
 import sys
 
+import asdoc
 import naming
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,8 +41,8 @@ FUNCTIONS_LEFT_OUT = {"typeof", "is_finite"}
 # What Godot's description leaves out of Object, because the engine handles these itself. Scripts override
 # the virtuals and call free(), so they are declared here. The generator refuses if the description ever
 # gains one of them.
-def _extra(name, arguments=(), result=None, virtual=True):
-    entry = {"name": name, "is_const": False, "is_vararg": False, "is_static": False, "is_virtual": virtual,
+def _extra(name, description, arguments=(), result=None, virtual=True):
+    entry = {"name": name, "description": description, "is_const": False, "is_vararg": False, "is_static": False, "is_virtual": virtual,
              "arguments": [dict({"name": argument, "type": kind}, **({"meta": "int32"} if kind == "int" else {}))
                            for argument, kind in arguments]}
     if result:
@@ -50,14 +51,22 @@ def _extra(name, arguments=(), result=None, virtual=True):
 
 
 OBJECT_EXTRAS = [
-    _extra("_notification", [("what", "int")]),
-    _extra("_get", [("property", "StringName")], "Variant"),
-    _extra("_set", [("property", "StringName"), ("value", "Variant")], "bool"),
-    _extra("_get_property_list", result="typedarray::Dictionary"),
-    _extra("_validate_property", [("property", "Dictionary")]),
-    _extra("_property_can_revert", [("property", "StringName")], "bool"),
-    _extra("_property_get_revert", [("property", "StringName")], "Variant"),
-    _extra("free", virtual=False),
+    _extra("_notification", "Receives an engine notification. The what argument identifies the notification.",
+           [("what", "int")]),
+    _extra("_get", "Returns the value of a custom property when Godot reads it.",
+           [("property", "StringName")], "Variant"),
+    _extra("_set", "Handles a write to a custom property. Return true if the write was handled.",
+           [("property", "StringName"), ("value", "Variant")], "bool"),
+    _extra("_get_property_list", "Returns dictionaries describing the extra properties exposed by this object.",
+           result="typedarray::Dictionary"),
+    _extra("_validate_property", "Adjusts a property description before Godot exposes it in the inspector.",
+           [("property", "Dictionary")]),
+    _extra("_property_can_revert", "Returns whether the named property can revert to a custom default.",
+           [("property", "StringName")], "bool"),
+    _extra("_property_get_revert", "Returns the custom default value for the named property.",
+           [("property", "StringName")], "Variant"),
+    _extra("free", "Releases the object immediately. References to it become invalid.",
+           virtual=False),
 ]
 
 # Listening to a signal is spelled the AS3 way, with the names AS3 programmers know from as3-signals, and
@@ -72,12 +81,18 @@ OBJECT_EXTRAS = [
 #   numListeners      the connections removeAll() would take away
 # A signal whose name is known only at run time is reached as any AS3 property is: `timer[name].add(f)`.
 SIGNAL_EXTRAS = [
-    ("add", "public native function add(listener:Function, deferred:Boolean = false):void;"),
-    ("addOnce", "public native function addOnce(listener:Function, deferred:Boolean = false):void;"),
-    ("remove", "public native function remove(listener:Function):void;"),
-    ("removeAll", "public native function removeAll():void;"),
-    ("has", "public native function has(listener:Function):Boolean;"),
-    ("numListeners", "public native function get numListeners():int;"),
+    ("add", "Registers a listener. Set deferred to true to call it at the end of the frame.",
+     "public native function add(listener:Function, deferred:Boolean = false):void;"),
+    ("addOnce", "Registers a listener that is removed after its first call.",
+     "public native function addOnce(listener:Function, deferred:Boolean = false):void;"),
+    ("remove", "Disconnects the given listener.",
+     "public native function remove(listener:Function):void;"),
+    ("removeAll", "Disconnects the listeners registered by the script for this signal.",
+     "public native function removeAll():void;"),
+    ("has", "Returns whether this listener is connected.",
+     "public native function has(listener:Function):Boolean;"),
+    ("numListeners", "The number of listeners that removeAll would disconnect.",
+     "public native function get numListeners():int;"),
 ]
 SIGNAL_REPLACED = {"connect", "disconnect", "is_connected", "get_connections", "has_connections"}
 
@@ -187,6 +202,7 @@ def wide(values):
 class Generator:
     def __init__(self, api):
         self.api = api
+        self.docs = asdoc.Documentation(api, AS3_STANDS_FOR)
         self.classes = {entry["name"]: entry for entry in api["classes"]}
         self.builtins = {entry["name"]: entry for entry in api["builtin_classes"]
                          if entry["name"] not in AS3_STANDS_FOR}
@@ -395,9 +411,11 @@ class Generator:
             kind = "Int64" if wide(enum["values"]) else "int"
             for value in enum["values"]:
                 self.claim(owner, value["name"], "the constant " + value["name"], inherited)
+                out.extend(self.docs.comment(value, owner, "constant"))
                 out.append("public static const %s:%s = %d;" % (value["name"], kind, value["value"]))
         for constant in entry.get("constants", []):
             self.claim(owner, constant["name"], "the constant " + constant["name"], inherited)
+            out.extend(self.docs.comment(constant, owner, "constant"))
             if "type" not in constant:  # A class's constants are integers.
                 self.integer(constant["value"], "%s.%s" % (owner, constant["name"]))
                 kind = "int" if is_int32(constant["value"]) else "Int64"
@@ -450,6 +468,7 @@ class Generator:
         out = []
         self.constants(entry, owner, inherited, out)
         if entry["is_instantiable"]:
+            out.extend(self.docs.comment(entry, owner))
             out.append("public native function %s();" % as3_name)
 
         own_methods = {method["name"]: method for method in entry.get("methods", [])}
@@ -472,6 +491,7 @@ class Generator:
                 hidden.add(getter)
             if setter in own_methods and len(own_methods[setter].get("arguments", [])) == 1:
                 hidden.add(setter)
+            out.extend(self.docs.comment(prop, owner, "property"))
             if getter:
                 if note:
                     out.append('[Godot(returns="%s")]' % note)
@@ -485,11 +505,13 @@ class Generator:
             name = naming.member(signal["name"])
             self.claim(owner, name, "the signal " + signal["name"], inherited)
             self.godot_names["%s.%s" % (as3_name, name)] += " signal"
+            out.extend(self.docs.comment(signal, owner, "signal"))
             out.append("public %snative function get %s():Signal;" % (sealed, name))
 
         if static:
             # The singleton itself, for the places that want an object. The name is AS3's only.
             self.claim(owner, "singleton", "the property @singleton", inherited)
+            out.append("/** The %s singleton as an object. */" % as3_name)
             out.append("public static native function get singleton():%s;" % as3_name)
 
         for method in methods:
@@ -512,8 +534,10 @@ class Generator:
             # The hash finds the method's own entry: a static one called through it reports a wrong call to the
             # script, where ClassDB would only print it.
             self.godot_names["%s.%s" % (as3_name, name)] += " " + self.signature(method, result.get("type"))
+            out.extend(self.docs.comment(method, owner, "method"))
             out.extend(lines)
 
+        self.lines.extend(self.docs.comment(entry, owner, indent="\t"))
         self.lines.extend(self.enum_lines(entry))
         if static:
             self.lines.append("\t[Singleton]")
@@ -596,7 +620,9 @@ class Generator:
             name = naming.member(member["name"])
             self.claim(owner, name, "the field " + member["name"], {})
             self.godot_names["%s.%s" % (as3_name, name)] += " field " + member["type"]
+            out.extend(self.docs.comment(member, owner, "property"))
             out.append("public var %s:%s;" % (name, self.type(member["type"], None, owner + "." + name)[0]))
+        out.extend(self.docs.comment(entry, owner))
         out.append(self.constructor(entry, as3_name))
         for method in entry.get("methods", []):
             if owner == "Signal" and method["name"] in SIGNAL_REPLACED:
@@ -605,14 +631,17 @@ class Generator:
             name = naming.member(method["name"])
             self.claim(owner, name, "the method " + method["name"], {})
             self.godot_names["%s.%s" % (as3_name, name)] += " " + self.signature(method, method.get("return_type"))
+            out.extend(self.docs.comment(method, owner, "method"))
             out.extend(self.function(where, name, method.get("arguments", []), method.get("return_type"), None,
                                      method["is_vararg"], "static " if method["is_static"] else ""))
         if owner == "Signal":
-            for name, line in SIGNAL_EXTRAS:
+            for name, description, line in SIGNAL_EXTRAS:
                 self.claim(owner, name, "AS3's " + name, {})
                 # Godot has no one method for it: the binding composes it. '@' marks such a name.
                 self.godot_names["Signal.%s" % name] = "@" + name
+                out.append("/** %s */" % description)
                 out.append(line)
+        self.lines.extend(self.docs.comment(entry, owner, indent="\t"))
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))
         self.lines.extend(self.constructor_lines(entry))
@@ -631,9 +660,11 @@ class Generator:
         for name in names:
             self.name(name, entry["name"])
         self.lines.append("\t[Abstract]")
-        self.block("public final native class %s" % as3_name,
-                   ["public static const %s:%s = %d;" % (name, kind, value["value"])
-                    for name, value in zip(names, entry["values"])])
+        members = []
+        for name, value in zip(names, entry["values"]):
+            members.extend(self.docs.comment(value, "@GlobalScope", "constant"))
+            members.append("public static const %s:%s = %d;" % (name, kind, value["value"]))
+        self.block("public final native class %s" % as3_name, members)
 
     def global_function(self, entry):
         if entry["name"] in FUNCTIONS_LEFT_OUT:
@@ -655,6 +686,7 @@ class Generator:
         self.godot_names["@global.%s" % name] = " ".join(
             [entry["name"], str(entry["hash"]), entry.get("return_type", "void"),
              ",".join(argument["type"] for argument in described) or "-"] + (["varargs"] if entry["is_vararg"] else []))
+        self.lines.extend(self.docs.comment(entry, "@GlobalScope", "method", indent="\t"))
         for line in self.function(entry["name"], name, arguments, entry.get("return_type"),
                                   None, entry["is_vararg"], ""):
             self.lines.append("\t" + line)
