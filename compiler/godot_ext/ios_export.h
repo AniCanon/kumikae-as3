@@ -17,6 +17,7 @@ class AS3IOSExport : public godot::EditorExportPlugin {
 	bool enabled_ = false;
 	bool debug_ = false;
 	bool ios_ = false;
+	bool web_ = false;
 	bool android_ = false;
 	godot::Ref<godot::DirAccess> android_temp_;
 
@@ -29,6 +30,10 @@ public:
 	godot::TypedArray<godot::Dictionary> _get_export_options(const godot::Ref<godot::EditorExportPlatform> &p_platform) const override;
 	void _export_begin(const godot::PackedStringArray &p_features, bool p_debug, const godot::String &p_path, uint32_t p_flags) override;
 	void _export_file(const godot::String &p_path, const godot::String &, const godot::PackedStringArray &) override;
+	bool _begin_customize_scenes(const godot::Ref<godot::EditorExportPlatform> &, const godot::PackedStringArray &) const override;
+	godot::Node *_customize_scene(godot::Node *, const godot::String &) override { return nullptr; }
+	uint64_t _get_customization_configuration_hash() const override { return 0; } // Scenes are used as-is.
+	void _end_customize_scenes() override;
 	void _end_generate_apple_embedded_project(const godot::String &p_path, bool) override;
 	void _export_end() override;
 };

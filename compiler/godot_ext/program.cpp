@@ -57,11 +57,9 @@ void Project::before_shutdown() {
 	}
 }
 
-static constexpr const char *PRECOMPILED_MODULE = "res://.kas3/program.kas3";
-
 static bool load_precompiled(ir::Module *r_module, std::string *r_error) {
 	if (!FileAccess::file_exists(PRECOMPILED_MODULE)) {
-		*r_error = "precompiled module res://.kas3/program.kas3 is missing from the export";
+		*r_error = std::string("precompiled module ") + PRECOMPILED_MODULE + " is missing from the export";
 		return false;
 	}
 	const PackedByteArray bytes = FileAccess::get_file_as_bytes(PRECOMPILED_MODULE);
@@ -180,9 +178,11 @@ Project &Project::get() {
 	}
 	program->loaded_ = true;
 	loads_++;
+#if !defined(KAS3_RUNTIME_ONLY)
 	// Taken before the scripts are read: an edit made from here on is one the game has not seen.
 	watch_loaded = watch_seen = scripts_signature();
 	refresh_scenes(); // What they are now: an edit from here on is read again.
+#endif
 	std::string errors;
 	if (!load_project_module(program->module_.get(), &errors)) {
 		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
@@ -208,6 +208,7 @@ Project &Project::get() {
 		program->interpreter_ = new_interpreter(*program->module_, program->host_);
 	}
 	program->valid_ = program->interpreter().start();
+#if !defined(KAS3_RUNTIME_ONLY)
 	static bool watching = false;
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (!watching && tree && tree->get_root()) {
@@ -217,6 +218,7 @@ Project &Project::get() {
 			tree->connect("process_frame", callable_mp_static(&Project::watch));
 		}
 	}
+#endif
 	return *program;
 }
 
@@ -436,6 +438,7 @@ void Project::restart_scene() {
 }
 
 void Project::reload_now() {
+#if !defined(KAS3_RUNTIME_ONLY)
 	if (program && program->valid_ && program->running()) {
 		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
 		return;
@@ -447,6 +450,7 @@ void Project::reload_now() {
 	}
 	watch_loaded = watch_seen = now; // What is read now: the watch need not reload it again.
 	reload();
+#endif
 }
 
 void Project::unload() {

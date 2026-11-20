@@ -7,6 +7,7 @@
 #include "sources.h"
 
 #include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
@@ -172,33 +173,6 @@ String build_android_library(const fs::path &p_stage, bool p_debug, String *r_li
 	return {};
 }
 
-String build_web_program(PackedByteArray *r_bytes) {
-	const String root = kas3::scripts_root();
-	std::vector<std::string> files;
-	kas3::collect_scripts(root, files);
-	std::vector<std::string> scripts;
-	for (const std::string &path : files) {
-		const std::string local = kas3::project_path(path, root);
-		if (!kas3::excluded_script(local)) {
-			scripts.push_back(local);
-		}
-	}
-	if (scripts.empty()) {
-		return {};
-	}
-	kas3::ir::Module module;
-	std::string diagnostics;
-	if (!kas3::compile_scripts(std::move(scripts), root, &module, &diagnostics)) {
-		return String::utf8(diagnostics.c_str());
-	}
-	const std::vector<uint8_t> encoded = kas3::ir::write_binary(module);
-	r_bytes->resize(static_cast<int64_t>(encoded.size()));
-	if (!encoded.empty()) {
-		std::memcpy(r_bytes->ptrw(), encoded.data(), encoded.size());
-	}
-	return {};
-}
-
 } // namespace
 
 bool AS3IOSExport::_supports_platform(const Ref<EditorExportPlatform> &p_platform) const {
@@ -232,7 +206,7 @@ TypedArray<Dictionary> AS3IOSExport::_get_export_options(const Ref<EditorExportP
 void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_debug, const String &, uint32_t) {
 	ios_ = p_features.has("ios");
 	android_ = p_features.has("android");
-	const bool web = p_features.has("web");
+	web_ = p_features.has("web");
 	enabled_ = false;
 	if (ios_ || android_) {
 		// Values 0 and 1 also preserve the choices saved by the old boolean option.
@@ -242,18 +216,6 @@ void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_deb
 	debug_ = p_debug;
 	scripts_.clear();
 	android_temp_.unref();
-	if (web) {
-		PackedByteArray bytes;
-		const String error = build_web_program(&bytes);
-		if (!error.is_empty()) {
-			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", error);
-		} else if (!bytes.is_empty()) {
-			add_file("res://.kas3/program.kas3", bytes, false);
-			get_export_platform()->add_message(
-					EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Packed precompiled AS3 module for Web.");
-		}
-		return;
-	}
 	if (android_ && enabled_) {
 		android_temp_ = DirAccess::create_temp("kas3-android");
 		if (android_temp_.is_null()) {
@@ -275,14 +237,52 @@ void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_deb
 }
 
 void AS3IOSExport::_export_file(const String &p_path, const String &, const PackedStringArray &) {
-	if (!ios_ || !enabled_ || !p_path.ends_with(".as") || p_path.contains("/.") || kas3::excluded_script(p_path.utf8().get_data())) {
+	if ((!web_ && !(ios_ && enabled_)) || !p_path.ends_with(".as") || p_path.contains("/.") || kas3::excluded_script(p_path.utf8().get_data())) {
 		return;
 	}
-	if (scripts_.empty()) {
+	if (web_) {
+		// Keep the script resource at its original path for scenes and the optional browser compiler.
+		// Loading each .as through scene customization would try to attach even plain AS3 classes.
+		Ref<FileAccess> source = FileAccess::open(p_path, FileAccess::READ);
+		if (source.is_null()) {
+			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Cannot read " + p_path);
+			return;
+		}
+		add_file(p_path, source->get_buffer(source->get_length()), false);
+		skip();
+	}
+	if (ios_ && scripts_.empty()) {
 		add_apple_embedded_platform_cpp_code(REGISTER_PROGRAM);
 		add_apple_embedded_platform_linker_flags("\"$(PROJECT_DIR)/$(PROJECT_NAME)/.kas3/$(PLATFORM_NAME).o\"");
 	}
 	scripts_.emplace_back(p_path.utf8().get_data());
+}
+
+// Godot flushes added files after scene customization ends. At this point _export_file has seen
+// exactly the paths chosen by the preset, including its include/exclude filters and dependencies.
+bool AS3IOSExport::_begin_customize_scenes(const Ref<EditorExportPlatform> &, const PackedStringArray &) const {
+	return web_;
+}
+
+void AS3IOSExport::_end_customize_scenes() {
+	if (!web_ || scripts_.empty()) {
+		return;
+	}
+	kas3::ir::Module module;
+	std::string diagnostics;
+	if (!kas3::compile_scripts(std::move(scripts_), "res://", &module, &diagnostics)) {
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", String::utf8(diagnostics.c_str()));
+		return;
+	}
+	const std::vector<uint8_t> encoded = kas3::ir::write_binary(module);
+	PackedByteArray bytes;
+	if (bytes.resize(static_cast<int64_t>(encoded.size())) != OK) {
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "No memory for the Web program.");
+		return;
+	}
+	std::memcpy(bytes.ptrw(), encoded.data(), encoded.size());
+	add_file(kas3::PRECOMPILED_MODULE, bytes, false);
+	get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Packed precompiled AS3 module for Web.");
 }
 
 void AS3IOSExport::_end_generate_apple_embedded_project(const String &p_path, bool) {
@@ -310,6 +310,7 @@ void AS3IOSExport::_export_end() {
 	enabled_ = false;
 	ios_ = false;
 	android_ = false;
+	web_ = false;
 }
 
 void AS3ExportEditor::_enter_tree() {
