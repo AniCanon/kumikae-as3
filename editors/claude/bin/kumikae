@@ -52,7 +52,7 @@ def new_game(destination):
         settings = game / "project.godot"
         settings.write_text(re.sub(r"(?m)^config/name=.*$", lambda _: "config/name=" + json.dumps(destination.name),
                                     settings.read_text()))
-        (game / "bin").mkdir()
+        (game / "bin").mkdir(exist_ok=True)
         shutil.copy2(KIT / "libkas3_godot.dylib", game / "bin")
         for tier in ("as3", "godot"):
             shutil.copytree(KIT / "testing" / tier / "app", game / "tests/framework/app", dirs_exist_ok=True)

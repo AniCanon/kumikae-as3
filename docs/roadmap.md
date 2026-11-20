@@ -46,7 +46,8 @@ state of the project changes.
 - **iOS:** the interpreter runs in the Simulator and on a device. Rider can sign, install and run a game on a paired iPhone or iPad.
 - **Android:** the interpreter runs on an ARM64 emulator through Rider.
 - **Web (WebAssembly):** `libkas3_godot.wasm` builds with Emscripten for Godot 4.7's single-threaded Web export
-  and runs projects such as `examples/coin-dash` on the interpreter in the browser.
+  and runs projects such as `examples/coin-dash` on the interpreter in the browser. Claude Code starters
+  include a Web export preset when the native kit supplies the Web runtime.
 
 ### Native code
 

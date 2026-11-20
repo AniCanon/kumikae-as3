@@ -2,12 +2,33 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
 
 PLUGIN = Path(__file__).resolve().parent
 ROOT = PLUGIN.parents[1]
+
+
+def configure_starter_web(starter, native):
+    wasm = Path("web/libkas3_godot.wasm")
+    if (native / wasm).is_file():
+        destination = starter / "bin" / wasm
+        destination.parent.mkdir(parents=True)
+        shutil.copy2(native / wasm, destination)
+        return
+
+    descriptor = starter / "kas3.gdextension"
+    descriptor.write_text("".join(line for line in descriptor.read_text().splitlines(keepends=True)
+                                  if not line.startswith("web.wasm32 =")))
+    presets = starter / "export_presets.cfg"
+    # Godot numbers presets consecutively. Keep each preset together with its options.
+    sections = re.split(r"(?m)^\[preset\.\d+\]\n", presets.read_text())
+    kept = [block for block in sections[1:] if 'platform="Web"' not in block.splitlines()]
+    presets.write_text(sections[0] + "".join(
+        f"[preset.{index}]\n" + re.sub(r"(?m)^\[preset\.\d+\.options\]$", f"[preset.{index}.options]", block)
+        for index, block in enumerate(kept)))
 
 
 def assemble(native, destination):
@@ -44,6 +65,7 @@ def assemble(native, destination):
         for pattern in ("*.tscn", "*.gdextension", "project.godot", "*.png", "export_presets.cfg", "kas3-tests.json"):
             for file in example.glob(pattern):
                 shutil.copy2(file, starter)
+        configure_starter_web(starter, native)
         shutil.copytree(example / "src", starter / "src")
         shutil.copytree(example / "assets", starter / "assets")
         shutil.copytree(example / "tests", starter / "tests", ignore=shutil.ignore_patterns("*.uid"))
