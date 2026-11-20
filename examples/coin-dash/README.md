@@ -24,9 +24,19 @@ godot --path examples/coin-dash
 
 ## Inside the game
 
-[Rooftop.as](Rooftop.as) connects Godot’s pickup signals, moves the courier and sweeps the laser across the gold route. Its typed waypoint vectors define repeatable routes you can learn across runs. [Round.as](Round.as) owns the clock, dash recharge and scoring. [Ledger.as](Ledger.as) reads and writes the local record through Godot’s ConfigFile API.
+The source root is `src/`. Each public ActionScript 3 class lives in the directory named by its package. The same convention applies under `tests/`. [Flash and AIR class-file conventions](https://airsdk.dev/docs/development/appendixes/how-to-use-actionscript-examples)
 
-[Player.as](Player.as), [Coin.as](Coin.as) and [Scanner.as](Scanner.as) draw the animated actors directly in ActionScript 3. To try hot reload, change the courier’s scarf shape in the player's `_draw` method and save during a run. The score and clock carry on as you edit. [How hot reload works](../../docs/hot-reload.md)
+| Under `dev.kumikae.coindash` | What to change here |
+|---|---|
+| [config](src/dev/kumikae/coindash/config/RoundRules.as) | Round length, pickup values, hit penalty and dash timing. The HUD reads these same rules. |
+| [gameplay](src/dev/kumikae/coindash/gameplay) | `Round` tracks the clock and pickups. `Rooftop` connects the scene, maps input and places the pickup routes. |
+| [entities](src/dev/kumikae/coindash/entities) | `Player` steers and dashes. `Scanner` owns its patrol, beam and hit test. Each actor draws its own sprite. |
+| [presentation](src/dev/kumikae/coindash/presentation/Hud.as) | Scoreboard, menus and pickup feedback. |
+| [storage](src/dev/kumikae/coindash/storage/Ledger.as) | Loading and saving the best score. |
+
+The scene-and-actor split follows the play state and player in the Flash game *Mode*. Actor-specific tuning stays with the actor, so the scanner’s beam drawing and collision check use one length. [Mode play state](https://github.com/AdamAtomic/Mode/blob/master/src/PlayState.as) · [Mode player](https://github.com/AdamAtomic/Mode/blob/master/src/Player.as)
+
+To try hot reload, change the scarf shape in `Player._draw` and save during a run. The score and clock carry on as you edit. [How hot reload works](../../docs/hot-reload.md)
 
 ## Run the gameplay tests
 
@@ -34,4 +44,4 @@ godot --path examples/coin-dash
 python3 testing/runner.py examples/coin-dash/kas3-tests.json --compiler compiler/build/kas3c --require-pass
 ```
 
-The ActionScript 3 tests cover the buzzer, restart, dash immunity, hit penalty and silver and gold pickups through Godot physics. The [Claude Code plugin](../../editors/claude/README.md) also packages this project as its standalone starter.
+The ActionScript 3 tests cover the buzzer, restart, dash immunity, hit penalty, the scanner’s patrol reset and silver and gold pickups through Godot physics. The [Claude Code plugin](../../editors/claude/README.md) also packages this project as its standalone starter.

@@ -1,20 +1,27 @@
-package {
+package dev.kumikae.coindash.gameplay {
+    import dev.kumikae.coindash.config.RoundRules;
+    import dev.kumikae.coindash.entities.Player;
+    import dev.kumikae.coindash.entities.Scanner;
+    import dev.kumikae.coindash.presentation.Hud;
+    import dev.kumikae.coindash.storage.Ledger;
     import godot.*;
 
     public class Rooftop extends Node2D {
+        private static const POINTER_EASE_RADIUS:Number = 12;
+        private static const POINTER_TOP:Number = 160;
+        private static const POINTER_BOTTOM:Number = 460;
+
         [Export] public var cruiseSpeed:Number = 295;
         private var run:Round = new Round();
         private var hud:Hud;
-        private var rider:CharacterBody2D;
+        private var rider:Player;
         private var silver:Area2D;
         private var gold:Area2D;
-        private var scanner:Node2D;
+        private var scanner:Scanner;
         private var best:int = 0;
-        private var elapsed:Number = 0;
+        private var deck:Rect2 = new Rect2(91, 193, 778, 255);
         private var silverStop:int = 0;
         private var goldStop:int = 0;
-        private var heading:Vector2 = new Vector2(1, 0);
-        private var dashHeading:Vector2 = new Vector2(1, 0);
         private var dock:Vector2 = new Vector2(465, 407);
         private var silverRoute:Vector.<Vector2> = new <Vector2>[
             new Vector2(578, 398), new Vector2(284, 416), new Vector2(731, 386),
@@ -27,10 +34,10 @@ package {
 
         override public function _ready():void {
             if (Engine.isEditorHint()) return;
-            rider = getNode("Player") as CharacterBody2D;
+            rider = getNode("Player") as Player;
             silver = getNode("Silver") as Area2D;
             gold = getNode("Gold") as Area2D;
-            scanner = getNode("Scanner") as Node2D;
+            scanner = getNode("Scanner") as Scanner;
             hud = new Hud(getNode("HUD") as Control);
             silver.bodyEntered.add(takeSilver);
             gold.bodyEntered.add(takeGold);
@@ -42,16 +49,12 @@ package {
         }
 
         private function resetDeck():void {
-            elapsed = 0;
             silverStop = 0;
             goldStop = 0;
             silver.position = silverRoute[0];
             gold.position = goldRoute[0];
-            rider.position = dock;
-            rider.velocity = Vector2.ZERO;
-            rider.modulate = Color.WHITE;
-            heading = new Vector2(1, 0);
-            moveScanner();
+            rider.resetAt(dock);
+            scanner.resetPatrol();
         }
 
         public function startRun():void {
@@ -64,7 +67,6 @@ package {
 
         private function startDash():void {
             if (!run.dash()) return;
-            dashHeading = heading;
             cue("Dash");
         }
 
@@ -80,7 +82,8 @@ package {
             run.tick(delta);
             if (run.phase == Round.RUNNING) {
                 drive(delta);
-                if (run.phase == Round.RUNNING && run.seconds <= 5 && int(Math.ceil(run.seconds)) < lastSecond) {
+                if (run.phase == Round.RUNNING && run.seconds <= RoundRules.COUNTDOWN_WARNING_SECONDS &&
+                    int(Math.ceil(run.seconds)) < lastSecond) {
                     cue("Tick");
                 }
             }
@@ -90,42 +93,33 @@ package {
         }
 
         private function drive(delta:Number):void {
+            if (Input.isActionJustPressed("ui_accept")) startDash();
+            rider.drive(steering(), run.boost > 0, cruiseSpeed, deck);
+            scanner.sweep(delta);
+            if (scanner.covers(rider.position) && run.hit()) {
+                hud.showPenalty(rider.position);
+                rider.position = dock;
+                rider.velocity = Vector2.ZERO;
+                cue("Hit");
+            }
+            rider.showGrace(run.grace);
+        }
+
+        private function steering():Vector2 {
             var direction:Vector2 = Input.getVector("move_left", "move_right", "move_up", "move_down");
             if (Input.isMouseButtonPressed(1)) {
                 var pointer:Vector2 = getLocalMousePosition();
-                if (pointer.y > 160 && pointer.y < 460) {
-                    direction = (pointer - rider.position).limitLength(12) / 12;
+                if (pointer.y > POINTER_TOP && pointer.y < POINTER_BOTTOM) {
+                    direction = (pointer - rider.position).limitLength(POINTER_EASE_RADIUS) / POINTER_EASE_RADIUS;
                 }
             }
-            if (direction.length() > 0.1) heading = direction.normalized();
-            if (Input.isActionJustPressed("ui_accept")) startDash();
-            rider.velocity = run.boost > 0 ? dashHeading * 780 : direction * cruiseSpeed;
-            rider.moveAndSlide();
-            rider.position = new Vector2(clampf(rider.position.x, 91, 869), clampf(rider.position.y, 193, 448));
-            elapsed += delta;
-            moveScanner();
-            if (absf(rider.position.x - scanner.position.x) < 16 &&
-                rider.position.y > scanner.position.y - 19 && rider.position.y < scanner.position.y + Scanner.BEAM + 11) {
-                if (run.hit()) {
-                    hud.flash("−3 SEC", rider.position, new Color("#ffa18e"));
-                    rider.position = dock;
-                    rider.velocity = Vector2.ZERO;
-                    cue("Hit");
-                }
-            }
-            rider.modulate = run.grace > 0 && int(run.grace * 12) % 2 == 0 ? new Color("#ffffff70") : Color.WHITE;
-        }
-
-        private function moveScanner():void {
-            // The phase is continuous when the late-round sweep accelerates.
-            var fast:Number = Math.max(0, elapsed - 20);
-            scanner.position = new Vector2(480 + 331 * sin(elapsed * 1.50 + fast * 0.38), 206);
+            return direction;
         }
 
         private function takeSilver(body:Node2D):void {
             if (body != rider || run.phase != Round.RUNNING) return;
-            run.collect(1);
-            hud.flash("+1", silver.position, new Color("#abffea"));
+            run.collectSilver();
+            hud.showSilver(silver.position);
             silverStop = (silverStop + 1) % silverRoute.length;
             silver.position = silverRoute[silverStop];
             cue("Silver");
@@ -133,8 +127,8 @@ package {
 
         private function takeGold(body:Node2D):void {
             if (body != rider || run.phase != Round.RUNNING) return;
-            run.collect(3);
-            hud.flash("+3 GOLD", gold.position, new Color("#ffe49a"));
+            run.collectGold();
+            hud.showGold(gold.position);
             goldStop = (goldStop + 1) % goldRoute.length;
             gold.position = goldRoute[goldStop];
             cue("Gold");

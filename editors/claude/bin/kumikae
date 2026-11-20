@@ -45,7 +45,7 @@ def new_game(destination):
         shutil.copytree(KIT / "starter", game)
         # Persist one identity in the presets. Moving the project keeps its identity.
         slug = re.sub("[^a-z0-9]", "", destination.name.lower())[:32]
-        identifier = f"org.kumikae.game{slug}.p{uuid.uuid4().hex}"
+        identifier = f"dev.kumikae.game{slug}.p{uuid.uuid4().hex}"
         presets = game / "export_presets.cfg"
         presets.write_text(re.sub(r'(?m)^((?:application/bundle_identifier|package/unique_name)=)"[^"]*"',
                                    lambda match: match[1] + json.dumps(identifier), presets.read_text()))

@@ -1,4 +1,6 @@
-package {
+package dev.kumikae.coindash.tests {
+    import dev.kumikae.coindash.entities.Scanner;
+    import dev.kumikae.coindash.gameplay.Round;
     import app.anicanon.kumikae.testing.Assert;
     import app.anicanon.kumikae.testing.TestScene;
     import godot.*;
@@ -9,10 +11,12 @@ package {
             var run:Round = new Round();
             run.start();
             run.tick(29.5);
-            run.collect(3);
+            run.collectGold();
             run.tick(0.5);
-            run.collect(1);
+            run.collectSilver();
             Assert.assertEquals(3, run.score);
+            Assert.assertEquals(1, run.gold);
+            Assert.assertEquals(0, run.silver);
             Assert.assertEquals(0, run.seconds);
             Assert.assertEquals(Round.FINISHED, run.phase);
             run.start();
@@ -31,6 +35,20 @@ package {
             Assert.assertTrue(run.hit());
             Assert.assertFalse(run.hit());
             Assert.assertEquals(26.75, run.seconds);
+        }
+
+        [Test]
+        public function scannerPatrolResetsToItsScenePosition():void {
+            var scene:Node = TestScene.instantiate("res://main.tscn");
+            var scanner:Scanner = scene.getNode("Scanner") as Scanner;
+            var dock:Vector2 = scanner.position;
+            scanner.sweep(1);
+            Assert.assertTrue(scanner.position.x > dock.x);
+            Assert.assertTrue(scanner.covers(scanner.position + new Vector2(0, 50)));
+            Assert.assertFalse(scanner.covers(scanner.position + new Vector2(30, 50)));
+            scanner.resetPatrol();
+            Assert.assertEquals(dock.x, scanner.position.x);
+            Assert.assertEquals(dock.y, scanner.position.y);
         }
 
         [Test]

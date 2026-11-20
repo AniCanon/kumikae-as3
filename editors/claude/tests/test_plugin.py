@@ -49,7 +49,9 @@ class PluginTest(unittest.TestCase):
             scene = (game / "main.tscn").read_text()
             for resource in re.findall(r'path="res://([^"]+)"', scene):
                 self.assertTrue((game / resource).is_file(), resource)
-            self.assertTrue((game / "tests/CoinPickupTest.as").is_file())
+            rules = game / "src/dev/kumikae/coindash/config/RoundRules.as"
+            self.assertIn("package dev.kumikae.coindash.config", rules.read_text())
+            self.assertTrue((game / "tests/dev/kumikae/coindash/tests/CoinPickupTest.as").is_file())
             self.assertTrue((game / "tests/framework/app/anicanon/kumikae/testing/TestScene.as").is_file())
             second = root / "another" / game.name
             subprocess.run([tool, "new", second], check=True, stdout=subprocess.PIPE)
@@ -59,6 +61,7 @@ class PluginTest(unittest.TestCase):
                 values = re.findall(r'(?:application/bundle_identifier|package/unique_name)="([^"]+)"', settings)
                 self.assertEqual(3, len(values))
                 self.assertEqual(1, len(set(values)))
+                self.assertTrue(values[0].startswith("dev.kumikae."))
                 ids.append(values[0])
             self.assertNotEqual(*ids)
             config = json.loads((plugin / ".lsp.json").read_text())["kumikae"]

@@ -1,4 +1,4 @@
-package {
+package dev.kumikae.coindash.entities {
     import godot.*;
 
     public class Coin extends Area2D {

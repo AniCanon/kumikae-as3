@@ -1,6 +1,6 @@
 {
   "version": 1,
   "tests": [
-    { "name": "Gameplay", "discover": "tests", "runtime": "godot", "timeout": 600 }
+    { "name": "Gameplay", "discover": "tests", "suitePackage": "dev.kumikae.coindash.tests", "runtime": "godot", "timeout": 600 }
   ]
 }

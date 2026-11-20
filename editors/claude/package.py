@@ -41,9 +41,10 @@ def assemble(native, destination):
         starter = kit / "starter"
         starter.mkdir()
         example = ROOT / "examples/coin-dash"
-        for pattern in ("*.as", "*.tscn", "*.gdextension", "project.godot", "*.png", "export_presets.cfg", "kas3-tests.json"):
+        for pattern in ("*.tscn", "*.gdextension", "project.godot", "*.png", "export_presets.cfg", "kas3-tests.json"):
             for file in example.glob(pattern):
                 shutil.copy2(file, starter)
+        shutil.copytree(example / "src", starter / "src")
         shutil.copytree(example / "assets", starter / "assets")
         shutil.copytree(example / "tests", starter / "tests", ignore=shutil.ignore_patterns("*.uid"))
         shutil.copy2(ROOT / "LICENSE", package)
