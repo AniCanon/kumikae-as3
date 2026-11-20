@@ -65,6 +65,7 @@ state of the project changes.
 - **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
   for desktop, iOS and Android, a Devices panel, and a live test runner that opens failed assertions,
   comparison diffs, compiler diagnostics and Godot script errors at their source.
+- **Claude Code plugin** with AS3 language support, a playable starter, debug exports and gameplay tests on desktop, iOS Simulator and Android emulator. [Setup](../editors/claude/README.md).
 - **VS Code client** for the language server.
 - **A testing library** written in AS3, with CLI and headless Godot engine runners (`TestScene`).
 

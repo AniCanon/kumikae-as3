@@ -28,6 +28,14 @@ def setting(text, group, key, replacement=None):
     return text[:end].rstrip() + "\n" + key + "=" + value + "\n\n" + text[end:].lstrip("\r\n")
 
 
+def include_test_folder(exports, group, folder="tests"):
+    patterns = setting(exports, group, "exclude_filter").split(",")
+    # Keep all exclusions unrelated to the test scene or fixtures.
+    test_globs = {base + suffix for base in ("tests", folder.strip("/")) for suffix in ("", "/", "/*", "/**")}
+    kept = [pattern for pattern in patterns if pattern.strip().removeprefix("res://") not in test_globs]
+    return setting(exports, group, "exclude_filter", ",".join(kept))
+
+
 def prepare(game, exports, preset, scene):
     groups = re.findall(r"(?m)^[ \t]*\[(preset\.\d+)\][ \t]*\r?$", exports)
     matches = [g for g in groups if setting(exports, g, "platform") == "iOS"
@@ -51,7 +59,7 @@ def prepare(game, exports, preset, scene):
             raise ValueError("Another game preset already uses the test bundle identifier.")
     game = setting(game, "application", "config/name", setting(game, "application", "config/name") + " Tests")
     game = setting(game, "application", "run/main_scene", scene)
-    exports = setting(exports, group, "exclude_filter", "")
+    exports = include_test_folder(exports, group)
     exports = setting(exports, options, "application/bundle_identifier", bundle)
     return game, exports, group, bundle
 

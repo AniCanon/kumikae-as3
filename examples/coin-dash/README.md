@@ -51,3 +51,9 @@ If your edit has an error, Godot prints it and the game carries on with the code
 One thing doesn't change on a live object: a field's first value, such as `private var age:Number = 0`.
 Objects of a class that extends a Godot class keep the values they have. Change the code that uses the
 field, or restart the game. [Hot reload](../../docs/hot-reload.md) explains why.
+
+## Verify a pickup
+
+The `Gameplay::CoinPickupTest::pickupUpdatesHud` test places the player on the coin and waits for the
+HUD to display the new score. The [Claude Code plugin](../../editors/claude/README.md) packages this
+example as its standalone starter and can run this test on desktop and both mobile simulators.

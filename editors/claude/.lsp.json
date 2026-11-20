@@ -1,0 +1,7 @@
+{
+  "kumikae": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/kumikae",
+    "args": ["lsp"],
+    "extensionToLanguage": { ".as": "actionscript" }
+  }
+}
