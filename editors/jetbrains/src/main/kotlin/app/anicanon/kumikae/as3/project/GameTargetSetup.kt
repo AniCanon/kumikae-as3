@@ -47,18 +47,7 @@ internal class GameTargetSetup(private val project: Project, private val root: V
         }
     }
 
-    fun suggestedPreset(platform: String): String {
-        val config = GodotConfig(exports())
-        val all = GameTargets.presets(config)
-        val existing = all.filter { it.platform == platform }
-        if (existing.isNotEmpty()) {
-            val preset = existing.firstOrNull { config.raw(it.section, "runnable") == "true" }
-                ?: existing.firstOrNull { it.name == platform } ?: existing.first()
-            return preset.name
-        }
-        return generateSequence(1) { it + 1 }.map { if (it == 1) platform else "$platform ($it)" }
-            .first { candidate -> all.none { it.name == candidate } }
-    }
+    fun suggestedPreset(platform: String) = GameTargets.suggestedPreset(GodotConfig(exports()), platform)
 
     fun ensurePreset(platform: String, name: String, identifier: String) {
         val old = exports()

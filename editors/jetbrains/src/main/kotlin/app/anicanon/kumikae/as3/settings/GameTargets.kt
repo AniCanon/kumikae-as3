@@ -24,6 +24,20 @@ internal object GameTargets {
         ExportPreset(it, config.string(it, "name"), config.string(it, "platform"))
     }
 
+    fun suggestedPreset(config: GodotConfig, platform: String): String {
+        val all = presets(config)
+        val existing = all.filter { it.platform == platform }
+        if (existing.isNotEmpty()) {
+            val runnable = config.string("runnable_presets", platform)
+            val preset = existing.firstOrNull { it.name == runnable }
+                ?: existing.firstOrNull { config.raw(it.section, "runnable") == "true" }
+                ?: existing.firstOrNull { it.name == platform } ?: existing.first()
+            return preset.name
+        }
+        return generateSequence(1) { it + 1 }.map { if (it == 1) platform else "$platform ($it)" }
+            .first { candidate -> all.none { it.name == candidate } }
+    }
+
     fun ios(text: String, name: String): IosTarget {
         val config = GodotConfig(text)
         val matching = presets(config).filter { it.platform == "iOS" && (name.isEmpty() || it.name == name) }

@@ -6,6 +6,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class GameTargetsTest {
+    @Test fun `new targets use the runnable preset saved by Godot`() {
+        val presets = "[preset.0]\nname=\"Web\"\nplatform=\"Web\"\n" +
+            "[preset.1]\nname=\"Browser QA\"\nplatform=\"Web\"\n"
+        val current = "[runnable_presets]\nWeb=\"Browser QA\"\n"
+        assertEquals("Browser QA", GameTargets.suggestedPreset(GodotConfig(current + presets), "Web"))
+        assertEquals("Browser QA", GameTargets.suggestedPreset(GodotConfig(presets + "runnable=true\n"), "Web"))
+        assertEquals("Web", GameTargets.suggestedPreset(GodotConfig(presets), "Web"))
+    }
+
     @Test fun `web presets enable the extension without a mobile identity`() {
         val config = GodotConfig(GameTargets.add("", "Web", "Browser QA", ""))
         assertEquals("Web", config.string("preset.0", "platform"))

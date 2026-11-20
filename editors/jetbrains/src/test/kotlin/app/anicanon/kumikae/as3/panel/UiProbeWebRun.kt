@@ -34,19 +34,32 @@ internal object UiProbeWebRun {
             KumikaeRunType.Kind.WEB to "Web",
         )) {
             val before = setup.presets()
-            lateinit var dialog: RunConfigurable
+            fun openDialog() = RunConfigurable(project).apply {
+                createComponent()
+                reset()
+            }
+            val configurations = manager.allSettings.toSet()
+            app.invokeAndWait {
+                val dialog = openDialog()
+                try {
+                    dialog.createNewConfiguration(KumikaeRunType.factory(kind))
+                } finally {
+                    dialog.disposeUIResources()
+                }
+            }
+            check(setup.presets() == before) { "Cancelling Add $platform changed the export presets." }
+            check(manager.allSettings.toSet() == configurations) {
+                "Cancelling Add $platform changed the run configurations."
+            }
             lateinit var name: String
             app.invokeAndWait {
-                dialog = RunConfigurable(project)
-                dialog.createComponent()
-                dialog.reset()
-                name = dialog.createNewConfiguration(KumikaeRunType.factory(kind)).configuration.name
-            }
-            try {
-                check(setup.presets() == before) { "Opening the editor changed the project's presets." }
-                app.invokeAndWait { dialog.apply() }
-            } finally {
-                app.invokeAndWait { dialog.disposeUIResources() }
+                val dialog = openDialog()
+                try {
+                    name = dialog.createNewConfiguration(KumikaeRunType.factory(kind)).configuration.name
+                    dialog.apply()
+                } finally {
+                    dialog.disposeUIResources()
+                }
             }
             val created = manager.allSettings.single { it.name == name }
             val preset = when (val config = created.configuration) {
