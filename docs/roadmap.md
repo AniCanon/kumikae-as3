@@ -36,6 +36,8 @@ state of the project changes.
 
 ### Inside Godot
 
+- **[Coin Dash](../examples/coin-dash/README.md)** is a playable ActionScript 3 example with physics pickups, a moving hazard, a dash and a saved best score.
+
 - **Scripts on nodes:** properties, methods, signals, singletons, constants, static methods and global
   functions, with what Godot returns checked against its declared type.
 - **`[Export]` and `[Signal]`.**

@@ -1,42 +1,510 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene format=3]
+[ext_resource type="Script" path="res://Rooftop.as" id="Rooftop"]
+[ext_resource type="Script" path="res://Player.as" id="Player"]
+[ext_resource type="Script" path="res://Coin.as" id="Coin"]
+[ext_resource type="Script" path="res://Scanner.as" id="Scanner"]
+[ext_resource type="Texture2D" path="res://assets/meridian.webp" id="Roof"]
+[ext_resource type="AudioStream" path="res://assets/start.wav" id="Start"]
+[ext_resource type="AudioStream" path="res://assets/silver.wav" id="Silver"]
+[ext_resource type="AudioStream" path="res://assets/gold.wav" id="Gold"]
+[ext_resource type="AudioStream" path="res://assets/hit.wav" id="Hit"]
+[ext_resource type="AudioStream" path="res://assets/dash.wav" id="Dash"]
+[ext_resource type="AudioStream" path="res://assets/tick.wav" id="Tick"]
+[ext_resource type="AudioStream" path="res://assets/finish.wav" id="Finish"]
 
-[ext_resource type="Script" path="res://Player.as" id="1"]
-[ext_resource type="Script" path="res://Coin.as" id="2"]
-[ext_resource type="Script" path="res://Hud.as" id="3"]
+[sub_resource type="CircleShape2D" id="Courier"]
+radius = 12.0
 
-[sub_resource type="CircleShape2D" id="player"]
-radius = 22.0
+[sub_resource type="CircleShape2D" id="Chip"]
+radius = 13.0
 
-[sub_resource type="CircleShape2D" id="coin"]
-radius = 16.0
+[sub_resource type="SystemFont" id="Bold"]
+font_names = PackedStringArray("Avenir Next", "DejaVu Sans", "Arial")
+font_weight = 850
 
-[node name="Main" type="Node2D"]
+[sub_resource type="SystemFont" id="Body"]
+font_names = PackedStringArray("Avenir Next", "DejaVu Sans", "Arial")
+font_weight = 550
 
-[node name="Background" type="ColorRect" parent="."]
+[sub_resource type="StyleBoxFlat" id="ButtonFace"]
+bg_color = Color(0.6039, 1.0, 0.8627, 1.0)
+border_width_bottom = 3
+border_color = Color(0.2078, 0.6235, 0.5725, 1.0)
+corner_radius_top_left = 2
+corner_radius_bottom_right = 2
+
+[sub_resource type="StyleBoxFlat" id="ButtonHover"]
+bg_color = Color(0.7725, 1.0, 0.9059, 1.0)
+border_width_bottom = 3
+border_color = Color(0.2078, 0.6235, 0.5725, 1.0)
+corner_radius_top_left = 2
+corner_radius_bottom_right = 2
+
+[sub_resource type="StyleBoxFlat" id="ButtonDown"]
+bg_color = Color(0.3333, 0.7882, 0.6941, 1.0)
+border_width_bottom = 3
+border_color = Color(0.2078, 0.6235, 0.5725, 1.0)
+corner_radius_top_left = 2
+corner_radius_bottom_right = 2
+
+[node name="Rooftop" type="Node2D"]
+script = ExtResource("Rooftop")
+
+[node name="Port" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
 offset_right = 960.0
 offset_bottom = 540.0
-color = Color(0.09, 0.1, 0.14, 1)
+mouse_filter = 2
+texture = ExtResource("Roof")
+expand_mode = 1
+texture_filter = 1
 
-[node name="Coin" type="Area2D" parent="."]
-position = Vector2(700, 200)
-script = ExtResource("2")
+[node name="Track" type="ColorRect" parent="."]
+offset_left = 128.0
+offset_top = 203.0
+offset_right = 832.0
+offset_bottom = 205.0
+mouse_filter = 2
+color = Color(0.9922, 0.5725, 0.4902, 0.3961)
 
-[node name="Shape" type="CollisionShape2D" parent="Coin"]
-shape = SubResource("coin")
+[node name="End128" type="ColorRect" parent="."]
+offset_left = 128.0
+offset_top = 199.0
+offset_right = 130.0
+offset_bottom = 209.0
+mouse_filter = 2
+color = Color(1.0, 0.651, 0.5294, 1.0)
+
+[node name="End830" type="ColorRect" parent="."]
+offset_left = 830.0
+offset_top = 199.0
+offset_right = 832.0
+offset_bottom = 209.0
+mouse_filter = 2
+color = Color(1.0, 0.651, 0.5294, 1.0)
+
+[node name="VaultMark" type="Label" parent="."]
+offset_left = 96.0
+offset_top = 170.0
+offset_right = 276.0
+offset_bottom = 193.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.9451, 0.6706, 0.5294, 1.0)
+text = "01   /   VAULT RAIL"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="DockMark" type="Label" parent="."]
+offset_left = 95.0
+offset_top = 330.0
+offset_right = 295.0
+offset_bottom = 354.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.4392, 0.7216, 0.7373, 1.0)
+text = "02   /   SAFE DECK"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="DockRule" type="ColorRect" parent="."]
+offset_left = 95.0
+offset_top = 353.0
+offset_right = 865.0
+offset_bottom = 354.0
+mouse_filter = 2
+color = Color(0.5294, 0.7843, 0.7882, 0.2902)
+
+[node name="Silver" type="Area2D" parent="."]
+position = Vector2(578, 398)
+script = ExtResource("Coin")
+
+[node name="Shape" type="CollisionShape2D" parent="Silver"]
+shape = SubResource("Chip")
+
+[node name="Gold" type="Area2D" parent="."]
+position = Vector2(713, 258)
+script = ExtResource("Coin")
+gold = true
+
+[node name="Shape" type="CollisionShape2D" parent="Gold"]
+shape = SubResource("Chip")
+
+[node name="Scanner" type="Node2D" parent="."]
+position = Vector2(480, 206)
+script = ExtResource("Scanner")
 
 [node name="Player" type="CharacterBody2D" parent="."]
-position = Vector2(480, 270)
+position = Vector2(465, 407)
+script = ExtResource("Player")
 motion_mode = 1
-script = ExtResource("1")
 
 [node name="Shape" type="CollisionShape2D" parent="Player"]
-shape = SubResource("player")
+shape = SubResource("Courier")
 
-[node name="Hud" type="Label" parent="."]
+[node name="Audio" type="Node" parent="."]
+
+[node name="Start" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Start")
+volume_db = -8
+
+[node name="Silver" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Silver")
+volume_db = -8
+
+[node name="Gold" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Gold")
+volume_db = -8
+
+[node name="Hit" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Hit")
+volume_db = -8
+
+[node name="Dash" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Dash")
+volume_db = -8
+
+[node name="Tick" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Tick")
+volume_db = -8
+
+[node name="Finish" type="AudioStreamPlayer" parent="Audio"]
+stream = ExtResource("Finish")
+volume_db = -8
+
+[node name="HUD" type="Control" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+
+[node name="BrandPlate" type="ColorRect" parent="HUD"]
 offset_left = 24.0
 offset_top = 16.0
-offset_right = 420.0
-offset_bottom = 60.0
-theme_override_font_sizes/font_size = 28
-text = "Coins: 0"
-script = ExtResource("3")
+offset_right = 255.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9333)
+
+[node name="BrandAccent" type="ColorRect" parent="HUD"]
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 29.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(1.0, 0.6588, 0.451, 1.0)
+
+[node name="Brand" type="Label" parent="HUD"]
+offset_left = 42.0
+offset_top = 15.0
+offset_right = 252.0
+offset_bottom = 58.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 31
+theme_override_colors/font_color = Color(0.9529, 0.9569, 0.902, 1.0)
+text = "COIN DASH"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Location" type="Label" parent="HUD"]
+offset_left = 44.0
+offset_top = 55.0
+offset_right = 234.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.651, 0.8863, 0.8471, 1.0)
+text = "PORT MERIDIAN   /   ROOFTOPS"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Board" type="ColorRect" parent="HUD"]
+offset_left = 535.0
+offset_top = 16.0
+offset_right = 936.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9569)
+
+[node name="ScoreName" type="Label" parent="HUD"]
+offset_left = 555.0
+offset_top = 21.0
+offset_right = 690.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.6627, 0.7725, 0.7961, 1.0)
+text = "SCORE"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Score" type="Label" parent="HUD"]
+offset_left = 555.0
+offset_top = 36.0
+offset_right = 690.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 31
+theme_override_colors/font_color = Color(1.0, 0.8745, 0.5804, 1.0)
+text = "00"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="RecordName" type="Label" parent="HUD"]
+offset_left = 658.0
+offset_top = 21.0
+offset_right = 793.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.6627, 0.7725, 0.7961, 1.0)
+text = "BEST"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Record" type="Label" parent="HUD"]
+offset_left = 658.0
+offset_top = 36.0
+offset_right = 793.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 31
+theme_override_colors/font_color = Color(0.9608, 0.9686, 0.9059, 1.0)
+text = "00"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="ClockName" type="Label" parent="HUD"]
+offset_left = 785.0
+offset_top = 21.0
+offset_right = 920.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.6627, 0.7725, 0.7961, 1.0)
+text = "TIME  /  SEC"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Clock" type="Label" parent="HUD"]
+offset_left = 785.0
+offset_top = 36.0
+offset_right = 920.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 31
+theme_override_colors/font_color = Color(0.9608, 0.9686, 0.9059, 1.0)
+text = "30"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Divider638" type="ColorRect" parent="HUD"]
+offset_left = 638.0
+offset_top = 28.0
+offset_right = 639.0
+offset_bottom = 68.0
+mouse_filter = 2
+color = Color(0.3961, 0.5451, 0.5725, 1.0)
+
+[node name="Divider761" type="ColorRect" parent="HUD"]
+offset_left = 761.0
+offset_top = 28.0
+offset_right = 762.0
+offset_bottom = 68.0
+mouse_filter = 2
+color = Color(0.3961, 0.5451, 0.5725, 1.0)
+
+[node name="TimeTrack" type="ColorRect" parent="HUD"]
+offset_left = 785.0
+offset_top = 74.0
+offset_right = 917.0
+offset_bottom = 77.0
+mouse_filter = 2
+color = Color(0.2118, 0.3294, 0.3765, 1.0)
+
+[node name="TimeBar" type="ColorRect" parent="HUD"]
+offset_left = 785.0
+offset_top = 74.0
+offset_right = 917.0
+offset_bottom = 77.0
+mouse_filter = 2
+color = Color(1.0, 0.6588, 0.451, 1.0)
+
+[node name="Popup" type="Label" parent="HUD"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 140.0
+offset_bottom = 30.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1.0, 1.0, 1.0, 1.0)
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_constants/outline_size = 5
+theme_override_colors/font_outline_color = Color(0.0824, 0.1294, 0.2157, 1.0)
+
+[node name="Burst" type="Button" parent="HUD"]
+offset_left = 785.0
+offset_top = 484.0
+offset_right = 936.0
+offset_bottom = 521.0
+visible = false
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 15
+text = "DASH  ›"
+theme_override_styles/normal = SubResource("ButtonFace")
+theme_override_styles/hover = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonDown")
+theme_override_colors/font_color = Color(0.051, 0.1647, 0.2118, 1.0)
+theme_override_colors/font_hover_color = Color(0.051, 0.1647, 0.2118, 1.0)
+theme_override_colors/font_pressed_color = Color(0.051, 0.1647, 0.2118, 1.0)
+
+[node name="KeyStrip" type="ColorRect" parent="HUD"]
+offset_left = 24.0
+offset_top = 484.0
+offset_right = 524.0
+offset_bottom = 521.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9333)
+
+[node name="Keys" type="Label" parent="HUD"]
+offset_left = 38.0
+offset_top = 484.0
+offset_right = 512.0
+offset_bottom = 521.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.7843, 0.8941, 0.8745, 1.0)
+text = "WASD / ARROWS   MOVE      ·      SPACE   DASH      ·      R   RESTART"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Menu" type="Control" parent="HUD"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+
+[node name="Shadow" type="ColorRect" parent="HUD/Menu"]
+offset_left = 106.0
+offset_top = 161.0
+offset_right = 596.0
+offset_bottom = 444.0
+mouse_filter = 2
+color = Color(0.0353, 0.0745, 0.1137, 0.6863)
+
+[node name="Sheet" type="ColorRect" parent="HUD/Menu"]
+offset_left = 100.0
+offset_top = 155.0
+offset_right = 590.0
+offset_bottom = 438.0
+mouse_filter = 2
+color = Color(0.0627, 0.1412, 0.2196, 0.9882)
+
+[node name="Binding" type="ColorRect" parent="HUD/Menu"]
+offset_left = 100.0
+offset_top = 155.0
+offset_right = 590.0
+offset_bottom = 159.0
+mouse_filter = 2
+color = Color(1.0, 0.6824, 0.451, 1.0)
+
+[node name="Eyebrow" type="Label" parent="HUD/Menu"]
+offset_left = 125.0
+offset_top = 175.0
+offset_right = 562.0
+offset_bottom = 199.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(1.0, 0.698, 0.4784, 1.0)
+text = "PORT MERIDIAN    /    NIGHT SHIFT"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Title" type="Label" parent="HUD/Menu"]
+offset_left = 121.0
+offset_top = 197.0
+offset_right = 572.0
+offset_bottom = 273.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 63
+theme_override_colors/font_color = Color(0.9686, 0.949, 0.8549, 1.0)
+text = "COIN DASH"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Summary" type="Label" parent="HUD/Menu"]
+offset_left = 126.0
+offset_top = 279.0
+offset_right = 566.0
+offset_bottom = 308.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Body")
+theme_override_font_sizes/font_size = 19
+theme_override_colors/font_color = Color(0.8392, 0.902, 0.8745, 1.0)
+text = "Thirty seconds. Dash through the laser for gold."
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Brief" type="Label" parent="HUD/Menu"]
+offset_left = 126.0
+offset_top = 309.0
+offset_right = 581.0
+offset_bottom = 334.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.5843, 0.7725, 0.7765, 1.0)
+text = "Silver +1     Gold +3     Laser −3 seconds"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="Action" type="Button" parent="HUD/Menu"]
+offset_left = 126.0
+offset_top = 354.0
+offset_right = 381.0
+offset_bottom = 406.0
+visible = true
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_fonts/font = SubResource("Bold")
+theme_override_font_sizes/font_size = 17
+text = "START RUN    [ SPACE ]"
+theme_override_styles/normal = SubResource("ButtonFace")
+theme_override_styles/hover = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonDown")
+theme_override_colors/font_color = Color(0.051, 0.1647, 0.2118, 1.0)
+theme_override_colors/font_hover_color = Color(0.051, 0.1647, 0.2118, 1.0)
+theme_override_colors/font_pressed_color = Color(0.051, 0.1647, 0.2118, 1.0)
+
+[node name="Credit" type="Label" parent="HUD/Menu"]
+offset_left = 396.0
+offset_top = 354.0
+offset_right = 577.0
+offset_bottom = 406.0
+mouse_filter = 2
+theme_override_fonts/font = SubResource("Body")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.5843, 0.7725, 0.7765, 1.0)
+text = "Built with ActionScript 3"
+vertical_alignment = 1

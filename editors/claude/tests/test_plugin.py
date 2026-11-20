@@ -46,6 +46,9 @@ class PluginTest(unittest.TestCase):
             tool = plugin / "bin/kumikae"
             game = root / "standalone game"
             subprocess.run([tool, "new", game], check=True, stdout=subprocess.PIPE)
+            scene = (game / "main.tscn").read_text()
+            for resource in re.findall(r'path="res://([^"]+)"', scene):
+                self.assertTrue((game / resource).is_file(), resource)
             self.assertTrue((game / "tests/CoinPickupTest.as").is_file())
             self.assertTrue((game / "tests/framework/app/anicanon/kumikae/testing/TestScene.as").is_file())
             second = root / "another" / game.name

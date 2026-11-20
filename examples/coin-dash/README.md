@@ -1,59 +1,37 @@
 # Coin Dash
 
-A small game written in ActionScript 3 for Godot 4.7. Move the disc with the arrow keys and collect the
-coin. The game has three scripts and no art: the scripts draw everything on screen.
+A 30-second rooftop score attack written in **ActionScript 3** for Godot 4.7. Run the lower deck for silver (+1), or cut across the drone’s patrol for gold (+3). A laser hit sends you back to the dock and costs three seconds. A well-timed dash takes you through the beam. The game saves your highest completed score on this device.
 
-| File | What it is |
-|---|---|
-| `Player.as` | A `CharacterBody2D` that reads the arrow keys, moves, and draws itself |
-| `Coin.as` | An `Area2D` that listens for the player touching it, counts, and moves somewhere else |
-| `Hud.as` | A `Label` that shows the count |
-| `main.tscn` | The scene: the three nodes and their collision shapes |
-| `kas3.gdextension` | Tells Godot where the AS3 extension is |
+![A courier collecting silver and gold on the rooftops of Port Meridian](../../docs/assets/coin-dash.gif)
 
-## Run it
+## Play
 
-You need Godot 4.7 as `godot` on your `PATH`, and a
-[godot-cpp](https://github.com/godotengine/godot-cpp) checkout for Godot 4.7.
+| Action | Keyboard | Controller | Touch or mouse |
+|---|---|---|---|
+| Start or play again | Space or Enter | Bottom face button | Press the menu button |
+| Steer | WASD or arrows | Left stick | Hold or drag on the deck |
+| Dash | Space | Bottom face button | Press **Dash** |
+| Restart immediately | R | Top face button | |
 
-1. From the repository's root, build the extension:
+Open this folder as a Godot project and press **Play** once the ActionScript 3 extension is built. From a source checkout, build it once using a [godot-cpp](https://github.com/godotengine/godot-cpp) checkout for Godot 4.7. Run these commands from the repository root, replacing the path on the first line.
 
-   ```sh
-   cmake -S compiler -B compiler/build-godot -DKAS3_GODOT_CPP=<path to godot-cpp>
-   cmake --build compiler/build-godot --target kas3_godot
-   ```
+```sh
+cmake -S compiler -B compiler/build-godot -DKAS3_GODOT_CPP=/path/to/godot-cpp
+cmake --build compiler/build-godot --target kas3_godot
+godot --headless --editor --quit-after 300 --path examples/coin-dash
+godot --path examples/coin-dash
+```
 
-   The `bin` folder here is a link to where that build puts the library.
+## Inside the game
 
-2. Let Godot's editor scan the project once, so that it registers the extension:
+[Rooftop.as](Rooftop.as) connects Godot’s pickup signals, moves the courier and sweeps the laser across the gold route. Its typed waypoint vectors define repeatable routes you can learn across runs. [Round.as](Round.as) owns the clock, dash recharge and scoring. [Ledger.as](Ledger.as) reads and writes the local record through Godot’s ConfigFile API.
 
-   ```sh
-   godot --headless --editor --quit-after 300 --path examples/coin-dash
-   ```
+[Player.as](Player.as), [Coin.as](Coin.as) and [Scanner.as](Scanner.as) draw the animated actors directly in ActionScript 3. To try hot reload, change the courier’s scarf shape in the player's `_draw` method and save during a run. The score and clock carry on as you edit. [How hot reload works](../../docs/hot-reload.md)
 
-3. Run the game:
+## Run the gameplay tests
 
-   ```sh
-   godot --path examples/coin-dash
-   ```
+```sh
+python3 testing/runner.py examples/coin-dash/kas3-tests.json --compiler compiler/build/kas3c --require-pass
+```
 
-## Change it while it runs
-
-Leave the game running, edit a script, and save. For example:
-
-- Change the speed, `320`, in `Player.as`.
-- Change a color or a size in a `_draw` method.
-- Change what `onTouched` does in `Coin.as`.
-
-The game takes the new code within half a second and keeps its state: the score, and where everything is.
-If your edit has an error, Godot prints it and the game carries on with the code it had.
-
-One thing doesn't change on a live object: a field's first value, such as `private var age:Number = 0`.
-Objects of a class that extends a Godot class keep the values they have. Change the code that uses the
-field, or restart the game. [Hot reload](../../docs/hot-reload.md) explains why.
-
-## Verify a pickup
-
-The `Gameplay::CoinPickupTest::pickupUpdatesHud` test places the player on the coin and waits for the
-HUD to display the new score. The [Claude Code plugin](../../editors/claude/README.md) packages this
-example as its standalone starter and can run this test on desktop and both mobile simulators.
+The ActionScript 3 tests cover the buzzer, restart, dash immunity, hit penalty and silver and gold pickups through Godot physics. The [Claude Code plugin](../../editors/claude/README.md) also packages this project as its standalone starter.
