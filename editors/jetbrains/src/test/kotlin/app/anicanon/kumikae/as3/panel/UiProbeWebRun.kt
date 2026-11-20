@@ -38,17 +38,17 @@ internal object UiProbeWebRun {
                 createComponent()
                 reset()
             }
-            val configurations = manager.allSettings.toSet()
+            val cancelled = "Cancelled $platform probe"
             app.invokeAndWait {
                 val dialog = openDialog()
                 try {
-                    dialog.createNewConfiguration(KumikaeRunType.factory(kind))
+                    dialog.createNewConfiguration(KumikaeRunType.factory(kind)).configuration.name = cancelled
                 } finally {
                     dialog.disposeUIResources()
                 }
             }
             check(setup.presets() == before) { "Cancelling Add $platform changed the export presets." }
-            check(manager.allSettings.toSet() == configurations) {
+            check(manager.allSettings.none { it.name == cancelled }) {
                 "Cancelling Add $platform changed the run configurations."
             }
             lateinit var name: String
