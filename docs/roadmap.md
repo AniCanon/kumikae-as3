@@ -72,7 +72,7 @@ state of the project changes.
   for desktop, Web, iOS and Android, a Devices panel, and a live test runner that opens failed assertions,
   comparison diffs, compiler diagnostics and Godot script errors at their source.
 - **Claude Code plugin** with AS3 language support, a playable starter, debug exports and gameplay tests on desktop, Web, iOS Simulator and Android emulator. [Setup](../editors/claude/README.md).
-- **VS Code client** for the language server.
+- **VS Code client** for the language server on VS Code 1.82 and newer.
 - **A testing library** written in AS3, with CLI and headless Godot engine runners (`TestScene`).
 
 ## Next
