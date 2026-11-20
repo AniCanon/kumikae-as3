@@ -46,8 +46,9 @@ Godot.
 
 If a change needs an include that crosses these lines, add an entry to the interface the lower layer owns.
 
-The build has one static library for each layer: `kas3front`, `kas3ir`, `kas3vm`, `kas3backend_cpp`,
-`kas3runtime` and `kas3lsp`. All are built without exceptions or RTTI. The extension, `kas3_godot`, is the
+The IR has two static libraries. `kas3ir_core` holds the program representation and binary format.
+`kas3ir` adds lowering and links the front end. Runtime-only builds link the core through `kas3vm`.
+The static libraries are built without exceptions or RTTI. The extension, `kas3_godot`, is the
 only shared library, and the only target built with RTTI, because godot-cpp needs it.
 
 ## Build and test

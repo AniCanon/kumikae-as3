@@ -380,17 +380,22 @@ Godot 4.7's Web export runs ActionScript 3 games in the browser via a WebAssembl
 
 - Build the slim runtime-only Web extension once with Emscripten (`emcmake` / `emcc`):
   `compiler/tests/build_web.sh <path to godot-cpp>`. This builds with `-Oz` + `wasm-opt -Oz` and writes
-  `bin/web/libkas3_godot.wasm` (~620 KiB raw / ~193 KiB Brotli), omitting the AS3 front end and Godot
+  `bin/web/libkas3_godot.wasm` (~628 KiB raw / ~194 KiB Brotli), omitting the AS3 front end and Godot
   declaration tables. Pass `--compiler` if you need in-browser compilation and `kas3_web_reload` hot reload
-  (`bin/web/libkas3_godot_compiler.wasm`).
+  and set `web.wasm32 = "res://bin/web/libkas3_godot_compiler.wasm"` in `kas3.gdextension`.
 - Configure a Godot **Web** export preset with **Extensions Support** enabled (`variant/extensions_support=true`)
   and **Thread Support** disabled (`variant/thread_support=false`). During Web export, the editor extension
-  compiles the project's scripts into `res://.kas3/program.kas3` inside the `.pck` automatically.
+  compiles the AS3 files selected by the preset into `res://.kas3/program.kas3` inside the `.pck` automatically.
 - Export with `godot --headless --path <project> --export-release "Web" <out>/index.html` and serve over HTTP.
   Because thread support is off, the export runs on standard static hosts without `SharedArrayBuffer` headers.
 - To also shrink Godot's own `index.side.wasm` export template (~42 MiB stock), build a trimmed template with
   `compiler/tools/build_web_template.sh --2d <godot checkout> <output.zip>` and set it as the preset's
-  custom Web template.
+  custom release template. This preset drops GDScript and several networking modules. The `--2d`
+  option also drops 3D rendering, physics and navigation.
+- To compare two clean release exports of the same game, run
+  `python3 compiler/tests/bench/web_bundle.py <new-export> --against <old-export> --brotli`.
+  It reports each file and the full directory in raw bytes, gzip at level 9 and Brotli at quality 11.
+  The compressed totals assume the host serves each file with that encoding.
 
 ## Limits
 
