@@ -38,6 +38,22 @@ class GameDistributionTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "disable threads"):
                 self.exporter.validate_web_preset(stage, "Browser")
 
+    def test_web_only_descriptor_loads_the_bundled_host_exporter(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            stage = root / "game"
+            stage.mkdir()
+            descriptor = stage / "kas3.gdextension"
+            descriptor.write_text('[libraries]\n')
+            kit = root / "kit"
+            (kit / "web").mkdir(parents=True)
+            (kit / "web/libkas3_godot.wasm").write_bytes(b"wasm")
+            (kit / "libkas3_godot.dylib").write_bytes(b"host")
+            self.exporter.stage_web_runtime(stage, kit)
+            self.assertIn('macos = "res://bin/libkas3_godot.dylib"', descriptor.read_text())
+            self.assertIn('web.wasm32 = "res://bin/web/libkas3_godot.wasm"', descriptor.read_text())
+            self.assertEqual(b"host", (stage / "bin/libkas3_godot.dylib").read_bytes())
+
     def test_web_export_stages_legacy_and_custom_runtimes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
