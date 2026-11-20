@@ -214,6 +214,7 @@ hits both.
 | Script | Measures |
 |---|---|
 | `bench/run_bench.py <build> [--against <other build>]` | The interpreter on the programs in `bench/` |
+| `bench/web_bundle.py <export> [--against <other export>] [--brotli]` | Raw and compressed bytes for each file and the complete Web export |
 | `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter |
 | `bench/languages/run.py` | The same workloads in Godot, in C#, GDScript and AS3. See [Performance](../../docs/performance.md#measure-it-yourself) |
 | `bench/recheck.py <build> --against <other build>` | A re-check after an edit, in generated projects of 100,000 and 1,000,000 lines |
@@ -229,6 +230,7 @@ The tests also hold the benchmarks to the number of times native code falls back
 
 | Script | What it does |
 |---|---|
+| `test_web_export.py [godot]` | Exports a Web pack and verifies that only selected scripts enter its compiled program |
 | `build_web.sh <path to godot-cpp>` | Builds the Web extension and runs the wasm32 pointer, vector storage and stack checks with the Emscripten SDK's Node.js |
 | `build_ios.sh <path to godot-cpp>` | Builds the extension for iOS, for a device and the Simulator, as an `.xcframework` beside the test project. It needs Xcode, and signs nothing |
 | `test_ios_native.py <booted test simulator UDID> <exported test .app>` | Installs and launches the test game, checks the execution mode in a fresh log and requires every scene check to pass. Use a disposable simulator. `--source-dir <project>` exercises Rider's hot reload setup and `--interpreted` checks an interpreter build |

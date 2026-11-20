@@ -19,6 +19,7 @@ For how the result looks to someone writing scripts, read
 | `generate.py` | The rules, one for each kind of thing Godot describes |
 | `naming.py` | Godot's names to AS3's: `get_node` to `getNode` |
 | `godot.as`, `godot_names.txt` | Generated. Never edit them by hand |
+| `runtime_names.py` | Extracts the names used for dynamic signal access and the signal emission method bind from the generated name table |
 | `embed.py` | Puts the two files inside `kas3c` |
 | `fixture_api.json`, `fixture.as`, `test_*.py` | A small API for the tests |
 | `NOTICE.md` | Godot's license, for the names |

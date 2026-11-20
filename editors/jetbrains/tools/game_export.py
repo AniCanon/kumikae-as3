@@ -132,14 +132,13 @@ def stage_web_runtime(stage, native):
     libraries = re.search(r"(?ms)^\[libraries\][ \t]*\n(.*?)(?=^\[|\Z)", text)
     if not libraries:
         raise ValueError("The AS3 extension descriptor needs a libraries section.")
-    paths = {value.removeprefix("res://") for tags, value in
-             re.findall(r'(?m)^[ \t]*([\w.-]+)[ \t]*=[ \t]*"([^"]+)"', libraries[1])
-             if "web" in tags.split(".")}
+    entries = re.findall(r'(?m)^[ \t]*([\w.-]+)[ \t]*=[ \t]*"([^"]+)"', libraries[1])
+    paths = {value.removeprefix("res://") for tags, value in entries if "web" in tags.split(".")}
+    additions = []
     standard = "bin/web/libkas3_godot.wasm"
     if not paths:
         paths.add(standard)
-        start = libraries.start(1)
-        descriptor.write_text(text[:start] + f'web.wasm32 = "res://{standard}"\n' + text[start:])
+        additions.append(f'web.wasm32 = "res://{standard}"')
     available = set()
     for relative in paths:
         destination = (stage / relative).resolve()
@@ -153,6 +152,18 @@ def stage_web_runtime(stage, native):
             available.add(destination.name)
     if not available:
         raise ValueError("Missing Web AS3 runtime at " + ", ".join(sorted(paths)) + ". Install the Kumikae Web kit.")
+    # Stage the host editor extension alongside the Web runtime so Godot runs AS3IOSExport and packs
+    # res://.kas3/program.kas3 for the slim runtime-only WebAssembly library.
+    for platform, name in (("macos", "libkas3_godot.dylib"), ("linux", "libkas3_godot.so"), ("windows", "kas3_godot.dll")):
+        host = native / name
+        if host.is_file():
+            (stage / "bin").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(host, stage / "bin" / name)
+            if not any(platform in tags.split(".") for tags, _ in entries):
+                additions.append(f'{platform} = "res://bin/{name}"')
+    if additions:
+        start = libraries.start(1)
+        descriptor.write_text(text[:start] + "\n".join(additions) + "\n" + text[start:])
     return available
 
 

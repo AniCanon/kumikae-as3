@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 
+import test_web_export
 import native_godot
 import play_godot
 
@@ -960,6 +961,8 @@ with tempfile.TemporaryDirectory() as edited:
     output = game(["-s", "game_runs.gd"])
     check("test folders: the folder the project names is left out",
           "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+
+test_web_export.check_export(godot)
 
 native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
 native.probe()

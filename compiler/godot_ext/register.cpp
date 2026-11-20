@@ -32,7 +32,7 @@ AS3Language *AS3Language::singleton = nullptr;
 static Ref<AS3ScriptLoader> loader;
 
 static void initialize(ModuleInitializationLevel p_level) {
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
 		GDREGISTER_INTERNAL_CLASS(AS3IOSExport);
 		GDREGISTER_INTERNAL_CLASS(AS3ExportEditor);
@@ -53,7 +53,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 }
 
 static void terminate(ModuleInitializationLevel p_level) {
-#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+#if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
 		EditorPlugins::remove_by_type<AS3ExportEditor>();
 	}

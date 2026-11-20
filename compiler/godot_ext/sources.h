@@ -11,6 +11,8 @@
 namespace kas3 {
 namespace ir { struct Module; }
 
+inline constexpr char PRECOMPILED_MODULE[] = "res://.kas3/program.kas3";
+
 // Lower a set of project scripts in the same order in a game and during export.
 bool compile_scripts(std::vector<std::string> files, const godot::String &root, ir::Module *r_module, std::string *r_errors,
 		const std::vector<std::string> &extra = {});

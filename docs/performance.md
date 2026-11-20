@@ -43,6 +43,29 @@ Two rules keep the comparison fair. Runs of the two languages alternate, so that
 both. And C# is measured only after .NET has finished optimizing the script: in its first few hundred frames
 C# runs two to three times as many instructions as it settles to.
 
+## Web export size
+
+Coin Dash uses the interpreter in Web exports. These are complete release exports of the same game
+with Godot 4.7.2 and Emscripten 7.0.0. Each compressed column sums the sizes of the individual
+files a static host could serve with that encoding. One MiB is 1,048,576 bytes.
+
+| Coin Dash release export | Raw MiB | gzip -9 MiB | Brotli -11 MiB |
+|---|---:|---:|---:|
+| Compiler included, stock engine (before the split, `13fd239b`) | 53.00 | 13.67 | 9.87 |
+| Precompiled scripts, stock engine | 48.60 | 12.82 | 9.31 |
+| Precompiled scripts, custom 2D engine | 34.98 | 10.23 | 7.68 |
+
+The stock engine's `index.side.wasm` accounts for 42.04 MiB raw. Moving compilation to export time
+reduces the AS3 extension from 5,297,837 to 643,002 bytes and adds 34,348 bytes to the game pack.
+The custom 2D template reduces the engine module to 29.90 MiB raw. See the
+[Web export instructions](godot.md#web-webassembly) for the features that template disables.
+
+Export the same game into two empty directories, then compare them with the bundle benchmark.
+
+```sh
+python3 compiler/tests/bench/web_bundle.py path/to/new-export --against path/to/base-export --brotli
+```
+
 ## Where the speed comes from
 
 ![The three kinds of call](diagrams/calls.svg)

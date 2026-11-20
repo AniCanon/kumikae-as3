@@ -46,8 +46,9 @@ Godot.
 
 If a change needs an include that crosses these lines, add an entry to the interface the lower layer owns.
 
-The build has one static library for each layer: `kas3front`, `kas3ir`, `kas3vm`, `kas3backend_cpp`,
-`kas3runtime` and `kas3lsp`. All are built without exceptions or RTTI. The extension, `kas3_godot`, is the
+The IR has two static libraries. `kas3ir_core` holds the program representation and binary format.
+`kas3ir` adds lowering and links the front end. Runtime-only builds link the core through `kas3vm`.
+The static libraries are built without exceptions or RTTI. The extension, `kas3_godot`, is the
 only shared library, and the only target built with RTTI, because godot-cpp needs it.
 
 ## Build and test
@@ -93,6 +94,7 @@ cmake --build compiler/build-san -j && ctest --test-dir compiler/build-san --out
 | `kas3c check <file>...` | Reads the files as one program and reports every error. |
 | `kas3c run <file>...` | Checks the program and runs it on the interpreter. |
 | `kas3c ir <file>...` | Prints the typed IR the interpreter runs. |
+| `kas3c pack [--godot] <file>... -o <file.kas3>` | Writes a precompiled binary IR module. With `--godot`, scripts under a Godot project retain their `res://` paths so scenes can attach them. |
 | `kas3c cpp <file>... -o <folder>` | Writes the program as C++ source. |
 | `kas3c lsp` | Serves an editor with the Language Server Protocol, over standard input and output. |
 
