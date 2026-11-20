@@ -36,6 +36,8 @@ namespace any {
 inline constexpr uint64_t NUMBER_OFFSET = uint64_t(1) << 48; // Added to a Number's bits: its top 16 bits are never 0.
 inline constexpr uint64_t INT_FLAG = uint64_t(1) << 47;
 inline constexpr uint64_t TAG_MASK = 7;
+// 64-bit addresses reserve another low bit to remember a heap tag in their top byte.
+inline constexpr size_t POINTER_ALIGNMENT = sizeof(uintptr_t) == 4 ? 8 : 16;
 inline constexpr uint64_t NULL_BITS = 1 << 3;
 inline constexpr uint64_t FALSE_BITS = 2 << 3;
 inline constexpr uint64_t TRUE_BITS = 3 << 3;

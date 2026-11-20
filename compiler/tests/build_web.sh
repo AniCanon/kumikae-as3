@@ -34,5 +34,6 @@ emcmake cmake -S "$here" -B "$build" \
 	-DKAS3_GODOT_CPP="$godot_cpp" \
 	-DKAS3_GODOT_OUTPUT="$out" \
 	-DKAS3_WEB_THREADS=OFF
-cmake --build "$build" --target kas3_godot -j"${KAS3_JOBS:-8}"
+cmake --build "$build" --target kas3_godot test_web_runtime -j"${KAS3_JOBS:-8}"
+ctest --test-dir "$build" --output-on-failure -R '^web_runtime$'
 echo "Built $out/libkas3_godot.wasm"

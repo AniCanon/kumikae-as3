@@ -14,11 +14,9 @@ namespace vm {
 
 namespace {
 
-// Android tags the top byte of every heap address on arm64 (0xB4: the hardware ignores it, free() checks
-// it). The encoding needs the top bits clear, so the tag is taken off, and bit 3 (free: every pointer held
-// is 16-aligned) says to put it back. One tag for the whole run, learned from the first address that has
-// one; memory tagging, which gives each allocation its own, can't be held this way and says so.
-constexpr uint64_t HEAP_TAGGED = uint64_t(1) << 3;
+// Android tags the top byte of an arm64 heap pointer. Save the tag once and use bit 3 to mark
+// pointers that need it restored. On wasm32 bit 3 belongs to the address and there is no top-byte tag.
+constexpr uint64_t HEAP_TAGGED = any::POINTER_ALIGNMENT == 16 ? uint64_t(1) << 3 : 0;
 uint64_t heap_tag = 0;
 
 [[noreturn]] void unholdable(const char *p_why) {

@@ -229,6 +229,7 @@ The tests also hold the benchmarks to the number of times native code falls back
 
 | Script | What it does |
 |---|---|
+| `build_web.sh <path to godot-cpp>` | Builds the Web extension and runs the wasm32 pointer, vector storage and stack checks with the Emscripten SDK's Node.js |
 | `build_ios.sh <path to godot-cpp>` | Builds the extension for iOS, for a device and the Simulator, as an `.xcframework` beside the test project. It needs Xcode, and signs nothing |
 | `test_ios_native.py <booted test simulator UDID> <exported test .app>` | Installs and launches the test game, checks the execution mode in a fresh log and requires every scene check to pass. Use a disposable simulator. `--source-dir <project>` exercises Rider's hot reload setup and `--interpreted` checks an interpreter build |
 | `test_ios_export_modes.py <godot>` | Exports the test game and checks device and Simulator objects, linker settings and legacy preset values. Requires the built extension, iOS runtime and installed export templates |

@@ -107,7 +107,8 @@ omit that bookkeeping.
 WebAssembly GDExtension side module (`bin/web/libkas3_godot.wasm`, registered under `web.wasm32` in
 `kas3.gdextension`). Export a project with Godot 4.7's **Web** preset with `variant/extensions_support=true`
 and `variant/thread_support=false`; scripts run on the interpreter in the browser without requiring
-`SharedArrayBuffer` headers. Native ahead-of-time WebAssembly program libraries are future work.
+`SharedArrayBuffer` headers. The release link removes unused code and retains the entry point Godot
+loads by name. Native ahead-of-time WebAssembly program libraries are future work.
 
 ## The program library
 

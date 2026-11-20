@@ -84,6 +84,8 @@ host that keeps nothing gets the request by name instead.
   the object or counts an object's slots.
 - **Create an object of a program's class with `Heap::object_slots()` slots,** never `slots_of()` alone.
   When hot reload remembers constructor arguments, each object has room for them after its own slots.
+- Untyped values use three low address bits for pointer kinds. On 64-bit targets one more bit records
+  a tag in the top byte. On wasm32 that fourth bit belongs to the address.
 - **A `Vector.<int>` or `Vector.<uint>` stores four bytes for each element.** Every other vector stores an
   eight-byte slot. Reach a vector's places through `place()`, `set_place()`, `move_places()` and
   `clear_places()` in `runtime.h`. Nothing else names the memory.
