@@ -124,6 +124,11 @@ package godot {
 		public final native function addChild(node:Node, forceReadableName:Boolean = false, internal_:int = 0):void;
 		[Godot(returns="Array[Node]")]
 		public final native function getChildren(includeInternal:Boolean = false):GodotArray;
+		/** AS3 example
+		 *
+		 *     var score:Label = getNode("HUD/Score") as Label;
+		 *     score.text = "100";
+		 */
 		public final native function getNode(path:String):Node;
 		public final native function isInsideTree():Boolean;
 		public final native function getIndex(includeInternal:Boolean = false):int;

@@ -68,7 +68,7 @@ class Fixture(unittest.TestCase):
         method["description"] = "Finds [param path] on an [Object]. See [enum Variant.Type], [method get_node] and [code]*/[/code]."
         text = generate.generate(api)
         self.assertIn("/** A scene object. */", text)
-        self.assertIn("/** Finds path on a GodotObject. See VariantType, getNode and * /. */", text)
+        self.assertIn("/** Finds path on a GodotObject. See VariantType, getNode and * /.\n", text)
 
     def test_docs_keep_literal_setting_keys(self):
         api = fixture()

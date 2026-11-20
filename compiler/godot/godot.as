@@ -4998,6 +4998,11 @@ package godot {
 		public final native function hasNode(path:String):Boolean;
 		/** Fetches a node. The String can either be a relative path (from this node), or an absolute path (from the SceneTree.root) to a node. If path does not point to a valid node, generates an error and returns null. Attempts to access methods on the return value will result in an "Attempt to call <method> on a null instance." error.
 		 *
+		 * AS3 example
+		 *
+		 *     var score:Label = getNode("HUD/Score") as Label;
+		 *     score.text = "100";
+		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_node.html#class-node-method-get-node
 		 */
 		public final native function getNode(path:String):Node;
@@ -5231,6 +5236,13 @@ package godot {
 		/** Returns the node's closest Viewport ancestor, if the node is inside the tree. Otherwise, returns null. */
 		public final native function getViewport():Viewport;
 		/** Queues this node to be deleted at the end of the current frame. When deleted, all of its children are deleted as well, and all references to the node and its children become invalid.
+		 *
+		 * AS3 example
+		 *
+		 *     var effect:Node = getNodeOrNull("HitEffect");
+		 *     if (effect != null) {
+		 *         effect.queueFree();
+		 *     }
 		 *
 		 * https://docs.godotengine.org/en/4.7/classes/class_node.html#class-node-method-queue-free
 		 */

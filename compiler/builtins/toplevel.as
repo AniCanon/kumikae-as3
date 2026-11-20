@@ -227,7 +227,13 @@ package {
 		public native function map(callback:Function, thisObject:* = null):Array;
 		/** Removes and returns the last element. */
 		public native function pop():*;
-		/** Appends the supplied values and returns the new length. */
+		/** Appends the supplied values and returns the new length.
+		 *
+		 * AS3 example
+		 *
+		 *     var colors:Array = ["red"];
+		 *     var count:uint = colors.push("blue", "green"); // 3
+		 */
 		public native function push(...args):uint;
 		/** Removes and returns the element at index, shifting later elements one place to the left. */
 		public native function removeAt(index:int):*;

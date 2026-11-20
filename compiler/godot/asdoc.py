@@ -4,12 +4,27 @@ import re
 import naming
 
 
+METHOD_EXAMPLES = {
+    ("Node", "get_node"): (
+        'var score:Label = getNode("HUD/Score") as Label;',
+        'score.text = "100";',
+    ),
+    ("Node", "queue_free"): (
+        'var effect:Node = getNodeOrNull("HitEffect");',
+        'if (effect != null) {',
+        '    effect.queueFree();',
+        '}',
+    ),
+}
+
+
 def block(paragraphs, indent=""):
     if len(paragraphs) == 1:
         return [indent + "/** " + paragraphs[0] + " */"]
     lines = [indent + "/** " + paragraphs[0]]
     for paragraph in paragraphs[1:]:
-        lines.extend([indent + " *", indent + " * " + paragraph])
+        lines.append(indent + " *")
+        lines.extend(indent + " * " + line for line in paragraph.splitlines())
     return lines + [indent + " */"]
 
 
@@ -105,9 +120,10 @@ class Documentation:
 
     def comment(self, entry, owner="", section="", indent=""):
         description = entry.get("brief_description") or entry.get("description", "")
-        if not description.strip():
-            return []
-        paragraphs = [self.summary(description, owner)]
+        paragraphs = [self.summary(description, owner)] if description.strip() else []
+        example = METHOD_EXAMPLES.get((owner, entry["name"])) if section == "method" else None
+        if example:
+            paragraphs.extend(["AS3 example", "\n".join("    " + line for line in example)])
         if owner and ("\n" in description.strip() or (entry.get("brief_description") and entry.get("description"))):
             paragraphs.append(self.url(owner, section, entry["name"]))
-        return block(paragraphs, indent)
+        return block(paragraphs, indent) if paragraphs else []

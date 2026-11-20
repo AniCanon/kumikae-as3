@@ -260,8 +260,8 @@ JSON raises, and the errors of the URI functions haven't been compared with a ru
 
 ## Documentation in the editor
 
-Select a completion to read what the name does. For example, `Array.push` appends values and returns
-the new length. Hover over a name already in your script to see its declaration and description.
+Select a completion to read what the name does. The entries for `Array.push`, `Node.getNode` and
+`Node.queueFree` also show short AS3 examples. Hover over a name already in your script to see its declaration and description.
 Signature help shows a function's description while you type its arguments. You can also browse the
 documented [top-level AS3 library](../compiler/builtins/toplevel.as) and
 [`flash.utils` declarations](../compiler/builtins/flash_utils.as).

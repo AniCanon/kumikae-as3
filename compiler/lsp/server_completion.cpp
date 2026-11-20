@@ -82,7 +82,13 @@ Json Server::completion_item(const Unit &p_unit, const Completion &p_found, cons
 		item.set("detail", p_found.detail);
 	}
 	if (!p_found.documentation.empty()) {
-		item.set("documentation", p_found.documentation);
+		const auto &docs = p_found.documentation;
+		// An indented ASDoc example needs Markdown to keep its line breaks in Rider.
+		if (markdown_completion_ && docs.find("\n\n    ") != std::string::npos) {
+			item.set("documentation", Json::object().set("kind", "markdown").set("value", docs));
+		} else {
+			item.set("documentation", docs);
+		}
 	}
 	char order[16];
 	std::snprintf(order, sizeof(order), "%08u", p_priority);

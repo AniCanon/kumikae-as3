@@ -32,7 +32,8 @@ For how the result looks to someone writing scripts, read
   References use the AS3 names for properties and constants. Settings keys keep their engine spelling
   so they can be passed to `getSetting`. Inline links retain their destinations. Entries with more text include
   the URL of the full versioned reference. A plain API dump still generates declarations, but provides
-  no engine descriptions.
+  no engine descriptions. The generator adds hand-written AS3 examples for `Node.getNode` and
+  `Node.queueFree`. The language-server tests compile the examples returned by completion.
 - **Names.** Methods, properties, signals and parameters are lowerCamel, with acronyms in capitals
   (`getAABB`). A name AS3 reserves gets a trailing underscore. Five class names that AS3 already uses get
   a `Godot` prefix, such as `GodotObject`. A getter and a setter become one property.

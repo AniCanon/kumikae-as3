@@ -68,6 +68,7 @@ whole list.
   typing a prefix asks again.
 
 Completion items and call signatures carry their declaration's documentation as plain text when present.
+When a completion client prefers Markdown, an indented ASDoc example renders as a code block.
 The front end finds the preceding ASDoc in the parsed source file, including for inherited members and
 the embedded declaration files. Keyword completions carry a short description of the language construct.
 
