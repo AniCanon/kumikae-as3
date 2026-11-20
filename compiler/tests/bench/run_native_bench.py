@@ -41,7 +41,14 @@ def native(build, program, folder):
     # A build folder is beside the sources it was built from (compiler/build): its own runtime's headers.
     tree = os.path.dirname(build) if os.path.exists(os.path.join(os.path.dirname(build), "runtime", "kas3.h")) else COMPILER
     includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(tree, each))]
-    libraries = [os.path.join(build, "lib%s.a" % each) for each in ("kas3standalone", "kas3runtime", "kas3vm", "kas3ir", "kas3front")]
+    manifest = os.path.join(build, "standalone-libraries.txt")
+    if os.path.isfile(manifest):
+        with open(manifest) as names:
+            libraries = [os.path.join(build, name.strip()) for name in names]
+    else:
+        # --against can point at a build made before CMake wrote the manifest.
+        ir = "kas3ir_core" if os.path.isfile(os.path.join(build, "libkas3ir_core.a")) else "kas3ir"
+        libraries = [os.path.join(build, "lib%s.a" % name) for name in ("kas3standalone", "kas3runtime", "kas3vm", ir, "kas3front")]
     executable = os.path.join(out, "program")
     built = subprocess.run(["c++", *FLAGS, *includes, *sorted(glob.glob(os.path.join(out, "*.cpp"))), *libraries, "-o", executable],
                            capture_output=True, text=True)

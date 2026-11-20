@@ -235,12 +235,23 @@ if(KAS3_SANITIZE)
     # And each program as one file of C++, as a release is built: the normal build has a file for each class.
     set(KAS3_NATIVE_FLAGS --unit --flag -fsanitize=address,undefined --flag -fno-omit-frame-pointer --flag -g)
 endif()
+# The native tests and the benchmark link standalone programs against the same runtime.
+set(KAS3_STANDALONE_LIBRARIES kas3standalone kas3runtime kas3vm kas3ir_core)
+set(KAS3_STANDALONE_LINK_ARGS "")
+set(KAS3_STANDALONE_PATHS "")
+foreach(library IN LISTS KAS3_STANDALONE_LIBRARIES)
+    list(APPEND KAS3_STANDALONE_LINK_ARGS --lib $<TARGET_FILE:${library}>)
+    string(APPEND KAS3_STANDALONE_PATHS "$<TARGET_FILE_NAME:${library}>\n")
+endforeach()
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/standalone-libraries.txt" CONTENT "${KAS3_STANDALONE_PATHS}")
 add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_native.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native
     --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
     --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
-    --lib $<TARGET_FILE:kas3standalone> --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir_core> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
+    ${KAS3_STANDALONE_LINK_ARGS})
+add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
