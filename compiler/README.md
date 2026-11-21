@@ -109,7 +109,7 @@ errors, 1 if errors were found, and 2 for bad usage or a file that can't be read
 | `--declarations <file>` | `check`, `lsp` | Loads a [declaration file](../docs/language.md#declaration-files). You can repeat it. |
 | `--dump-names` | `check` | Prints what every name refers to, one line each: `<line>:<col> <name> -> <kind> <qualified name> <where>`. |
 | `--dump-types` | `check` | Prints the type of each expression statement and initializer as `<line>:<col> <type>`. A type the compiler couldn't work out is `?`. |
-| `--godot` | `ir`, `cpp` | Treats the files as scripts for Godot: loads Godot's API and expects no class to start the program. |
+| `--godot` | `ir`, `pack`, `cpp` | Treats the files as scripts for Godot: loads Godot's API and expects no class to start the program. |
 | `--unit` | `cpp` | Writes the whole program into `program.cpp`. |
 | `--remember` | `cpp` | Makes each constructor tell the host what its object was built with, so that hot reload can update objects created as native code. For a game that is being edited. Without it, the C++ is the same to the byte. |
 | `--stdio` | `lsp` | Accepted and ignored. Some editors add it. |

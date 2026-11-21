@@ -54,8 +54,12 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 		p_first.remove_suffix(3);
 		p_second.remove_prefix(3);
 	}
-	std::memcpy(string->data(), p_first.data(), p_first.size());
-	std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
+	if (!p_first.empty()) {
+		std::memcpy(string->data(), p_first.data(), p_first.size());
+	}
+	if (!p_second.empty()) {
+		std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
+	}
 	string->data()[size] = 0;
 	strings_alive++;
 	return string;

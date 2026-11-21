@@ -64,7 +64,9 @@ public:
 
 	std::string_view copy(std::string_view p_text) {
 		char *memory = static_cast<char *>(allocate(p_text.size() ? p_text.size() : 1, 1));
-		std::memcpy(memory, p_text.data(), p_text.size());
+		if (!p_text.empty()) {
+			std::memcpy(memory, p_text.data(), p_text.size());
+		}
 		return std::string_view(memory, p_text.size());
 	}
 };

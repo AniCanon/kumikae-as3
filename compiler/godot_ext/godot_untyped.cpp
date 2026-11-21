@@ -75,7 +75,7 @@ std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
 			return vm::any::string(text);
 		}
 		case Variant::OBJECT:
-			if (((ObjectID)p_value).is_null()) {
+			if (((ObjectID)p_value).is_null() || !p_value.get_validated_object()) {
 				return vm::any::null();
 			}
 			return vm::any::godot_object(make_handle(p_value));

@@ -110,5 +110,5 @@ fresh check after random edits. See [tests/README.md](../tests/README.md#the-inc
 ## Tests
 
 `test_lexer`, `test_parser`, `test_ast`, `test_source`, `test_names`, `test_types`, `test_type_errors`,
-`test_godot_math`, `test_query`, `test_override_completion`, `test_statement_completion`, and the `golden`
+`test_godot_math`, `test_query`, `test_documentation`, `test_override_completion`, `test_statement_completion`, and the `golden`
 group.

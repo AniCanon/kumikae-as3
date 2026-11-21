@@ -243,11 +243,14 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 		return engine_thunk(c, function, host.program.thunks[p_thunk], p_given, r_updated);
 	}
 	Slot *const outer = host.updated;
+	const bool prev_caller_active = host.caller_active;
 	host.updated = r_updated;
+	host.caller_active = false;
 	host.nesting++;
 	Slot result = empty();
 	const bool done = host.interpreter->call_function(function, p_given, host.module.functions[function].parameters, &result);
 	host.nesting--;
+	host.caller_active = prev_caller_active;
 	host.updated = outer;
 	if (!done && !c->failing) {
 		// Not an error the thunk caught. With the interpreter's frames beneath (it counts entries its own

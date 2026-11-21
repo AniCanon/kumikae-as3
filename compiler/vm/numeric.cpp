@@ -75,7 +75,12 @@ std::optional<int64_t> string_to_wide_exact(std::string_view p_text) {
 	if (const std::optional<int64_t> exact = wide_digits(p_text, &past)) {
 		return exact;
 	}
-	return past ? std::nullopt : number_to_wide(string_to_number(p_text));
+	if (past) {
+		return std::nullopt;
+	}
+	const double number = string_to_number(p_text);
+	const std::optional<int64_t> whole = number_to_wide(number);
+	return whole && static_cast<double>(*whole) == number ? whole : std::nullopt;
 }
 
 double compare_wide(int64_t p_wide, double p_number) {

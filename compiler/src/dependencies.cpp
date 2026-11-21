@@ -19,7 +19,9 @@ uint64_t name_hash(std::string_view p_name) {
 		hash ^= hash >> 32;
 	}
 	uint64_t tail = 0;
-	std::memcpy(&tail, p_name.data() + at, p_name.size() - at);
+	if (at < p_name.size()) {
+		std::memcpy(&tail, p_name.data() + at, p_name.size() - at);
+	}
 	hash = (hash ^ tail) * 0xC4CEB9FE1A85EC53ull;
 	return hash ^ (hash >> 29);
 }

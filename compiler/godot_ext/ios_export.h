@@ -1,4 +1,4 @@
-// Godot and the IDE both use this plugin when exporting iOS or Android projects.
+// Godot and the IDE both use this plugin when exporting iOS, Android or Web projects.
 #pragma once
 
 #if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)

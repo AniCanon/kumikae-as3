@@ -14,6 +14,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <new>
 
 #if defined(__ANDROID__)
@@ -63,6 +64,18 @@ uint64_t lookups() {
 // How many of the objects found behind handles (object_behind) Godot has freed. It starts at one: a handle
 // nothing was found behind yet has seen none.
 std::atomic<uint64_t> gone{ 1 };
+
+// Active native context's freed-instance counter, guarded so worker threads freeing script instances never
+// touch Project::get() or dereference a destroyed NativeProgram.
+struct ActiveFreed {
+	std::mutex lock;
+	std::atomic<uint32_t> *counter = nullptr;
+};
+
+ActiveFreed &active_freed() {
+	static ActiveFreed *state = new ActiveFreed();
+	return *state;
+}
 
 // Godot tells whoever keeps a binding on an object when the object ends, as it tells C# and godot-cpp of
 // theirs: this one keeps nothing but the count. Under a token of its own, so that it is beside godot-cpp's
@@ -380,6 +393,11 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 	embedder.remember = p_remember;
 	made->host_ = std::make_unique<rt::Host>(*program, embedder);
 	made->resolve(*program);
+	{
+		ActiveFreed &state = active_freed();
+		const std::lock_guard<std::mutex> held(state.lock);
+		state.counter = &made->host_->context.freed;
+	}
 	return made;
 }
 
@@ -501,6 +519,13 @@ bool NativeProgram::resolve_value(const GodotHost::Worked &p_worked, rt::Resolve
 }
 
 NativeProgram::~NativeProgram() {
+	if (host_) {
+		ActiveFreed &state = active_freed();
+		const std::lock_guard<std::mutex> held(state.lock);
+		if (state.counter == &host_->context.freed) {
+			state.counter = nullptr;
+		}
+	}
 	// The host first: what it lets go of is freed by the library's own functions.
 	host_.reset();
 	for (void *handle : singletons_) {
@@ -508,6 +533,14 @@ NativeProgram::~NativeProgram() {
 	}
 	names_.clear();
 	library_.close();
+}
+
+void notify_instance_freed() {
+	ActiveFreed &state = active_freed();
+	const std::lock_guard<std::mutex> held(state.lock);
+	if (state.counter) {
+		state.counter->fetch_add(1, std::memory_order_relaxed);
+	}
 }
 
 } // namespace kas3

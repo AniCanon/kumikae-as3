@@ -53,8 +53,12 @@ struct Caller {
 	uint32_t klass = ir::NONE;
 };
 static Caller caller() {
-	vm::Interpreter &interpreter = Project::get().interpreter();
+	Project &project = Project::get();
 	Caller found;
+	if (project.native_caller(&found.object, &found.klass)) {
+		return found;
+	}
+	vm::Interpreter &interpreter = project.interpreter();
 	if (interpreter.depth() == 0) {
 		return found;
 	}

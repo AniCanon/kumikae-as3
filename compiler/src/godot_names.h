@@ -4,11 +4,9 @@
 // is found again without text.
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string_view>
-#include <vector>
 
 namespace kas3 {
 
@@ -26,15 +24,5 @@ GodotEntry godot_entry_at(uint32_t p_id);
 std::optional<uint32_t> godot_operator(std::string_view p_name);
 // The whole value of the entry of this key: a global function's signature, a default's text.
 std::optional<std::string_view> godot_value(std::string_view p_key);
-// The words of a value, split at its spaces: "position property Vector2 get_position 3341600327 ...".
-inline std::vector<std::string_view> godot_words(std::string_view p_value) {
-	std::vector<std::string_view> words;
-	for (size_t at = 0; at <= p_value.size();) {
-		const size_t space = std::min(p_value.find(' ', at), p_value.size());
-		words.push_back(p_value.substr(at, space - at));
-		at = space + 1;
-	}
-	return words;
-}
 
 } // namespace kas3

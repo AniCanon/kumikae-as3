@@ -51,14 +51,14 @@ bool is_identifier_like(TokenKind p_kind) {
 
 TokenKind keyword_kind(std::string_view p_text) {
 	// The reserved words are declared in alphabetical order, so a binary search over their spellings works.
-	int low = (int)TokenKind::KwAs;
-	int high = (int)TokenKind::KwWith;
+	int low = static_cast<int>(TokenKind::KwAs);
+	int high = static_cast<int>(TokenKind::KwWith);
 	while (low <= high) {
 		int middle = (low + high) / 2;
-		std::string_view word = token_kind_spelling((TokenKind)middle);
+		std::string_view word = token_kind_spelling(static_cast<TokenKind>(middle));
 		int order = word.compare(p_text);
 		if (order == 0) {
-			return (TokenKind)middle;
+			return static_cast<TokenKind>(middle);
 		}
 		if (order < 0) {
 			low = middle + 1;

@@ -20,8 +20,9 @@ class RefCounted;
 namespace kas3 {
 
 class Project {
-	// On the heap: the interpreter refers to it, and a reload puts another in its place.
-	std::unique_ptr<ir::Module> module_ = std::make_unique<ir::Module>();
+	// Shared pointer so worker threads inspecting metadata (e.g. threaded ResourceLoader or refuse_thread)
+	// hold a safe snapshot across reloads without touching Project::get() off the main thread.
+	std::shared_ptr<ir::Module> module_ = std::make_shared<ir::Module>();
 	GodotHost host_;
 	std::unique_ptr<vm::Interpreter> interpreter_;
 	// The scripts as native code, where the project has a program library built from them as they are
@@ -29,6 +30,7 @@ class Project {
 	std::unique_ptr<NativeProgram> native_;
 	bool loaded_ = false;
 	bool valid_ = false;
+	std::string load_error_;
 	static uint64_t loads_; // How many times the scripts have been loaded afresh (generation()).
 
 	Project() {}
@@ -37,6 +39,8 @@ public:
 	// The one program, compiled from every .as file under the project folder the first time it is asked
 	// for. Errors are printed to Godot's output; the program is then not valid.
 	static Project &get();
+	// Thread-safe snapshot of the currently loaded module, or null if no valid program is loaded.
+	static std::shared_ptr<const ir::Module> module_snapshot();
 	// Godot is closing (its main loop, whatever kind, has finished; other scripting languages are still
 	// there): what the program holds beyond the scene (in static fields, and through listeners) is let go
 	// now. Later, when this library is unloaded, a Godot object that a listener of another language is
@@ -61,10 +65,8 @@ public:
 		return native_ ? native_->call(p_function, p_arguments, p_count, r_result)
 					   : interpreter_->call_function(p_function, p_arguments, p_count, r_result);
 	}
-	void instance_freed() {
-		if (native_) {
-			native_->instance_freed();
-		}
+	bool native_caller(const vm::Object **r_object, uint32_t *r_class) const {
+		return native_ && native_->caller(r_object, r_class);
 	}
 	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return *module_; }
@@ -92,6 +94,7 @@ public:
 	static void collect_step();
 	// The class a script file declares: the one named after the file. NONE if there is none.
 	uint32_t class_of_file(std::string_view p_path) const;
+	static uint32_t class_of_file(const ir::Module &p_module, std::string_view p_path);
 };
 
 // For a reload: whether every script instance's object has a place in the new program, and the move.
@@ -150,8 +153,12 @@ void note_main_thread();
 bool on_main_thread();
 // Reports the refusal: the function Godot tried to call.
 void refuse_thread(uint32_t p_function);
-// The program is unloaded: the names members.h's reach() keeps go, while Godot is there to free them.
+// The program is unloaded: caches holding Godot strings/names/signals go while Godot is still there to free them.
 void forget_reached();
+void forget_restart();
+void forget_class_text();
+void forget_class_signals();
+void forget_folders();
 // What Godot frees on another thread (a script instance, when an object's last reference goes in a worker's
 // task) is freed on the main thread: once a frame, before the instances are looked through (a reload), and
 // as Godot shuts down or the program is unloaded.

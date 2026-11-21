@@ -1,16 +1,12 @@
 // The errors the editor is sent: what changed since it was last told, after a check.
 #include "server.h"
+#include "token.h"
 
 #include <set>
 
 namespace kas3 {
 
 namespace {
-
-bool is_name_byte(unsigned char p_c) {
-	return (p_c >= 'a' && p_c <= 'z') || (p_c >= 'A' && p_c <= 'Z') || (p_c >= '0' && p_c <= '9') || p_c == '_' ||
-			p_c == '$' || p_c >= 0x80;
-}
 
 // How much of the text an error at this offset is about: the name, number or string there, or else one
 // character. Nothing at the end of a line.
@@ -31,7 +27,7 @@ uint32_t extent(std::string_view p_text, uint32_t p_offset) {
 		}
 		return 1;
 	}
-	while (end < p_text.size() && is_name_byte((unsigned char)p_text[end])) {
+	while (end < p_text.size() && is_identifier_byte(p_text[end])) {
 		end++;
 	}
 	if (end > p_offset) {
@@ -39,7 +35,7 @@ uint32_t extent(std::string_view p_text, uint32_t p_offset) {
 	}
 	// One character, which may be several bytes.
 	end = p_offset + 1;
-	while (end < p_text.size() && ((unsigned char)p_text[end] & 0xC0) == 0x80) {
+	while (end < p_text.size() && (static_cast<unsigned char>(p_text[end]) & 0xC0) == 0x80) {
 		end++;
 	}
 	return end - p_offset;

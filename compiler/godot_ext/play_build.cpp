@@ -1,12 +1,18 @@
 #include "play_build.h"
 
-#if defined(__EMSCRIPTEN__) || defined(KAS3_RUNTIME_ONLY)
+#if defined(__EMSCRIPTEN__) || defined(KAS3_RUNTIME_ONLY) || defined(__ANDROID__) || defined(IOS_ENABLED)
 
 namespace kas3 {
 namespace play {
 
 std::string write_sources(const ir::Module &, const std::filesystem::path &, bool) {
+#if defined(__EMSCRIPTEN__)
 	return "native Play builds are not supported on the Web";
+#elif defined(KAS3_RUNTIME_ONLY)
+	return "native Play builds are not available in runtime-only builds";
+#else
+	return "native Play builds are not supported on mobile";
+#endif
 }
 
 bool builds() {

@@ -149,12 +149,21 @@ bool from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, S
 
 namespace {
 
-// An untyped value into an Int64: one held as an Int64 as it is, and a Number only if it is a whole one an
-// Int64 holds exactly.
+// An untyped value into an Int64: one held as an Int64 as it is, text parsed exactly when it holds one,
+// and a Number only if it is a whole one an Int64 holds exactly.
 bool wide_from_any(Library &p_library, Slot p_value, Slot *r_out) {
 	if (any::tag(p_value) == AnyTag::Wide) {
 		r_out->l = static_cast<Wide *>(any::pointer(p_value))->value;
 		return true;
+	}
+	if (any::tag(p_value) == AnyTag::String) {
+		const std::string_view text = static_cast<Str *>(any::pointer(p_value))->view();
+		if (const std::optional<int64_t> exact = string_to_wide_exact(text)) {
+			r_out->l = *exact;
+			return true;
+		}
+		p_library.runner.raise(p_library.module().range_error_class, "\"" + std::string(text) + "\" does not fit an Int64.");
+		return false;
 	}
 	const double number = any::to_number(p_value);
 	const std::optional<int64_t> whole = number_to_wide(number);
@@ -182,7 +191,7 @@ bool text_from_any(Library &p_library, Slot p_value, Slot *r_out) {
 		return false;
 	}
 	r_out->p = p_library.text(words);
-	return true;
+	return r_out->p != nullptr;
 }
 
 // An untyped value into an object of the class p_check (any object for NONE).

@@ -15,7 +15,7 @@ bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 		return false;
 	}
 	for (size_t i = 0; i < p_prefix.size(); i++) {
-		if (std::tolower((unsigned char)p_name[i]) != std::tolower((unsigned char)p_prefix[i])) {
+		if (std::tolower(static_cast<unsigned char>(p_name[i])) != std::tolower(static_cast<unsigned char>(p_prefix[i]))) {
 			return false;
 		}
 	}
@@ -199,7 +199,7 @@ class Completer {
 		while (keyword_end > 0 && std::isspace(static_cast<unsigned char>(source_[keyword_end - 1]))) {
 			--keyword_end;
 		}
-		if (word_before(keyword_end) != "import") {
+		if (word_before(keyword_end) != token_kind_spelling(TokenKind::KwImport)) {
 			return false;
 		}
 		offer_package(std::string(source_.substr(begin, start_ - begin)), false);
@@ -317,7 +317,7 @@ class Completer {
 			if (p_node->kind == NodeKind::Member) {
 				Member *member = static_cast<Member *>(p_node);
 				uint32_t gap = member->object ? member->object->end : p_dot + 1;
-				while (gap < p_dot && (std::isspace((unsigned char)source_[gap]) || queries_.text_byte(unit_, gap))) {
+				while (gap < p_dot && (std::isspace(static_cast<unsigned char>(source_[gap])) || queries_.text_byte(unit_, gap))) {
 					gap++;
 				}
 				if (gap == p_dot && member->name_offset > p_dot && (!found || member->name_offset < found->name_offset)) {
@@ -331,7 +331,7 @@ class Completer {
 	// The last thing written before the word being typed, skipping spaces: one character of it.
 	uint32_t before() const {
 		uint32_t at = start_;
-		while (at > 0 && std::isspace((unsigned char)source_[at - 1])) {
+		while (at > 0 && std::isspace(static_cast<unsigned char>(source_[at - 1]))) {
 			at--;
 		}
 		return at;
@@ -375,7 +375,9 @@ class Completer {
 			}
 		}
 		const std::string_view keyword = word_before(end);
-		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
+		return keyword == token_kind_spelling(TokenKind::KwNew) || keyword == token_kind_spelling(TokenKind::KwExtends) ||
+				keyword == token_kind_spelling(TokenKind::KwImplements) || keyword == token_kind_spelling(TokenKind::KwIs) ||
+				keyword == token_kind_spelling(TokenKind::KwAs);
 	}
 
 	// Inside a function's body: locals, members, definitions, keywords and statement templates.
@@ -395,7 +397,7 @@ class Completer {
 		// Typing a keyword can turn a recovery gap into a known statement start.
 		incomplete_ |= prefix_.empty();
 		const auto &self = completion_keywords::KW_THIS;
-		if (class_ && !is_static && starts_with_any_case(self.name, prefix_)) {
+		if (class_ && !is_static && starts_with_any_case(self.name, prefix_) && seen_.insert(self.name).second) {
 			Completion item;
 			item.name = self.name;
 			item.documentation = self.documentation;

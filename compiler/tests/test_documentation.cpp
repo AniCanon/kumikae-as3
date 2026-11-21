@@ -25,6 +25,14 @@ int main() {
 	const auto *property = inherited.find("value");
 	CHECK(property && property->documentation == "**Number of tiles.**\n\n    trace(value);");
 
+	// Split-file partial override: subclass overrides setter only, getter ASDoc lives in Base's unit.
+	const auto partial = complete(
+			"package { class Player extends Base { override public function set count(n:int):void {} function f():void { this.cou| } } }",
+			"package { public class Base { /** Base getter docs. */ public function get count():int { return 0; }"
+			" public function set count(n:int):void {} } }");
+	const auto *partial_prop = partial.find("count");
+	CHECK(partial_prop && partial_prop->documentation == "Base getter docs.");
+
 	for (const char *source : {
 		"package { | }", "package { class Player { | } }", "package { class Player { function run():void { | } } }",
 	}) {

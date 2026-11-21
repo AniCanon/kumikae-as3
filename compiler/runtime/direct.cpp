@@ -171,7 +171,8 @@ void text_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_co
 		}
 		return;
 	}
-	vm::Library library = host.library();
+	const Direct direct(c);
+	vm::Library library = direct.library();
 	Slot made = empty();
 	if (vm::text_call(library, which, p_values, p_count, &made)) {
 		hand_back(c, gives, made, r_out);

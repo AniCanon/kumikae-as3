@@ -31,13 +31,14 @@ bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, con
 	if (!p_signal || p_signal->get_type() != Variant::SIGNAL) {
 		return false;
 	}
-	const void *held = inside(*const_cast<Variant *>(p_signal), Variant::SIGNAL);
+	const Signal &signal = *static_cast<const Signal *>(inside(*const_cast<Variant *>(p_signal), Variant::SIGNAL));
+	const uint64_t object_id = static_cast<uint64_t>(signal.get_object_id());
+	const StringName signal_name = signal.get_name();
 	SignalSeen &seen = p_worked.seen;
-	if (!seen.any || std::memcmp(held, seen.bytes, sizeof(seen.bytes)) != 0) {
-		const Signal &signal = *static_cast<const Signal *>(held);
-		seen.name = signal.get_name();
-		seen.object = static_cast<uint64_t>(signal.get_object_id());
-		std::memcpy(seen.bytes, held, sizeof(seen.bytes));
+	if (!seen.any || seen.object != object_id || seen.signal_name != signal_name) {
+		seen.signal_name = signal_name;
+		seen.name = signal_name;
+		seen.object = object_id;
 		seen.any = true;
 	}
 	// By its id, each time: an object Godot has freed since is not there to emit anything.
@@ -55,7 +56,7 @@ bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, con
 	// What emit_signal gives (whether anything listens, as a number) is nothing a signal's emit() gives,
 	// and nothing to give back to Godot. Nothing of the handle is read from here on: a listener may have
 	// let go of it (a field the signal was lent from, given another).
-	return true;
+	return error.error == GDEXTENSION_CALL_OK;
 }
 
 } // namespace kas3

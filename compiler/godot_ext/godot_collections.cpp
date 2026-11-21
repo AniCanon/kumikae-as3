@@ -318,6 +318,8 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 		ok = values_of<PackedVector4Array, Vector4>(p_kind, p_vector, Variant::VECTOR4, Variant::VECTOR4, "Vector4s", &made, r_error);
 	} else if (p_type == "PackedColorArray") {
 		ok = values_of<PackedColorArray, Color>(p_kind, p_vector, Variant::COLOR, Variant::COLOR, "Colors", &made, r_error);
+	} else if (p_kind == ir::Kind::Obj || p_kind == ir::Kind::Any) {
+		ok = object_element(p_vector, &made, r_error);
 	} else {
 		// An Array, or a place that takes anything: each element as Godot holds a value of its kind.
 		Array array;
@@ -326,11 +328,7 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 		const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
 		for (uint32_t i = 0; i < p_vector->length && ok; i++) {
 			const vm::Slot held = slots ? slots[i] : vm::place(p_vector, i);
-			if (p_kind == ir::Kind::Obj) {
-				ok = object_element(static_cast<const vm::Object *>(held.p), &places[i], r_error);
-			} else {
-				place(&places[i], p_kind, held);
-			}
+			place(&places[i], p_kind, held);
 		}
 		made = array;
 	}

@@ -117,4 +117,13 @@ void restart_scene(const Restart &p_restart) {
 	callable_mp_static(&start_again).call_deferred();
 }
 
+void forget_restart() {
+	in_flight = false;
+	once_more = false;
+	SceneTree *tree = scene_tree();
+	if (tree && tree->is_connected("scene_changed", callable_mp_static(&scene_changed))) {
+		tree->disconnect("scene_changed", callable_mp_static(&scene_changed));
+	}
+}
+
 } // namespace kas3

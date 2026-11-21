@@ -64,12 +64,21 @@ static bool skipped(const String &p_folder, const String &p_name) {
 		return true;
 	}
 	const std::string place = p_folder.path_join(p_name).utf8().get_data();
-	return excluded_script(std::string_view(place).substr((size_t)scripts_root().utf8().length()));
+	const CharString root = scripts_root().utf8();
+	const std::string_view root_view(root.get_data(), static_cast<size_t>(root.length()));
+	const std::string_view relative = place.compare(0, root_view.size(), root_view) == 0 ? std::string_view(place).substr(root_view.size()) : std::string_view(place);
+	return excluded_script(relative);
 }
 
 // A script by its place in the project ("res://game/Player.as"), wherever it is read from.
 std::string project_path(std::string_view p_file, const String &p_root) {
-	return "res://" + std::string(p_file.substr((size_t)p_root.utf8().length()));
+	if (p_file.rfind("res://", 0) == 0) {
+		return std::string(p_file);
+	}
+	const CharString root = p_root.utf8();
+	const std::string_view root_view(root.get_data(), static_cast<size_t>(root.length()));
+	const std::string_view relative = p_file.compare(0, root_view.size(), root_view) == 0 ? p_file.substr(root_view.size()) : p_file;
+	return "res://" + std::string(relative);
 }
 
 // Every .as file under a folder, by where it is. Folders and files whose name starts with a dot are not
@@ -144,8 +153,8 @@ struct Folder {
 };
 
 std::unordered_map<std::string, Folder> &folders() {
-	static std::unordered_map<std::string, Folder> all;
-	return all;
+	static auto *all = new std::unordered_map<std::string, Folder>();
+	return *all;
 }
 
 // A scene or a resource saved as text, which Godot reads as it is: no importing.
@@ -206,8 +215,8 @@ std::unordered_map<std::string, Seen> &seen() {
 
 // The scenes and resources read from the folder elsewhere, each in its place in the project.
 std::unordered_map<std::string, Ref<Resource>> &taken() {
-	static std::unordered_map<std::string, Ref<Resource>> all;
-	return all;
+	static auto *all = new std::unordered_map<std::string, Ref<Resource>>();
+	return *all;
 }
 
 } // namespace
@@ -282,6 +291,10 @@ std::vector<std::string> refresh_scenes() {
 
 void forget_scenes() {
 	taken().clear();
+}
+
+void forget_folders() {
+	folders().clear();
 }
 
 } // namespace kas3

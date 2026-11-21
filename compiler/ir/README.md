@@ -69,5 +69,5 @@ Its lowering goes in the `lower_*.cpp` that owns that kind of code.
 
 ## Tests
 
-`test_ir`, `test_constructors`, `test_vm`, and the `programs` group, which runs every program in
+`test_ir`, `test_ir_binary`, `test_constructors`, `test_vm`, and the `programs` group, which runs every program in
 `tests/run/`.

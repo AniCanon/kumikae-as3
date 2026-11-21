@@ -66,6 +66,9 @@ static void terminate(ModuleInitializationLevel p_level) {
 	kas3::play::finish(); // Its thread, if the shutdown before this did not come.
 	kas3::Project::unload();
 	kas3::forget_defaults();
+	kas3::forget_class_text();
+	kas3::forget_class_signals();
+	kas3::forget_folders();
 	Engine::get_singleton()->unregister_script_language(AS3Language::singleton);
 	memdelete(AS3Language::singleton);
 	AS3Language::singleton = nullptr;

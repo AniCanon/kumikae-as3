@@ -52,7 +52,7 @@ static void test_strings() {
 static void test_malformed() {
 	Json value;
 	const char *cases[] = { "", " ", "{", "[1,", "[1,]", "{\"a\":1,}", "{\"a\"}", "{a:1}", "nul", "tru", "01", "1.", "-", "\"abc",
-		"\"\\x\"", "\"\\u12\"", "[1] 2", "{\"a\":1}}", "'a'", "+1", "1e", "[1 2]", "\"a\nb\"" };
+		"\"\\x\"", "\"\\u12\"", "[1] 2", "{\"a\":1}}", "'a'", "+1", "1e", "[1 2]", "\"a\nb\"", "\"a\tb\"", "\"a\x01" "b\"", "\"a\x1f" "b\"" };
 	for (const char *text : cases) {
 		check::checks()++;
 		if (parse_json(text, &value)) {

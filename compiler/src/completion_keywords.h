@@ -15,17 +15,17 @@ struct Keyword {
 			Keyword(token_kind_spelling(p_kind), p_documentation) {}
 };
 
-constexpr Keyword KW_VAR{ TokenKind::KwVar, "Declares a variable with an optional type and initial value." };
-constexpr Keyword KW_CONST{ TokenKind::KwConst, "Declares a value that can be assigned only once." };
-constexpr Keyword KW_FUNCTION{ TokenKind::KwFunction, "Declares a function or introduces a function expression." };
-constexpr Keyword KW_PUBLIC{ TokenKind::KwPublic, "Makes a declaration accessible wherever its containing type or package is visible." };
-constexpr Keyword KW_INTERNAL{ TokenKind::KwInternal, "Restricts access to the declaring package." };
-constexpr Keyword KW_FINAL{ "final", "Prevents subclassing a class or overriding a member." };
-constexpr Keyword KW_IMPORT{ TokenKind::KwImport, "Makes a definition or a package's public definitions available by short name." };
+inline constexpr Keyword KW_VAR{ TokenKind::KwVar, "Declares a variable with an optional type and initial value." };
+inline constexpr Keyword KW_CONST{ TokenKind::KwConst, "Declares a value that can be assigned only once." };
+inline constexpr Keyword KW_FUNCTION{ TokenKind::KwFunction, "Declares a function or introduces a function expression." };
+inline constexpr Keyword KW_PUBLIC{ TokenKind::KwPublic, "Makes a declaration accessible wherever its containing type or package is visible." };
+inline constexpr Keyword KW_INTERNAL{ TokenKind::KwInternal, "Restricts access to the declaring package." };
+inline constexpr Keyword KW_FINAL{ "final", "Prevents subclassing a class or overriding a member." };
+inline constexpr Keyword KW_IMPORT{ TokenKind::KwImport, "Makes a definition or a package's public definitions available by short name." };
 
-constexpr Keyword KW_THIS{ TokenKind::KwThis, "The current instance of the class." };
+inline constexpr Keyword KW_THIS{ TokenKind::KwThis, "The current instance of the class." };
 
-constexpr Keyword IN_FUNCTION[] = {
+inline constexpr Keyword IN_FUNCTION[] = {
 	KW_VAR,
 	KW_CONST,
 	{ TokenKind::KwIf, "Runs a statement or block when its condition is true." },
@@ -59,7 +59,7 @@ constexpr Keyword IN_FUNCTION[] = {
 	{ TokenKind::KwVoid, "Declares a function with no return value. In an expression, void evaluates its operand and yields undefined." },
 };
 
-constexpr Keyword IN_CLASS[] = {
+inline constexpr Keyword IN_CLASS[] = {
 	KW_PUBLIC,
 	{ TokenKind::KwPrivate, "Restricts access to the declaring class." },
 	{ TokenKind::KwProtected, "Allows access from the declaring class and its subclasses." },
@@ -76,7 +76,7 @@ constexpr Keyword IN_CLASS[] = {
 	{ "set", "Declares the accessor that runs when a property is assigned." },
 };
 
-constexpr Keyword IN_FILE[] = {
+inline constexpr Keyword IN_FILE[] = {
 	{ TokenKind::KwPackage, "Groups definitions under a shared package name." },
 	KW_IMPORT,
 	KW_PUBLIC,

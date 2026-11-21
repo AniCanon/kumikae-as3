@@ -195,6 +195,12 @@ enum class Op : uint8_t {
 #undef X
 };
 
+inline constexpr uint8_t OP_COUNT = 0
+#define X(name, shape) + 1
+	KAS3_IR_OPS(X)
+#undef X
+;
+
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.
 

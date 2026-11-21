@@ -14,19 +14,19 @@ const int MAX_DEPTH = 200;
 
 void append_utf8(std::string &r_out, uint32_t p_code) {
 	if (p_code < 0x80) {
-		r_out += (char)p_code;
+		r_out += static_cast<char>(p_code);
 	} else if (p_code < 0x800) {
-		r_out += (char)(0xC0 | (p_code >> 6));
-		r_out += (char)(0x80 | (p_code & 0x3F));
+		r_out += static_cast<char>(0xC0 | (p_code >> 6));
+		r_out += static_cast<char>(0x80 | (p_code & 0x3F));
 	} else if (p_code < 0x10000) {
-		r_out += (char)(0xE0 | (p_code >> 12));
-		r_out += (char)(0x80 | ((p_code >> 6) & 0x3F));
-		r_out += (char)(0x80 | (p_code & 0x3F));
+		r_out += static_cast<char>(0xE0 | (p_code >> 12));
+		r_out += static_cast<char>(0x80 | ((p_code >> 6) & 0x3F));
+		r_out += static_cast<char>(0x80 | (p_code & 0x3F));
 	} else {
-		r_out += (char)(0xF0 | (p_code >> 18));
-		r_out += (char)(0x80 | ((p_code >> 12) & 0x3F));
-		r_out += (char)(0x80 | ((p_code >> 6) & 0x3F));
-		r_out += (char)(0x80 | (p_code & 0x3F));
+		r_out += static_cast<char>(0xF0 | (p_code >> 18));
+		r_out += static_cast<char>(0x80 | ((p_code >> 12) & 0x3F));
+		r_out += static_cast<char>(0x80 | ((p_code >> 6) & 0x3F));
+		r_out += static_cast<char>(0x80 | (p_code & 0x3F));
 	}
 }
 
@@ -74,7 +74,7 @@ class Reader {
 			if (c == '"') {
 				return true;
 			}
-			if (c == '\n' || c == '\r') {
+			if (static_cast<unsigned char>(c) < 0x20) {
 				return false;
 			}
 			if (c != '\\') {

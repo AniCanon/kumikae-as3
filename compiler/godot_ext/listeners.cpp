@@ -34,10 +34,15 @@ struct TextHash {
 
 // The signals of a class, its own and those it inherits: found once for each class. A signal added to
 // one object alone (add_user_signal) is not among them, and a listener in one is not found here: it then
-// counts as held from outside, which keeps it, and what it holds.
+// counts as held from outside, which keeps it, and what it holds. Heap-allocated and cleared before
+// extension shutdown so Godot String/StringName keys never outlive GDExtension.
+std::unordered_map<String, std::vector<StringName>, TextHash> &known_class_signals() {
+	static auto *known = new std::unordered_map<String, std::vector<StringName>, TextHash>();
+	return *known;
+}
+
 const std::vector<StringName> &class_signals(const String &p_class) {
-	static std::unordered_map<String, std::vector<StringName>, TextHash> known;
-	auto [at, made] = known.try_emplace(p_class);
+	auto [at, made] = known_class_signals().try_emplace(p_class);
 	if (made) {
 		TypedArray<Dictionary> signals = ClassDBSingleton::get_singleton()->class_get_signal_list(p_class);
 		for (int64_t i = 0; i < signals.size(); i++) {
@@ -48,6 +53,10 @@ const std::vector<StringName> &class_signals(const String &p_class) {
 }
 
 } // namespace
+
+void forget_class_signals() {
+	known_class_signals().clear();
+}
 
 // Read from the object's own connections, so that a copy of a listener GDScript connected is found too.
 void listeners_of(Object *p_object, std::vector<uint64_t> *r_nodes) {
