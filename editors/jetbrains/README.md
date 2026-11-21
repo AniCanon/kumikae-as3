@@ -89,7 +89,7 @@ The wizard creates a small game that runs: a
   project's name.
 - **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and a
   run configuration for simulators and physical devices. Choosing Android or Web adds its export preset and run configuration.
-  Companion plugins can contribute additional targets.
+  Companion plugins can contribute additional targets. After setup, select the target under **Build & Release → Build target** to open its settings.
 
 ## Run the game
 
@@ -124,7 +124,7 @@ Use **Export Game** to create a release build for hosting.
 
 ## Run on iOS or Android
 
-Open **Run > Add Game Target…** and choose a Godot export preset. In **Devices > Simulators**, start
+Open **Run > Add Game Target…** and choose a Godot export preset. In **Devices > Devices**, start
 an iOS simulator or Android emulator, select it in the run toolbar, and press **Run**. The plugin reads the
 application identifier from the preset, exports and builds the game, installs it, and launches it.
 
@@ -193,9 +193,10 @@ Open **View > Tool Windows > Devices** to start and view simulators and Android 
 
 ![Devices panel showing iOS simulators and Android emulators](docs/images/devices.png)
 
-- **Simulators** groups devices by platform, with running devices first. Choose **Open** to view a running
+- **Devices** groups devices by platform, with running devices first. Choose **Open** to view a running
   device or **Start** to boot one. On macOS the list also includes iOS simulators. The gear beside
   **Android emulators** selects **Device default**, **Host GPU** or **Software** for the next start.
+- Installed plugins can add hardware to the device list. Choose **Refresh** after connecting or disconnecting a device. Choose **Select** to use a connected device for Run.
 - **iOS** shows the selected simulator's screen, input controls and console.
 - **Android** shows the selected emulator's screen and forwards pointer input.
 

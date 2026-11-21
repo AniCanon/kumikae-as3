@@ -28,6 +28,7 @@ internal fun ProjectSettingsView(
     modifier: SwingModifier = SwingModifier,
     initialPage: String = "General",
     addTarget: (() -> Unit)? = null,
+    targetSettings: Map<String, () -> Unit> = emptyMap(),
     export: ((ProjectSettings, List<ExportPreset>) -> Unit)? = null,
     release: ((ProjectSettings, ExportPreset) -> Unit)? = null,
     configureKey: ((ExportPreset) -> Unit)? = null,
@@ -57,42 +58,43 @@ internal fun ProjectSettingsView(
                     "Properties" -> GodotProperties(draft, controller)
 
                     "Export" -> {
-                        ExportSettings(
-                            draft,
-                            controller,
-                            choose,
-                            addTarget,
-                            release,
-                            configureKey,
-                            hasKey,
-                            openStore,
-                            distribute,
-                            deliveryStatus,
-                        )
-                        if (export != null && draft.presets.isNotEmpty()) {
-                            SettingsActions {
-                                draft.presets.find { it.section == draft.preset }?.let { selected ->
-                                    Button(
-                                        "Export ${selected.name}…",
-                                        {
-                                            val presets = listOf(selected)
-                                            if (controller.readyToExport(presets)) export(draft, presets)
-                                        },
-                                        SwingModifier.enabled(!controller.dirty),
-                                    )
-                                }
-                                if (draft.presets.size >
-                                    1
-                                ) {
-                                    Button(
-                                        "Export All…",
-                                        {
-                                            if (controller.readyToExport(draft.presets)) {
-                                                export(draft, draft.presets)
-                                            }
-                                        },
-                                        SwingModifier.enabled(!controller.dirty),
-                                    )
+                        BuildTargetPicker(draft, controller, addTarget, targetSettings) {
+                            ExportSettings(
+                                draft,
+                                controller,
+                                choose,
+                                release,
+                                configureKey,
+                                hasKey,
+                                openStore,
+                                distribute,
+                                deliveryStatus,
+                            )
+                            if (export != null && draft.presets.isNotEmpty()) {
+                                SettingsActions {
+                                    draft.presets.find { it.section == draft.preset }?.let { selected ->
+                                        Button(
+                                            "Export ${selected.name}…",
+                                            {
+                                                val presets = listOf(selected)
+                                                if (controller.readyToExport(presets)) export(draft, presets)
+                                            },
+                                            SwingModifier.enabled(!controller.dirty),
+                                        )
+                                    }
+                                    if (draft.presets.size >
+                                        1
+                                    ) {
+                                        Button(
+                                            "Export All…",
+                                            {
+                                                if (controller.readyToExport(draft.presets)) {
+                                                    export(draft, draft.presets)
+                                                }
+                                            },
+                                            SwingModifier.enabled(!controller.dirty),
+                                        )
+                                    }
                                 }
                             }
                         }

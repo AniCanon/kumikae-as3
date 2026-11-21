@@ -1,10 +1,16 @@
 package app.anicanon.kumikae.as3.settings
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.panel.BackgroundWorker
+import app.anicanon.kumikae.as3.project.GameTargetContribution
 import app.anicanon.kumikae.as3.project.showAddGameTarget
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.service
@@ -21,6 +27,9 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VFileProperty
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.beans.PropertyChangeListener
 import java.io.IOException
@@ -89,6 +98,40 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
         if (!accepted) Messages.showInfoMessage(project, "Checking this project’s signing settings.", "Android Signing")
     }
 
+    private var configuredTargets by mutableStateOf(emptyList<GameTargetContribution>())
+
+    private var selected = false
+
+    init {
+        val root = gameFile.parent.path + "/"
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    if (selected && GameTargetContribution.EP.hasAnyExtensions() &&
+                        events.any { it.path.startsWith(root) }
+                    ) {
+                        refreshTargets()
+                    }
+                }
+            },
+        )
+        GameTargetContribution.EP.addChangeListener(Runnable { refreshTargets() }, this)
+    }
+
+    private fun refreshTargets() {
+        ReadAction.nonBlocking<List<GameTargetContribution>> {
+            if (!gameFile.isValid) return@nonBlocking emptyList()
+            buildList {
+                GameTargetContribution.EP.forEachExtensionSafe { target ->
+                    if (target.hasSettings(gameFile)) add(target)
+                }
+            }
+        }.expireWith(this).coalesceBy(this, "configured-targets")
+            .finishOnUiThread(ModalityState.any()) { configuredTargets = it }
+            .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
     private val panel = composePanel(this) {
         ProjectSettingsView(
             controller,
@@ -117,13 +160,25 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
                     },
                 )
             },
+            targetSettings = remember(configuredTargets) {
+                configuredTargets.associate { target -> target.label to { target.openSettings(project, gameFile) } }
+            },
             addTarget = {
-                showAddGameTarget(project, gameFile.parent) { controller.reload() }
+                showAddGameTarget(project, gameFile.parent) {
+                    if (!controller.dirty) controller.reload()
+                    refreshTargets()
+                }
             },
         )
     }
 
+    override fun deselectNotify() {
+        selected = false
+    }
+
     override fun selectNotify() {
+        selected = true
+        refreshTargets()
         if (!controller.dirty) controller.reload()
         val parent = file.parent ?: return
         ReadAction.nonBlocking<Map<String, String>> {

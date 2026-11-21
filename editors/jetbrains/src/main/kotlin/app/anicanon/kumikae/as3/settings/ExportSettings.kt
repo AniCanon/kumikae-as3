@@ -11,8 +11,6 @@ import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import com.intellij.ui.components.ActionLink
 import com.intellij.util.ui.JBUI
-import org.jetbrains.compose.swing.components.ComboBox
-import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
 import org.jetbrains.compose.swing.components.layout.Panel
 import org.jetbrains.compose.swing.components.layout.PanelLayout
@@ -25,7 +23,6 @@ internal fun ExportSettings(
     value: ProjectSettings,
     controller: SettingsController,
     choose: (GameResourceKind, (String) -> Unit) -> Unit,
-    addTarget: (() -> Unit)?,
     release: ((ProjectSettings, ExportPreset) -> Unit)?,
     configureKey: ((ExportPreset) -> Unit)?,
     hasKey: (ExportPreset) -> Boolean,
@@ -33,21 +30,6 @@ internal fun ExportSettings(
     distribute: ((ProjectSettings, ExportPreset) -> Unit)?,
     deliveryStatus: (ExportPreset) -> String,
 ) {
-    SettingsSection("Build target") {
-        Panel(PanelLayout.Border(8, 0)) {
-            if (value.presets.isEmpty()) {
-                StatusLine("Add a target to configure its build and signing settings.", SwingModifier.center())
-            } else {
-                val selected = value.presets.firstOrNull { it.section == value.preset }
-                ComboBox(value.presets, selected, modifier = SwingModifier.center(), onSelectionChange = { preset ->
-                    if (preset != null) controller.edit { it.select(preset.section) }
-                }) { Label(if (it.name == it.platform) it.name else it.toString()) }
-            }
-            if (addTarget != null) {
-                Button("Add target…", addTarget, SwingModifier.east().enabled(!controller.dirty))
-            }
-        }
-    }
     val preset = value.presets.firstOrNull { it.section == value.preset } ?: return
     if (preset.identifierKey == null) return
     val ios = preset.platform == "iOS"

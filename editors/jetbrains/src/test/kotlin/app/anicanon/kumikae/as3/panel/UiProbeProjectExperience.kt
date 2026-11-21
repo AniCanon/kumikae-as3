@@ -93,6 +93,8 @@ internal object UiProbeProjectExperience {
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
         var chosenResource = ""
+        val configuredTarget = mutableStateOf(false)
+        var targetSettingsOpened = false
         var distributed = ""
         var released = ""
         var portal = ""
@@ -115,6 +117,11 @@ internal object UiProbeProjectExperience {
                         distribute = { _, preset -> distributed = preset.platform },
                         release = { _, preset -> released = preset.platform },
                         addTarget = {},
+                        targetSettings = if (configuredTarget.value) {
+                            mapOf("Example platform" to { targetSettingsOpened = true })
+                        } else {
+                            emptyMap()
+                        },
                         export = { _, _ -> },
                         openStore = { portal = it },
                         configureKey = { keyPreset = it.name },
@@ -145,6 +152,58 @@ internal object UiProbeProjectExperience {
             click(panel, "Reload")
             tab(panel, "Export")
             fun combos() = descendants(panel).filterIsInstance<JComboBox<*>>()
+            await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
+            fun targetPicker() = combos().single { it.selectedItem is ExportPreset }
+            edt {
+                check(
+                    (0 until targetPicker().itemCount).none {
+                        targetPicker().getItemAt(it).toString() ==
+                            "Example platform"
+                    },
+                )
+                configuredTarget.value = true
+            }
+            await {
+                (0 until targetPicker().itemCount).any {
+                    targetPicker().getItemAt(it).toString() ==
+                        "Example platform"
+                }
+            }
+            edt {
+                check(descendants(panel).filterIsInstance<JButton>().none { it.text == "Example platform settings…" }) {
+                    "Companion settings appeared while iOS was selected"
+                }
+                val picker = combos().single { it.selectedItem is ExportPreset }
+                picker.selectedIndex = picker.itemCount - 1
+            }
+            click(panel, "Example platform settings…")
+            check(targetSettingsOpened)
+            for (width in listOf(420, 960)) {
+                edt {
+                    panel.setSize(width, 720)
+                    repeat(3) { layout(panel) }
+                }
+                await { combos().any { it.selectedItem is SettingsPage } == (width == 420) && fitsViewport(panel) }
+                render(panel, destination.resolve("$theme-companion-target-$width.png"), width)
+                edt {
+                    val picker = combos().single { it.selectedItem.toString() == "Example platform" }
+                    val button = descendants(panel).filterIsInstance<JButton>().single {
+                        it.text ==
+                            "Example platform settings…"
+                    }
+                    val selector = SwingUtilities.convertRectangle(picker.parent, picker.bounds, panel)
+                    val action = SwingUtilities.convertRectangle(button.parent, button.bounds, panel)
+                    check(selector.x == action.x) {
+                        "Selector starts at ${selector.x}, settings at ${action.x} (width $width)"
+                    }
+                    check(action.y > selector.y + selector.height && fitsViewport(panel))
+                }
+            }
+            edt {
+                check(combos().none { it.selectedItem == IosExecutionMode.Automatic })
+                check(descendants(panel).filterIsInstance<JButton>().none { it.text == "Export All…" })
+                combos().single().selectedIndex = 0
+            }
             await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
             edt {
                 val team = combos().single { it.selectedItem.toString() == "Choose a team…" }
@@ -307,6 +366,11 @@ internal object UiProbeProjectExperience {
         val android = AndroidAvd("Pixel_9")
         var opened = ""
         var refreshes = 0
+        val sample = object : javax.swing.AbstractAction("Example device") {
+            override fun actionPerformed(event: java.awt.event.ActionEvent?) {
+                opened = "example"
+            }
+        }
         val mode = mutableStateOf(AndroidGraphics.DEVICE)
         lateinit var panel: JComponent
         lateinit var frame: JFrame
@@ -314,7 +378,11 @@ internal object UiProbeProjectExperience {
             panel = composePanel(owner) {
                 DeviceCatalogView(
                     listOf(stopped, running), listOf(android), "", "", false, mode.value,
-                    { opened = it.id }, { opened = it.name }, { mode.value = it }, { refreshes++ },
+                    {
+                        opened = it.id
+                    }, {
+                        opened = it.name
+                    }, { mode.value = it }, { refreshes++ }, listOf(DeviceGroup("External devices", listOf(sample))),
                 )
             }
             frame = JFrame().apply { contentPane.add(panel) }
@@ -332,6 +400,8 @@ internal object UiProbeProjectExperience {
                 check(opened == stopped.id)
                 button("Start Pixel 9").doClick()
                 check(opened == android.name)
+                button("Select Example device").doClick()
+                check(opened == "example")
                 button("Refresh devices").doClick()
                 button("Emulator graphics").doClick()
             }

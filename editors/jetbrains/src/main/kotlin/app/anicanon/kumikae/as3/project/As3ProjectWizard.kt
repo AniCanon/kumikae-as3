@@ -166,13 +166,18 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             val built = ProjectTemplate.libraryBeside(compiler)
             val carried = PluginFiles.native().takeIf(ProjectTemplate::hasLibrary)
             template.write(folder, built ?: carried, link = built != null)
-            LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder)?.refresh(true, true)
+            val files = LocalFileSystem.getInstance()
+            val gameFile = files.refreshAndFindFileByNioFile(folder.resolve("project.godot"))
+            gameFile?.parent?.refresh(true, true)
             addRunTargets(project, platforms)
             DumbService.getInstance(project).smartInvokeLater {
-                val game = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder.resolve("project.godot"))
-                if (game != null) FileEditorManager.getInstance(project).openFile(game, true)
+                if (gameFile != null &&
+                    gameFile.isValid
+                ) {
+                    FileEditorManager.getInstance(project).openFile(gameFile, true)
+                }
             }
-            contributions.filter { optional[it.setupAction] == true }.forEach { it.configure(project) }
+            contributions.filter { optional[it.setupAction] == true }.forEach { it.configure(project, gameFile) }
         }
 
         private fun addRunTargets(project: Project, platforms: Set<Platform>) {

@@ -23,7 +23,7 @@ rules hold across all three:
 | `src/main/kotlin/.../run/` | Run configurations and destinations for Godot desktop, iOS and Android |
 | `src/main/kotlin/.../testing/` | The AS3 Tests run configuration, gutter actions and result tree |
 | `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot`, artwork gallery, GDScript overview and scene editors |
-| `src/main/kotlin/.../panel/` | The Devices tool window (Simulators catalog, iOS and Android views) |
+| `src/main/kotlin/.../panel/` | The Devices tool window (device catalog, iOS and Android views) |
 | `src/main/kotlin/.../ui/` | The Compose host and the shared composables |
 | `src/main/resources/META-INF/` | `plugin.xml` and the optional descriptors for Rider and IntelliJ IDEA |
 | `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
@@ -135,6 +135,12 @@ SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
     SimulatorScreen          native: paints the picture, turns the mouse into gestures
 ```
 
+Companion plugins can contribute a group through `app.anicanon.kumikae.as3.deviceGroup`, with
+a `label` and an `implementation` of `Function<Project, List<javax.swing.Action>>`. The catalog queries
+providers on a background worker when opened or refreshed. An empty result shows **Disconnected**.
+Each action supplies its device name, icon and short description. Selecting a device invokes its
+action on the UI thread. The provider owns discovery and run-configuration selection.
+
 ### The service
 
 `core/` wraps `xcrun simctl` in a local HTTP service protected by a token. [protocol.md](protocol.md)
@@ -209,6 +215,15 @@ controller's disposal. Compose owns the layout and whether buttons are enabled.
 The UI uses Compose Swing UI: the Compose runtime driving Swing components, with no separate renderer. The
 library is an alpha, pinned in `build.gradle.kts`. That's why the plugin accepts only the range of IDE
 builds between the two it was tested on.
+
+### Companion build targets
+
+A `gameTarget` contribution supplies its label and setup action for **Add target**. To appear in
+**Build & Release**, it also supplies a settings action and a `configuredWhen` class implementing
+`java.util.function.Predicate<VirtualFile>`. The editor calls this predicate on a background thread
+with the game's `project.godot` file when the editor is selected, after setup, and when game files
+change in the active editor. The predicate checks existing
+configuration without running setup. Setup and settings actions receive the same game file.
 
 ## How it's tested
 

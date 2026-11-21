@@ -10,6 +10,7 @@
     <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
     <extensionPoints>
         <extensionPoint name="gameTarget" beanClass="app.anicanon.kumikae.as3.project.GameTargetContribution" dynamic="true"/>
+        <extensionPoint name="deviceGroup" beanClass="app.anicanon.kumikae.as3.panel.DeviceCatalogContribution" dynamic="true"/>
     </extensionPoints>
     <extensions defaultExtensionNs="com.intellij">
         <codeInsight.lineMarkerProvider language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.scene.AttachedScenesLineMarker"/>

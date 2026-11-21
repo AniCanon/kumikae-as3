@@ -125,7 +125,13 @@ internal class AddGameTargetDialog(
     override fun doOKAction() {
         try {
             val external = contributed[platform]
-            if (external == null) setup.add(platform, name.trim(), identifier.trim()) else external.configure(game)
+            if (external ==
+                null
+            ) {
+                setup.add(platform, name.trim(), identifier.trim())
+            } else {
+                external.configure(game, setup.projectFile)
+            }
             super.doOKAction()
         } catch (canceled: ProcessCanceledException) {
             throw canceled
