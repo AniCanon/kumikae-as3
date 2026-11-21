@@ -74,7 +74,7 @@ state of the project changes.
   and ASDoc from the project. Selected API entries include compile-checked AS3 examples. A change to a
   million-line project is checked in milliseconds.
 - **Rider plugin:** language support, a project wizard, `project.godot` and scene editors, run configurations
-  for desktop, Web, iOS and Android, automatic Godot preset setup for new run targets, a Devices panel, and a live test runner that opens failed assertions,
+  for desktop, Web, iOS and Android, automatic Godot preset setup for new run targets, per-game companion targets in Build & Release, a Devices panel, and a live test runner that opens failed assertions,
   comparison diffs, compiler diagnostics and Godot script errors at their source.
 - **Claude Code plugin** with AS3 language support, a playable starter, debug exports and gameplay tests on desktop, Web, iOS Simulator and Android emulator. [Setup](../editors/claude/README.md).
 - **VS Code client** for the language server on VS Code 1.82 and newer.

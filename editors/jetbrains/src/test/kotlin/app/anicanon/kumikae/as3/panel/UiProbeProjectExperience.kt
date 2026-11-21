@@ -93,6 +93,7 @@ internal object UiProbeProjectExperience {
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
         var chosenResource = ""
+        val configuredTarget = mutableStateOf(false)
         var targetSettingsOpened = false
         var distributed = ""
         var released = ""
@@ -116,7 +117,11 @@ internal object UiProbeProjectExperience {
                         distribute = { _, preset -> distributed = preset.platform },
                         release = { _, preset -> released = preset.platform },
                         addTarget = {},
-                        targetSettings = mapOf("Example platform" to { targetSettingsOpened = true }),
+                        targetSettings = if (configuredTarget.value) {
+                            mapOf("Example platform" to { targetSettingsOpened = true })
+                        } else {
+                            emptyMap()
+                        },
                         export = { _, _ -> },
                         openStore = { portal = it },
                         configureKey = { keyPreset = it.name },
@@ -146,9 +151,38 @@ internal object UiProbeProjectExperience {
             await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
+            fun combos() = descendants(panel).filterIsInstance<JComboBox<*>>()
+            await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
+            fun targetPicker() = combos().single { it.selectedItem is ExportPreset }
+            edt {
+                check(
+                    (0 until targetPicker().itemCount).none {
+                        targetPicker().getItemAt(it).toString() ==
+                            "Example platform"
+                    },
+                )
+                configuredTarget.value = true
+            }
+            await {
+                (0 until targetPicker().itemCount).any {
+                    targetPicker().getItemAt(it).toString() ==
+                        "Example platform"
+                }
+            }
+            edt {
+                check(descendants(panel).filterIsInstance<JButton>().none { it.text == "Example platform settings…" }) {
+                    "Companion settings appeared while iOS was selected"
+                }
+                val picker = combos().single { it.selectedItem is ExportPreset }
+                picker.selectedIndex = picker.itemCount - 1
+            }
             click(panel, "Example platform settings…")
             check(targetSettingsOpened)
-            fun combos() = descendants(panel).filterIsInstance<JComboBox<*>>()
+            edt {
+                check(combos().none { it.selectedItem == IosExecutionMode.Automatic })
+                check(descendants(panel).filterIsInstance<JButton>().none { it.text == "Export All…" })
+                combos().single().selectedIndex = 0
+            }
             await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
             edt {
                 val team = combos().single { it.selectedItem.toString() == "Choose a team…" }

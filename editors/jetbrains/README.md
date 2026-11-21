@@ -89,7 +89,7 @@ The wizard creates a small game that runs: a
   project's name.
 - **Where the game should run.** Desktop is always included. Choosing iOS adds an iOS export preset and a
   run configuration for simulators and physical devices. Choosing Android or Web adds its export preset and run configuration.
-  Companion plugins can contribute additional targets. Their settings actions appear under **Build & Release → Build target**.
+  Companion plugins can contribute additional targets. After setup, select the target under **Build & Release → Build target** to open its settings.
 
 ## Run the game
 

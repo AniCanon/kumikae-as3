@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.settings
 
-internal data class ExportPreset(val section: String, val name: String, val platform: String) {
+internal data class ExportPreset(val section: String, val name: String, val platform: String) : BuildTargetChoice {
+    override val label get() = if (name == platform) name else toString()
     val identifierKey: String? get() = when (platform) {
         "iOS" -> "application/bundle_identifier"
         "Android" -> "package/unique_name"

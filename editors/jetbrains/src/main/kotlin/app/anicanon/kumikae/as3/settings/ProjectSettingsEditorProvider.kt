@@ -1,6 +1,9 @@
 package app.anicanon.kumikae.as3.settings
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.panel.BackgroundWorker
 import app.anicanon.kumikae.as3.project.GameTargetContribution
 import app.anicanon.kumikae.as3.project.showAddGameTarget
@@ -90,8 +93,16 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
         if (!accepted) Messages.showInfoMessage(project, "Checking this project’s signing settings.", "Android Signing")
     }
 
-    private val targetSettings = GameTargetContribution.EP.extensionList.filter { it.settingsAction.isNotBlank() }
-        .associate { target -> target.label to { target.openSettings(project, gameFile) } }
+    private var targetSettings by mutableStateOf(emptyMap<String, () -> Unit>())
+
+    private fun refreshTargets() {
+        ReadAction.nonBlocking<List<GameTargetContribution>> {
+            GameTargetContribution.EP.extensionList.filter { it.hasSettings(gameFile) }
+        }.expireWith(this).coalesceBy(this, "configured-targets")
+            .finishOnUiThread(ModalityState.any()) { targets ->
+                targetSettings = targets.associate { it.label to { it.openSettings(project, gameFile) } }
+            }.submit(AppExecutorUtil.getAppExecutorService())
+    }
 
     private val panel = composePanel(this) {
         ProjectSettingsView(
@@ -129,6 +140,7 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     }
 
     override fun selectNotify() {
+        refreshTargets()
         if (!controller.dirty) controller.reload()
         val parent = file.parent ?: return
         ReadAction.nonBlocking<Map<String, String>> {

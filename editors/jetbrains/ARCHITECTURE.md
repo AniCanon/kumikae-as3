@@ -210,6 +210,14 @@ The UI uses Compose Swing UI: the Compose runtime driving Swing components, with
 library is an alpha, pinned in `build.gradle.kts`. That's why the plugin accepts only the range of IDE
 builds between the two it was tested on.
 
+### Companion build targets
+
+A `gameTarget` contribution supplies its label and setup action for **Add target**. To appear in
+**Build & Release**, it also supplies a settings action and a `configuredWhen` class implementing
+`java.util.function.Predicate<VirtualFile>`. The editor calls this predicate on a background thread
+with the game's `project.godot` file when the editor is selected. The predicate checks existing
+configuration without running setup. The settings action receives the same game file.
+
 ## How it's tested
 
 | What | How |

@@ -4,13 +4,15 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.extensions.CustomLoadingExtensionPointBean
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.xmlb.annotations.Attribute
+import java.util.function.Predicate
 
 /** A platform plugin contributes its own setup workflow through its existing IDE action. */
-class GameTargetContribution {
+class GameTargetContribution : CustomLoadingExtensionPointBean<Predicate<VirtualFile>>() {
     @Attribute("label")
     var label: String = ""
 
@@ -19,6 +21,14 @@ class GameTargetContribution {
 
     @Attribute("settingsAction")
     var settingsAction: String = ""
+
+    @Attribute("configuredWhen")
+    var configuredWhen: String = ""
+
+    override fun getImplementationClassName() = configuredWhen
+
+    fun hasSettings(game: VirtualFile) =
+        settingsAction.isNotBlank() && configuredWhen.isNotBlank() && instance.test(game)
 
     fun configure(project: Project) = invoke(setupAction, project, null)
 
