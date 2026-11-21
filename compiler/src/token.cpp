@@ -41,24 +41,6 @@ bool is_identifier_byte(char p_char) {
 			(p_char >= '0' && p_char <= '9') || p_char == '_' || p_char == '$' || byte >= 0x80;
 }
 
-static const char *const NAMES[] = {
-#define X(kind, name) name,
-	KAS3_TOKENS(X)
-#undef X
-};
-
-const char *token_kind_name(TokenKind p_kind) {
-	return NAMES[(int)p_kind];
-}
-
-std::string_view token_kind_spelling(TokenKind p_kind) {
-	std::string_view name = NAMES[(int)p_kind];
-	if (name.size() >= 2 && name.front() == '\'' && name.back() == '\'') {
-		return name.substr(1, name.size() - 2);
-	}
-	return std::string_view();
-}
-
 bool is_reserved_word(TokenKind p_kind) {
 	return p_kind >= TokenKind::KwAs && p_kind <= TokenKind::KwWith;
 }

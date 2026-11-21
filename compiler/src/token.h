@@ -133,10 +133,26 @@ struct Token {
 	bool newline_before; // A line break lies between the previous token and this one.
 };
 
+namespace token_detail {
+inline constexpr const char *NAMES[] = {
+#define X(kind, name) name,
+	KAS3_TOKENS(X)
+#undef X
+};
+} // namespace token_detail
+
 // "identifier", "'('", "'function'", and so on.
-const char *token_kind_name(TokenKind p_kind);
+constexpr const char *token_kind_name(TokenKind p_kind) {
+	return token_detail::NAMES[static_cast<size_t>(p_kind)];
+}
 // The operator or keyword as written in source ("+", "function"); empty for identifiers and literals.
-std::string_view token_kind_spelling(TokenKind p_kind);
+constexpr std::string_view token_kind_spelling(TokenKind p_kind) {
+	const std::string_view name = token_kind_name(p_kind);
+	if (name.size() >= 2 && name.front() == '\'' && name.back() == '\'') {
+		return name.substr(1, name.size() - 2);
+	}
+	return std::string_view();
+}
 // Words that can never be plain identifiers.
 bool is_reserved_word(TokenKind p_kind);
 // An identifier or any reserved word: what may follow a dot or name an object-literal key.

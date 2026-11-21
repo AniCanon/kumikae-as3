@@ -101,6 +101,8 @@ fresh check after random edits. See [tests/README.md](../tests/README.md#the-inc
 - **Override completion** uses the same visibility rule as name resolution. The generated signature
   qualifies types and default values so that they mean the same thing in the derived class. Tests apply
   the generated edit and check the result with a fresh compiler.
+- **Keyword completion** takes reserved-word spellings from `TokenKind`. The completion table keeps
+  the handwritten descriptions, display order and contextual labels such as `for each`, `get` and `set`.
 - **Statement completion** (`completion_statements`) offers language blocks such as `try` and `for` at the
   start of a statement. A block is ordinary AS3 text with ordered tab stops. Only the language server
   turns that into snippet syntax.
