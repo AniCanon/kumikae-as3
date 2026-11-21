@@ -7,6 +7,7 @@ The tests that run the compiler need KAS3C, the path to kas3c; CTest sets it.
 import copy
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -40,9 +41,9 @@ def lines_of(text, class_name):
     for line in text.split("\n"):
         if inside and line == "\t}":
             return result
-        if inside:
+        if inside and line.lstrip().startswith(("public ", "[")):
             result.append(line.strip())
-        elif (" class %s " % class_name) in line + " ":
+        elif line.startswith("\tpublic ") and (" class %s " % class_name) in line + " ":
             inside = True
     raise AssertionError("no class " + class_name)
 
@@ -58,6 +59,70 @@ class Fixture(unittest.TestCase):
     def test_whole_output(self):
         self.maxDiff = None
         self.assertEqual(self.text, read(os.path.join(HERE, "fixture.as")))
+
+    def test_asdoc_from_documented_dump(self):
+        api = fixture()
+        node = next(entry for entry in api["classes"] if entry["name"] == "Node")
+        node["brief_description"] = "A scene object."
+        method = next(entry for entry in node["methods"] if entry["name"] == "get_node")
+        method["description"] = "Finds [param path] on an [Object]. See [enum Variant.Type], [method get_node] and [code]*/[/code]."
+        text = generate.generate(api)
+        self.assertIn("/** A scene object. */", text)
+        self.assertIn("/** Finds path on a GodotObject. See VariantType, getNode and * /.\n", text)
+
+    def test_docs_keep_literal_setting_keys(self):
+        api = fixture()
+        entry = api["utility_functions"][0]
+        entry["description"] = ("Read [member ProjectSettings.physics/3d/default_gravity] or "
+                                "[member EditorSettings.interface/editor/display_scale].")
+        self.assertIn('Read "physics/3d/default_gravity" or "interface/editor/display_scale".',
+                      generate.generate(api))
+
+    def test_docs_reference_the_declared_constants_and_properties(self):
+        api = fixture()
+        node = next(c for c in api["classes"] if c["name"] == "Node")
+        base = next(c for c in api["classes"] if c["name"] == "Object")
+        base["constants"].append({"name": "KEY_ESCAPE", "value": 12})
+        node["brief_description"] = ("See [constant OK], [constant KEY_ESCAPE], [constant @GlobalScope.KEY_ESCAPE], "
+                                     "[method Node.get_name], [method set_owner], [method Control.get_anchor], and [constant @GDScript.INF].")
+        self.assertIn("See GodotError.OK, GodotObject.KEY_ESCAPE, Key.ESCAPE, "
+                      "Node.name, owner, Control.getAnchor, and Infinity.", generate.generate(api))
+
+    def test_constructor_docs_describe_each_documented_form(self):
+        api = fixture()
+        vector = next(c for c in api["builtin_classes"] if c["name"] == "Vector2")
+        vector["brief_description"] = "A vector."
+        vector["constructors"][0]["description"] = "Initializes both components to zero."
+        vector["constructors"][2]["description"] = "Uses [param x] and [param y] as the coordinates."
+        text = generate.generate(api)
+        constructor = text.index("public native function Vector2(")
+        comment = text[text.rindex("/**", 0, constructor):constructor]
+        self.assertIn("Vector2() — Initializes both components to zero.", comment)
+        self.assertIn("Vector2(x:Number, y:Number) — Uses x and y as the coordinates.", comment)
+
+    def test_docs_preserve_inline_links_and_literal_code(self):
+        api = fixture()
+        api["header"].update(version_major=4, version_minor=7)
+        node = next(c for c in api["classes"] if c["name"] == "Node")
+        node["brief_description"] = ("See [url=$DOCS_URL/tutorials/example.html]the [code]node[/code] guide[/url] "
+                                     "and [url=https://example.org/diagram]diagram[/url]. "
+                                     "The literal tag is [code][url=address]label[/url][/code].")
+        self.assertIn("See the node guide (https://docs.godotengine.org/en/4.7/tutorials/example.html) "
+                      "and diagram (https://example.org/diagram). The literal tag is [url=address]label[/url].",
+                      generate.generate(api))
+
+    def test_long_descriptions_link_to_the_original_member(self):
+        api = fixture()
+        api["header"].update(version_major=4, version_minor=7)
+        node = next(entry for entry in api["classes"] if entry["name"] == "Node")
+        node["methods"][0]["description"] = "Called before a physics step.\nMore detail."
+        node["methods"][0]["name"] = "_before_physics"
+        self.assertIn("https://docs.godotengine.org/en/4.7/classes/class_node.html#class-node-private-method-before-physics",
+                      generate.generate(api))
+
+    def test_binding_only_members_have_asdoc(self):
+        self.assertIn("/** Releases the object immediately.", self.text)
+        self.assertIn("/** The Input singleton as an object.", self.text)
 
     def test_classes(self):
         self.assertIn("\tpublic native class GodotObject {", self.text)
@@ -578,9 +643,17 @@ class RealApi(unittest.TestCase):
         cls.generator = generate.Generator(cls.api)
         cls.text = cls.generator.run()
 
-    def test_the_committed_file_is_current(self):
-        self.assertTrue(self.text == read(os.path.join(HERE, "godot.as")),
+    def test_the_committed_declarations_are_current(self):
+        def declarations(text):
+            return re.sub(r"^\s*/\*\*.*?\*/\n", "", text, flags=re.MULTILINE | re.DOTALL)
+        self.assertTrue(declarations(self.text) == declarations(read(os.path.join(HERE, "godot.as"))),
                         "godot.as is stale: run generate.py again")
+
+    def test_the_committed_documentation_is_current(self):
+        if not any(entry.get("brief_description") for entry in self.api["classes"]):
+            self.skipTest("full documentation check needs --dump-extension-api-with-docs")
+        self.assertTrue(self.text == read(os.path.join(HERE, "godot.as")),
+                        "godot.as documentation is stale: regenerate it from --dump-extension-api-with-docs")
 
     def test_print_takes_any_number_of_arguments(self):
         # Godot describes print(arg1, ...) though print() is allowed: a lone leading argument of a function

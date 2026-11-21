@@ -9,7 +9,9 @@ and VS Code.
 ## Ask for completion
 
 Type a dot, or use your editor's completion shortcut. The list shows each declaration with its parameter
-and return types.
+and return types. Open the selected item's documentation to read its description. Godot names carry
+summaries from the engine reference, and the built-in AS3 library and language keywords have their own
+descriptions. For project classes and members, the editor reads the [ASDoc on the declaration](../docs/language.md#documentation-in-the-editor).
 
 - **Locals and parameters come first,** then members, then other definitions in reach and keywords.
 - **A name nearer the cursor hides the same name in an outer scope.**

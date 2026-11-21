@@ -15,7 +15,7 @@ dependency: the JSON reader is in this folder on purpose.
 | Find references | Every use of it in the project's files. For a method, also the methods that override it and the one it overrides |
 | Completion | Members after a dot, types where a type is written, override stubs after `override`, and otherwise the names in reach |
 | Signature help | The declaration being called and the active parameter, including in unfinished and nested calls |
-| Hover | The declaration, and the class or package it belongs to |
+| Hover | The declaration, its class or package, and its ASDoc text |
 | Document symbols | The classes and members of the file |
 | Workspace symbols | The project's definitions whose name contains the query, then Godot's classes and the built-in library's |
 
@@ -66,6 +66,11 @@ whole list.
 - An automatic import and an override stub carry an additional text edit.
 - A list requested with nothing typed is marked incomplete when automatic imports were held back, so that
   typing a prefix asks again.
+
+Completion items and call signatures carry their declaration's documentation as plain text when present.
+When a completion client prefers Markdown, an indented ASDoc example renders as a code block.
+The front end finds the preceding ASDoc in the parsed source file, including for inherited members and
+the embedded declaration files. Keyword completions carry a short description of the language construct.
 
 The server never parses a declaration to find a call's parameters. The compiler's candidates carry them.
 

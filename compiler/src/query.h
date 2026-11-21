@@ -60,6 +60,7 @@ struct CompletionRange {
 };
 
 struct SignatureHelp {
+	std::string documentation;
 	std::string label;
 	std::vector<std::string> parameters;
 	uint32_t active_parameter = 0;
@@ -80,6 +81,7 @@ struct CompletionTabStop {
 
 // One thing completion offers.
 struct Completion {
+	std::string documentation;
 	std::string name;
 	SymbolKind kind = SymbolKind::Local; // Not meaningful for a keyword.
 	bool is_keyword = false;
@@ -160,6 +162,7 @@ public:
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	// The declaration as one line of AS3: "function hit(by:Node, power:int = 1):void".
 	std::string describe(const Symbol *p_symbol) const;
+	std::string documentation(const Symbol *p_symbol) const;
 	// A parameter as its declaration writes it: "...rest", "power:int". From the declaration alone, so that
 	// it reads the same whether or not the function's file has had its bodies checked.
 	static std::string parameter_text(const Unit &p_unit, const Parameter &p_parameter);

@@ -29,6 +29,7 @@ class Server {
 	int exit_code_ = 1;
 	bool default_edit_range_ = false;
 	bool snippets_ = false;
+	bool markdown_completion_ = false;
 	bool diagnostic_versions_ = false;
 	bool insert_replace_ = false;
 	bool utf8_ = false; // Positions count bytes. Otherwise UTF-16 code units.

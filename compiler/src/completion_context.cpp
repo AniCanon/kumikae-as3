@@ -21,6 +21,7 @@ const Completion &Queries::completion_item(Symbol *p_symbol) {
 		item.kind = p_symbol->kind;
 		item.is_const = p_symbol->is_const;
 		item.detail = describe(p_symbol);
+		item.documentation = documentation(p_symbol);
 		const FunctionDecl *decl = function_declaration(p_symbol);
 		item.callable = decl && !p_symbol->is_type() && decl->accessor == FunctionDecl::None;
 		if (item.callable) {

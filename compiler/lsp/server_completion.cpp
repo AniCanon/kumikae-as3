@@ -81,6 +81,15 @@ Json Server::completion_item(const Unit &p_unit, const Completion &p_found, cons
 	if (!p_found.detail.empty()) {
 		item.set("detail", p_found.detail);
 	}
+	if (!p_found.documentation.empty()) {
+		const auto &docs = p_found.documentation;
+		// An indented ASDoc example needs Markdown to keep its line breaks in Rider.
+		if (markdown_completion_ && docs.find("\n\n    ") != std::string::npos) {
+			item.set("documentation", Json::object().set("kind", "markdown").set("value", docs));
+		} else {
+			item.set("documentation", docs);
+		}
+	}
 	char order[16];
 	std::snprintf(order, sizeof(order), "%08u", p_priority);
 	item.set("sortText", order);
@@ -168,6 +177,9 @@ Json Server::signature_help(const Json &p_params) {
 		parameters.push(Json::object().set("label", parameter));
 	}
 	Json signature = Json::object().set("label", help->label).set("parameters", std::move(parameters));
+	if (!help->documentation.empty()) {
+		signature.set("documentation", help->documentation);
+	}
 	return Json::object().set("signatures", Json::array().push(std::move(signature)))
 			.set("activeSignature", 0).set("activeParameter", static_cast<int>(help->active_parameter));
 }

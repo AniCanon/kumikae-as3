@@ -253,6 +253,69 @@ if messages:
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
 
+# Documentation travels with the selected declaration, including across metadata and a comment-only edit.
+source = """package { import godot.*; public class Main extends Node {
+    /** Move one tile.
+     * @param steps Number of tiles.
+     */
+    [Example] public function moveTile(steps:int):void {}
+    /* Ordinary comment. */ public var moveSpeed:int;
+    public function run():void { moveTile(1); queueFree(); var list:Array; list.push(1); getNode("HUD"); }
+} }"""
+body = source.splitlines()[6]
+
+
+def at_word(number, method, word, offset):
+    return request(number, "textDocument/" + method, {"textDocument": {"uri": URI},
+                   "position": {"line": 6, "character": body.index(word) + offset}})
+
+
+code, messages, errors = session(START + opened(source) + at_word(2, "completion", "moveTile", 4) +
+    at_word(3, "hover", "moveTile", 4) + at_word(4, "signatureHelp", "moveTile", 9) +
+    at_word(5, "completion", "queueFree", 5) + at_word(6, "completion", "push", 3) +
+    at_word(8, "completion", "getNode", 5) +
+    changed(source.replace("Move one tile.", "Move two tiles.")) + at_word(7, "completion", "moveTile", 4) + END)
+replies = {m["id"]: m.get("result") for m in messages or [] if "id" in m}
+
+
+def item_docs(number, label):
+    items = replies[number]["items"]
+    return next(item.get("documentation", "") for item in items if item["label"] == label)
+
+
+check("ASDoc completion", item_docs(2, "moveTile") == "Move one tile.\n@param steps Number of tiles.")
+check("ordinary comment omitted", not item_docs(2, "moveSpeed"))
+check("ASDoc hover", "Move one tile." in replies[3]["contents"]["value"])
+check("ASDoc signature help", "Number of tiles." in replies[4]["signatures"][0].get("documentation", ""))
+check("Godot completion docs", "frame" in item_docs(5, "queueFree"))
+check("AS3 built-in completion docs", "length" in item_docs(6, "push"))
+check("edited ASDoc", "Move two tiles." in item_docs(7, "moveTile"))
+
+# Compile the exact examples returned to the editor, each in its own AS3 method.
+for number, label in [(5, "queueFree"), (6, "push"), (8, "getNode")]:
+    paragraphs = item_docs(number, label).split("\n\n")
+    example = next((p for p in paragraphs if p.startswith("    ")), "")
+    check(label + " completion has a code sample", label + "(" in example)
+    if example:
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "Example.as")
+            with open(path, "w", encoding="utf-8") as out:
+                out.write("package { import godot.*; public class Example extends Node {\n"
+                          "public function demo():void {\n" + example + "\n} } }")
+            compiled = subprocess.run([KAS3C, "check", path], capture_output=True, text=True, timeout=30)
+            check(label + " completion sample compiles", compiled.returncode == 0, compiled.stderr)
+
+# A client that prefers Markdown should render the indented sample as a code block.
+for formats in (["markdown", "plaintext"], ["plaintext", "markdown"]):
+    capabilities = {"textDocument": {"completion": {"completionItem": {"documentationFormat": formats}}}}
+    init = request(1, "initialize", {"capabilities": capabilities}) + notify("initialized", {})
+    code, messages, errors = session(init + opened(source) + at_word(6, "completion", "push", 3) + END)
+    push = next(item for msg in messages if msg.get("id") == 6 for item in msg["result"]["items"]
+                if item["label"] == "push")
+    original = item_docs(6, "push")
+    expected = {"kind": "markdown", "value": original} if formats[0] == "markdown" else original
+    check("sample uses preferred " + formats[0], push.get("documentation") == expected)
+
 # An override's whole declaration, over the transport, with Godot's API loaded.
 override_text = "package { import godot.*; public class Main extends Node2D {\noverride _pro\n} }"
 code, messages, errors = session(start + opened(override_text) +

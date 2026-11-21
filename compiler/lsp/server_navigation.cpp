@@ -64,6 +64,10 @@ Json Server::hover(const Json &p_params) {
 	}
 	Queries &queries = workspace_.queries();
 	std::string text = "```" + code_language_ + "\n" + queries.describe(found->symbol) + "\n```\n" + queries.context(found->symbol);
+	const auto docs = queries.documentation(found->symbol);
+	if (!docs.empty()) {
+		text += "\n\n" + docs;
+	}
 	return Json::object()
 			.set("contents", Json::object().set("kind", "markdown").set("value", text))
 			.set("range", range(*unit, found->offset, found->length));

@@ -75,7 +75,9 @@ package game {
 
 ## How Godot's API is named
 
-Godot's whole API is available in the `godot` package, under AS3 naming conventions.
+Godot's whole API is available in the `godot` package, under AS3 naming conventions. In your editor,
+completion and hover show the description from Godot's class reference when the engine supplies one.
+Longer entries include the address of the full reference for the engine version used to generate the API.
 
 | In Godot | In AS3 | Rule |
 |---|---|---|

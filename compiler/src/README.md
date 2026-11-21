@@ -85,6 +85,8 @@ fresh check after random edits. See [tests/README.md](../tests/README.md#the-inc
 
 `Queries` in `query.h` answers what an editor asks about a checked program.
 
+- **Documentation follows the resolved symbol.** The editor queries read the ASDoc text immediately
+  before its declaration from the parser's text regions. Getter and setter share one description.
 - **Text regions come from the parser.** `Parsed::text_regions` records comments, strings and regular
   expression literals as the lexer and parser found them, so completion needs no second scanner.
 - **Completion reads the resolver's scopes.** The resolver keeps `Unit::local_scopes` for function bodies.

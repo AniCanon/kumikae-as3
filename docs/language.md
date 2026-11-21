@@ -64,7 +64,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 | Standard library | `String`, `Number`, `Math`, `Date`, `RegExp`, `JSON`, `Error` and its subclasses, and the top-level functions such as `parseInt`, `isNaN` and `encodeURIComponent` |
 | Packages | Several files, packages, imports, and package-level functions and variables |
 
-The built-in library is AS3's top level and `flash.utils.Dictionary`. The rest of the Flash API, such as
+The [built-in library](standard-library.md) is AS3's top level and `flash.utils.Dictionary`. The rest of the Flash API, such as
 `flash.display.Sprite`, isn't there. In Godot you use Godot's classes instead.
 
 ## What isn't supported
@@ -257,6 +257,34 @@ deeper than 1,000 levels is Error #1023.
 The library's behavior was written from the AS3 language reference and from the source of avmplus, the
 open-source virtual machine that Flash Player is built on. The texts `Date` produces, the error numbers
 JSON raises, and the errors of the URI functions haven't been compared with a running Flash Player.
+
+## Documentation in the editor
+
+Select a completion to read what the name does. The entries for `Array.push`, `Node.getNode` and
+`Node.queueFree` also show short AS3 examples. Hover over a name already in your script to see its declaration and description.
+Signature help shows a function's description while you type its arguments. You can also browse the
+documented [top-level AS3 library](../compiler/builtins/toplevel.as) and
+[`flash.utils` declarations](../compiler/builtins/flash_utils.as).
+
+Document your own classes, methods, properties and package definitions with an ASDoc comment immediately
+before the declaration. When a declaration has metadata such as `[Export]`, put the comment above the
+metadata. For a property with a getter and setter, write its description on the getter. The editor uses
+the setter's comment when only the setter has one.
+
+```actionscript
+/**
+ * Adds points to the player's score and returns the new total.
+ * @param points Number of points earned this turn.
+ * @return The updated score.
+ */
+public function addScore(points:int):int {
+    score += points;
+    return score;
+}
+```
+
+The editor displays the comment text, including the parameter and return notes. The same format works in
+a declaration file passed with `--declarations`.
 
 ## Declaration files
 

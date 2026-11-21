@@ -39,6 +39,12 @@ Json Server::initialize(const Json &p_params) {
 	for (const Json &item : capabilities.get("textDocument").get("completion").get("completionList").get("itemDefaults").items()) {
 		default_edit_range_ = default_edit_range_ || item.string() == "editRange";
 	}
+	for (const Json &format : completion_item.get("documentationFormat").items()) {
+		if (format.string() == "markdown" || format.string() == "plaintext") {
+			markdown_completion_ = format.string() == "markdown";
+			break;
+		}
+	}
 	snippets_ = completion_item.get("snippetSupport").boolean();
 	insert_replace_ = completion_item.get("insertReplaceSupport").boolean();
 	for (const Json &encoding : capabilities.get("general").get("positionEncodings").items()) {
