@@ -179,13 +179,7 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
         val home = Path.of(System.getProperty("user.home"))
         val settings = PropertiesComponent.getInstance()
         val native = PluginFiles.native()
-        val compiler = CompilerLocator.find(
-            folder,
-            settings.getValue(COMPILER_PATH).orEmpty(),
-            System.getenv("PATH").orEmpty(),
-            home,
-            native,
-        )
+        val compiler = CompilerLocator.findForProject(folder)
         return { say ->
             val godot = IdeGodot.find()
                 ?: error("Godot was not found: it writes the Xcode project. Install it or put it on the search path.")
@@ -207,7 +201,6 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
     }
 
     private companion object {
-        const val COMPILER_PATH = "kumikae.as3.compilerPath"
         const val TEMPLATE_PATH = "kumikae.as3.iosSimulatorTemplate"
     }
 }

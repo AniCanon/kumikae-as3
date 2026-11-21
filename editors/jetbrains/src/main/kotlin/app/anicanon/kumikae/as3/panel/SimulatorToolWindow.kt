@@ -5,6 +5,8 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import java.awt.EventQueue
+import java.awt.event.HierarchyEvent
+import java.awt.event.HierarchyListener
 import javax.swing.JPanel
 import javax.swing.Timer
 
@@ -44,13 +46,8 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
         controller.onFramesReady = frames::request
         controller.onFrame = { screen.frame = it }
         component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }
-        Disposer.register(controller) {
-            screen.frame = null
-            controller.onFrame = {}
-            timer.stop()
-            controller.onFramesReady = {}
-        }
-        component.addHierarchyListener {
+        val visibility = HierarchyListener { event ->
+            if ((event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong()) == 0L) return@HierarchyListener
             if (component.isShowing) {
                 controller.shown()
                 timer.start()
@@ -61,6 +58,14 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
                 timer.stop()
             }
         }
+        Disposer.register(controller) {
+            component.removeHierarchyListener(visibility)
+            screen.frame = null
+            controller.onFrame = {}
+            timer.stop()
+            controller.onFramesReady = {}
+        }
+        component.addHierarchyListener(visibility)
     }
 
     private companion object {

@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -34,12 +35,13 @@ internal fun SimulatorView(
     prompts: SimulatorPrompts,
     screen: SimulatorScreen,
     console: JTextArea,
+    modifier: SwingModifier = SwingModifier,
 ) {
     val device = controller.selected
     val open = openDevices(controller)
     val list = state.listShown || device == null || open.none { it.id == device.id }
     SideEffect { controller.deviceTabShown(!list) }
-    Panel(PanelLayout.Border()) {
+    Panel(PanelLayout.Border(), modifier = modifier) {
         Tabs(controller, state, open, list, SwingModifier.north())
         val shown = device.takeUnless { list }
         if (shown == null) {
@@ -64,7 +66,7 @@ private fun Tabs(
     state: SimulatorPanelState,
     open: List<SimulatorDevice>,
     list: Boolean,
-    modifier: SwingModifier,
+    modifier: SwingModifier = SwingModifier,
 ) {
     Panel(
         PanelLayout.Flow(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(6)),
@@ -72,15 +74,17 @@ private fun Tabs(
     ) {
         Tab("Simulators", chosen = list, onClick = { state.listShown = true }, icon = AllIcons.Nodes.Folder)
         for (device in open) {
-            Tab(
-                device.name,
-                chosen = !list && device.id == controller.selected?.id,
-                onClick = {
-                    state.listShown = false
-                    controller.open(device)
-                },
-                onClose = { controller.shutdown(device) }.takeIf { device.state == BOOTED },
-            )
+            key(device.id) {
+                Tab(
+                    device.name,
+                    chosen = !list && device.id == controller.selected?.id,
+                    onClick = {
+                        state.listShown = false
+                        controller.open(device)
+                    },
+                    onClose = { controller.shutdown(device) }.takeIf { device.state == BOOTED },
+                )
+            }
         }
     }
 }

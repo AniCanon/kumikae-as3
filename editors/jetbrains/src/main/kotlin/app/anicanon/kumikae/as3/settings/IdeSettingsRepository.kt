@@ -24,18 +24,15 @@ internal class IdeSettingsRepository(
     private val tasks: BackgroundTasks,
 ) : SettingsRepository {
     override val hasXcodeTeams get() = SystemInfo.isMac
-    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) {
-        tasks.submit({
-            val preferences = Path.of(System.getProperty("user.home"), "Library/Preferences/com.apple.dt.Xcode.plist")
-            XcodeTeams.load(ProcessRunner(), preferences)
-        }, ready)
-    }
-    override fun openXcode(ready: (Result<Unit>) -> Unit) {
-        tasks.submit({
-            ProcessRunner().run(listOf("/usr/bin/open", "-b", "com.apple.dt.Xcode"), 5000)
-            Unit
-        }, ready)
-    }
+    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit): Boolean = tasks.submit({
+        val preferences = Path.of(System.getProperty("user.home"), "Library/Preferences/com.apple.dt.Xcode.plist")
+        XcodeTeams.load(ProcessRunner(), preferences)
+    }, ready)
+
+    override fun openXcode(ready: (Result<Unit>) -> Unit): Boolean = tasks.submit({
+        ProcessRunner().run(listOf("/usr/bin/open", "-b", "com.apple.dt.Xcode"), 5000)
+        Unit
+    }, ready)
 
     private fun root(): VirtualFile = requireNotNull(file.parent) { "Project file has no parent directory." }
 

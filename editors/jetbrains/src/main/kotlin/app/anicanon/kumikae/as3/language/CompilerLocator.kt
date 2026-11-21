@@ -1,10 +1,22 @@
 package app.anicanon.kumikae.as3.language
 
+import app.anicanon.kumikae.as3.PluginFiles
+import com.intellij.ide.util.PropertiesComponent
 import java.nio.file.Files
 import java.nio.file.Path
 
 /** Finds `kas3c`, the compiler that is also the language server. */
 internal object CompilerLocator {
+    const val PROPERTY_KEY = "kumikae.as3.compilerPath"
+
+    fun findForProject(project: Path): Path? = find(
+        project = project,
+        configured = PropertiesComponent.getInstance().getValue(PROPERTY_KEY).orEmpty(),
+        searchPath = System.getenv("PATH").orEmpty(),
+        home = Path.of(System.getProperty("user.home")),
+        bundled = PluginFiles.native(),
+    )
+
     /**
      * In order: the path the person set; a build of the compiler in the project or a folder above it (the
      * compiler's own repository); the one the plugin carries; the search path; the home folder's own bin.

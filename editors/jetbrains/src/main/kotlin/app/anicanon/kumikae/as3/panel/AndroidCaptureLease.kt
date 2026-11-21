@@ -7,8 +7,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object AndroidCaptureLease {
     private data class Producer(var readers: Int, val stop: () -> Unit)
     private val locks = ConcurrentHashMap<String, Any>()
-    private val producers = mutableMapOf<String, Producer>()
-    private val stopped = mutableSetOf<String>()
+    private val producers = ConcurrentHashMap<String, Producer>()
+    private val stopped = ConcurrentHashMap.newKeySet<String>()
 
     private fun lockFor(key: String) = locks.computeIfAbsent(key) { Any() }
 

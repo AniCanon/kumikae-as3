@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.extensions.CustomLoadingExtensionPointBean
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.xmlb.annotations.Attribute
 import java.util.function.Predicate
@@ -36,7 +37,15 @@ class GameTargetContribution : CustomLoadingExtensionPointBean<Predicate<Virtual
     fun openSettings(project: Project, game: VirtualFile) = invoke(settingsAction, project, game)
 
     private fun invoke(id: String, project: Project, game: VirtualFile?) {
-        val action = requireNotNull(ActionManager.getInstance().getAction(id)) { "Missing action for $label." }
+        val action = ActionManager.getInstance().getAction(id)
+        if (action == null) {
+            Messages.showErrorDialog(
+                project,
+                "The companion action for ${label.ifBlank { id }} is unavailable.",
+                "Game Target",
+            )
+            return
+        }
         val context = SimpleDataContext.builder().add(CommonDataKeys.PROJECT, project)
         if (game != null) context.add(CommonDataKeys.VIRTUAL_FILE, game)
         ActionUtil.invokeAction(action, context.build(), "KumikaeGameTarget", null, null)

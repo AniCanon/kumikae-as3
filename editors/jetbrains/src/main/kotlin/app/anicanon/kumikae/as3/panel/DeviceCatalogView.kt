@@ -39,6 +39,7 @@ internal fun DeviceCatalogView(
     setGraphics: (AndroidGraphics) -> Unit,
     refresh: () -> Unit,
     groups: List<DeviceGroup> = emptyList(),
+    modifier: SwingModifier = SwingModifier,
 ) {
     val count = ios.orEmpty().size + android.size + groups.sumOf { it.devices.size }
     val active = ios.orEmpty().count { it.state == BOOTED } + android.count { it.serial != null }
@@ -47,7 +48,7 @@ internal fun DeviceCatalogView(
         count == 1 -> "1 device"
         else -> "$count devices"
     }
-    Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insets(8, 12))) {
+    Panel(PanelLayout.Border(), modifier = modifier.emptyBorder(JBUI.insets(8, 12))) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.north().emptyBorder(JBUI.insets(0, 4, 6, 0))) {
             Panel(PanelLayout.Border(JBUI.scale(8), 0), modifier = SwingModifier.west()) {
                 Label(summary, SwingModifier.west().font(JBFont.h2().asBold()))
@@ -85,22 +86,27 @@ internal fun DeviceCatalogView(
                         }
                     }
                     for (group in groups) {
-                        CatalogSection(group.label)
-                        SurfaceGroup {
-                            for (action in group.devices) {
-                                CatalogRow(
-                                    action.getValue(javax.swing.Action.NAME).toString(),
-                                    action.getValue(javax.swing.Action.SHORT_DESCRIPTION)?.toString() ?: "Connected",
-                                    running = true,
-                                    android = false,
-                                    available = action.isEnabled,
-                                    verb = "Select",
-                                    icon =
-                                    action.getValue(javax.swing.Action.SMALL_ICON) as? Icon
-                                        ?: AllIcons.Nodes.Console,
-                                ) { action.actionPerformed(java.awt.event.ActionEvent(action, 0, "select")) }
+                        key(group.label) {
+                            CatalogSection(group.label)
+                            SurfaceGroup {
+                                for (action in group.devices) {
+                                    key(action) {
+                                        CatalogRow(
+                                            action.getValue(javax.swing.Action.NAME).toString(),
+                                            action.getValue(javax.swing.Action.SHORT_DESCRIPTION)?.toString()
+                                                ?: "Connected",
+                                            running = true,
+                                            android = false,
+                                            available = action.isEnabled,
+                                            verb = "Select",
+                                            icon =
+                                            action.getValue(javax.swing.Action.SMALL_ICON) as? Icon
+                                                ?: AllIcons.Nodes.Console,
+                                        ) { action.actionPerformed(java.awt.event.ActionEvent(action, 0, "select")) }
+                                    }
+                                }
+                                if (group.devices.isEmpty()) StatusLine(group.emptyStatus)
                             }
-                            if (group.devices.isEmpty()) StatusLine(group.emptyStatus)
                         }
                     }
                     var configure by remember { mutableStateOf(false) }
@@ -143,8 +149,12 @@ internal fun DeviceCatalogView(
 }
 
 @Composable
-private fun CatalogSection(title: String, action: @Composable () -> Unit = {}) {
-    Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insets(8, 4, 4, 0))) {
+private fun CatalogSection(
+    title: String,
+    modifier: SwingModifier = SwingModifier,
+    action: @Composable () -> Unit = {},
+) {
+    Panel(PanelLayout.Border(), modifier = modifier.emptyBorder(JBUI.insets(8, 4, 4, 0))) {
         Label(
             title,
             SwingModifier.center().font(JBFont.label().asBold()).foreground(catalogSecondary)
@@ -172,10 +182,13 @@ private fun ToolbarAction(
             preferredSize = JBUI.size(26)
             isRolloverEnabled = true
             margin = JBUI.emptyInsets()
-            toolTipText = name
-            accessibleContext.accessibleName = name
         }
     }, modifier = modifier, update = {
+        set(name) {
+            toolTipText = it
+            accessibleContext.accessibleName = it
+        }
+        set(icon) { this.icon = it }
         set(enabled) { isEnabled = it }
         set(click) {
             actionListeners.forEach(::removeActionListener)
@@ -190,12 +203,13 @@ private fun CatalogRow(
     detail: String,
     running: Boolean,
     android: Boolean,
+    modifier: SwingModifier = SwingModifier,
     available: Boolean = true,
     verb: String = if (running) "Open" else "Start",
     icon: Icon? = null,
     click: () -> Unit,
 ) {
-    SwingNode(factory = { CatalogDeviceButton() }, update = {
+    SwingNode(factory = { CatalogDeviceButton() }, modifier = modifier, update = {
         set(CatalogDevice(title, detail, running, android, available, verb, icon)) { device = it }
         set(click) { activate = it }
     })

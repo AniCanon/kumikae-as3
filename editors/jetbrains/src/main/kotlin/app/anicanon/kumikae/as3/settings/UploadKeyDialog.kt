@@ -58,7 +58,10 @@ internal class UploadKeyDialog(private val game: Project, preset: String, privat
     override fun createCenterPanel() = composePanel(disposable) {
         Column {
             SettingsSection("Release keystore") {
-                LabelledField("Keystore file", path, { path = it })
+                LabelledField("Keystore file", path, {
+                    path = it
+                    creating = false
+                })
                 Panel(PanelLayout.Flow(FlowLayout.LEFT)) {
                     Button("Choose existing…", {
                         FileChooser.chooseFile(
@@ -107,9 +110,7 @@ internal class UploadKeyDialog(private val game: Project, preset: String, privat
         }
     }.apply { minimumSize = JBUI.size(420, 280) }
 
-    override fun doCancelAction() {
-        if (!busy) super.doCancelAction()
-    }
+    override fun doCancelAction() = super.doCancelAction()
 
     override fun doOKAction() {
         if (busy) return

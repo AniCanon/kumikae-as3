@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,7 +18,6 @@ import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.execution.RunManager
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.util.projectWizard.WizardContext
 import com.intellij.ide.wizard.AbstractNewProjectWizardStep
 import com.intellij.ide.wizard.GeneratorNewProjectWizard
@@ -78,7 +78,9 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                             GodotSetupSection(engine, canInstall) {
                                 val chooser = FileChooserDescriptor(true, true, false, false, false, false)
                                     .withTitle("Choose Godot App or Executable")
-                                FileChooser.chooseFile(chooser, context.project, null) { engine.choose(it.toNioPath()) }
+                                FileChooser.chooseFile(chooser, context.project, null) { file ->
+                                    if (file.isInLocalFileSystem) engine.choose(file.toNioPath())
+                                }
                             }
                             SettingsSection("Application") {
                                 LabelledField(
@@ -93,18 +95,26 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                             }
                             SettingsSection("Run targets") {
                                 for (choice in choices) {
-                                    CheckBox(
-                                        choice.platform.label,
-                                        chosen[choice.platform] == true,
-                                        { on: Boolean -> if (!choice.always) chosen[choice.platform] = on },
-                                        SwingModifier.enabled(choice.available && !choice.always),
-                                    )
-                                    StatusLine(choice.note)
+                                    key(choice.platform) {
+                                        CheckBox(
+                                            choice.platform.label,
+                                            chosen[choice.platform] == true,
+                                            { on: Boolean -> if (!choice.always) chosen[choice.platform] = on },
+                                            SwingModifier.enabled(choice.available && !choice.always),
+                                        )
+                                        StatusLine(choice.note)
+                                    }
                                 }
                                 for (target in contributions) {
-                                    CheckBox(target.label, optional[target.setupAction] == true, { selected: Boolean ->
-                                        optional[target.setupAction] = selected
-                                    })
+                                    key(target.setupAction) {
+                                        CheckBox(
+                                            target.label,
+                                            optional[target.setupAction] == true,
+                                            { selected: Boolean ->
+                                                optional[target.setupAction] = selected
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -154,13 +164,7 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
                         ProjectTemplate.DEFAULT_VERSION
                     },
                 )
-            val compiler = CompilerLocator.find(
-                folder,
-                PropertiesComponent.getInstance().getValue(COMPILER_PATH).orEmpty(),
-                System.getenv("PATH").orEmpty(),
-                Path.of(System.getProperty("user.home")),
-                PluginFiles.native(),
-            )
+            val compiler = CompilerLocator.findForProject(folder)
             // A build of the compiler's own repository is linked, so that a rebuild reaches the game. Otherwise
             // the library the plugin carries is copied in.
             val built = ProjectTemplate.libraryBeside(compiler)
@@ -190,9 +194,5 @@ class As3ProjectWizard : GeneratorNewProjectWizard {
             if (Platform.ANDROID in platforms) GameTargetSetup.selectAndroid(project, "Android")
             if (Platform.IOS in platforms) GameTargetSetup.selectSimulator(project, "iOS")
         }
-    }
-
-    private companion object {
-        const val COMPILER_PATH = "kumikae.as3.compilerPath"
     }
 }

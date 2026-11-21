@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import app.anicanon.kumikae.as3.ui.Column
 import app.anicanon.kumikae.as3.ui.IconButton
 import app.anicanon.kumikae.as3.ui.StatusLine
@@ -19,7 +20,7 @@ import java.awt.FlowLayout
 internal fun DeviceListPage(
     controller: SimulatorWindowController,
     state: SimulatorPanelState,
-    modifier: SwingModifier,
+    modifier: SwingModifier = SwingModifier,
 ) {
     Panel(PanelLayout.Border(), modifier = modifier) {
         Panel(PanelLayout.Border(), modifier = SwingModifier.north().emptyBorder(JBUI.insets(0, 4, 0, 6))) {
@@ -32,7 +33,9 @@ internal fun DeviceListPage(
             Panel(PanelLayout.Border(), modifier = SwingModifier.viewport()) {
                 Column(SwingModifier.north()) {
                     for (device in controller.devices) {
-                        DeviceRow(device, controller, state)
+                        key(device.id) {
+                            DeviceRow(device, controller, state)
+                        }
                     }
                 }
             }

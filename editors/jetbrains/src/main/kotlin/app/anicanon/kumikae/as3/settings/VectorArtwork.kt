@@ -58,6 +58,7 @@ internal object VectorArtwork {
 
     fun decode(file: VirtualFile, edge: Int): Artwork {
         require(edge > 0) { "Target edge must be positive." }
+        require(file.isInLocalFileSystem) { "Vector artwork must reside on the local filesystem." }
         val (w, h) = file.inputStream.use(::size)
         val scale = (edge.toDouble() / maxOf(w, h)).coerceAtLeast(0.01)
         val icon = requireNotNull(IconLoader.findIcon(file.toNioPath().toUri().toURL(), false))

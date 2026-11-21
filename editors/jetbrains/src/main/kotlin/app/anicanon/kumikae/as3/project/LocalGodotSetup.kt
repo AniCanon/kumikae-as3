@@ -98,13 +98,33 @@ internal class LocalGodotSetup(
 
         private fun command(args: List<String>, seconds: Long, label: String): String {
             val process = ProcessBuilder(args).redirectErrorStream(true).start()
+            val captured = java.io.ByteArrayOutputStream()
+            val drainer = Thread(
+                {
+                    process.inputStream.use { input ->
+                        val buf = ByteArray(4096)
+                        var n = input.read(buf)
+                        while (n >= 0) {
+                            val remaining = 4096 - captured.size()
+                            if (remaining > 0) captured.write(buf, 0, minOf(n, remaining))
+                            n = input.read(buf)
+                        }
+                    }
+                },
+                "Kumikae Godot setup output",
+            ).apply {
+                isDaemon = true
+                start()
+            }
             try {
                 if (!process.waitFor(seconds, TimeUnit.SECONDS)) throw IOException("$label timed out.")
-                val output = process.inputStream.use { it.readNBytes(2048).decodeToString().trim() }
+                drainer.join(2000)
+                val output = captured.toByteArray().decodeToString().trim()
                 if (process.exitValue() != 0) throw IOException("$label failed. $output")
                 return output
             } finally {
                 if (process.isAlive) process.destroyForcibly().waitFor()
+                drainer.join(1000)
             }
         }
     }

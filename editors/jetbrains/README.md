@@ -262,7 +262,7 @@ local image into `assets/` with **Browse…** and **Import and Use**. The splash
 project's launch window size, background, filtering and boot stretch mode.
 
 Use **Add Game Target** to create an export preset, **Export** or **Export All** to build existing targets,
-and **Properties** to inspect additional settings entered in Source.
+and **Properties** to inspect, edit, or add settings in `project.godot`.
 
 **Scenes.** Open a `.tscn` file to use the **Scene** editor. Its outline shows each node's type and the AS3
 script attached to it. You can open a script, and attach or detach one. Attaching accepts a script that

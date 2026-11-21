@@ -12,6 +12,8 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VfsUtilCore
@@ -32,14 +34,18 @@ internal fun sceneUsages(project: Project, script: VirtualFile): List<SceneUsage
             ?: return emptyList()
     val relative = VfsUtilCore.getRelativePath(script, root, '/') ?: return emptyList()
     return FilenameIndex.getAllFilesByExt(project, "tscn", GlobalSearchScope.projectScope(project)).flatMap { file ->
+        ProgressManager.checkCanceled()
         if (!VfsUtilCore.isAncestor(root, file, true)) return@flatMap emptyList()
         val source =
             FileDocumentManager.getInstance().getDocument(file)?.immutableCharSequence?.toString()
                 ?: return@flatMap emptyList()
-        runCatching {
+        try {
             SceneDocument(source).nodes.filter { it.script == "res://$relative" }.map { SceneUsage(file, it) }
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            emptyList()
         }
-            .getOrDefault(emptyList())
     }
 }
 
@@ -51,12 +57,20 @@ class FindAttachedScenesAction : AnAction("Find Attached Scene Nodes") {
     override fun actionPerformed(event: AnActionEvent) {
         val project = event.project ?: return
         val script = event.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        ReadAction.nonBlocking<List<SceneUsage>> { sceneUsages(project, script) }.expireWith(project)
+        val editor = event.getData(CommonDataKeys.EDITOR)
+        ReadAction.nonBlocking<List<SceneUsage>> { sceneUsages(project, script) }
+            .inSmartMode(project)
+            .expireWith(project)
             .finishOnUiThread(ModalityState.defaultModalityState()) { usages ->
-                JBPopupFactory.getInstance().createPopupChooserBuilder(usages)
+                val popup = JBPopupFactory.getInstance().createPopupChooserBuilder(usages)
                     .setTitle(if (usages.isEmpty()) "No attached scene nodes" else "Attached scene nodes")
                     .setItemChosenCallback { OpenFileDescriptor(project, it.file, it.node.offset).navigate(true) }
-                    .createPopup().showInBestPositionFor(event.dataContext)
+                    .createPopup()
+                if (editor != null && !editor.isDisposed) {
+                    popup.showInBestPositionFor(editor)
+                } else {
+                    popup.showCenteredInCurrentWindow(project)
+                }
             }.submit(AppExecutorUtil.getAppExecutorService())
     }
 }

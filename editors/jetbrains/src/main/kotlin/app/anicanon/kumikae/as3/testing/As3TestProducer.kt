@@ -34,7 +34,9 @@ class As3TestProducer :
             .resolve(configuration.options.manifest)
             .toAbsolutePath()
             .normalize()
-        val discoveredManifest = tests.first().manifest.toNioPath().toAbsolutePath().normalize()
+        val manifest = tests.first().manifest
+        if (!manifest.isInLocalFileSystem) return false
+        val discoveredManifest = manifest.toNioPath().toAbsolutePath().normalize()
         return configuredManifest == discoveredManifest &&
             configuration.options.cases == tests.joinToString("\n") { it.name }
     }
@@ -46,8 +48,8 @@ internal fun configureTestScope(configuration: As3TestsConfiguration, element: P
     if (tests.isEmpty()) return false
     val manifest = tests.first().manifest
     val root = configuration.project.basePath?.let(Path::of)?.toAbsolutePath()?.normalize()
-    val manifestPath = manifest.toNioPath().toAbsolutePath().normalize()
-    configuration.options.manifest = if (root != null && manifestPath.startsWith(root)) {
+    val manifestPath = if (manifest.isInLocalFileSystem) manifest.toNioPath().toAbsolutePath().normalize() else null
+    configuration.options.manifest = if (root != null && manifestPath != null && manifestPath.startsWith(root)) {
         root.relativize(manifestPath).toString()
     } else {
         manifest.path
