@@ -15,7 +15,7 @@ import tempfile
 
 # Isolated Python excludes the script directory. Import the staging helper shipped beside this file.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from game_export import run_export, stage_game, stage_ios_runtime
+from game_export import install_sigterm_handler, run_export, stage_game, stage_ios_runtime, update_preset_options
 
 
 @contextmanager
@@ -73,14 +73,6 @@ def signing_team(preset, available_teams):
 def prepare_preset(text, section, template, team, bundle):
     if not re.fullmatch(r"preset\.\d+", section):
         raise ValueError("Choose an iOS export preset.")
-    sections = re.split(r"(?m)^[ \t]*(\[[^\]\n]+\])[^\S\n]*$", text)
-    header = f"[{section}.options]"
-    if f"[{section}]" not in sections:
-        raise ValueError("The selected iOS export preset is missing.")
-    if header not in sections:
-        sections[-1] = sections[-1].rstrip("\n") + "\n"
-        sections += [header, "\n"]
-    options = sections.index(header) + 1
     values = {
         "custom_template/debug": '"' + template.replace('\\', '\\\\').replace('"', '\\"') + '"',
         "application/app_store_team_id": '"' + team + '"',
@@ -89,12 +81,12 @@ def prepare_preset(text, section, template, team, bundle):
         "application/code_sign_identity_debug": '"Apple Development"',
         "application/provisioning_profile_uuid_debug": '""',
     }
-    body = sections[options]
-    for key, value in values.items():
-        body = re.sub(r"(?m)^" + re.escape(key) + r"=.*\n?", "", body)
-        body += "\n" + key + "=" + value + "\n"
-    sections[options] = body
-    return "".join(sections)
+    try:
+        return update_preset_options(text, section, values, require_preset=True)
+    except ValueError as error:
+        if "missing" in str(error):
+            raise ValueError("The selected iOS export preset is missing.") from None
+        raise
 
 
 def run(command, timeout=1800):
@@ -148,6 +140,7 @@ def install_and_launch(args):
 
 
 def main():
+    install_sigterm_handler()
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("project", "device", "bundle"):
         parser.add_argument("--" + name, required=True)

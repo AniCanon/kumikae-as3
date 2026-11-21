@@ -24,3 +24,14 @@ class AndroidRunTest(unittest.TestCase):
             tool.install(["adb", "-s", "emulator-5554"], "game.apk")
             self.assertEqual(["adb", "-s", "emulator-5554", "wait-for-device"], run.call_args_list[0].args[0])
             self.assertEqual(["adb", "-s", "emulator-5554", "install", "-r", "game.apk"], run.call_args_list[1].args[0])
+
+    def test_rejects_shell_metacharacters_in_package_and_activity(self):
+        spec = spec_from_file_location("android_run", Path(__file__).resolve().parents[1] / "tools/android_run.py")
+        tool = module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        with self.assertRaises(ValueError):
+            tool.launch_activity("package: name='org.example;id'")
+        with self.assertRaises(ValueError):
+            tool.launch_activity("package: name='org.example.app'\nlaunchable-activity: name='$(touch /tmp/x)'")
+        with self.assertRaises(ValueError):
+            tool.validate_component("org.example.app", "org.example.app/Main;id")

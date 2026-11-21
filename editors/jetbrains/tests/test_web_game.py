@@ -50,3 +50,8 @@ class WebGameTest(unittest.TestCase):
                 products = web_game.game_export.export(project, root, str(godot), root / "kit", [job])
             self.assertTrue(Path(products[0]).is_file())
             self.assertEqual(3, len((root / "calls").read_text().splitlines()))
+
+    def test_preview_handler_ignores_non_integer_log_codes(self):
+        handler = object.__new__(web_game.PreviewHandler)
+        handler.log_request("-", "-")
+        handler.log_request("invalid", "-")

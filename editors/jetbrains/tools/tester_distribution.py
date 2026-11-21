@@ -45,11 +45,13 @@ def run(mode, data):
             print("Continuing with the existing TestFlight build.", flush=True)
             return store_apple.finish(api, app, spec, data["target"], build)
     with tempfile.TemporaryDirectory(prefix="kumikae-testers-") as temp:
-        folder = Path(temp)
+        folder = Path(temp).resolve()
         job = data["job"]
         if job["platform"] != spec["platform"] or not job["store"]:
             raise ValueError("Build target changed. Review the release again.")
         products = game_export.export(root, folder, data["godot"], Path(data["runtime"]), [job], data["signing"], [key])
+        if not products:
+            raise ValueError("Godot did not produce a build artifact.")
         artifact = Path(products[0]).resolve(strict=True)
         if not artifact.is_relative_to(folder):
             raise ValueError("Unexpected build output path.")
@@ -61,6 +63,7 @@ def run(mode, data):
 
 
 if __name__ == "__main__":
+    game_export.install_sigterm_handler()
     try:
         mode = sys.argv[1]
         result = run(mode, json.load(sys.stdin))

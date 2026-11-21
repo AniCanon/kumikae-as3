@@ -20,19 +20,31 @@ def _take_field(buf, units):
         if prefix.isascii():
             if units >= len(buf):
                 return None
-            if buf[units] != "\n":
-                raise ValueError("Truncated AS3 test event")
-            return prefix, buf[units + 1:]
+            if buf[units] == "\n":
+                return prefix, buf[units + 1:]
+            if buf[units] == "\r":
+                if units + 1 >= len(buf):
+                    return None
+                if buf[units + 1] == "\n":
+                    return prefix, buf[units + 2:]
+            raise ValueError("Truncated AS3 test event")
     end = 0
     remaining = units
     while remaining > 0 and end < len(buf):
         remaining -= 2 if ord(buf[end]) > 0xFFFF else 1
         end += 1
+    if remaining < 0:
+        raise ValueError("Truncated AS3 test event")
     if remaining > 0 or end >= len(buf):
         return None
-    if buf[end] != "\n":
-        raise ValueError("Truncated AS3 test event")
-    return buf[:end], buf[end + 1:]
+    if buf[end] == "\n":
+        return buf[:end], buf[end + 1:]
+    if buf[end] == "\r":
+        if end + 1 >= len(buf):
+            return None
+        if buf[end + 1] == "\n":
+            return buf[:end], buf[end + 2:]
+    raise ValueError("Truncated AS3 test event")
 
 
 class StreamParser:

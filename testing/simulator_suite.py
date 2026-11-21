@@ -1,6 +1,7 @@
 """Run a project's registered Godot test scene on an iOS simulator."""
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -60,7 +61,7 @@ def select_preset(presets, platform, requested):
     return matches[0]
 
 
-def prepare(game, exports, preset, scene):
+def prepare(game, exports, preset, scene, folder="tests"):
     presets = platform_presets(exports, "iOS")
     group, _ = select_preset(presets, "iOS", preset)
     options = group + ".options"
@@ -77,7 +78,7 @@ def prepare(game, exports, preset, scene):
             raise ValueError("Another game preset already uses the test bundle identifier.")
     game = setting(game, "application", "config/name", setting(game, "application", "config/name") + " Tests")
     game = setting(game, "application", "run/main_scene", scene)
-    exports = include_test_folder(exports, group)
+    exports = include_test_folder(exports, group, folder)
     exports = setting(exports, options, "application/bundle_identifier", bundle)
     return game, exports, group, bundle
 
@@ -88,7 +89,7 @@ def main():
     parser.add_argument("--case", required=True, help="Godot scene target in kas3-tests.json")
     parser.add_argument("--device", required=True)
     parser.add_argument("--preset", default="")
-    parser.add_argument("--godot", default="godot")
+    parser.add_argument("--godot", default=os.environ.get("KAS3_GODOT", "godot"))
     kit = Path(__file__).resolve().parents[1]
     parser.add_argument("--template", type=Path, default=kit / "ios-with-arm64-simulator.zip")
     parser.add_argument("--ios-library", type=Path, default=kit / "ios")
@@ -107,12 +108,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="kas3-test-game-") as temporary:
         stage = Path(temporary)
         subprocess.run(["rsync", "-aL", *["--exclude=/" + name for name in (".git", ".idea", ".run", ".godot", ".build", "build")],
-                        str(project) + "/", str(stage)], check=True)
+                        str(project) + "/", str(stage)], check=True, timeout=180)
         (stage / "project.godot").write_text(game)
         (stage / "export_presets.cfg").write_text(cfg)
         result = subprocess.run(["/bin/sh", str(build), stage, project / ".godot/ios-tests", args.godot,
                                  args.template.resolve(), args.ios_library.resolve(), setting(cfg, group, "name"), group, bundle],
-                                stdout=subprocess.PIPE, text=True)
+                                stdout=subprocess.PIPE, text=True, timeout=1200)
         print(result.stdout)
         result.check_returncode()
         lines = [line for line in result.stdout.splitlines() if line.strip()]
@@ -120,11 +121,11 @@ def main():
             raise ValueError("The Simulator build did not print the built .app path.")
         product = lines[-1].strip()
         subprocess.run([sys.executable, "-I", str(Path(__file__).with_name("simulator_report.py")), product, "--device", args.device,
-                        "--evidence", project / ".build/verification"], check=True)
+                        "--evidence", project / ".build/verification"], check=True, timeout=360)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         sys.exit(str(error))

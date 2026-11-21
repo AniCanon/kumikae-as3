@@ -189,8 +189,10 @@ Put a manifest named `kas3-tests.json` beside `project.godot`:
     "command": [
       "{compiler}", "run", "tests/ScoringSuite.as", "{sources}",
       "{library}/app/anicanon/kumikae/testing/Assert.as",
+      "{library}/app/anicanon/kumikae/testing/AssertionError.as",
       "{library}/app/anicanon/kumikae/testing/Suite.as",
-      "{library}/app/anicanon/kumikae/testing/TestCase.as"
+      "{library}/app/anicanon/kumikae/testing/TestCase.as",
+      "{library}/app/anicanon/kumikae/testing/TestProtocol.as"
     ],
     "sources": ["src/**/*.as", "tests/**/*.as"],
     "marker": "PASS scoring suite",

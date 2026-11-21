@@ -67,6 +67,8 @@ class DiscoveryTest(unittest.TestCase):
                 folder = root / "tests" / package
                 folder.mkdir(parents=True)
                 (folder / "Score.as").write_text("package " + package + " { public class Score {"
+                    + "[BeforeClass] public static function setup():void {}"
+                    + "[AfterClass] public static function teardown():void {}"
                     + "[Test] public function score():void {} } }")
             manifest = root / "kas3-tests.json"
             manifest.write_text(json.dumps({"version": 1, "tests": [{"name": "Model", "discover": "tests"}]}))

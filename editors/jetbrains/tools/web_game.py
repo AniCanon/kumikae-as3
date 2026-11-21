@@ -42,7 +42,7 @@ def build(project, native, godot, preset):
 
 class PreviewHandler(SimpleHTTPRequestHandler):
     def log_request(self, code="-", size="-"):
-        if int(code) >= 400:
+        if isinstance(code, int) and code >= 400:
             super().log_request(code, size)
 
 
