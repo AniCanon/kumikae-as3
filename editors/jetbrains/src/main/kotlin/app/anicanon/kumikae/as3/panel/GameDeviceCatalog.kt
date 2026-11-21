@@ -9,6 +9,7 @@ import java.awt.event.HierarchyEvent
 import java.awt.event.HierarchyListener
 
 internal class GameDeviceCatalog(
+    private val project: com.intellij.openapi.project.Project,
     private val ios: SimulatorRepository?,
     private val android: AndroidEmulators,
     private val openIos: (SimulatorDevice) -> Unit,
@@ -22,17 +23,21 @@ internal class GameDeviceCatalog(
     private var graphics by mutableStateOf(android.graphics)
     private var androidStatus by mutableStateOf("Loading emulators…")
 
+    private val companionWorker = BackgroundWorker("Companion devices")
+    private var groups by mutableStateOf(emptyList<DeviceGroup>())
+    private var loadingGroups by mutableStateOf(false)
     private var loadingIos by mutableStateOf(false)
     private var loadingAndroid by mutableStateOf(false)
     val component = composePanel(this) {
         DeviceCatalogView(
-            simulators.takeIf { ios != null }, emulators, iosStatus, androidStatus, loadingIos || loadingAndroid,
+            simulators.takeIf { ios != null }, emulators, iosStatus, androidStatus,
+            loadingIos || loadingAndroid || loadingGroups,
             graphics, openIos, openAndroid,
             { value ->
                 graphics = value
                 android.graphics = value
             },
-            ::refresh,
+            ::refresh, groups,
         )
     }
 
@@ -49,7 +54,17 @@ internal class GameDeviceCatalog(
     }
 
     private fun refresh() {
-        if (loadingIos || loadingAndroid) return
+        if (loadingIos || loadingAndroid || loadingGroups) return
+        val providers = DeviceCatalogContribution.EP.extensionList
+        if (providers.isNotEmpty()) {
+            loadingGroups = true
+            companionWorker.submit({ providers.map { it.read(project) } }) { result ->
+                loadingGroups = false
+                result.onSuccess { groups = it }
+            }
+        } else {
+            groups = emptyList()
+        }
         ios?.let { repository ->
             loadingIos = true
             iosWorker.submit({
@@ -75,5 +90,6 @@ internal class GameDeviceCatalog(
         component.removeHierarchyListener(visibility)
         iosWorker.dispose()
         androidWorker.dispose()
+        companionWorker.dispose()
     }
 }

@@ -23,7 +23,7 @@ rules hold across all three:
 | `src/main/kotlin/.../run/` | Run configurations and destinations for Godot desktop, iOS and Android |
 | `src/main/kotlin/.../testing/` | The AS3 Tests run configuration, gutter actions and result tree |
 | `src/main/kotlin/.../settings/`, `.../scene/` | The `project.godot`, artwork gallery, GDScript overview and scene editors |
-| `src/main/kotlin/.../panel/` | The Devices tool window (Simulators catalog, iOS and Android views) |
+| `src/main/kotlin/.../panel/` | The Devices tool window (device catalog, iOS and Android views) |
 | `src/main/kotlin/.../ui/` | The Compose host and the shared composables |
 | `src/main/resources/META-INF/` | `plugin.xml` and the optional descriptors for Rider and IntelliJ IDEA |
 | `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
@@ -134,6 +134,12 @@ SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
     DevicePage               toolbar, framed device with zoom, console drawer
     SimulatorScreen          native: paints the picture, turns the mouse into gestures
 ```
+
+Companion plugins can contribute a group through `app.anicanon.kumikae.as3.deviceGroup`, with
+a `label` and an `implementation` of `Function<Project, List<javax.swing.Action>>`. The catalog queries
+providers on a background worker when opened or refreshed. An empty result shows **Disconnected**.
+Each action supplies its device name, icon and short description. Selecting a device invokes its
+action on the UI thread. The provider owns discovery and run-configuration selection.
 
 ### The service
 

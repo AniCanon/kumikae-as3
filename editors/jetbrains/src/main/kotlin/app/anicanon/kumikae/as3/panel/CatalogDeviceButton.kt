@@ -26,9 +26,9 @@ internal data class CatalogDevice(
     val running: Boolean,
     val android: Boolean,
     val available: Boolean,
-) {
-    val action get() = if (running) "Open" else "Start"
-}
+    val action: String = if (running) "Open" else "Start",
+    val icon: javax.swing.Icon? = null,
+)
 
 /** One focusable action for the whole row, including its trailing Start or Open affordance. */
 internal class CatalogDeviceButton : JButton() {
@@ -103,6 +103,10 @@ internal class CatalogDeviceButton : JButton() {
     }
 
     private fun paintDevice(g: Graphics2D, left: Int, row: CatalogDevice) {
+        row.icon?.let {
+            it.paintIcon(this, g, left + (JBUI.scale(32) - it.iconWidth) / 2, (height - it.iconHeight) / 2)
+            return
+        }
         val icon = g.create() as Graphics2D
         try {
             val size = JBUI.scale(32)

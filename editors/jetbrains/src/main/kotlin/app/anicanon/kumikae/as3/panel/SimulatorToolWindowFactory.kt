@@ -21,7 +21,7 @@ class SimulatorToolWindowFactory :
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val ios = if (SystemInfo.isMac) project.service<SimulatorHost>().repository else null
         val emulators = androidEmulators(project)
-        val catalog = GameDeviceCatalog(ios, emulators, { device ->
+        val catalog = GameDeviceCatalog(project, ios, emulators, { device ->
             val content = iosContent(project, toolWindow)
             toolWindow.contentManager.setSelectedContent(content)
             content.getUserData(IOS)?.openDevice(device)
@@ -30,14 +30,14 @@ class SimulatorToolWindowFactory :
             toolWindow.contentManager.setSelectedContent(content)
             content.getUserData(ANDROID)?.openAvd(device)
         })
-        val content = ContentFactory.getInstance().createContent(catalog.component, SIMULATORS_TAB, false)
+        val content = ContentFactory.getInstance().createContent(catalog.component, DEVICES_TAB, false)
         content.setDisposer(catalog)
         toolWindow.contentManager.addContent(content)
     }
 
     companion object {
         private const val TOOL_WINDOW_ID = "Game Devices"
-        private const val SIMULATORS_TAB = "Simulators"
+        private const val DEVICES_TAB = "Devices"
         private const val IOS_TAB = "iOS"
         private const val ANDROID_TAB = "Android"
         private val IOS = Key.create<SimulatorToolWindow>("kumikae.ios.window")

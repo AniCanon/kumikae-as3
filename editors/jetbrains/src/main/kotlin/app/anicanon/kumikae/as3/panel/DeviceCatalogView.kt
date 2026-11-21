@@ -38,8 +38,9 @@ internal fun DeviceCatalogView(
     openAndroid: (AndroidAvd) -> Unit,
     setGraphics: (AndroidGraphics) -> Unit,
     refresh: () -> Unit,
+    groups: List<DeviceGroup> = emptyList(),
 ) {
-    val count = ios.orEmpty().size + android.size
+    val count = ios.orEmpty().size + android.size + groups.sumOf { it.devices.size }
     val active = ios.orEmpty().count { it.state == BOOTED } + android.count { it.serial != null }
     val summary = when {
         refreshing -> "Refreshing devices…"
@@ -81,6 +82,25 @@ internal fun DeviceCatalogView(
                                 }
                             }
                             if (iosStatus.isNotBlank()) StatusLine(iosStatus)
+                        }
+                    }
+                    for (group in groups) {
+                        CatalogSection(group.label)
+                        SurfaceGroup {
+                            for (action in group.devices) {
+                                CatalogRow(
+                                    action.getValue(javax.swing.Action.NAME).toString(),
+                                    action.getValue(javax.swing.Action.SHORT_DESCRIPTION)?.toString() ?: "Connected",
+                                    running = true,
+                                    android = false,
+                                    available = action.isEnabled,
+                                    verb = "Select",
+                                    icon =
+                                    action.getValue(javax.swing.Action.SMALL_ICON) as? Icon
+                                        ?: AllIcons.Nodes.Console,
+                                ) { action.actionPerformed(java.awt.event.ActionEvent(action, 0, "select")) }
+                            }
+                            if (group.devices.isEmpty()) StatusLine(group.emptyStatus)
                         }
                     }
                     var configure by remember { mutableStateOf(false) }
@@ -171,10 +191,12 @@ private fun CatalogRow(
     running: Boolean,
     android: Boolean,
     available: Boolean = true,
+    verb: String = if (running) "Open" else "Start",
+    icon: Icon? = null,
     click: () -> Unit,
 ) {
     SwingNode(factory = { CatalogDeviceButton() }, update = {
-        set(CatalogDevice(title, detail, running, android, available)) { device = it }
+        set(CatalogDevice(title, detail, running, android, available, verb, icon)) { device = it }
         set(click) { activate = it }
     })
 }

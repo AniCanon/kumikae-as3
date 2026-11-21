@@ -366,6 +366,11 @@ internal object UiProbeProjectExperience {
         val android = AndroidAvd("Pixel_9")
         var opened = ""
         var refreshes = 0
+        val sample = object : javax.swing.AbstractAction("Example device") {
+            override fun actionPerformed(event: java.awt.event.ActionEvent?) {
+                opened = "example"
+            }
+        }
         val mode = mutableStateOf(AndroidGraphics.DEVICE)
         lateinit var panel: JComponent
         lateinit var frame: JFrame
@@ -373,7 +378,11 @@ internal object UiProbeProjectExperience {
             panel = composePanel(owner) {
                 DeviceCatalogView(
                     listOf(stopped, running), listOf(android), "", "", false, mode.value,
-                    { opened = it.id }, { opened = it.name }, { mode.value = it }, { refreshes++ },
+                    {
+                        opened = it.id
+                    }, {
+                        opened = it.name
+                    }, { mode.value = it }, { refreshes++ }, listOf(DeviceGroup("External devices", listOf(sample))),
                 )
             }
             frame = JFrame().apply { contentPane.add(panel) }
@@ -391,6 +400,8 @@ internal object UiProbeProjectExperience {
                 check(opened == stopped.id)
                 button("Start Pixel 9").doClick()
                 check(opened == android.name)
+                button("Select Example device").doClick()
+                check(opened == "example")
                 button("Refresh devices").doClick()
                 button("Emulator graphics").doClick()
             }
