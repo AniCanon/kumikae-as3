@@ -221,8 +221,9 @@ builds between the two it was tested on.
 A `gameTarget` contribution supplies its label and setup action for **Add target**. To appear in
 **Build & Release**, it also supplies a settings action and a `configuredWhen` class implementing
 `java.util.function.Predicate<VirtualFile>`. The editor calls this predicate on a background thread
-with the game's `project.godot` file when the editor is selected. The predicate checks existing
-configuration without running setup. The settings action receives the same game file.
+with the game's `project.godot` file when the editor is selected, after setup, and when game files
+change in the active editor. The predicate checks existing
+configuration without running setup. Setup and settings actions receive the same game file.
 
 ## How it's tested
 

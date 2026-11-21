@@ -65,6 +65,7 @@ class UiProbeStarter : ApplicationStarter {
     }
 
     private fun checkThemes(destination: Path, deviceSettingsOnly: Boolean = false, godotSetupOnly: Boolean = false) {
+        if (!godotSetupOnly) UiProbeTargetSettings.run()
         val manager = LafManager.getInstance()
         val original = manager.currentUIThemeLookAndFeel
         val available = manager.installedThemes.toList()

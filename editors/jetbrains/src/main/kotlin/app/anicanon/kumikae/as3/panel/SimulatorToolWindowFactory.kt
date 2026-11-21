@@ -37,7 +37,7 @@ class SimulatorToolWindowFactory :
 
     companion object {
         private const val TOOL_WINDOW_ID = "Game Devices"
-        private const val DEVICES_TAB = "Devices"
+        internal const val DEVICES_TAB = "Devices"
         private const val IOS_TAB = "iOS"
         private const val ANDROID_TAB = "Android"
         private val IOS = Key.create<SimulatorToolWindow>("kumikae.ios.window")

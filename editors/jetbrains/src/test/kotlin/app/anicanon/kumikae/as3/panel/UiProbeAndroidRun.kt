@@ -44,7 +44,12 @@ internal object UiProbeAndroidRun {
                 val root = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
                 if (System.getenv("KUMIKAE_EXPECT_TARGET_PROVIDER") == "1") {
                     val providers = GameTargetContribution.EP.extensionList
-                    check(providers.any { ActionManager.getInstance().getAction(it.setupAction) != null })
+                    check(
+                        providers.any {
+                            it.setupAction != "UiProbe.TargetSettings" &&
+                                ActionManager.getInstance().getAction(it.setupAction) != null
+                        },
+                    )
                 }
                 UiProbeGameSettings.run(project, root, output)
                 val source = Files.readString(folder.resolve("export_presets.cfg"))
@@ -90,13 +95,17 @@ internal object UiProbeAndroidRun {
                 val window = checkNotNull(ToolWindowManager.getInstance(project).getToolWindow("Game Devices"))
                 app.invokeAndWait {
                     window.show {
-                        window.contentManager.findContent("Simulators")?.let(window.contentManager::setSelectedContent)
+                        window.contentManager.findContent(
+                            SimulatorToolWindowFactory.DEVICES_TAB,
+                        )?.let(window.contentManager::setSelectedContent)
                     }
                 }
                 await("running emulator in Devices", 30) {
                     var clicked = false
                     app.invokeAndWait {
-                        val content = window.contentManager.findContent("Simulators")?.component
+                        val content = window.contentManager.findContent(
+                            SimulatorToolWindowFactory.DEVICES_TAB,
+                        )?.component
                         content?.let(::children)?.filterIsInstance<JButton>()?.firstOrNull {
                             it.accessibleContext.accessibleName == "Open $avd"
                         }?.let {

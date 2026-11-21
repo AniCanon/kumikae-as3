@@ -5,6 +5,15 @@
     <vendor>AniCanon</vendor>
     <depends>com.intellij.modules.platform</depends>
     <depends>app.anicanon.kumikae.as3</depends>
+    <extensions defaultExtensionNs="app.anicanon.kumikae.as3">
+        <deviceGroup label="Probe devices" implementation="app.anicanon.kumikae.as3.panel.UiProbeMissingDriver"/>
+        <gameTarget label="Probe target" setupAction="UiProbe.TargetSettings"
+                    settingsAction="UiProbe.TargetSettings"
+                    configuredWhen="app.anicanon.kumikae.as3.panel.UiProbeTargetMarker"/>
+    </extensions>
+    <actions>
+        <action id="UiProbe.TargetSettings" class="app.anicanon.kumikae.as3.panel.UiProbeTargetSettingsAction"/>
+    </actions>
     <extensions defaultExtensionNs="com.intellij">
         <appStarter id="kumikae-as3-ui-check" implementation="app.anicanon.kumikae.as3.panel.UiProbeStarter"/>
     </extensions>

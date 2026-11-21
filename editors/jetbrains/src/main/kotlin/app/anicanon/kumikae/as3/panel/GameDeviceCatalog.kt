@@ -5,11 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.project.Project
 import java.awt.event.HierarchyEvent
 import java.awt.event.HierarchyListener
 
 internal class GameDeviceCatalog(
-    private val project: com.intellij.openapi.project.Project,
+    private val project: Project,
     private val ios: SimulatorRepository?,
     private val android: AndroidEmulators,
     private val openIos: (SimulatorDevice) -> Unit,
@@ -23,7 +24,7 @@ internal class GameDeviceCatalog(
     private var graphics by mutableStateOf(android.graphics)
     private var androidStatus by mutableStateOf("Loading emulators…")
 
-    private val companionWorker = BackgroundWorker("Companion devices")
+    private var companionWorker = BackgroundWorker("Companion devices")
     private var groups by mutableStateOf(emptyList<DeviceGroup>())
     private var loadingGroups by mutableStateOf(false)
     private var loadingIos by mutableStateOf(false)
@@ -51,10 +52,19 @@ internal class GameDeviceCatalog(
 
     init {
         component.addHierarchyListener(visibility)
+        DeviceCatalogContribution.EP.addChangeListener(
+            Runnable {
+                companionWorker.dispose()
+                companionWorker = BackgroundWorker("Companion devices")
+                groups = emptyList()
+                loadingGroups = false
+                if (showing) refreshGroups()
+            },
+            this,
+        )
     }
 
-    private fun refresh() {
-        if (loadingIos || loadingAndroid || loadingGroups) return
+    private fun refreshGroups() {
         val providers = DeviceCatalogContribution.EP.extensionList
         if (providers.isNotEmpty()) {
             loadingGroups = true
@@ -65,6 +75,11 @@ internal class GameDeviceCatalog(
         } else {
             groups = emptyList()
         }
+    }
+
+    private fun refresh() {
+        if (loadingIos || loadingAndroid || loadingGroups) return
+        refreshGroups()
         ios?.let { repository ->
             loadingIos = true
             iosWorker.submit({

@@ -30,7 +30,8 @@ class GameTargetContribution : CustomLoadingExtensionPointBean<Predicate<Virtual
     fun hasSettings(game: VirtualFile) =
         settingsAction.isNotBlank() && configuredWhen.isNotBlank() && instance.test(game)
 
-    fun configure(project: Project) = invoke(setupAction, project, null)
+    @JvmOverloads
+    fun configure(project: Project, game: VirtualFile? = null) = invoke(setupAction, project, game)
 
     fun openSettings(project: Project, game: VirtualFile) = invoke(settingsAction, project, game)
 

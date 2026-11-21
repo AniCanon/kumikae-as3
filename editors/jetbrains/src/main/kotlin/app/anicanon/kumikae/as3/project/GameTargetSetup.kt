@@ -22,8 +22,9 @@ internal class GameTargetSetup(private val project: Project, private val root: V
     private fun file() = root.findChild("export_presets.cfg")
     private fun exports() = file()?.let(::text).orEmpty()
     fun presets() = GameTargets.presets(GodotConfig(exports()))
+    val projectFile: VirtualFile get() = requireNotNull(root.findChild("project.godot")) { "Missing project.godot." }
+
     fun defaultIdentifier(): String {
-        val projectFile = requireNotNull(root.findChild("project.godot")) { "Missing project.godot." }
         val config = GodotConfig(text(projectFile))
         val stored = config.string("application", "config/kumikae_package")
         if (stored.isNotBlank()) return stored

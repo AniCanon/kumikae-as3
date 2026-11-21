@@ -20,9 +20,18 @@ class DeviceCatalogContribution : CustomLoadingExtensionPointBean<Function<Proje
         DeviceGroup(label, instance.apply(project))
     } catch (error: com.intellij.openapi.progress.ProcessCanceledException) {
         throw error
+    } catch (error: LinkageError) {
+        unavailable(error)
     } catch (error: Exception) {
-        DeviceGroup(label, emptyList(), error.message ?: "Device discovery failed.")
+        unavailable(error)
     }
+
+    private fun unavailable(error: Throwable) = DeviceGroup(
+        label,
+        emptyList(),
+        error.message ?: "Device discovery failed.",
+    )
+
     companion object {
         val EP = ExtensionPointName.create<DeviceCatalogContribution>("app.anicanon.kumikae.as3.deviceGroup")
     }
