@@ -123,10 +123,21 @@ internal class AndroidDisplayFeed(
                     onUpdate()
                 }
             } finally {
-                process.destroy()
-                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly().waitFor()
-                Files.deleteIfExists(slot)
-                Files.deleteIfExists(directory)
+                // Closing interrupts this thread; clear the flag so cleanup waits and deletes complete.
+                Thread.interrupted()
+                try {
+                    process.destroy()
+                    try {
+                        if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                            process.destroyForcibly().waitFor(2, TimeUnit.SECONDS)
+                        }
+                    } catch (_: InterruptedException) {
+                        process.destroyForcibly()
+                    }
+                } finally {
+                    runCatching { Files.deleteIfExists(slot) }
+                    runCatching { Files.deleteIfExists(directory) }
+                }
             }
         }
     }

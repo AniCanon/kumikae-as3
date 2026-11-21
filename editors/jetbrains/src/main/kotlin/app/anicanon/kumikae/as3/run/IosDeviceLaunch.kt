@@ -27,7 +27,11 @@ internal object IosDeviceLaunch {
         if (signedApp.isNotBlank()) {
             arguments += listOf("--app", folder.resolve(signedApp).toString())
         } else {
-            val preset = target ?: GameTargets.ios(Files.readString(folder.resolve("export_presets.cfg")), "")
+            val preset = try {
+                target ?: GameTargets.ios(Files.readString(folder.resolve("export_presets.cfg")), "")
+            } catch (error: Exception) {
+                throw ExecutionException(error.message ?: "Cannot read iOS export presets.", error)
+            }
             val godot = IdeGodot.find()
                 ?: throw ExecutionException("Install Godot to export the game.")
             val template = preset.template.takeIf(String::isNotBlank)?.let { folder.resolve(it.removePrefix("res://")) }

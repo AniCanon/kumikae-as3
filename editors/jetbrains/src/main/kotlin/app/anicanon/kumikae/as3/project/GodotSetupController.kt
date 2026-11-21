@@ -22,7 +22,7 @@ internal class GodotSetupController(private val setup: GodotSetup, private val w
         if (busy) return
         busy = true
         message = status
-        worker.submit(work) { result ->
+        val submitted = worker.submit(work) { result ->
             busy = false
             result.onSuccess {
                 installation = it
@@ -30,6 +30,10 @@ internal class GodotSetupController(private val setup: GodotSetup, private val w
             }.onFailure {
                 message = it.localizedMessage ?: "Godot setup failed. Try again."
             }
+        }
+        if (!submitted) {
+            busy = false
+            message = ""
         }
     }
 }

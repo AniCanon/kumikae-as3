@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.settings
 
 import com.google.gson.Gson
+import com.google.gson.JsonParseException
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.ide.passwordSafe.PasswordSafe
@@ -101,13 +102,30 @@ internal class AndroidUploadKeys(project: Project, root: String, preset: String)
         val saved = requireNotNull(PasswordSafe.instance.get(attributes)) {
             "Unlock Rider’s password store or configure the upload key again."
         }
-        val fields = Gson().fromJson(saved.userName, Array<String>::class.java)
-        return UploadKey(fields[0], fields[1], requireNotNull(saved.getPasswordAsString()))
+        return parseUploadKey(saved.userName, saved.getPasswordAsString())
     }
 
     fun save(key: UploadKey?) {
         val credentials = key?.let { Credentials(Gson().toJson(arrayOf(it.path, it.user)), it.password) }
         PasswordSafe.instance.set(attributes, credentials)
         local.setValue(reference, key != null, false)
+    }
+
+    companion object {
+        internal fun parseUploadKey(userName: String?, password: String?): UploadKey {
+            val fields = try {
+                Gson().fromJson(userName, Array<String>::class.java)
+            } catch (_: JsonParseException) {
+                null
+            }
+            require(fields != null && fields.size >= 2 && fields[0] != null && fields[1] != null) {
+                "Saved upload key details are unreadable. Configure the upload key again."
+            }
+            return UploadKey(
+                fields[0],
+                fields[1],
+                requireNotNull(password) { "Saved upload key password is missing. Configure the upload key again." },
+            )
+        }
     }
 }

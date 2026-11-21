@@ -7,15 +7,24 @@ import com.intellij.openapi.progress.ProcessCanceledException
 
 internal interface SettingsRepository {
     val hasXcodeTeams: Boolean get() = false
-    fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) = ready(Result.success(emptyList()))
-    fun openXcode(ready: (Result<Unit>) -> Unit) = ready(Result.success(Unit))
+    fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit): Boolean {
+        ready(Result.success(emptyList()))
+        return true
+    }
+    fun openXcode(ready: (Result<Unit>) -> Unit): Boolean {
+        ready(Result.success(Unit))
+        return true
+    }
     fun preview(path: String): Artwork? = null
     fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) = ready(preview(path))
     fun load(): ProjectSettings
     fun save(expected: ProjectSettings, draft: ProjectSettings): ProjectSettings
 }
 
-internal class SettingsController(private val repository: SettingsRepository) {
+internal class SettingsController(
+    private val repository: SettingsRepository,
+    private val onDirtyChanged: (Boolean) -> Unit = {},
+) {
     var preview by mutableStateOf<Artwork?>(null)
         private set
     var splashPreview by mutableStateOf<Artwork?>(null)
@@ -64,7 +73,7 @@ internal class SettingsController(private val repository: SettingsRepository) {
         requestedTeams = true
         teamsBusy = true
         teamStatus = "Looking for teams in Xcode…"
-        repository.loadTeams { result ->
+        val accepted = repository.loadTeams { result ->
             teamsBusy = false
             result.onSuccess {
                 teams = it
@@ -72,12 +81,16 @@ internal class SettingsController(private val repository: SettingsRepository) {
                     if (it.isEmpty()) "Add an account in Xcode → Settings → Apple Accounts, then refresh." else ""
             }.onFailure { teamStatus = "Couldn’t read Xcode teams. Refresh or enter the team ID." }
         }
+        if (!accepted) {
+            teamsBusy = false
+            teamStatus = ""
+        }
     }
 
     fun openXcode() {
         if (teamsBusy || !hasXcodeTeams) return
         teamsBusy = true
-        repository.openXcode { result ->
+        val accepted = repository.openXcode { result ->
             teamsBusy = false
             teamStatus = if (result.isSuccess) {
                 "In Xcode, open Settings → Apple Accounts. Refresh here after signing in."
@@ -85,6 +98,7 @@ internal class SettingsController(private val repository: SettingsRepository) {
                 "Couldn’t open Xcode. Check that Xcode is installed on this Mac."
             }
         }
+        if (!accepted) teamsBusy = false
     }
 
     private var original: ProjectSettings? = null
@@ -95,10 +109,16 @@ internal class SettingsController(private val repository: SettingsRepository) {
     var dirty by mutableStateOf(false)
         private set
 
+    private fun updateDirty(value: Boolean) {
+        if (dirty == value) return
+        dirty = value
+        onDirtyChanged(value)
+    }
+
     fun reload() {
         try {
             val loaded = repository.load()
-            dirty = false
+            updateDirty(false)
             original = loaded
             draft = loaded
             previews(loaded)
@@ -113,18 +133,39 @@ internal class SettingsController(private val repository: SettingsRepository) {
 
     fun edit(change: (ProjectSettings) -> ProjectSettings) {
         val previous = draft
-        draft = draft?.let(change)
+        val updated = draft?.let(change)
+        draft = if (previous != null && updated != null) reconcilePropertyEdits(previous, updated) else updated
         draft?.let { previews(it, previous) }
         val value = draft ?: return
         if (value == previous) return
-        dirty = try {
+        val nextDirty = try {
             value.write(value.projectText, value.exportText) != (value.projectText to value.exportText)
         } catch (canceled: ProcessCanceledException) {
             throw canceled
         } catch (_: Exception) {
             true
         }
+        updateDirty(nextDirty)
         status = if (dirty) "Unsaved changes" else ""
+    }
+
+    private fun reconcilePropertyEdits(previous: ProjectSettings, updated: ProjectSettings): ProjectSettings {
+        if (updated.propertyEdits.isEmpty()) return updated
+        val superseded = mutableListOf<ConfigKey>()
+        if (updated.name != previous.name) superseded += ConfigKey("application", "config/name")
+        if (updated.version != previous.version) superseded += ConfigKey("application", "config/version")
+        if (updated.mainScene != previous.mainScene) superseded += ConfigKey("application", "run/main_scene")
+        if (updated.icon != previous.icon) superseded += ConfigKey("application", "config/icon")
+        if (updated.splash != previous.splash) superseded += ConfigKey("application", "boot_splash/image")
+        if (updated.stretch != previous.stretch) superseded += ConfigKey("display", "window/stretch/mode")
+        if (updated.aspect != previous.aspect) superseded += ConfigKey("display", "window/stretch/aspect")
+        if (updated.width != previous.width) superseded += ConfigKey("display", "window/size/viewport_width")
+        if (updated.height != previous.height) superseded += ConfigKey("display", "window/size/viewport_height")
+        if (updated.orientation != previous.orientation) {
+            superseded += ConfigKey("display", "window/handheld/orientation")
+        }
+        if (superseded.isEmpty()) return updated
+        return updated.copy(propertyEdits = updated.propertyEdits - superseded.toSet())
     }
 
     fun readyToExport(presets: List<ExportPreset>): Boolean {
@@ -141,7 +182,7 @@ internal class SettingsController(private val repository: SettingsRepository) {
         val value = draft ?: return
         try {
             val saved = repository.save(expected, value)
-            dirty = false
+            updateDirty(false)
             original = saved
             draft = saved
             previews(saved)

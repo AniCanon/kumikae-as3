@@ -31,6 +31,9 @@ internal class ProjectArtworkLibrary(private val root: VirtualFile, private val 
 
     fun importFile(path: String): String {
         val source = requireNotNull(external?.takeIf { it.isValid && it.url == path }) { "The chosen image moved." }
+        require(source.isInLocalFileSystem && root.isInLocalFileSystem) {
+            "Image import requires local files on disk."
+        }
         val result = ProjectImageImport.copy(source.toNioPath(), root.toNioPath())
         val target = root.toNioPath().resolve(result.removePrefix("res://"))
         LocalFileSystem.getInstance().refreshAndFindFileByNioFile(target)

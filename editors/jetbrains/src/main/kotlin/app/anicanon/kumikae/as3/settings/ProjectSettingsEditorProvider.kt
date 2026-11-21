@@ -32,6 +32,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.beans.PropertyChangeListener
+import java.beans.PropertyChangeSupport
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -57,8 +58,12 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     } else {
         requireNotNull(file.parent.findChild("project.godot"))
     }
+    private val changes = PropertyChangeSupport(this)
     private val teamWorker = BackgroundWorker("kumikae-xcode-teams").also { Disposer.register(this, it) }
-    private val controller = SettingsController(IdeSettingsRepository(project, gameFile, this, teamWorker)).also {
+    private val controller = SettingsController(
+        IdeSettingsRepository(project, gameFile, this, teamWorker),
+        onDirtyChanged = { modified -> changes.firePropertyChange(PROP_MODIFIED, !modified, modified) },
+    ).also {
         it.reload()
     }
     private val configuredKeys = mutableStateMapOf<String, Boolean>()
@@ -237,11 +242,14 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     override fun setState(state: FileEditorState) = Unit
     override fun isModified() = controller.dirty
     override fun isValid() = file.isValid
-    override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
-    override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
+    override fun addPropertyChangeListener(listener: PropertyChangeListener) =
+        changes.addPropertyChangeListener(listener)
+    override fun removePropertyChangeListener(listener: PropertyChangeListener) =
+        changes.removePropertyChangeListener(listener)
     override fun dispose() = Unit
 
     private companion object {
+        const val PROP_MODIFIED = "modified"
         val UID_PATTERN = Regex("""uid="(uid://[^"]+)"""")
     }
 }

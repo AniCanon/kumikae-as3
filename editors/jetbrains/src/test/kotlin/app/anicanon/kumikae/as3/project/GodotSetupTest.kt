@@ -71,6 +71,15 @@ class GodotSetupTest {
         assertEquals("", controller.message)
     }
 
+    @Test fun `rejected work submission does not leave setup controller busy`() {
+        val tasks = ManualBackgroundTasks()
+        tasks.dispose()
+        val controller = GodotSetupController(LocalGodotSetup({ emptyList() }, root), tasks)
+        controller.detect()
+        assertFalse(controller.busy)
+        assertEquals("", controller.message)
+    }
+
     private fun executable(name: String, version: String): Path {
         val file = root.resolve(name)
         Files.createDirectories(file.parent)

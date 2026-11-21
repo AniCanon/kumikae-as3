@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.project
 
 import app.anicanon.kumikae.as3.PluginFiles
+import app.anicanon.kumikae.as3.scene.resolveProjectResource
 import app.anicanon.kumikae.as3.settings.GameArtwork
 import app.anicanon.kumikae.as3.settings.GodotConfig
 import com.intellij.icons.AllIcons
@@ -12,6 +13,7 @@ import com.intellij.ide.projectView.impl.nodes.PsiFileNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
@@ -19,16 +21,30 @@ import javax.swing.Icon
 
 internal class GameRootNode(private val game: Project, node: PsiDirectoryNode) : PsiDirectoryNode(node) {
     private val projectFile get() = virtualFile?.findChild("project.godot")
+    private var cachedIconKey: Pair<String, Long>? = null
+    private var cachedIcon: Icon = PluginFiles.mark
+
     override fun update(data: PresentationData) {
         super.update(data)
         val config = projectFile?.let { FileDocumentManager.getInstance().getDocument(it) } ?: return
-        val identity = runCatching { GodotConfig(config.text) }.getOrNull() ?: return
+        val identity = try {
+            GodotConfig(config.text)
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            return
+        }
         val gameName = identity.string("application", "config/name")
         if (gameName.isNotBlank()) data.presentableText = gameName
-        val image = virtualFile?.let {
-            GameArtwork.preview(it, identity.string("application", "config/icon"))
+        val root = virtualFile
+        val iconPath = identity.string("application", "config/icon")
+        val stamp = root?.let { resolveProjectResource(it, iconPath)?.modificationStamp } ?: -1L
+        val key = iconPath to stamp
+        if (cachedIconKey != key) {
+            cachedIconKey = key
+            cachedIcon = root?.let { GameArtwork.preview(it, iconPath)?.treeIcon } ?: PluginFiles.mark
         }
-        data.setIcon(image?.treeIcon ?: PluginFiles.mark)
+        data.setIcon(cachedIcon)
     }
     override fun canNavigate() = projectFile != null
     override fun navigate(requestFocus: Boolean) {

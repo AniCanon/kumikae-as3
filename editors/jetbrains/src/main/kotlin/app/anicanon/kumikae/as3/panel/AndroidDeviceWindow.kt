@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.Column
@@ -16,6 +17,7 @@ import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import java.awt.EventQueue
+import java.awt.event.HierarchyEvent
 import java.awt.event.HierarchyListener
 import javax.swing.Timer
 
@@ -57,11 +59,13 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
             if (current == null) {
                 Column(SwingModifier.north()) {
                     for (device in devices) {
-                        TitleButton(
-                            device.name.replace('_', ' '),
-                            if (device.serial == null) "Start emulator" else "Open running emulator",
-                            { choose(device) },
-                        )
+                        key(device.name, device.serial) {
+                            TitleButton(
+                                device.name.replace('_', ' '),
+                                if (device.serial == null) "Start emulator" else "Open running emulator",
+                                { choose(device) },
+                            )
+                        }
                     }
                 }
             } else {
@@ -87,8 +91,8 @@ internal class AndroidDeviceWindow(private val repository: AndroidEmulators) : D
             status = it
         }
     }
-    private val visibility = HierarchyListener {
-        if (disposed) return@HierarchyListener
+    private val visibility = HierarchyListener { event ->
+        if (disposed || (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong()) == 0L) return@HierarchyListener
         if (component.isShowing) {
             if (!refresh.isRunning) {
                 refresh()

@@ -2,6 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 import app.anicanon.kumikae.as3.PluginFiles
 import com.google.gson.Gson
+import com.google.gson.JsonParseException
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.ide.passwordSafe.PasswordSafe
@@ -73,7 +74,7 @@ internal class TesterAccess(private val root: Path, preset: ExportPreset, privat
     private val credentials = CredentialAttributes("Kumikae AS3 tester distribution · $id")
 
     override fun read(): TesterConnection? = PasswordSafe.instance.get(credentials)?.getPasswordAsString()?.let {
-        Gson().fromJson(it, TesterConnection::class.java)
+        parseTesterConnection(it)
     }
 
     override fun remember(connection: TesterConnection?) {
@@ -107,9 +108,24 @@ internal class TesterAccess(private val root: Path, preset: ExportPreset, privat
             val exit = process.waitFor()
             val reply = output.get()
             check(exit == 0) { errors.get().trim().takeLast(1500).ifEmpty { "Could not connect to the store." } }
-            return Gson().fromJson(reply, TesterConnection::class.java)
+            return requireNotNull(parseTesterConnection(reply)) {
+                "Store connection returned an unreadable response."
+            }
         } finally {
             if (process.isAlive) process.destroyForcibly()
+        }
+    }
+
+    companion object {
+        internal fun parseTesterConnection(raw: String?): TesterConnection? {
+            if (raw.isNullOrBlank()) return null
+            val parsed = try {
+                Gson().fromJson(raw, TesterConnection::class.java)
+            } catch (_: JsonParseException) {
+                return null
+            } ?: return null
+            if (parsed.account == null || parsed.label == null || parsed.targets == null) return null
+            return parsed
         }
     }
 }

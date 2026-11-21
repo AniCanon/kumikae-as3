@@ -477,11 +477,14 @@ internal object UiProbeProjectExperience {
 
 internal class UiProbeSettingsRepository : SettingsRepository {
     override val hasXcodeTeams = true
-    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit) = ready(
-        Result.success(
-            listOf(SigningTeam("EXAMPLE123", "Example Studio"), SigningTeam("PERSONAL12", "Individual", true)),
-        ),
-    )
+    override fun loadTeams(ready: (Result<List<SigningTeam>>) -> Unit): Boolean {
+        ready(
+            Result.success(
+                listOf(SigningTeam("EXAMPLE123", "Example Studio"), SigningTeam("PERSONAL12", "Individual", true)),
+            ),
+        )
+        return true
+    }
 
     var value = ProjectSettings.read(
         "[application]\nconfig/name=\"Example Game\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",

@@ -3,12 +3,15 @@ package app.anicanon.kumikae.as3.scene
 import app.anicanon.kumikae.as3.language.As3Lexer
 import app.anicanon.kumikae.as3.language.As3Tokens
 import app.anicanon.kumikae.as3.run.IdeGodot
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 
 internal fun resolveProjectResource(root: VirtualFile, path: String): VirtualFile? {
     if (!path.startsWith("res://")) return null
@@ -31,13 +34,27 @@ internal class IdeSceneRepository(private val project: Project, private val file
         ?: error("Resource not found: $path")
 
     override fun openInGodot() {
-        val godot = IdeGodot.find()
-            ?: error("Install Godot to open its scene editor.")
         FileDocumentManager.getInstance().saveDocument(document())
         val folder = root()
         val relative = requireNotNull(VfsUtilCore.getRelativePath(file, folder))
-        ProcessBuilder(godot.toString(), "--editor", "--path", folder.path, "res://$relative")
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+        val folderPath = folder.path
+        AppExecutorUtil.getAppExecutorService().execute {
+            val error = try {
+                val godot = IdeGodot.find() ?: error("Install Godot to open its scene editor.")
+                ProcessBuilder(godot.toString(), "--editor", "--path", folderPath, "res://$relative")
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+                null
+            } catch (failure: Exception) {
+                failure.message ?: "Could not open Godot."
+            }
+            if (error != null) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!project.isDisposed) Messages.showErrorDialog(project, error, "Open in Godot")
+                }
+            }
+        }
     }
     override fun read() = document().text
     override fun open(path: String) {

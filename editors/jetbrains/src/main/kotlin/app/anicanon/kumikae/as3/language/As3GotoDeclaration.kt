@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.language
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.platform.lsp.api.LspClient
 import com.intellij.platform.lsp.api.LspClientManager
@@ -29,9 +30,13 @@ class As3GotoDeclaration : GotoDeclarationHandler {
         val client = LspClientManager.getInstance(project).getClients(As3LspSupportProvider::class.java)
             .firstOrNull { it.state == LspServerState.Running } ?: return null
         val asked = DefinitionParams(client.getDocumentIdentifier(script), position(editor.document, offset))
-        val answer = runCatching {
+        val answer = try {
             client.sendRequestSync(TIMEOUT_MILLIS) { it.textDocumentService.definition(asked) }
-        }.getOrNull() ?: return null
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            null
+        } ?: return null
         val places = if (answer.isLeft) {
             answer.left
         } else {

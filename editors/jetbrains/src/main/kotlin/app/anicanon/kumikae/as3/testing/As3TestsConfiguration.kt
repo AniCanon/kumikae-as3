@@ -102,15 +102,11 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                 } catch (error: RuntimeConfigurationError) {
                     throw ExecutionException(error.message)
                 }
-                val compiler = CompilerLocator.find(
-                    projectRoot,
-                    "",
-                    System.getenv("PATH").orEmpty(),
-                    Path.of(System.getProperty("user.home")),
-                    PluginFiles.native(),
-                ) ?: throw ExecutionException("Build kas3c or place it on the search path.")
+                val compiler = CompilerLocator.findForProject(projectRoot)
+                    ?: throw ExecutionException("Build kas3c or place it on the search path.")
                 val command = mutableListOf(
                     "python3",
+                    "-I",
                     "-u",
                     runnerScript.toString(),
                     projectRoot.resolve(options.manifest).toString(),

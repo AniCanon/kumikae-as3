@@ -18,13 +18,16 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 
 @Service(Service.Level.PROJECT)
 internal class TesterDelivery(private val project: Project) : Disposable {
@@ -61,15 +64,15 @@ internal class TesterDelivery(private val project: Project) : Disposable {
             val approved = requireNotNull(dialog.approved)
             FileDocumentManager.getInstance().saveAllDocuments()
             val runtime = requireNotNull(PluginFiles.native()) { "Install the plugin with its mobile runtime." }
-            val godot =
-                requireNotNull(IdeGodot.find()) {
-                    "Install Godot to distribute this game."
-                }
             val job = exportJobs(settings, listOf(preset), true).single()
             messages[id] = "Preparing ${spec.version} (${spec.build})…"
             object : Task.Backgroundable(project, "Preparing tester delivery", true) {
                 private var payload = ""
                 override fun run(indicator: ProgressIndicator) {
+                    val godot = requireNotNull(IdeGodot.find()) {
+                        "Install Godot to distribute this game."
+                    }
+                    indicator.checkCanceled()
                     val upload = if (spec.platform ==
                         "Android"
                     ) {
@@ -95,6 +98,8 @@ internal class TesterDelivery(private val project: Project) : Disposable {
                     if (project.isDisposed) return
                     try {
                         launch(id, runtime, spec, payload)
+                    } catch (canceled: ProcessCanceledException) {
+                        throw canceled
                     } catch (failure: Exception) {
                         onThrowable(failure)
                     } finally {
@@ -107,6 +112,9 @@ internal class TesterDelivery(private val project: Project) : Disposable {
                 }
                 override fun onCancel() = finish(id, "Delivery cancelled.")
             }.queue()
+        } catch (canceled: ProcessCanceledException) {
+            active.remove(id)
+            throw canceled
         } catch (error: Exception) {
             active.remove(id)
             Messages.showErrorDialog(project, error.message ?: "Could not prepare release.", "Distribute to Testers")
@@ -133,12 +141,12 @@ internal class TesterDelivery(private val project: Project) : Disposable {
         }
         val handler = KillableColoredProcessHandler(command)
         active[id] = handler
-        var receipt = ""
+        val receipt = AtomicReference("")
         handler.addProcessListener(object : ProcessListener {
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                 if (outputType == ProcessOutputTypes.STDOUT || outputType == ProcessOutputTypes.STDERR) {
                     val line = event.text.trim().lineSequence().lastOrNull { it.isNotBlank() } ?: return
-                    receipt = line.take(400)
+                    receipt.set(line.take(400))
                     if (line in progressMessages) {
                         ApplicationManager.getApplication().invokeLater {
                             if (!project.isDisposed && active[id] === handler) messages[id] = line
@@ -148,19 +156,27 @@ internal class TesterDelivery(private val project: Project) : Disposable {
             }
 
             override fun processTerminated(event: ProcessEvent) {
+                val last = receipt.get()
                 val result = if (event.exitCode == 0) {
-                    receipt.ifBlank { "Delivery completed." }
+                    last.ifBlank { "Delivery completed." }
                 } else {
-                    "Delivery stopped. " + receipt.ifBlank { "See the distribution console for details." }
+                    "Delivery stopped. " + last.ifBlank { "See the distribution console for details." }
                 }
                 ApplicationManager.getApplication().invokeLater { if (!project.isDisposed) finish(id, result) }
             }
         })
         try {
-            requireNotNull(handler.processInput).bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
             ProcessTerminatedListener.attach(handler)
             RunContentExecutor(project, handler).withTitle("Distribute · ${spec.identifier}")
                 .withActivateToolWindow(true).withStop(handler::destroyProcess, { !handler.isProcessTerminated }).run()
+            val stdin = requireNotNull(handler.processInput)
+            AppExecutorUtil.getAppExecutorService().execute {
+                try {
+                    stdin.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+                } catch (_: Exception) {
+                    if (!handler.isProcessTerminated) handler.destroyProcess()
+                }
+            }
         } catch (failure: Exception) {
             handler.destroyProcess()
             throw failure

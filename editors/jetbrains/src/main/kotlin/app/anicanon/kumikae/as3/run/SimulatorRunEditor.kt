@@ -9,9 +9,13 @@ import app.anicanon.kumikae.as3.ui.LabelledField
 import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
 import app.anicanon.kumikae.as3.ui.composePanel
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.options.SettingsEditor
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
@@ -33,23 +37,42 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
     private var appPath by mutableStateOf("")
 
     override fun resetEditorFrom(configuration: SimulatorRunConfiguration) {
-        val root = configuration.project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
-        fun text(name: String) =
-            root?.findChild(name)?.let { FileDocumentManager.getInstance().getDocument(it)?.text }.orEmpty()
-        runCatching {
-            game = GodotConfig(text("project.godot")).string("application", "config/name", configuration.project.name)
-            presets = GameTargets.presets(GodotConfig(text("export_presets.cfg"))).filter {
-                it.platform == "iOS"
-            }.map { it.name }
-        }.onFailure {
-            presets = emptyList()
-            problem = it.message ?: "Cannot read Godot settings."
-        }.onSuccess { problem = "" }
         deviceAppPath = configuration.options.deviceAppPath
         bundle = configuration.options.bundle
         appPath = configuration.options.appPath
         legacy = configuration.options.preset.isEmpty() && bundle.isNotEmpty()
-        preset = configuration.options.preset.ifEmpty { presets.singleOrNull().orEmpty() }
+        preset = configuration.options.preset
+        game = configuration.project.name
+        presets = emptyList()
+        problem = "Loading iOS targets…"
+        val basePath = configuration.project.basePath
+        val projectName = configuration.project.name
+        ReadAction.nonBlocking<Result<Pair<String, List<String>>>> {
+            try {
+                val root = basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+                fun text(name: String) =
+                    root?.findChild(name)?.let { FileDocumentManager.getInstance().getDocument(it)?.text }.orEmpty()
+                val title = GodotConfig(text("project.godot")).string("application", "config/name", projectName)
+                val iosPresets = GameTargets.presets(GodotConfig(text("export_presets.cfg")))
+                    .filter { it.platform == "iOS" }
+                    .map { it.name }
+                Result.success(title to iosPresets)
+            } catch (canceled: ProcessCanceledException) {
+                throw canceled
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }.coalesceBy(this).expireWith(this).finishOnUiThread(ModalityState.any()) { result ->
+            result.onSuccess { (title, found) ->
+                game = title
+                presets = found
+                problem = ""
+                if (preset.isEmpty()) preset = found.singleOrNull().orEmpty()
+            }.onFailure { error ->
+                presets = emptyList()
+                problem = error.message ?: "Cannot read Godot settings."
+            }
+        }.submit(AppExecutorUtil.getAppExecutorService())
     }
 
     override fun applyEditorTo(configuration: SimulatorRunConfiguration) {
@@ -68,6 +91,7 @@ internal class SimulatorRunEditor : SettingsEditor<SimulatorRunConfiguration>() 
                     StatusLine("This configuration uses a previously exported app.")
                     Button("Build from Godot settings", {
                         legacy = false
+                        if (preset.isEmpty()) preset = presets.singleOrNull().orEmpty()
                         fireEditorStateChanged()
                     })
                     LabelledField("Custom bundle identifier", bundle, {

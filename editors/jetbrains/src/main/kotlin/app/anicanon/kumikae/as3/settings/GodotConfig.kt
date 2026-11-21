@@ -24,10 +24,12 @@ internal class GodotConfig(private val source: String) {
                     val name = line.substring(0, equals).trim()
                     val tail = line.substring(equals + 1)
                     val value = tail.trim()
-                    val start = offset + equals + 1 + tail.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+                    val firstNonBlank = tail.indexOfFirst { !it.isWhitespace() }
+                    val start = offset + equals + 1 + if (firstNonBlank >= 0) firstNonBlank else 0
+                    val end = if (firstNonBlank >= 0) start + value.length else offset + line.length
                     val key = ConfigKey(section, name)
                     require(key !in entries) { "Duplicate setting: $section/$name" }
-                    entries[key] = Entry(start, start + value.length, value)
+                    entries[key] = Entry(start, end, value)
                 }
             }
         }
@@ -40,15 +42,17 @@ internal class GodotConfig(private val source: String) {
     fun string(section: String, name: String, default: String = ""): String =
         raw(section, name)?.let(::unquote) ?: default
 
+    private data class Edit(val start: Int, val end: Int, val text: String, val isAppend: Boolean)
+
     fun update(values: Map<ConfigKey, String>): String {
-        val edits = mutableListOf<Triple<Int, Int, String>>()
+        val edits = mutableListOf<Edit>()
         val missing = linkedMapOf<String, MutableList<String>>()
         val newline = if (source.contains("\r\n")) "\r\n" else "\n"
         for ((key, value) in values) {
             require(!value.contains('\n') && !value.contains('\r')) { "A setting value must occupy one line" }
             val entry = entries[key]
             if (entry != null) {
-                edits += Triple(entry.start, entry.end, value)
+                edits += Edit(entry.start, entry.end, value, isAppend = false)
             } else {
                 missing.getOrPut(key.section) { mutableListOf() }.add("${key.name}=$value")
             }
@@ -59,13 +63,14 @@ internal class GodotConfig(private val source: String) {
             val text = lines.joinToString(newline, postfix = newline)
             if (at != null) {
                 val prefix = if (at > 0 && source[at - 1] != '\n') newline else ""
-                edits += Triple(at, at, prefix + text)
+                edits += Edit(at, at, prefix + text, isAppend = true)
             } else {
                 append.append(newline).append("[$section]").append(newline).append(text)
             }
         }
         var result = source
-        for ((start, end, text) in edits.sortedByDescending { it.first }) result = result.replaceRange(start, end, text)
+        val ordered = edits.sortedWith(compareByDescending<Edit> { it.start }.thenByDescending { it.isAppend })
+        for (edit in ordered) result = result.replaceRange(edit.start, edit.end, edit.text)
         return result + append
     }
 

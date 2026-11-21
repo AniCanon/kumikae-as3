@@ -1,7 +1,5 @@
 package app.anicanon.kumikae.as3.language
 
-import app.anicanon.kumikae.as3.PluginFiles
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
@@ -32,13 +30,7 @@ internal class As3ProjectLanguageService(private val project: Project) : Disposa
 
     fun compiler(): Path? {
         val base = project.basePath ?: return null
-        return CompilerLocator.find(
-            Path.of(base),
-            PropertiesComponent.getInstance().getValue("kumikae.as3.compilerPath").orEmpty(),
-            System.getenv("PATH").orEmpty(),
-            Path.of(System.getProperty("user.home")),
-            PluginFiles.native(),
-        )
+        return CompilerLocator.findForProject(Path.of(base))
     }
 
     fun refreshDeclarations() = declarations.start()

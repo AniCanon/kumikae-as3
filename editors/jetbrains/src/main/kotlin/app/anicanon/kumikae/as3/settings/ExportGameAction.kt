@@ -4,6 +4,7 @@ import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.run.AndroidDevices
 import app.anicanon.kumikae.as3.run.IdeGodot
 import com.google.gson.Gson
+import com.google.gson.JsonParseException
 import com.intellij.execution.RunContentExecutor
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.KillableColoredProcessHandler
@@ -24,6 +25,7 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.awt.Desktop
 import java.nio.file.Files
 import java.nio.file.Path
@@ -89,14 +91,15 @@ internal fun exportGame(
     FileChooser.chooseFile(chooser, project, root.parent) { destination ->
         try {
             FileDocumentManager.getInstance().saveAllDocuments()
-            val godot = requireNotNull(IdeGodot.find()) {
-                "Install Godot to export the game."
-            }
             val runtime = requireNotNull(PluginFiles.native()) { "The plugin's runtime is missing." }
             val jobs = exportJobs(settings, presets, store)
             object : Task.Backgroundable(project, "Preparing game export", true) {
+                private var godot = ""
                 private var signing = emptyMap<String, UploadKey>()
                 override fun run(indicator: ProgressIndicator) {
+                    godot = requireNotNull(IdeGodot.find()) {
+                        "Install Godot to export the game."
+                    }.toString()
                     signing = presets.filter { it.platform == "Android" }.mapNotNull { preset ->
                         indicator.checkCanceled()
                         AndroidUploadKeys(project, root.path, preset.name).read()?.let {
@@ -108,7 +111,7 @@ internal fun exportGame(
                 override fun onSuccess() {
                     if (project.isDisposed) return
                     try {
-                        startExport(project, root, destination, godot.toString(), runtime, jobs, signing, store)
+                        startExport(project, root, destination, godot, runtime, jobs, signing, store)
                     } catch (error: Exception) {
                         Messages.showErrorDialog(project, error.message ?: "Could not start Godot.", "Export Game")
                     }
@@ -162,8 +165,13 @@ private fun startExport(
             override fun processTerminated(event: ProcessEvent) {
                 try {
                     if (store && event.exitCode == 0) {
-                        val products = Gson().fromJson(Files.readString(result), Array<String>::class.java)
-                        val product = Path.of(products.single()).toRealPath()
+                        val products = try {
+                            Gson().fromJson(Files.readString(result), Array<String>::class.java)
+                        } catch (_: JsonParseException) {
+                            null
+                        }
+                        val first = products?.singleOrNull() ?: return
+                        val product = Path.of(first).toRealPath()
                         if (product.startsWith(Path.of(destination.path).toRealPath())) {
                             ApplicationManager.getApplication().invokeLater {
                                 if (!project.isDisposed) notifyProduct(project, product)
@@ -176,12 +184,18 @@ private fun startExport(
             }
         })
         try {
-            requireNotNull(handler.processInput).bufferedWriter(Charsets.UTF_8).use {
-                it.write(Gson().toJson(signing))
-            }
+            val payload = Gson().toJson(signing)
             ProcessTerminatedListener.attach(handler)
             RunContentExecutor(project, handler).withTitle("Export Game").withActivateToolWindow(true)
                 .withStop({ handler.destroyProcess() }, { !handler.isProcessTerminated }).run()
+            val stdin = requireNotNull(handler.processInput)
+            AppExecutorUtil.getAppExecutorService().execute {
+                try {
+                    stdin.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+                } catch (_: Exception) {
+                    if (!handler.isProcessTerminated) handler.destroyProcess()
+                }
+            }
         } catch (error: Exception) {
             handler.destroyProcess()
             throw error

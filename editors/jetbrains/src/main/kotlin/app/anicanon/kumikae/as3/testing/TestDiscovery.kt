@@ -2,6 +2,8 @@ package app.anicanon.kumikae.as3.testing
 
 import com.google.gson.JsonParser
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -44,13 +46,17 @@ internal object TestDiscovery {
         if (folder.name != "tests") return emptyList()
         val manifest = root.findChild("kas3-tests.json") ?: return emptyList()
         val text = FileDocumentManager.getInstance().getDocument(manifest)?.text ?: return emptyList()
-        return runCatching {
+        return try {
             val rootObject = JsonParser.parseString(text).asJsonObject
             require(rootObject["version"].asInt == 1)
             rootObject.getAsJsonArray("tests").map {
                 RegisteredTest(manifest, it.asJsonObject["name"].asString)
             }
-        }.getOrDefault(emptyList())
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     /** Kept with the file until it, any other source, or a file on disk (the manifest) changes. */
@@ -80,6 +86,7 @@ internal object TestDiscovery {
             VfsUtilCore.iterateChildrenRecursively(directory, {
                 !it.name.startsWith('.') && it.name != "build" && it.name != "bin"
             }) { entry ->
+                ProgressManager.checkCanceled()
                 if (entry != virtual && entry.extension == "as") {
                     val declaration = FileDocumentManager.getInstance().getDocument(entry)?.let {
                         TestSource.read(it.text)
@@ -91,15 +98,26 @@ internal object TestDiscovery {
                     if (path != null && declaration != null && !declaration.suite &&
                         (source.suiteFixtures.isEmpty() || fixture in source.suiteFixtures)
                     ) {
-                        cases +=
-                            runCatching { TestCaseMappings.forFile(text, path, declaration) }.getOrDefault(emptyList())
+                        cases += try {
+                            TestCaseMappings.forFile(text, path, declaration)
+                        } catch (canceled: ProcessCanceledException) {
+                            throw canceled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
                     }
                 }
                 true
             }
             return FileTests(source, manifest, cases.distinctBy { it.identity })
         }
-        val cases = runCatching { TestCaseMappings.forFile(text, relative, source) }.getOrDefault(emptyList())
+        val cases = try {
+            TestCaseMappings.forFile(text, relative, source)
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            emptyList()
+        }
         return FileTests(source, manifest, cases)
     }
 }

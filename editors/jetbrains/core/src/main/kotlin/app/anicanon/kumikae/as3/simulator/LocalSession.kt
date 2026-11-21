@@ -13,11 +13,17 @@ class LocalSession(
     val server: LocalServer
 
     init {
+        var createdSession: SimulatorSession? = null
+        var createdServer: LocalServer? = null
         try {
-            session = SimulatorSession(directory, runner)
-            server = LocalServer(directory, Protocol(session::dispatch))
+            createdSession = SimulatorSession(directory, runner)
+            createdServer = LocalServer(directory, Protocol(createdSession::dispatch))
+            session = createdSession
+            server = createdServer
             if (System.getenv("KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT") == "1") enableInput()
         } catch (e: Exception) {
+            runCatching { createdServer?.close() }.onFailure(e::addSuppressed)
+            runCatching { createdSession?.close() }.onFailure(e::addSuppressed)
             Files.deleteIfExists(directory.resolve("session.json"))
             Files.deleteIfExists(directory)
             throw e

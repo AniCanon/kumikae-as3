@@ -190,8 +190,8 @@ internal data class ProjectSettings(
             }
         }
         val mergedChanges = linkedMapOf<ConfigKey, String>().apply {
-            putAll(propertyEdits)
             putAll(changes)
+            putAll(propertyEdits)
         }
         return GodotConfig(project).update(mergedChanges) to GodotConfig(exports).update(exportChanges)
     }

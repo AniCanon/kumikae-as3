@@ -7,6 +7,7 @@ import com.intellij.ide.projectView.ViewSettings
 import com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode
 import com.intellij.ide.projectView.impl.nodes.PsiFileNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import java.nio.file.Path
@@ -88,10 +89,15 @@ class GameProjectView : TreeStructureProvider {
     }
 
     private fun isGame(project: Project): Boolean {
-        if (project.getUserData(GAME) == true) return true
-        val game =
-            project.basePath?.let { runCatching { GodotLaunch.isAs3Game(Path.of(it)) }.getOrDefault(false) } ?: false
-        if (game) project.putUserData(GAME, true)
+        project.getUserData(GAME)?.let { return it }
+        val game = try {
+            project.basePath?.let { GodotLaunch.isAs3Game(Path.of(it)) } ?: false
+        } catch (canceled: ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            false
+        }
+        project.putUserData(GAME, game)
         return game
     }
 

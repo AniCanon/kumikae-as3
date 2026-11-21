@@ -52,4 +52,16 @@ config/name="Before"
             GodotConfig("[application]\nconfig/name=\"open").string("application", "config/name")
         }
     }
+
+    @Test fun `updating an empty value at eof while appending to the same section preserves both`() {
+        val edited = GodotConfig("[application]\nfoo=").update(
+            linkedMapOf(
+                ConfigKey("application", "foo") to "\"bar\"",
+                ConfigKey("application", "added") to "42",
+            ),
+        )
+        val parsed = GodotConfig(edited)
+        assertEquals("bar", parsed.string("application", "foo"))
+        assertEquals("42", parsed.raw("application", "added"))
+    }
 }

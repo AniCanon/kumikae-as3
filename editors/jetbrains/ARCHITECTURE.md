@@ -29,7 +29,7 @@ rules hold across all three:
 | `core/` | The Simulator service. Plain Kotlin with no IDE imports. Also the standalone `kumikae-simulator` program |
 | `native/SimulatorBridge/` | The Swift helper that reads Simulator and Android emulator displays and sends iOS input |
 | `simulator.py`, `tests/` | The command-line client and its tests |
-| `tools/` | Bundled build, export and Android run scripts (`build-ios-simulator.sh`, `android_run.py`, `game_export.py`) |
+| `tools/` | Bundled build, export, distribution and run scripts (`build-ios-simulator.sh`, `ios-device.py`, `android_run.py`, `game_export.py`, `web_game.py`, `tester_distribution.py`) |
 | `src/test/kotlin/`, `src/uiProbe/` | Tests, and a test-only plugin that drives the real views in a sandbox IDE |
 
 ## Mobile tester distribution

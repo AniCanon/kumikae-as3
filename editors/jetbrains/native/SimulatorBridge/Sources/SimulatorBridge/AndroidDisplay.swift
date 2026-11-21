@@ -78,6 +78,7 @@ public enum AndroidDisplay {
       try FileHandle.standardOutput.write(contentsOf: Data("ready\n".utf8))
       var output = Data(count: scaledW * scaledH * 4)
       var previous: UInt32?
+      var sequence: UInt64 = 0
       while !Task.isCancelled && !parentClosed() {
         let frame = base.load(fromByteOffset: 12, as: UInt32.self)
         if frame == 0 || previous == frame {
@@ -102,11 +103,13 @@ public enum AndroidDisplay {
           }
         }
         if base.load(fromByteOffset: 12, as: UInt32.self) != frame { continue }
+        let nextSequence = sequence + 1
         let header = FrameHeader(
-          sequence: UInt64(frame), width: scaledW, height: scaledH,
+          sequence: nextSequence, width: scaledW, height: scaledH,
           stride: scaledW * 4, observedNanos: observed, writtenNanos: observed,
           nativeWidth: width, nativeHeight: height, densityMilli: 1000)
         if try await sink.tryPublish(CapturedFrame(header: header, pixels: output)) {
+          sequence = nextSequence
           previous = frame
         }
       }
