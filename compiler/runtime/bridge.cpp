@@ -60,8 +60,7 @@ void take_error(Host &r_host, Slot p_error) {
 		return;
 	}
 	r_host.carried = false;
-	const Slot error = p_error;
-	vm::retain(vm::any::counted(error));
+	const Slot error = shared(&r_host.context, p_error);
 	// An Error the library made took its stack from the interpreter's frames, which are the thunk's: where
 	// the program reads stacks, it is given the generated functions'.
 	Object *object = vm::any::tag(error) == vm::AnyTag::Object ? static_cast<Object *>(vm::any::pointer(error)) : nullptr;

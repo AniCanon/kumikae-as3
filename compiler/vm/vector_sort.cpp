@@ -306,25 +306,50 @@ bool sort_on_fields(Library &p_library, const VectorCall &p_call, std::vector<So
 		*r_number = any::tag(p_value) == AnyTag::Undefined ? 0 : whole.i;
 		return done;
 	};
+	const auto snapshot = [&](const Vector *p_list) {
+		std::vector<Slot> copy;
+		copy.reserve(p_list->length);
+		for (uint32_t i = 0; i < p_list->length; i++) {
+			copy.push_back(p_library.heap.share(Kind::Any, any::filled(slots_of(p_list)[i])));
+		}
+		return copy;
+	};
+	const auto release_all = [&](std::vector<Slot> &p_slots) {
+		for (Slot &each : p_slots) {
+			p_library.heap.drop_any(each);
+		}
+	};
 	std::vector<Slot> written;
 	if (const Vector *list = array_of(names)) {
-		written.assign(slots_of(list), slots_of(list) + list->length);
+		written = snapshot(list);
 	} else {
-		written.push_back(names);
+		written.push_back(p_library.heap.share(Kind::Any, names));
 	}
+	bool ok = true;
 	for (Slot each : written) {
 		std::string name;
 		if (!any_text(p_library, each, &name)) {
-			return false;
+			ok = false;
+			break;
 		}
 		r_fields->push_back({ std::move(name), 0 });
 	}
+	release_all(written);
+	if (!ok) {
+		return false;
+	}
 	const Vector *each_option = array_of(options);
 	if (each_option && each_option->length == r_fields->size()) {
-		for (uint32_t i = 0; i < each_option->length; i++) {
-			if (!number(slots_of(each_option)[i], &(*r_fields)[i].options)) {
-				return false;
+		std::vector<Slot> option_values = snapshot(each_option);
+		for (size_t i = 0; i < option_values.size(); i++) {
+			if (!number(option_values[i], &(*r_fields)[i].options)) {
+				ok = false;
+				break;
 			}
+		}
+		release_all(option_values);
+		if (!ok) {
+			return false;
 		}
 		*r_options = r_fields->empty() ? 0 : (*r_fields)[0].options;
 	} else if (!each_option) {

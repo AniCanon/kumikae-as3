@@ -3,7 +3,6 @@
 #include "godot_calls.h"
 #include "godot_host.h"
 #include "handles.h"
-#include "godot_names.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -22,19 +21,24 @@ using namespace godot;
 
 namespace kas3 {
 
-// The names are listed once.
+// The names are listed once and searched without heap allocation.
 std::optional<int> value_type(std::string_view p_name) {
-	static const std::unordered_map<std::string, int> types = [] {
-		std::unordered_map<std::string, int> found;
+	static const std::vector<std::pair<std::string, int>> types = [] {
+		std::vector<std::pair<std::string, int>> found;
 		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
 			if (i != Variant::OBJECT) {
-				found.emplace(Variant::get_type_name((Variant::Type)i).utf8().get_data(), i);
+				const CharString text = Variant::get_type_name(static_cast<Variant::Type>(i)).utf8();
+				found.emplace_back(std::string(text.get_data(), static_cast<size_t>(text.length())), i);
 			}
 		}
 		return found;
 	}();
-	auto found = types.find(std::string(p_name));
-	return found == types.end() ? std::nullopt : std::optional<int>(found->second);
+	for (const auto &[name, type] : types) {
+		if (name == p_name) {
+			return type;
+		}
+	}
+	return std::nullopt;
 }
 
 namespace {

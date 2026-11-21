@@ -85,8 +85,12 @@ std::string Queries::documentation(const Symbol *p_symbol) const {
 		return {};
 	}
 	if (p_symbol->kind == SymbolKind::Property) {
-		auto doc = preceding_asdoc(*p_symbol->unit, p_symbol->getter);
-		return doc.empty() ? preceding_asdoc(*p_symbol->unit, p_symbol->setter) : doc;
+		const auto accessor_doc = [&](const FunctionDecl *p_accessor) -> std::string {
+			const Unit *unit = p_accessor && p_accessor->symbol && p_accessor->symbol->unit ? p_accessor->symbol->unit : p_symbol->unit;
+			return preceding_asdoc(*unit, p_accessor);
+		};
+		auto doc = accessor_doc(p_symbol->getter);
+		return doc.empty() ? accessor_doc(p_symbol->setter) : doc;
 	}
 	return preceding_asdoc(*p_symbol->unit, p_symbol->node);
 }

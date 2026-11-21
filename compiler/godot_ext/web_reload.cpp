@@ -3,6 +3,7 @@
 #if defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 #include "program.h"
 
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/godot.hpp>
 
 #include <optional>
@@ -30,14 +31,23 @@ const std::string *web_source_override(std::string_view p_res_path) {
 	return found != map.end() ? &found->second : nullptr;
 }
 
+bool has_web_source_overrides() {
+	return !overrides().empty();
+}
+
 } // namespace kas3
 
 extern "C" GDE_EXPORT int kas3_web_reload(const char *p_res_path, const char *p_source) {
 	if (!p_res_path || !p_source) {
+		kas3::last_error() = "missing script path or source";
+		return 0;
+	}
+	const std::string key(p_res_path);
+	if (!godot::FileAccess::file_exists(godot::String::utf8(key.c_str()))) {
+		kas3::last_error() = "unknown script path: " + key;
 		return 0;
 	}
 	auto &map = kas3::overrides();
-	const std::string key(p_res_path);
 	const auto prior = map.find(key);
 	const std::optional<std::string> previous = prior != map.end() ? std::optional<std::string>(prior->second) : std::nullopt;
 	map[key] = p_source;
@@ -58,8 +68,14 @@ extern "C" GDE_EXPORT const char *kas3_web_last_error() {
 }
 
 extern "C" GDE_EXPORT int kas3_web_reset_sources() {
-	kas3::overrides().clear();
+	auto &map = kas3::overrides();
+	const auto previous = map;
+	map.clear();
 	kas3::last_error().clear();
-	return kas3::Project::reload_with_errors(&kas3::last_error()) ? 1 : 0;
+	if (!kas3::Project::reload_with_errors(&kas3::last_error())) {
+		map = previous;
+		return 0;
+	}
+	return 1;
 }
 #endif

@@ -208,9 +208,20 @@ std::optional<int> compare_numbers(Slot p_a, Slot p_b) {
 		return x < y ? -1 : (x > y ? 1 : 0);
 	}
 	if (a == AnyTag::Wide || b == AnyTag::Wide) {
-		// An Int64 against a Number, exactly: compare_wide puts the Int64 first.
 		const bool wide_first = a == AnyTag::Wide;
-		const double order = compare_wide(whole(wide_first ? p_a : p_b, AnyTag::Wide), to_number(wide_first ? p_b : p_a));
+		const int64_t x = whole(wide_first ? p_a : p_b, AnyTag::Wide);
+		const Slot other = wide_first ? p_b : p_a;
+		const AnyTag other_tag = wide_first ? b : a;
+		// Text that is a whole number an Int64 holds is compared exactly, as typed CmpI64Str does.
+		if (other_tag == AnyTag::String) {
+			const std::string_view text = static_cast<Str *>(pointer(other))->view();
+			if (const std::optional<int64_t> exact = string_to_wide_exact(text)) {
+				const int sign = x < *exact ? -1 : (x > *exact ? 1 : 0);
+				return wide_first ? sign : -sign;
+			}
+		}
+		// An Int64 against a Number, exactly: compare_wide puts the Int64 first.
+		const double order = compare_wide(x, to_number(other));
 		if (order != order) {
 			return std::nullopt;
 		}
@@ -255,10 +266,7 @@ std::optional<bool> loose_equal(Slot p_a, Slot p_b) {
 		if (a == AnyTag::String && b == AnyTag::String) {
 			return strict_equal(p_a, p_b);
 		}
-		if (numeric(a) && numeric(b)) {
-			return compare_numbers(p_a, p_b) == 0;
-		}
-		return to_number(p_a) == to_number(p_b);
+		return compare_numbers(p_a, p_b) == 0;
 	}
 	if (primitive(a) != primitive(b)) {
 		return std::nullopt; // An object against a primitive: compared by its text, which the interpreter gives.

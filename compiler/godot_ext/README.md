@@ -40,6 +40,7 @@ nothing differently for the editor, so one library serves both.
 | `godot_untyped.cpp`, `godot_collections.cpp` | Untyped values to and from `Variant`, and AS3 collections handed to Godot |
 | `callable`, `bound_method.h` | A method as a Godot callable |
 | `restart.cpp` | What a reload reports, and restarting the running scene |
+| `ios_export` | Editor export plugin for iOS (native objects), Android (`libkas3_program.so`), and Web (`res://.kas3/program.kas3`) |
 | `web_reload` | In-browser source overrides and `kas3_web_reload` C API for WebAssembly hot reload |
 | `native_program`, `shared_library` | [The program library](#the-program-library): found, loaded, checked, and given what it needs from Godot |
 | `play_build`, `play_cache.h`, `toolchain.h` | [Building the program library on Play](#building-on-play) |

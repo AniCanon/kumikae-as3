@@ -29,6 +29,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -40,12 +41,52 @@ static Project *program = nullptr;
 uint64_t Project::loads_ = 0;
 static const uint64_t WATCH_MILLIS = 200; // Between looks at the scripts.
 static uint64_t looks = 0;
+#if !defined(KAS3_RUNTIME_ONLY)
+static bool watching = false;
+#endif
+
+struct ModuleSnapshot {
+	std::mutex lock;
+	std::shared_ptr<const ir::Module> module;
+};
+
+static ModuleSnapshot &module_snapshot_state() {
+	static ModuleSnapshot *state = new ModuleSnapshot();
+	return *state;
+}
+
+static void publish_module(std::shared_ptr<const ir::Module> p_module) {
+	ModuleSnapshot &state = module_snapshot_state();
+	const std::lock_guard<std::mutex> held(state.lock);
+	state.module = std::move(p_module);
+}
+
+std::shared_ptr<const ir::Module> Project::module_snapshot() {
+	ModuleSnapshot &state = module_snapshot_state();
+	const std::lock_guard<std::mutex> held(state.lock);
+	return state.module;
+}
+
+static void stop_watching() {
+#if !defined(KAS3_RUNTIME_ONLY)
+	if (!watching) {
+		return;
+	}
+	watching = false;
+	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
+	if (tree && tree->is_connected("process_frame", callable_mp_static(&Project::watch))) {
+		tree->disconnect("process_frame", callable_mp_static(&Project::watch));
+	}
+#endif
+}
 
 uint64_t Project::watch_looks() {
 	return looks;
 }
 
 void Project::before_shutdown() {
+	stop_watching();
+	forget_restart();
 	play::finish();
 	forget_scenes();
 	free_instances_freed_elsewhere();
@@ -126,7 +167,7 @@ static bool load_project_module(ir::Module *r_module, std::string *r_errors) {
 #else
 	// Exported packs can carry a precompiled binary IR module to skip front-end compilation at startup.
 	const bool local_folder = DirAccess::dir_exists_absolute(ProjectSettings::get_singleton()->globalize_path(scripts_root()));
-	if (!local_folder && FileAccess::file_exists(PRECOMPILED_MODULE)) {
+	if (!local_folder && !has_web_source_overrides() && FileAccess::file_exists(PRECOMPILED_MODULE)) {
 		return load_precompiled(r_module, r_errors);
 	}
 	return compile_project(r_module, r_errors);
@@ -185,10 +226,13 @@ Project &Project::get() {
 #endif
 	std::string errors;
 	if (!load_project_module(program->module_.get(), &errors)) {
+		program->load_error_ = errors;
+		publish_module(nullptr);
 		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
 				String::utf8(errors.c_str()));
 		return *program;
 	}
+	program->load_error_.clear();
 	// A program library the project was given (named, or in its `bin`) before the one Play builds.
 	std::string library = NativeProgram::path();
 	if (library.empty() && !NativeProgram::linked()) {
@@ -208,8 +252,8 @@ Project &Project::get() {
 		program->interpreter_ = new_interpreter(*program->module_, program->host_);
 	}
 	program->valid_ = program->interpreter().start();
+	publish_module(program->valid_ ? program->module_ : nullptr);
 #if !defined(KAS3_RUNTIME_ONLY)
-	static bool watching = false;
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (!watching && tree && tree->get_root()) {
 		watching = true;
@@ -287,6 +331,7 @@ static std::vector<std::string> kept_outside(const vm::Interpreter &p_running, c
 	return kept;
 }
 
+#if !defined(KAS3_RUNTIME_ONLY)
 // Moves the running program onto a new build, the new program into `r_fresh`. A class of the library's
 // containers that the new build no longer names, of which an object is alive, is added to the build. False,
 // said, when an object alive has no place in the new program: the game carries on with the one it had.
@@ -329,6 +374,7 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 		}
 	}
 }
+#endif
 
 void Project::reload() {
 	reload_with_errors(nullptr);
@@ -357,11 +403,11 @@ bool Project::reload_with_errors(std::string *r_errors) {
 			return true;
 		}
 		if (r_errors) {
-			*r_errors = "scripts failed to load";
+			*r_errors = !program->load_error_.empty() ? program->load_error_ : std::string("scripts failed to load");
 		}
 		return false;
 	}
-	auto module = std::make_unique<ir::Module>();
+	auto module = std::make_shared<ir::Module>();
 	std::string errors;
 	size_t count = 0;
 	if (!compile_project(module.get(), &errors, &count)) {
@@ -389,6 +435,7 @@ bool Project::reload_with_errors(std::string *r_errors) {
 	std::unique_ptr<NativeProgram> native = std::move(program->native_);
 	program->interpreter_.swap(fresh);
 	program->module_.swap(module);
+	publish_module(program->module_);
 	// Godot's objects now hold the new program's script objects, not the old one's.
 	(native ? native->interpreter() : *fresh).superseded();
 	fresh.reset();
@@ -427,6 +474,7 @@ bool Project::reload_with_errors(std::string *r_errors) {
 }
 
 void Project::restart_scene() {
+	free_instances_freed_elsewhere();
 	Restart restart;
 	restart.asked = true;
 	restart.classes = std::move(left_since_start);
@@ -454,6 +502,9 @@ void Project::reload_now() {
 }
 
 void Project::unload() {
+	stop_watching();
+	forget_restart();
+	publish_module(nullptr);
 	// First, so that whatever is destroyed along with the program (a listener held through one of its
 	// static fields) knows the program is no longer there to be used.
 	free_instances_freed_elsewhere();
@@ -470,26 +521,33 @@ void Project::unload() {
 	program = nullptr;
 	left_since_start.clear();
 	forget_reached();
+	forget_class_text();
+	forget_class_signals();
+	forget_folders();
 }
 
-uint32_t Project::class_of_file(std::string_view p_path) const {
+uint32_t Project::class_of_file(const ir::Module &p_module, std::string_view p_path) {
 	// The class named after the file and declared in it: two folders may each have a Thing.as.
 	const size_t slash = p_path.find_last_of('/');
 	const size_t start = slash == std::string_view::npos ? 0 : slash + 1;
 	const size_t end = p_path.rfind('.');
 	const std::string_view stem = p_path.substr(start, end == std::string_view::npos || end < start ? std::string_view::npos : end - start);
-	for (size_t i = 0; i < module_->classes.size(); i++) {
-		const ir::Class &klass = module_->classes[i];
+	for (size_t i = 0; i < p_module.classes.size(); i++) {
+		const ir::Class &klass = p_module.classes[i];
 		const size_t dot = klass.name.rfind('.');
 		if ((dot == std::string::npos ? klass.name : klass.name.substr(dot + 1)) != stem || klass.constructor == ir::NONE) {
 			continue;
 		}
-		const uint32_t file = module_->functions[klass.constructor].file;
-		if (file < module_->files.size() && module_->files[file] == p_path) {
+		const uint32_t file = p_module.functions[klass.constructor].file;
+		if (file < p_module.files.size() && p_module.files[file] == p_path) {
 			return (uint32_t)i;
 		}
 	}
 	return ir::NONE;
+}
+
+uint32_t Project::class_of_file(std::string_view p_path) const {
+	return class_of_file(*module_, p_path);
 }
 
 static std::thread::id main_thread;
@@ -503,9 +561,9 @@ bool on_main_thread() {
 }
 
 void refuse_thread(uint32_t p_function) {
-	// The names are only read, and the program is not replaced while the game's threads run.
-	const ir::Module &module = Project::get().module();
-	std::string name = p_function < module.functions.size() ? module.functions[p_function].name : std::string("a method");
+	// Read the thread-safe module snapshot so a worker never triggers Project::get() or races with reload().
+	const std::shared_ptr<const ir::Module> module = Project::module_snapshot();
+	std::string name = module && p_function < module->functions.size() ? module->functions[p_function].name : std::string("a method");
 	UtilityFunctions::push_error(String::utf8(("Error: " + name + "() was called by Godot from another thread. AS3 runs on the main thread only: the call was not made.").c_str()));
 }
 

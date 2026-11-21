@@ -8,6 +8,7 @@
 | `bench_recheck.cpp` | Times a re-check after an edit to a body, a signature, a member, and a method every file calls, and after a file joins and leaves the program. `--soak N` repeats renames and prints resident memory |
 | `embed_runtime.py` | Writes the runtime's headers as C++ for the Godot extension, so that the extension can build a project's program library wherever it's installed. CMake runs it |
 | `case_table.py` | Writes `vm/case_table.cpp`, the table behind `toUpperCase()` and `toLowerCase()`, from the Unicode data of the Python that runs it |
+| `build_web_template.sh` | Builds a size-optimized single-threaded Godot 4.7 Web GDExtension export template (`dlink_enabled=yes`) from a Godot checkout (`--2d`, `--profile`) |
 
 ## Run the style check
 

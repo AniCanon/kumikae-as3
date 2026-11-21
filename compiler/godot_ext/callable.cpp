@@ -105,11 +105,14 @@ bool BoundMethod::equal(const CallableCustom *p_a, const CallableCustom *p_b) {
 bool BoundMethod::less(const CallableCustom *p_a, const CallableCustom *p_b) {
 	const BoundMethod *a = static_cast<const BoundMethod *>(p_a);
 	const BoundMethod *b = static_cast<const BoundMethod *>(p_b);
+	if (a->key_program_ != b->key_program_) {
+		return a->key_program_ < b->key_program_;
+	}
 	return a->key_object_ != b->key_object_ ? a->key_object_ < b->key_object_ : a->key_function_ < b->key_function_;
 }
 
 uint32_t BoundMethod::hash() const {
-	uint64_t mixed = (uint64_t)(uintptr_t)key_object_ * 0x9E3779B97F4A7C15ull + key_function_;
+	uint64_t mixed = (uint64_t)(uintptr_t)key_object_ * 0x9E3779B97F4A7C15ull ^ (key_program_ * 0xC2B2AE3D27D4EB4Full) + key_function_;
 	return (uint32_t)(mixed ^ (mixed >> 32));
 }
 
@@ -161,9 +164,9 @@ void BoundMethod::call(const Variant **p_arguments, int p_argcount, Variant &r_r
 			text = "TypeError: Error #1034: Type Coercion failed: cannot convert argument " + std::to_string(r_call_error.argument + 1) +
 					" of " + callee.name + "(), a " + given.get_data() + ", to " + (type.empty() ? ir::kind_name(kind) : type.c_str()) + ".";
 		} else {
+			// Error #1063 reports the required count for both too-few and too-many arguments (avmplus's rule).
 			const size_t first = callee.is_static ? 0 : 1;
-			size_t most = callee.parameters > first ? callee.parameters - first : 0;
-			size_t least = callee.required > first ? callee.required - first : 0;
+			const size_t least = callee.required > first ? callee.required - first : 0;
 			text = "ArgumentError: Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
 					std::to_string(least) + ", got " + std::to_string(p_argcount) + ".";
 		}

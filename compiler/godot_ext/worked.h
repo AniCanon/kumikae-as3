@@ -58,11 +58,11 @@ public:
 	void *room() { return memory_[made_++]; }
 };
 
-// The signal last emitted through one emit() (Worked, What::Emit): the bytes Godot holds it in, with its
-// name as Godot's emit_signal takes one and its object's id. The same bytes are the same signal for as
-// long as the name is kept here, so that the two are asked of Godot only when another signal comes.
+// The signal last emitted through one emit() (Worked, What::Emit): its name as a StringName and as the
+// Variant emit_signal takes, plus its object's id. Compared by fields rather than raw bytes so padding
+// bytes in godot::Signal are never read.
 struct SignalSeen {
-	unsigned char bytes[sizeof(godot::Signal)] = {};
+	godot::StringName signal_name;
 	godot::Variant name;
 	uint64_t object = 0;
 	bool any = false;

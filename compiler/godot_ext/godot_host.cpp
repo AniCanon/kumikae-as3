@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
+#include <map>
 #include <new>
 #include <optional>
 #include <string>
@@ -94,35 +96,26 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 
 namespace {
 
-// Godot's value type of this name ("Vector2"), found without making text: the names are read once.
-std::optional<Variant::Type> value_type_named(std::string_view p_name) {
-	static const std::vector<std::pair<std::string, Variant::Type>> types = [] {
-		std::vector<std::pair<std::string, Variant::Type>> all;
-		for (int type = 0; type < Variant::VARIANT_MAX; type++) {
-			const CharString name = Variant::get_type_name((Variant::Type)type).utf8();
-			all.emplace_back(std::string(name.get_data(), (size_t)name.length()), (Variant::Type)type);
-		}
-		return all;
-	}();
-	for (const auto &[name, type] : types) {
-		if (name == p_name) {
-			return type;
-		}
-	}
-	return std::nullopt;
+// Godot's text for a class name the program declares, made once: checking what arrives builds no text.
+// Heap-allocated and cleared before extension shutdown so Godot Strings never outlive GDExtension.
+std::map<std::string, String, std::less<>> &class_texts() {
+	static auto *made = new std::map<std::string, String, std::less<>>();
+	return *made;
 }
 
-// Godot's text for a class name the program declares, made once: checking what arrives builds no text.
 const String &class_text(std::string_view p_name) {
-	static std::unordered_map<std::string, String> made;
-	const auto [entry, added] = made.try_emplace(std::string(p_name));
-	if (added) {
-		entry->second = to_godot(p_name);
+	auto &made = class_texts();
+	if (const auto found = made.find(p_name); found != made.end()) {
+		return found->second;
 	}
-	return entry->second;
+	return made.emplace(std::string(p_name), to_godot(p_name)).first->second;
 }
 
 } // namespace
+
+void forget_class_text() {
+	class_texts().clear();
+}
 
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_value) {
 	Variant::Type type = p_value.get_type();
@@ -177,7 +170,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			if (type == Variant::OBJECT) {
 				return false;
 			}
-			return type == Variant::NIL || p_godot_type.empty() || value_type_named(p_godot_type) == type;
+			return type == Variant::NIL || p_godot_type.empty() || value_type(p_godot_type) == static_cast<int>(type);
 		default:
 			// An object of the program's: which class is declared is not known here (members.h, object_arrives).
 			return false;
@@ -260,7 +253,7 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 
 
 
-const StringName &GodotHost::name(std::string_view p_text) {
+const GodotHost::Name &GodotHost::find_name(std::string_view p_text) {
 	Name &entry = names_[Place{ p_text.data(), p_text.size() }];
 	if (!entry.made || entry.text != p_text) {
 		entry.text.assign(p_text.data(), p_text.size());
@@ -268,12 +261,15 @@ const StringName &GodotHost::name(std::string_view p_text) {
 		entry.godot = StringName(entry.godot_text);
 		entry.made = true;
 	}
-	return entry.godot;
+	return entry;
+}
+
+const StringName &GodotHost::name(std::string_view p_text) {
+	return find_name(p_text).godot;
 }
 
 const String &GodotHost::text_of(std::string_view p_text) {
-	name(p_text);
-	return names_[Place{ p_text.data(), p_text.size() }].godot_text;
+	return find_name(p_text).godot_text;
 }
 
 void GodotHost::print(std::string_view p_text) {
@@ -406,6 +402,10 @@ static bool whole_index(const Variant &p_receiver, Variant *r_key, std::string *
 
 bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	const Variant *receiver = static_cast<Variant *>(p_receiver);
+	if (is_freed(*receiver)) {
+		*r_error = FREED;
+		return false;
+	}
 	Variant key = to_variant(p_key.kind, p_key.slot);
 	if (!whole_index(*receiver, &key, r_error)) {
 		return false;
@@ -421,6 +421,10 @@ bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm:
 
 bool GodotHost::index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
+	if (is_freed(*receiver)) {
+		*r_error = FREED;
+		return false;
+	}
 	Variant key = to_variant(p_key.kind, p_key.slot);
 	if (!whole_index(*receiver, &key, r_error)) {
 		return false;
@@ -468,7 +472,7 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 	}
 	const bool found = last_signal_.owner != 0;
 	const vm::Object *script = found ? nullptr : script_object(object);
-	const Member field = script ? find_member(script->klass, StringName(to_godot(p_name))) : Member{};
+	const Member field = script ? find_member(script->klass, name(p_name)) : Member{};
 	if (!found && field.what != Member::What::Field) {
 		CharString type = object->get_class().utf8();
 		*r_error = "a " + std::string(type.get_data()) + " has no signal '" + std::string(p_name) + "'";

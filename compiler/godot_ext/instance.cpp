@@ -399,7 +399,7 @@ static FreedElsewhere &freed_elsewhere() {
 
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
-	Project::get().instance_freed();
+	kas3::notify_instance_freed();
 	if (kas3::on_main_thread()) {
 		free_instance(instance);
 		return;
@@ -505,7 +505,7 @@ void *GodotHost::attach_new(uint32_t p_class, vm::Object *p_object, std::string 
 		*r_error = "the script of '" + klass.name + "' can't be found to attach";
 		return nullptr;
 	}
-	Variant made = ClassDBSingleton::get_singleton()->instantiate(StringName(klass.native_base.c_str()));
+	Variant made = ClassDBSingleton::get_singleton()->instantiate(name(klass.native_base));
 	Object *owner = made.get_validated_object();
 	if (!owner) {
 		*r_error = "Godot can't make a '" + klass.native_base + "' for '" + klass.name + "'";

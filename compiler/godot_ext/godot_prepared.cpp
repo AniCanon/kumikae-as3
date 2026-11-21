@@ -6,7 +6,6 @@
 // held untyped) is left to the requests by name (godot_host.cpp), which say what is wrong.
 #include "godot_calls.h"
 #include "handles.h"
-#include "godot_names.h"
 #include "worked.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>

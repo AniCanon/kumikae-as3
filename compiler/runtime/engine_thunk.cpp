@@ -61,6 +61,12 @@ Slot engine_thunk(Context *c, uint32_t p_function, const ThunkInfo &p_info, cons
 	}
 	const uint32_t carries = host.interpreter->carries();
 	const uint32_t outer = host.asking;
+	const bool prev_caller_active = host.caller_active;
+	const vm::Object *const prev_caller_object = host.caller_object;
+	const uint32_t prev_caller_class = host.caller_class;
+	host.caller_active = true;
+	host.caller_class = p_info.code_class;
+	host.caller_object = p_info.self != NONE && p_info.self < p_info.registers ? static_cast<const vm::Object *>(registers[p_info.self].p) : nullptr;
 	host.direct++;
 	host.asking = host.direct;
 	host.interpreter->direct_began();
@@ -68,6 +74,9 @@ Slot engine_thunk(Context *c, uint32_t p_function, const ThunkInfo &p_info, cons
 	host.interpreter->direct_ended();
 	host.direct--;
 	host.asking = outer;
+	host.caller_active = prev_caller_active;
+	host.caller_object = prev_caller_object;
+	host.caller_class = prev_caller_class;
 	settle_direct(c, carries);
 	if (host.held.active && host.held.depth == c->depth) {
 		// A function the engine ran for this request failed (Host::enter kept its error): it comes out of

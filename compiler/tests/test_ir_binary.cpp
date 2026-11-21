@@ -184,6 +184,65 @@ static void test_rejects_invalid_references() {
 	broken = original;
 	broken.classes.front().constructor = static_cast<uint32_t>(broken.functions.size());
 	CHECK(invalid(broken));
+	// Empty function body or missing terminating instruction.
+	broken = original;
+	broken.functions.front().code.clear();
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().code.back() = { ir::Op::Stmt, 0, 0, 0, 0 };
+	CHECK(invalid(broken));
+	// Op::Native is never produced by lowering and must not appear in serialized IR.
+	broken = original;
+	broken.functions.front().code.front() = { ir::Op::Native, ir::NONE, 0, 0, 0 };
+	CHECK(invalid(broken));
+	// Class method table must not contain NONE.
+	broken = original;
+	broken.classes.front().methods.push_back(ir::NONE);
+	CHECK(invalid(broken));
+	// Invalid handler type, local register, parameter class, virtual receiver, field class, global class.
+	broken = original;
+	broken.functions.front().handlers.push_back({ 0, 1, 0, 0, 0x123456u, false });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().locals.push_back({ "bad", static_cast<uint32_t>(broken.functions.front().registers.size()) });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().parameter_classes.push_back(static_cast<uint32_t>(broken.classes.size()));
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().virtual_receivers.push_back({ 0, static_cast<uint32_t>(broken.classes.size()) });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.classes.front().fields.push_back({ "bad", ir::Kind::Obj, static_cast<uint32_t>(broken.classes.size()), false, false, false, false, {}, false, {} });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.globals.push_back({ "bad", ir::Kind::Obj, static_cast<uint32_t>(broken.classes.size()), false, {}, false, false });
+	CHECK(invalid(broken));
+	// Rest parameter requires at least one parameter slot and an array_class.
+	broken = original;
+	broken.functions.front().rest = true;
+	broken.functions.front().parameters = 0;
+	broken.functions.front().required = 0;
+	CHECK(invalid(broken));
+	// Invalid FromAny / AnyIs / ClassValue / HostBind immediate operands.
+	broken = original;
+	broken.functions.front().registers.push_back(ir::Kind::Obj);
+	const uint32_t obj_reg = static_cast<uint32_t>(broken.functions.front().registers.size() - 1);
+	broken.functions.front().code.insert(broken.functions.front().code.begin(),
+			{ ir::Op::FromAny, obj_reg, 0, static_cast<uint32_t>(broken.classes.size()), 0 });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().code.insert(broken.functions.front().code.begin(),
+			{ ir::Op::AnyIs, 0, 0, 0x123456u, 0 });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().code.insert(broken.functions.front().code.begin(),
+			{ ir::Op::ClassValue, 0, 0x123456u, 0, 0 });
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().code.insert(broken.functions.front().code.begin(),
+			{ ir::Op::HostBind, 0, 0, static_cast<uint32_t>(broken.functions.size()), 0 });
+	CHECK(invalid(broken));
 }
 
 int main() {

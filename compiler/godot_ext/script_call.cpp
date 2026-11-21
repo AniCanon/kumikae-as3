@@ -316,9 +316,12 @@ void hand_back(Project &p_program, const ir::Function &p_function, const vm::Slo
 	if (returned && kas3::object_element(returned, &owner, &why)) {
 		*r_return = owner; // A script object that is one of Godot's: its Godot object; an Array: Godot's Array.
 	} else if (returned) {
+		*r_return = Variant();
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(p_function.name.c_str()) +
 				" returns a script object Godot can't hold (" + String::utf8(why.c_str()) + "). The caller gets null.");
-	} else if (p_function.result != ir::Kind::Void && p_function.result != ir::Kind::Obj) {
+	} else if (p_function.result == ir::Kind::Obj) {
+		*r_return = Variant();
+	} else if (p_function.result != ir::Kind::Void) {
 		*r_return = kas3::to_variant(p_function.result, p_result);
 	}
 	p_program.interpreter().discard(p_function.result, p_result);

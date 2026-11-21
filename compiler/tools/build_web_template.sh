@@ -20,6 +20,10 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		--profile)
+			if [ $# -lt 2 ]; then
+				echo "missing argument for --profile" >&2
+				exit 2
+			fi
 			profile=$2
 			shift 2
 			;;
@@ -46,6 +50,7 @@ if ! command -v scons >/dev/null 2>&1; then
 fi
 
 godot_src=$(cd "$godot_src" && pwd)
+mkdir -p "$(dirname "$output_zip")"
 out_dir=$(cd "$(dirname "$output_zip")" && pwd)
 out_abs="$out_dir/$(basename "$output_zip")"
 

@@ -124,6 +124,11 @@ struct Host final : vm::NativeCode {
 	// frame (engine_thunk), or NONE: a function the engine calls back then has only generated code and
 	// that request beneath it, which takes its error as a call on bare values does.
 	uint32_t asking = NONE;
+	// The native method or class currently asking the engine through engine_thunk (with no interpreter frame
+	// of its own): what Godot's singleton signal helpers inspect to identify the caller's `this` and class.
+	bool caller_active = false;
+	const vm::Object *caller_object = nullptr;
+	uint32_t caller_class = NONE;
 	// The engine calling a function of the program (a script's method, a listener): the generated function
 	// itself, with no interpreter between, where nothing of the interpreter's is in progress; its own call
 	// otherwise. Either way an error is reported or carried as the interpreter does it (vm::Interpreter::call),

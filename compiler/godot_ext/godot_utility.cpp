@@ -109,12 +109,7 @@ const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::
 		return found->second.get();
 	}
 	// "name hash result parameters [varargs]".
-	std::vector<std::string_view> parts;
-	for (size_t at = 0; at <= p_signature.size();) {
-		const size_t space = std::min(p_signature.find(' ', at), p_signature.size());
-		parts.push_back(p_signature.substr(at, space - at));
-		at = space + 1;
-	}
+	const std::vector<std::string_view> parts = godot_words(p_signature);
 	auto made = std::make_unique<Utility>();
 	made->signature = std::string(p_signature);
 	if (parts.size() < 4) {

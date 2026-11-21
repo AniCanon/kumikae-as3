@@ -64,6 +64,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	// A class's static method, by "Class.method hash", found once: called through it, a wrong call is an
 	// error the script is told of.
 	std::unordered_map<std::string, GDExtensionMethodBindPtr> static_methods_;
+	const Name &find_name(std::string_view p_text);
 	const godot::StringName &name(std::string_view p_text);
 	const godot::Variant *evaluated(std::string_view p_expression, std::string *r_error);
 	// name() as a String, made once.

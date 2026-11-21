@@ -66,15 +66,28 @@ void AS3Script::refresh_all() {
 void AS3Script::set_file(const String &p_resource_path) {
 	file_ = p_resource_path.utf8().get_data();
 	source_ = FileAccess::get_file_as_string(p_resource_path);
-	Project &program = Project::get();
-	class_ = program.valid() ? program.class_of_file(file_) : kas3::ir::NONE;
+	std::shared_ptr<const kas3::ir::Module> module;
+	if (kas3::on_main_thread()) {
+		Project &program = Project::get();
+		if (program.valid()) {
+			module = Project::module_snapshot();
+		}
+		resolved_ = true;
+	} else {
+		// Threaded ResourceLoader must never compile or run AS3 static initializers off the main thread.
+		module = Project::module_snapshot();
+		resolved_ = module != nullptr;
+	}
+	class_ = module ? Project::class_of_file(*module, file_) : kas3::ir::NONE;
 	// Only a class that extends a Godot class can be attached to an object.
-	if (class_ != kas3::ir::NONE && program.module().classes[class_].native_base.empty()) {
+	if (class_ != kas3::ir::NONE && module->classes[class_].native_base.empty()) {
 		UtilityFunctions::push_error(String("ActionScript: ") + p_resource_path +
 				": its class does not extend a Godot class, so it can't be attached to anything.");
 		class_ = kas3::ir::NONE;
 	}
-	_update_exports();
+	if (kas3::on_main_thread()) {
+		_update_exports();
+	}
 }
 
 bool AS3Script::_can_instantiate() const {
@@ -117,10 +130,11 @@ StringName AS3Script::_get_global_name() const {
 }
 
 StringName AS3Script::_get_instance_base_type() const {
-	if (class_ == kas3::ir::NONE) {
+	const std::shared_ptr<const kas3::ir::Module> module = Project::module_snapshot();
+	if (!module || class_ >= module->classes.size()) {
 		return StringName("Object");
 	}
-	return StringName(Project::get().module().classes[class_].native_base.c_str());
+	return StringName(module->classes[class_].native_base.c_str());
 }
 
 void *AS3Script::_instance_create(Object *p_for_object) const {
@@ -131,6 +145,9 @@ void *AS3Script::_instance_create(Object *p_for_object) const {
 				p_for_object->get_class() + ": Godot attached it from another thread (a task of its worker threads, or a resource " +
 				"loaded in a thread). AS3 runs on the main thread only: attach it, or load what has it, there.");
 		return nullptr;
+	}
+	if (!resolved_ && !file_.empty()) {
+		const_cast<AS3Script *>(this)->set_file(String::utf8(file_.c_str()));
 	}
 	if (class_ == kas3::ir::NONE) {
 		return nullptr;
@@ -232,7 +249,8 @@ PackedStringArray AS3ScriptLoader::_get_recognized_extensions() const {
 }
 
 bool AS3ScriptLoader::_handles_type(const StringName &p_type) const {
-	return p_type == StringName("Script") || p_type == StringName("AS3Script");
+	const String name(p_type);
+	return name == "Script" || name == "AS3Script";
 }
 
 String AS3ScriptLoader::_get_resource_type(const String &p_path) const {

@@ -8,6 +8,7 @@
 #endif
 #include <windows.h>
 #else
+#include <cerrno>
 #include <poll.h>
 #include <unistd.h>
 #endif
@@ -37,13 +38,16 @@ bool Channel::fill(bool p_wait) {
 #ifdef _WIN32
 	int got = _read(input_, chunk, sizeof(chunk));
 #else
-	ssize_t got = read(input_, chunk, sizeof(chunk));
+	ssize_t got = 0;
+	do {
+		got = read(input_, chunk, sizeof(chunk));
+	} while (got < 0 && errno == EINTR);
 #endif
 	if (got <= 0) {
 		ended_ = true;
 		return false;
 	}
-	buffer_.append(chunk, (size_t)got);
+	buffer_.append(chunk, static_cast<size_t>(got));
 	return true;
 }
 
@@ -69,7 +73,7 @@ bool Channel::next(std::string *r_message, bool p_wait) {
 			}
 			if (matches) {
 				size_t digits = name.size();
-				while (digits < line.size() && line[digits] == ' ') {
+				while (digits < line.size() && (line[digits] == ' ' || line[digits] == '\t')) {
 					digits++;
 				}
 				size_t value = 0;
@@ -128,14 +132,17 @@ bool Channel::send(const std::vector<std::string> &p_messages) {
 	size_t sent = 0;
 	while (sent < out.size()) {
 #ifdef _WIN32
-		int wrote = _write(output_, out.data() + sent, (unsigned)(out.size() - sent));
+		int wrote = _write(output_, out.data() + sent, static_cast<unsigned>(out.size() - sent));
 #else
-		ssize_t wrote = write(output_, out.data() + sent, out.size() - sent);
+		ssize_t wrote = 0;
+		do {
+			wrote = write(output_, out.data() + sent, out.size() - sent);
+		} while (wrote < 0 && errno == EINTR);
 #endif
 		if (wrote <= 0) {
 			return false;
 		}
-		sent += (size_t)wrote;
+		sent += static_cast<size_t>(wrote);
 	}
 	return true;
 }

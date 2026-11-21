@@ -107,7 +107,7 @@ file(GLOB KAS3_RUNTIME_SOURCES CONFIGURE_DEPENDS runtime/*.cpp)
 # the whole runtime in, and has no use for one.
 list(FILTER KAS3_RUNTIME_SOURCES EXCLUDE REGEX "standalone_main\\.cpp$")
 add_library(kas3standalone STATIC runtime/standalone_main.cpp)
-target_include_directories(kas3standalone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(kas3standalone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir)
 target_compile_options(kas3standalone PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 add_library(kas3runtime STATIC ${KAS3_RUNTIME_SOURCES})
 target_include_directories(kas3runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
@@ -133,7 +133,9 @@ if(KAS3_GODOT_CPP)
     add_subdirectory(${KAS3_GODOT_CPP} ${CMAKE_CURRENT_BINARY_DIR}/godot-cpp EXCLUDE_FROM_ALL)
     file(GLOB KAS3_GODOT_SOURCES CONFIGURE_DEPENDS godot_ext/*.cpp)
     set(KAS3_GODOT_EXTRA_SOURCES "")
-    if(NOT EMSCRIPTEN AND NOT KAS3_RUNTIME_ONLY)
+    set(KAS3_HAS_PLAY_BACKEND OFF)
+    if(NOT EMSCRIPTEN AND NOT KAS3_RUNTIME_ONLY AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(KAS3_HAS_PLAY_BACKEND ON)
         # What Play builds a project's program library from is carried by the extension: the headers generated
         # code is built against, and one word for them and the backend together (tools/embed_runtime.py).
         file(GLOB KAS3_PLAY_INPUTS CONFIGURE_DEPENDS runtime/*.h vm/*.h ir/*.h backend_cpp/*.cpp backend_cpp/*.h)
@@ -150,17 +152,23 @@ if(KAS3_GODOT_CPP)
             ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${runtime_names}
         DEPENDS godot/runtime_names.py godot/godot_names.txt)
     add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES} ${runtime_names})
-    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
+    get_target_property(KAS3_GODOT_CPP_INCLUDES godot-cpp INTERFACE_INCLUDE_DIRECTORIES)
+    if(KAS3_GODOT_CPP_INCLUDES)
+        target_include_directories(kas3_godot SYSTEM PRIVATE ${KAS3_GODOT_CPP_INCLUDES})
+    endif()
+    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
+    if(NOT KAS3_RUNTIME_ONLY)
+        target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    endif()
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
-    target_compile_options(kas3_godot PRIVATE -fno-exceptions)
+    target_compile_options(kas3_godot PRIVATE -fno-exceptions -Wall -Wextra -Werror)
     if(KAS3_RUNTIME_ONLY)
         target_compile_definitions(kas3_godot PRIVATE KAS3_RUNTIME_ONLY=1)
         target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir_core)
-    elseif(EMSCRIPTEN)
-        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir)
-    else()
+    elseif(KAS3_HAS_PLAY_BACKEND)
         target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir kas3backend_cpp)
+    else()
+        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir)
     endif()
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
@@ -248,7 +256,7 @@ add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native
     --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
-    --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+    --include ${CMAKE_CURRENT_SOURCE_DIR}/ir
     ${KAS3_STANDALONE_LINK_ARGS})
 add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)

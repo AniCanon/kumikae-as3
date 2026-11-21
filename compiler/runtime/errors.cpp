@@ -41,6 +41,12 @@ std::string object_words(Host &r_host, Object *p_object) {
 // The error on its way out, as its report begins.
 std::string error_text(Host &r_host) {
 	const Slot error = r_host.context.pending;
+	if (vm::any::is_engine(error)) {
+		Str *text = r_host.handles.text(vm::any::pointer(error));
+		std::string out = text ? std::string(text->view()) : std::string(vm::OUT_OF_MEMORY);
+		release(&r_host.context, text);
+		return out;
+	}
 	if (vm::any::tag(error) != vm::AnyTag::Object) {
 		return vm::any::text(error).value_or(std::string());
 	}

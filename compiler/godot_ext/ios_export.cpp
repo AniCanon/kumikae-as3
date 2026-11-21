@@ -133,27 +133,17 @@ std::optional<fs::path> find_ndk_clang() {
 	return std::nullopt;
 }
 
-String build_android_library(const fs::path &p_stage, bool p_debug, String *r_library) {
+String build_android_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, String *r_library) {
 	const std::optional<fs::path> clang = find_ndk_clang();
 	if (!clang) {
 		return "Android NDK was not found (set ANDROID_NDK_HOME or install an NDK in ANDROID_HOME/ndk).";
 	}
-	const String root = kas3::scripts_root();
-	std::vector<std::string> files;
-	kas3::collect_scripts(root, files);
-	std::vector<std::string> scripts;
-	for (const std::string &path : files) {
-		const std::string local = kas3::project_path(path, root);
-		if (!kas3::excluded_script(local)) {
-			scripts.push_back(local);
-		}
-	}
-	if (scripts.empty()) {
+	if (p_scripts.empty()) {
 		return {};
 	}
 	kas3::ir::Module module;
 	std::string diagnostics;
-	if (!kas3::compile_scripts(std::move(scripts), root, &module, &diagnostics)) {
+	if (!kas3::compile_scripts(std::move(p_scripts), "res://", &module, &diagnostics)) {
 		return String::utf8(diagnostics.c_str());
 	}
 	const std::string write_err = kas3::play::write_sources(module, p_stage, p_debug);
@@ -216,28 +206,11 @@ void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_deb
 	debug_ = p_debug;
 	scripts_.clear();
 	android_temp_.unref();
-	if (android_ && enabled_) {
-		android_temp_ = DirAccess::create_temp("kas3-android");
-		if (android_temp_.is_null()) {
-			get_export_platform()->add_message(
-					EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Could not create a temporary folder for Android native sources.");
-			return;
-		}
-		const fs::path stage(android_temp_->get_current_dir().utf8().get_data());
-		String library;
-		const String error = build_android_library(stage, debug_, &library);
-		if (!error.is_empty()) {
-			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", error);
-		} else if (!library.is_empty()) {
-			add_shared_object(library, PackedStringArray({ "arm64-v8a" }), "");
-			get_export_platform()->add_message(
-					EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Built native scripts for Android ARM64.");
-		}
-	}
 }
 
 void AS3IOSExport::_export_file(const String &p_path, const String &, const PackedStringArray &) {
-	if ((!web_ && !(ios_ && enabled_)) || !p_path.ends_with(".as") || p_path.contains("/.") || kas3::excluded_script(p_path.utf8().get_data())) {
+	if ((!web_ && !((ios_ || android_) && enabled_)) || !p_path.ends_with(".as") || p_path.contains("/.") ||
+			kas3::excluded_script(p_path.utf8().get_data())) {
 		return;
 	}
 	if (web_) {
@@ -245,7 +218,7 @@ void AS3IOSExport::_export_file(const String &p_path, const String &, const Pack
 		// Loading each .as through scene customization would try to attach even plain AS3 classes.
 		Ref<FileAccess> source = FileAccess::open(p_path, FileAccess::READ);
 		if (source.is_null()) {
-			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Cannot read " + p_path);
+			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "ActionScript", "Cannot read " + p_path);
 			return;
 		}
 		add_file(p_path, source->get_buffer(source->get_length()), false);
@@ -258,26 +231,48 @@ void AS3IOSExport::_export_file(const String &p_path, const String &, const Pack
 	scripts_.emplace_back(p_path.utf8().get_data());
 }
 
-// Godot flushes added files after scene customization ends. At this point _export_file has seen
-// exactly the paths chosen by the preset, including its include/exclude filters and dependencies.
+// Godot flushes added files and shared objects after scene customization ends. At this point _export_file
+// has seen exactly the paths chosen by the preset, including its include/exclude filters and dependencies.
 bool AS3IOSExport::_begin_customize_scenes(const Ref<EditorExportPlatform> &, const PackedStringArray &) const {
-	return web_;
+	return web_ || (android_ && enabled_);
 }
 
 void AS3IOSExport::_end_customize_scenes() {
-	if (!web_ || scripts_.empty()) {
+	if (scripts_.empty()) {
+		return;
+	}
+	if (android_ && enabled_) {
+		android_temp_ = DirAccess::create_temp("kas3-android");
+		if (android_temp_.is_null()) {
+			get_export_platform()->add_message(
+					EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Could not create a temporary folder for Android native sources.");
+			return;
+		}
+		const fs::path stage(android_temp_->get_current_dir().utf8().get_data());
+		String library;
+		const String error = build_android_library(std::move(scripts_), stage, debug_, &library);
+		if (!error.is_empty()) {
+			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", error);
+		} else if (!library.is_empty()) {
+			add_shared_object(library, PackedStringArray({ "arm64-v8a" }), "");
+			get_export_platform()->add_message(
+					EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Built native scripts for Android ARM64.");
+		}
+		return;
+	}
+	if (!web_) {
 		return;
 	}
 	kas3::ir::Module module;
 	std::string diagnostics;
 	if (!kas3::compile_scripts(std::move(scripts_), "res://", &module, &diagnostics)) {
-		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", String::utf8(diagnostics.c_str()));
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "ActionScript", String::utf8(diagnostics.c_str()));
 		return;
 	}
 	const std::vector<uint8_t> encoded = kas3::ir::write_binary(module);
 	PackedByteArray bytes;
 	if (bytes.resize(static_cast<int64_t>(encoded.size())) != OK) {
-		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "No memory for the Web program.");
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "ActionScript", "No memory for the Web program.");
 		return;
 	}
 	std::memcpy(bytes.ptrw(), encoded.data(), encoded.size());

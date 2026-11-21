@@ -280,6 +280,23 @@ void test_vectors() {
 	const Slot bad[] = { any::number(1.5) };
 	CHECK(array_new(library, ARRAY, bad, 1) == nullptr);
 	CHECK(recorder.raised.back().find("Error #1005") == 0);
+	// Shrinking a Vector.<Object> (element == Any, element_check != NONE) must not run fill_zeroes backwards.
+	kas3::ir::Class objects;
+	objects.name = "Vector.<Object>";
+	objects.element = Kind::Any;
+	objects.element_check = 0;
+	module.classes.push_back(objects);
+	const uint32_t OBJECTS = static_cast<uint32_t>(module.classes.size() - 1);
+	Vector *obj_vec = vector_new(library, OBJECTS, 4, false);
+	CHECK(obj_vec != nullptr && obj_vec->length == 4u);
+	CHECK(any::tag(slots_of(obj_vec)[0]) == AnyTag::Null);
+	CHECK(vector_set(library, obj_vec, Kind::I32, of_int(1), any::integer(99)));
+	CHECK(vector_set_length(library, obj_vec, 2));
+	CHECK_EQ(obj_vec->length, 2u);
+	CHECK(any::tag(slots_of(obj_vec)[1]) == AnyTag::Int && any::to_int_payload(slots_of(obj_vec)[1]) == 99);
+	CHECK(vector_set_length(library, obj_vec, 0));
+	CHECK_EQ(obj_vec->length, 0u);
+	heap.release_object(obj_vec);
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }
 
@@ -352,6 +369,33 @@ void test_untyped() {
 	recorder.raised.clear();
 	CHECK(!from_any(library, any::number(1.5), Kind::I64, kas3::ir::NONE, &out));
 	CHECK_EQ(recorder.raised.size(), static_cast<size_t>(1));
+	recorder.raised.clear();
+	// Untyped Int64 vs String above 2^53 preserves all 64 bits.
+	Wide *big = new_wide(9007199254740993LL);
+	Str *big_str = new_string("9007199254740993");
+	Str *near_str = new_string("9007199254740992");
+	const Slot wide_same[] = { any::wide(big), any::string(big_str) };
+	const Slot wide_near[] = { any::wide(big), any::string(near_str) };
+	CHECK(any_operate(library, kas3::ir::Op::AnyEq, wide_same, 2, &out) && out.b);
+	CHECK(any_operate(library, kas3::ir::Op::AnyEq, wide_near, 2, &out) && !out.b);
+	CHECK(any_operate(library, kas3::ir::Op::AnyGt, wide_near, 2, &out) && out.b);
+	CHECK(from_any(library, any::string(big_str), Kind::I64, kas3::ir::NONE, &out) && out.l == 9007199254740993LL);
+	Str *frac_str = new_string("12.5");
+	CHECK(!from_any(library, any::string(frac_str), Kind::I64, kas3::ir::NONE, &out));
+	recorder.raised.clear();
+	// text_from_any returns false on OOM instead of true with nullptr.
+	fail_allocations(1);
+	CHECK(!from_any(library, any::integer(42), Kind::Str, kas3::ir::NONE, &out));
+	fail_allocations(0);
+	recorder.memory = 0;
+	for (Str *s : { big_str, near_str, frac_str }) {
+		if (release(s)) {
+			free_string(s);
+		}
+	}
+	if (release(big)) {
+		free_wide(big);
+	}
 	heap.release_object(error);
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }

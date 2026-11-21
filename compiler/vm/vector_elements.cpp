@@ -114,6 +114,9 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 // where the class says so (ir::Class::element_zero). False, with the error raised, if the engine can't make one.
 // A place that holds such a value whole is at its zero already: an empty slot is one.
 bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
+	if (p_from >= p_vector->length) {
+		return true;
+	}
 	const ir::Class &klass = p_library.class_of(p_vector);
 	if (klass.element == Kind::Any && klass.element_check != ir::NONE) {
 		// A Vector.<Object>: what an Object variable starts as, where a Vector.<*>'s place is undefined.
@@ -127,6 +130,7 @@ bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 		std::string error;
 		slots_of(p_vector)[i].p = p_library.heap.source.construct(klass.element_type, nullptr, 0, &error);
 		if (!slots_of(p_vector)[i].p) {
+			p_vector->length = i;
 			p_library.runner.raise(p_library.module().error_class, error.empty() ? "the engine refused" : error);
 			return false;
 		}
