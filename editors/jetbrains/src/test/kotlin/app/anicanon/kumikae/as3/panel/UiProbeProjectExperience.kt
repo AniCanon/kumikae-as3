@@ -178,6 +178,27 @@ internal object UiProbeProjectExperience {
             }
             click(panel, "Example platform settings…")
             check(targetSettingsOpened)
+            for (width in listOf(420, 960)) {
+                edt {
+                    panel.setSize(width, 720)
+                    repeat(3) { layout(panel) }
+                }
+                await { combos().any { it.selectedItem is SettingsPage } == (width == 420) && fitsViewport(panel) }
+                render(panel, destination.resolve("$theme-companion-target-$width.png"), width)
+                edt {
+                    val picker = combos().single { it.selectedItem.toString() == "Example platform" }
+                    val button = descendants(panel).filterIsInstance<JButton>().single {
+                        it.text ==
+                            "Example platform settings…"
+                    }
+                    val selector = SwingUtilities.convertRectangle(picker.parent, picker.bounds, panel)
+                    val action = SwingUtilities.convertRectangle(button.parent, button.bounds, panel)
+                    check(selector.x == action.x) {
+                        "Selector starts at ${selector.x}, settings at ${action.x} (width $width)"
+                    }
+                    check(action.y > selector.y + selector.height && fitsViewport(panel))
+                }
+            }
             edt {
                 check(combos().none { it.selectedItem == IosExecutionMode.Automatic })
                 check(descendants(panel).filterIsInstance<JButton>().none { it.text == "Export All…" })

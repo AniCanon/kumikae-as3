@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.2.8"
+version = "0.2.9"
 
 repositories {
     mavenCentral()

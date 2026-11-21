@@ -7,12 +7,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.anicanon.kumikae.as3.ui.SettingsSection
 import app.anicanon.kumikae.as3.ui.StatusLine
+import com.intellij.util.ui.JBUI
 import org.jetbrains.compose.swing.components.ComboBox
 import org.jetbrains.compose.swing.components.Label
 import org.jetbrains.compose.swing.components.button.Button
 import org.jetbrains.compose.swing.components.layout.Panel
 import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.modifier.SwingModifier
+import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import org.jetbrains.compose.swing.modifier.interaction.enabled
 
 internal sealed interface BuildTargetChoice {
@@ -56,11 +58,11 @@ internal fun BuildTargetPicker(
             if (addTarget != null) Button("Add target…", addTarget, SwingModifier.east().enabled(!controller.dirty))
         }
         if (selected is CompanionTarget) {
-            SettingsActions {
+            Panel(PanelLayout.Border(), modifier = SwingModifier.emptyBorder(JBUI.insetsTop(4))) {
                 Button(
                     "${selected.label} settings…",
                     targetSettings.getValue(selected.label),
-                    SwingModifier.enabled(!controller.dirty),
+                    SwingModifier.west().enabled(!controller.dirty),
                 )
             }
         }
