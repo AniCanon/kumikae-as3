@@ -4,14 +4,23 @@ The rules are the functions below, with the reason beside each. Everything that 
 name in AS3 (the declaration generator here, the bindings later) asks this module, so that there is one
 answer.
 """
+from pathlib import Path
 import re
 
-# The compiler's reserved words (compiler/src/token.h). A test holds this list to that file.
-KEYWORDS = frozenset("""
-as break case catch class const continue default delete do else extends false finally for function if
-implements import in instanceof interface internal is new null package private protected public return
-super switch this throw true try typeof use var void while with
-""".split())
+
+def _reserved_words(header):
+    words = set()
+    for entry in re.finditer(r"^\s*X\s*\(\s*Kw\w+\b(.*)$", header.read_text(encoding="utf-8"), re.MULTILINE):
+        spelling = re.match(r"""\s*,\s*"'(\w+)'"\s*\)""", entry[1])
+        if not spelling:
+            raise ValueError(f"Unrecognized keyword in {header}: {entry[0].strip()}")
+        words.add(spelling[1])
+    if not words:
+        raise ValueError(f"No reserved words found in {header}")
+    return frozenset(words)
+
+
+KEYWORDS = _reserved_words(Path(__file__).resolve().parents[1] / "src/token.h")
 
 # Godot names that are also AS3 built-ins. `import godot.*` would make the bare name ambiguous in every
 # file, so the Godot one gets a prefix. The generator fails on a clash that is not listed here.

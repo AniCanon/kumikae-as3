@@ -1,6 +1,8 @@
 """Tests for the naming rules. Run: python3 -m unittest discover -s compiler/godot -p 'test_*.py'"""
-import os
-import re
+from pathlib import Path
+import runpy
+import shutil
+import tempfile
 import unittest
 
 import naming
@@ -60,12 +62,28 @@ class Safe(unittest.TestCase):
         self.assertEqual(naming.member("new"), "new_")
         self.assertEqual(naming.member("from_node"), "fromNode")
 
-    def test_keywords_are_the_compilers(self):
-        token_h = os.path.join(os.path.dirname(__file__), "..", "src", "token.h")
-        with open(token_h) as file:
-            words = re.findall(r"X\(Kw\w+, \"'(\w+)'\"\)", file.read())
-        self.assertGreater(len(words), 30)
-        self.assertEqual(sorted(naming.KEYWORDS), sorted(words))
+    def test_escaping_follows_the_compiler_token_spelling(self):
+        with tempfile.TemporaryDirectory() as folder:
+            compiler = Path(folder)
+            (compiler / "src").mkdir()
+            (compiler / "godot").mkdir()
+            module = Path(naming.__file__)
+            header = (module.parents[1] / "src/token.h").read_text(encoding="utf-8")
+            (compiler / "src/token.h").write_text(header.replace("\"'class'\"", "\"'record'\""), encoding="utf-8")
+            copy = shutil.copy(module, compiler / "godot")
+            safe = runpy.run_path(copy)["safe"]
+            self.assertEqual(safe("record"), "record_")
+            self.assertEqual(safe("class"), "class")
+
+    def test_an_unreadable_keyword_table_stops_generation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            header = Path(folder) / "token.h"
+            for table, message in [('X(Identifier, "identifier")', "No reserved words"),
+                                   ('''X(KwIf, "'if'")\nX(KwClass, "class")''', "Unrecognized keyword")]:
+                with self.subTest(table=table):
+                    header.write_text(table, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, message):
+                        naming._reserved_words(header)
 
 
 class Classes(unittest.TestCase):
