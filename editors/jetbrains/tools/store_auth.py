@@ -36,13 +36,23 @@ def apple_token(account):
     signature = signed.stdout
     if signed.returncode or not signature.startswith(b"\x30") or len(signature) < 8:
         raise ValueError("Choose the .p8 private key for this App Store Connect team key.")
+    seq_len = signature[1]
+    if seq_len & 0x80 or 2 + seq_len != len(signature):
+        raise ValueError("Invalid Apple signing key.")
     cursor, values = 2, []
     for _ in range(2):
-        if signature[cursor] != 2:
+        if cursor + 2 > len(signature) or signature[cursor] != 2:
             raise ValueError("Invalid Apple signing key.")
         size = signature[cursor + 1]
-        values.append(int.from_bytes(signature[cursor + 2:cursor + 2 + size], "big").to_bytes(32, "big"))
+        if size == 0 or (size & 0x80) or cursor + 2 + size > len(signature):
+            raise ValueError("Invalid Apple signing key.")
+        try:
+            values.append(int.from_bytes(signature[cursor + 2:cursor + 2 + size], "big").to_bytes(32, "big"))
+        except OverflowError:
+            raise ValueError("Invalid Apple signing key.") from None
         cursor += size + 2
+    if cursor != len(signature):
+        raise ValueError("Invalid Apple signing key.")
     return data + "." + b64(b"".join(values))
 
 
@@ -62,11 +72,17 @@ def google_consent(client):
             if parsed.path != "/" or not hmac.compare_digest(query.get("state", [""])[0].encode(), state.encode()):
                 self.send_error(400)
                 return
-            result.update(code=query.get("code", [""])[0])
+            code = query.get("code", [""])[0]
+            result.update(code=code, error=query.get("error", [""])[0])
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
-            self.wfile.write(b"Return to Rider to continue Google Play setup.")
+            body = (
+                b"Return to your IDE to continue Google Play setup."
+                if code
+                else b"Google sign-in did not complete. Return to your IDE to try again."
+            )
+            self.wfile.write(body)
 
     with HTTPServer(("127.0.0.1", 0), Callback) as server:
         redirect = f"http://127.0.0.1:{server.server_port}/"

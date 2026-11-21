@@ -78,3 +78,30 @@ fi
             self.assertIn("application/export_project_only=true", second)
             self.assertEqual("Custom Product.app", Path(result.stdout.strip().splitlines()[-1]).name)
             self.assertTrue(Path(result.stdout.strip().splitlines()[-1]).is_dir())
+
+    def test_rejects_invalid_section_and_as3_errors_even_on_zero_godot_exit(self):
+        script = Path(__file__).resolve().parents[1] / "tools/build-ios-simulator.sh"
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            game = base / "Game"
+            game.mkdir()
+            (game / "project.godot").write_text('[application]\nconfig/name="Demo"\n')
+            (game / "export_presets.cfg").write_text('[preset.0]\nname="iOS"\nplatform="iOS"\n')
+            (game / "bin/ios/kas3_godot.xcframework").mkdir(parents=True)
+            template = base / "sim.zip"
+            template.touch()
+            godot = base / "godot"
+            godot.write_text('#!/bin/sh\nif [ "$4" = "--export-debug" ]; then echo "ERROR: ActionScript: bad script"; fi\nexit 0\n')
+            xcode = base / "xcodebuild"
+            xcode.write_text('#!/bin/sh\nexit 0\n')
+            for tool in (godot, xcode):
+                tool.chmod(0o755)
+            env = dict(os.environ, PATH=f"{base}:{os.environ['PATH']}")
+            bad_section = subprocess.run([script, game, base / "out", godot, template, "", "iOS", "bad;section"],
+                                         env=env, capture_output=True, text=True)
+            self.assertNotEqual(0, bad_section.returncode)
+            self.assertIn("Invalid export preset section", bad_section.stderr)
+            as3_err = subprocess.run([script, game, base / "out", godot, template, "", "iOS", "preset.0"],
+                                     env=env, capture_output=True, text=True)
+            self.assertNotEqual(0, as3_err.returncode)
+            self.assertIn("AS3 compilation failed", as3_err.stderr)

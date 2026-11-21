@@ -13,10 +13,17 @@ function start() {
   if (!settings.get("godot", true)) {
     args.push("--no-godot");
   }
-  for (const file of settings.get("declarations", [])) {
-    args.push("--declarations", file);
+  const declarations = settings.get("declarations", []);
+  if (Array.isArray(declarations)) {
+    for (const file of declarations) {
+      if (typeof file === "string" && file.trim()) {
+        args.push("--declarations", file);
+      }
+    }
   }
-  const server = { command: settings.get("serverPath", "kas3c"), args, transport: TransportKind.stdio };
+  const configured = settings.get("serverPath", "kas3c");
+  const command = typeof configured === "string" && configured.trim() ? configured.trim() : "kas3c";
+  const server = { command, args, transport: TransportKind.stdio };
   client = new LanguageClient("kas3", "Kumikae AS3", server, {
     documentSelector: [{ scheme: "file", language: "actionscript" }],
   });
@@ -28,7 +35,14 @@ function restart() {
   const apply = async () => {
     if (requested !== generation) return;
     if (client?.needsStop()) await client.stop();
-    if (requested === generation) await start();
+    if (requested === generation) {
+      try {
+        await start();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window?.showErrorMessage?.(`Kumikae AS3 language server failed to start: ${message}`);
+      }
+    }
   };
   pending = pending.then(apply, apply);
   return pending;

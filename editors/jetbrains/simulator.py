@@ -20,11 +20,23 @@ class ClientError(RuntimeError):
 class Client:
     def __init__(self, endpoint):
         endpoint = Path(endpoint)
-        info = endpoint.lstat()
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
-            raise ClientError("The endpoint must be an owner-only regular file")
-        descriptor = json.loads(endpoint.read_text())
-        if (set(descriptor) != {"version", "port", "token"} or descriptor["version"] != 1
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            fd = os.open(endpoint, flags)
+        except OSError as error:
+            raise ClientError("The endpoint must be an owner-only regular file") from error
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+                raise ClientError("The endpoint must be an owner-only regular file")
+            with os.fdopen(fd, "r", encoding="utf-8") as stream:
+                fd = -1
+                descriptor = json.loads(stream.read())
+        finally:
+            if fd >= 0:
+                os.close(fd)
+        if (not isinstance(descriptor, dict) or set(descriptor) != {"version", "port", "token"}
+                or descriptor["version"] != 1
                 or type(descriptor["port"]) is not int or not 1 <= descriptor["port"] <= 65535
                 or not isinstance(descriptor["token"], str) or not descriptor["token"]):
             raise ClientError("Invalid endpoint descriptor")
@@ -49,7 +61,9 @@ class Client:
             raise ClientError("Wrong response id or version")
         if "error" in result:
             error = result["error"]
-            raise ClientError(f'{error["code"]}: {error["message"]}')
+            if isinstance(error, dict) and "code" in error and "message" in error:
+                raise ClientError(f'{error["code"]}: {error["message"]}')
+            raise ClientError(f"Service error: {error}")
         if "result" not in result:
             raise ClientError("Missing result")
         return result["result"]

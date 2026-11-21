@@ -46,15 +46,24 @@ def check_archive(info, spec):
             raise ValueError(f"The archived {field} differs from the settings you reviewed.")
 
 
+def _run_xcodebuild(args, step, timeout=1800):
+    try:
+        subprocess.run(args, check=True, timeout=timeout)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f"Xcode {step} failed with exit code {error.returncode}.") from None
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"Xcode {step} timed out after {timeout} seconds.") from None
+
+
 def upload(project, folder, account, spec):
     archive = folder / "Game.xcarchive"
     auth = ["-allowProvisioningUpdates", "-authenticationKeyPath", account["file"],
             "-authenticationKeyID", account["keyId"], "-authenticationKeyIssuerID", account["issuer"]]
     print("Archiving for an iOS device…", flush=True)
-    subprocess.run(["/usr/bin/xcodebuild", "-project", str(project), "-scheme", project.stem, "-configuration",
-                    "Release", "-destination", "generic/platform=iOS", "-archivePath", str(archive),
-                    "-derivedDataPath", str(folder / "DerivedData"), *auth, "archive",
-                    "DEVELOPMENT_TEAM=" + spec["team"]], check=True)
+    _run_xcodebuild(["/usr/bin/xcodebuild", "-project", str(project), "-scheme", project.stem, "-configuration",
+                     "Release", "-destination", "generic/platform=iOS", "-archivePath", str(archive),
+                     "-derivedDataPath", str(folder / "DerivedData"), *auth, "archive",
+                     "DEVELOPMENT_TEAM=" + spec["team"]], "archive")
     with (archive / "Info.plist").open("rb") as source:
         info = plistlib.load(source)["ApplicationProperties"]
     check_archive(info, spec)
@@ -64,8 +73,8 @@ def upload(project, folder, account, spec):
                            teamID=spec["team"], manageAppVersionAndBuildNumber=False,
                            testFlightInternalTestingOnly=True), out)
     print("Uploading to TestFlight for internal testing…", flush=True)
-    subprocess.run(["/usr/bin/xcodebuild", "-exportArchive", "-archivePath", str(archive), "-exportOptionsPlist",
-                    str(options), "-exportPath", str(folder / "upload"), *auth], check=True)
+    _run_xcodebuild(["/usr/bin/xcodebuild", "-exportArchive", "-archivePath", str(archive), "-exportOptionsPlist",
+                     str(options), "-exportPath", str(folder / "upload"), *auth], "upload")
 
 
 def find_build(api, app, spec):

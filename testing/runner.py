@@ -128,6 +128,8 @@ def select(tests, names):
 
 def stop(process):
     # The owned group can outlive its leader while descendants hold our output pipe.
+    if process.returncode is not None:
+        return
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except (ProcessLookupError, PermissionError):
@@ -267,6 +269,8 @@ def run_case(root, case, env=None, reporter=None):
     start = time.monotonic()
     process = None
     stopped = False
+    reaped = False
+    process_lock = threading.Lock()
     timed_out = threading.Event()
     timer = None
     chunks = []
@@ -280,14 +284,24 @@ def run_case(root, case, env=None, reporter=None):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            errors="replace",
             bufsize=1,
             start_new_session=True,
             env=env,
         )
 
+        def safe_stop():
+            nonlocal stopped, reaped
+            with process_lock:
+                if reaped:
+                    return
+                stop(process)
+                stopped = True
+                reaped = process.returncode is not None
+
         def on_timeout():
             timed_out.set()
-            stop(process)
+            safe_stop()
 
         timer = threading.Timer(case.get("timeout", 120), on_timeout)
         timer.daemon = True
@@ -307,10 +321,12 @@ def run_case(root, case, env=None, reporter=None):
                 except ValueError as error:
                     protocol_error = error
         try:
-            process.wait(timeout=2)
+            with process_lock:
+                if not reaped:
+                    process.wait(timeout=2)
+                    reaped = True
         except subprocess.TimeoutExpired:
-            stop(process)
-            stopped = True
+            safe_stop()
         if timer is not None:
             timer.cancel()
         output = "".join(chunks)
@@ -368,7 +384,10 @@ def run_case(root, case, env=None, reporter=None):
             timer.cancel()
         if process is not None:
             if not stopped:
-                stop(process)
+                with process_lock:
+                    if not reaped:
+                        stop(process)
+                        reaped = True
             if process.stdout is not None:
                 process.stdout.close()
 
@@ -430,7 +449,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--compiler", default="kas3c")
-    parser.add_argument("--godot", default="godot")
+    parser.add_argument("--godot", default=os.environ.get("KAS3_GODOT", "godot"))
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--require-pass", action="store_true", help="Fail if no test actually passed")
@@ -492,6 +511,8 @@ def main():
                     if args.android_sdk:
                         mobile_cmd.extend(["--android-sdk", args.android_sdk])
                     command_case["command"] = mobile_cmd
+                    # Separate mobile/web build time from the per-suite execution timeout enforced by mobile_runner.
+                    command_case["timeout"] = max(case.get("timeout", 120), 1200 + case.get("timeout", 120))
                 elif "discover" in case and case.get("runtime") == "godot":
                     bootstrap, _, _ = _discovery.godot_entry(temp_path, case, filters=filters)
                     command_case["command"] = [

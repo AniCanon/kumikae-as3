@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import signal
 import subprocess
+import sys
 import time
 import uuid
 
@@ -42,29 +44,36 @@ def collect(app, device, evidence, timeout):
     simctl("launch", device, bundle, env=dict(os.environ, SIMCTL_CHILD_KAS3_TEST_RUN=token), check=True)
     report = data / "kas3-test-result.json"
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if report.is_file():
-            try:
-                loaded = json.loads(report.read_text())
-                result = loaded if isinstance(loaded, dict) else {}
-            except json.JSONDecodeError:
-                result = {}
-            if result.get("run") == token:
-                evidence = evidence / token
-                evidence.mkdir(parents=True, exist_ok=True)
-                for path in data.iterdir():
-                    if path.is_file() and path.suffix in {".json", ".txt", ".png"} and (
-                        path == report or path.stat().st_mtime >= started
-                    ):
-                        shutil.copy2(path, evidence / path.name)
-                if finished(result, token):
-                    print(f"Passed {result.get('checks', 0)} integration checks.")
-                    return
-        time.sleep(0.4)
-    raise ValueError("Timed out waiting for this launch's test report.")
+    try:
+        while time.monotonic() < deadline:
+            if report.is_file():
+                try:
+                    loaded = json.loads(report.read_text())
+                    result = loaded if isinstance(loaded, dict) else {}
+                except json.JSONDecodeError:
+                    result = {}
+                if result.get("run") == token:
+                    evidence = evidence / token
+                    evidence.mkdir(parents=True, exist_ok=True)
+                    for path in data.iterdir():
+                        if path.is_file() and path.suffix in {".json", ".txt", ".png"} and (
+                            path == report or path.stat().st_mtime >= started
+                        ):
+                            shutil.copy2(path, evidence / path.name)
+                    if finished(result, token):
+                        print(f"Passed {result.get('checks', 0)} integration checks.")
+                        return
+            time.sleep(0.4)
+        raise ValueError("Timed out waiting for this launch's test report.")
+    finally:
+        try:
+            simctl("terminate", device, bundle)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, lambda signum, _: sys.exit(128 + signum))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("app", type=Path)
     parser.add_argument("--device", required=True)

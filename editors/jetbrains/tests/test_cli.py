@@ -96,6 +96,15 @@ class ClientTest(unittest.TestCase):
         with self.assertRaises(cli.ClientError):
             cli.frame_params(self.endpoint)
 
+    def test_symlink_endpoint_and_non_dict_service_error_are_rejected(self):
+        link = Path(self.tmp.name) / "link.json"
+        link.symlink_to(self.endpoint)
+        with self.assertRaises(cli.ClientError):
+            cli.Client(link)
+        Handler.response = lambda r: {"version": 1, "id": r["id"], "error": "plain string"}
+        with self.assertRaisesRegex(cli.ClientError, "plain string"):
+            cli.Client(self.endpoint).call("status", {})
+
 
 if __name__ == "__main__":
     unittest.main()

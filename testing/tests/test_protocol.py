@@ -35,3 +35,16 @@ class ProtocolTest(unittest.TestCase):
         data += event("testFailed", name, "failed 😀\nnext")
         data += event("testFinished", name) + event("suiteFinished", "suite")
         self.assertEqual(protocol.parse(data)[2], ("testFailed", name, "failed 😀\nnext"))
+
+    def test_crlf_line_endings_and_mid_surrogate_truncation(self):
+        crlf = (
+            event("suiteStarted", "suite")
+            + event("testStarted", "ok")
+            + event("testFinished", "ok")
+            + event("suiteFinished", "suite")
+        ).replace("\n", "\r\n")
+        self.assertEqual(4, len(protocol.parse(crlf)))
+        # '😀' is 2 UTF-16 code units; claiming length 1 splits a surrogate pair and must fail.
+        bad = "@kas3-test-v1 suiteStarted 1 0\n😀\n\n"
+        with self.assertRaises(ValueError):
+            protocol.parse(bad)

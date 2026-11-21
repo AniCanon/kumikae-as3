@@ -37,7 +37,9 @@ def request(method, url, body=None, token=None, content_type=None):
     try:
         connection.request(method, parts.path + ("?" + parts.query if parts.query else ""), body, headers)
         response = connection.getresponse()
-        raw = response.read(2_000_000)
+        raw = response.read(2_000_000 + 1)
+        if len(raw) > 2_000_000:
+            raise StoreError(response.status, f"{parts.hostname} ({response.status}): response exceeded 2 MB limit")
         if not 200 <= response.status < 300:
             try:
                 error = json.loads(raw)

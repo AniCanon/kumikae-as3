@@ -21,10 +21,10 @@ def configure_starter_web(starter, native):
                                   if not line.startswith("web.wasm32 =")))
     presets = starter / "export_presets.cfg"
     # Godot numbers presets consecutively. Keep each preset together with its options.
-    sections = re.split(r"(?m)^\[preset\.\d+\]\n", presets.read_text())
-    kept = [block for block in sections[1:] if 'platform="Web"' not in block.splitlines()]
+    sections = re.split(r"(?m)^\[preset\.\d+\]\r?\n", presets.read_text())
+    kept = [block for block in sections[1:] if not any(line.strip() == 'platform="Web"' for line in block.splitlines())]
     presets.write_text(sections[0] + "".join(
-        f"[preset.{index}]\n" + re.sub(r"(?m)^\[preset\.\d+\.options\]$", f"[preset.{index}.options]", block)
+        f"[preset.{index}]\n" + re.sub(r"(?m)^\[preset\.\d+\.options\]\r?$", f"[preset.{index}.options]", block)
         for index, block in enumerate(kept)))
 
 

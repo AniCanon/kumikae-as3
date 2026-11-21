@@ -54,3 +54,45 @@ test("the server owns the watcher and settings changes cannot overlap client lif
   await Promise.all([last, shutdown]);
   assert.ok(clients.every(client => client.stopped));
 });
+
+test("serverPath is application-scoped and untrusted workspaces are restricted", () => {
+  const manifest = require("../package.json");
+  assert.equal(manifest.contributes.configuration.properties["kas3.serverPath"].scope, "application");
+  assert.equal(manifest.capabilities.untrustedWorkspaces.supported, "limited");
+  assert.ok(manifest.capabilities.untrustedWorkspaces.restrictedConfigurations.includes("kas3.serverPath"));
+});
+
+test("handles malformed settings and server start rejections cleanly", async () => {
+  const errors = [];
+  const launched = [];
+  const workspace = {
+    getConfiguration: () => ({
+      get: (key, fallback) => {
+        if (key === "serverPath") return "   ";
+        if (key === "declarations") return "not-an-array";
+        return fallback;
+      },
+    }),
+    onDidChangeConfiguration: () => ({ dispose() {} }),
+  };
+  const window = { showErrorMessage: msg => errors.push(msg) };
+  class LanguageClient {
+    constructor(_id, _name, server) { launched.push(server); }
+    async start() { throw new Error("spawn ENOENT"); }
+    needsStop() { return false; }
+    async stop() {}
+  }
+  const sandbox = {
+    module: {},
+    require: name => name === "vscode"
+      ? { workspace, window }
+      : { LanguageClient, TransportKind: { stdio: "stdio" } },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(root, "extension.js"), "utf8"), sandbox);
+  await sandbox.module.exports.activate({ subscriptions: [] });
+  assert.equal(launched.length, 1);
+  assert.equal(launched[0].command, "kas3c");
+  assert.deepEqual(Array.from(launched[0].args), ["lsp"]);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /spawn ENOENT/);
+});

@@ -1,9 +1,9 @@
 """Export a Godot preset and follow the AS3 game on the chosen Android device."""
+import importlib.util
 import os
 from pathlib import Path
 import re
-import importlib.util
-import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -15,13 +15,38 @@ spec = importlib.util.spec_from_file_location("game_export", Path(__file__).with
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
+_PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$")
+_ACTIVITY_RE = re.compile(r"^[A-Za-z0-9_.$]+$")
+_COMPONENT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+/[A-Za-z0-9_.$]+$")
+
+
+def validate_package(package):
+    if not _PACKAGE_RE.fullmatch(package):
+        raise ValueError("Invalid Android package name: " + package)
+    return package
+
+
+def validate_component(package, component):
+    validate_package(package)
+    if not component.startswith(package + "/") or not _COMPONENT_RE.fullmatch(component):
+        raise ValueError("Android could not resolve a valid launcher for " + package)
+    return component
+
+
+def shell_args(*args):
+    return [shlex.quote(str(arg)) for arg in args]
+
 
 def launch_activity(badging):
     package = re.search(r"^package: name='([^']+)'", badging, re.M)
     activity = re.search(r"^launchable-activity: name='([^']+)'", badging, re.M)
     if not package:
         raise ValueError("Android Build Tools could not identify the game's launch activity.")
-    return package[1], activity[1] if activity else None
+    pkg = validate_package(package[1])
+    act = activity[1] if activity else None
+    if act is not None and not _ACTIVITY_RE.fullmatch(act):
+        raise ValueError("Android Build Tools reported an invalid launch activity.")
+    return pkg, act
 
 
 def wait_for_device(adb):
@@ -37,10 +62,12 @@ def install(adb, apk):
 
 
 def run(project, preset, serial, sdk, godot, runtime):
+    if not serial or serial.startswith("-"):
+        raise ValueError("Select a valid Android device serial.")
     adb = [str(sdk / "platform-tools/adb"), "-s", serial]
 
     def shell(*args, timeout=30):
-        return subprocess.check_output([*adb, "shell", *args], text=True, timeout=timeout).strip()
+        return subprocess.check_output([*adb, "shell", *shell_args(*args)], text=True, timeout=timeout).strip()
 
     wait_for_device(adb)
     abi = shell("getprop", "ro.product.cpu.abilist").split(",")
@@ -56,20 +83,22 @@ def run(project, preset, serial, sdk, godot, runtime):
         apk = Path(folder) / "game.apk"
         env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
         subprocess.run(
-            [godot, "--headless", "--path", stage, "--editor", "--quit-after", "120", "--max-fps", "60"],
+            [godot, "--headless", "--path", str(stage), "--editor", "--quit-after", "120", "--max-fps", "60"],
             env=env,
             check=True,
             timeout=180,
         )
-        subprocess.run(
-            [godot, "--headless", "--path", stage, "--export-debug", preset, apk],
+        module.run_export(
+            [godot, "--headless", "--path", str(stage), "--export-debug", preset, str(apk)],
             env=env,
-            check=True,
             timeout=900,
         )
-        with zipfile.ZipFile(apk) as archive:
-            if not any(item.startswith("lib/arm64-v8a/") and "kas3" in item for item in archive.namelist()):
-                raise ValueError("The selected Android preset did not export the ARM64 AS3 runtime.")
+        try:
+            with zipfile.ZipFile(apk) as archive:
+                if "lib/arm64-v8a/libkas3_godot.so" not in archive.namelist():
+                    raise ValueError("The selected Android preset did not export the ARM64 AS3 runtime.")
+        except zipfile.BadZipFile as error:
+            raise ValueError("The exported APK is not a valid zip archive.") from error
         badging = subprocess.check_output([aapt, "dump", "badging", apk], text=True, timeout=30)
         package, activity = launch_activity(badging)
         install(adb, apk)
@@ -80,25 +109,25 @@ def run(project, preset, serial, sdk, godot, runtime):
                 "cmd", "package", "resolve-activity", "--brief", "-a", "android.intent.action.MAIN",
                 "-c", "android.intent.category.LAUNCHER", package,
             ).splitlines()
-            component = resolved[-1] if resolved else ""
-        if not component.startswith(package + "/"):
-            raise ValueError("Android could not resolve a launcher for " + package)
+            component = resolved[-1].strip() if resolved else ""
+        component = validate_component(package, component)
         result = shell("am", "start", "-W", "-n", component, timeout=60)
         print(result, flush=True)
         if "Status: ok" not in result:
             raise ValueError("Android could not launch this game.")
+        quoted_pkg = shlex.quote(package)
         try:
-            while subprocess.run([*adb, "shell", "pidof", package], stdout=subprocess.DEVNULL, timeout=15).returncode == 0:
+            while subprocess.run([*adb, "shell", "pidof", quoted_pkg], stdout=subprocess.DEVNULL, timeout=15).returncode == 0:
                 time.sleep(1)
         finally:
             try:
-                subprocess.run([*adb, "shell", "am", "force-stop", package], check=False, timeout=10, stderr=subprocess.DEVNULL)
+                subprocess.run([*adb, "shell", "am", "force-stop", quoted_pkg], check=False, timeout=10, stderr=subprocess.DEVNULL)
             except (OSError, subprocess.SubprocessError):
                 pass
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(130))
+    module.install_sigterm_handler()
     if len(sys.argv) != 7:
         sys.exit("Usage: android_run.py <project> <preset> <serial> <sdk> <godot> <runtime>")
     try:

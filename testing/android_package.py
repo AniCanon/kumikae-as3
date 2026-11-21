@@ -1,7 +1,23 @@
 """Verify and install the AS3 APK and resolve its launchable Android component."""
 import re
+import shlex
 import subprocess
 import zipfile
+
+_PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$")
+_COMPONENT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+/[A-Za-z0-9_.$]+$")
+
+
+def _validate_package(package):
+    if not _PACKAGE_RE.fullmatch(package):
+        raise ValueError("Invalid Android package name: " + package)
+    return package
+
+
+def _validate_component(component):
+    if not _COMPONENT_RE.fullmatch(component):
+        raise ValueError("Invalid Android component: " + component)
+    return component
 
 
 def verify_runtime(apk):
@@ -21,19 +37,21 @@ def install(sdk, adb, apk, android_run):
     verify_runtime(apk)
     badging = subprocess.check_output([aapt, "dump", "badging", apk], text=True, timeout=30)
     package, activity = android_run.launch_activity(badging)
+    package = _validate_package(package)
     android_run.install(adb, apk)
     if activity:
-        return package, package + "/" + activity
+        return package, _validate_component(package + "/" + activity)
     resolved = subprocess.check_output([*adb, "shell", "cmd", "package", "resolve-activity", "--brief",
                                         "-a", "android.intent.action.MAIN", "-c",
-                                        "android.intent.category.LAUNCHER", package], text=True, timeout=30).strip().splitlines()
+                                        "android.intent.category.LAUNCHER", shlex.quote(package)], text=True, timeout=30).strip().splitlines()
     if not resolved or not resolved[-1].startswith(package + "/"):
         raise ValueError("Android could not resolve a launcher for " + package)
-    return package, resolved[-1]
+    return package, _validate_component(resolved[-1].strip())
 
 
 def launch(adb, component):
-    result = subprocess.check_output([*adb, "shell", "am", "start", "-S", "-W", "-n", component], text=True, timeout=60)
+    component = _validate_component(component)
+    result = subprocess.check_output([*adb, "shell", "am", "start", "-S", "-W", "-n", shlex.quote(component)], text=True, timeout=60)
     if "Status: ok" not in result:
         raise ValueError("Android could not launch the game. " + result.strip())
     return result

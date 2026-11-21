@@ -38,6 +38,10 @@ class MobileRunnerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             project = (Path(tmp) / "game").resolve()
             (project / "src").mkdir(parents=True)
+            (project / "src/build").mkdir(parents=True)
+            (project / "src/build/Helper.as").write_text("package build { public class Helper {} }\n")
+            (project / "build").mkdir()
+            (project / "build/ignored.txt").write_text("root build ignored")
             (project / "tests").mkdir()
             (project / "project.godot").write_text(
                 '[application]\nconfig/name="Sample"\nrun/main_scene="res://scenes/main.tscn"\n'
@@ -73,6 +77,8 @@ class MobileRunnerTest(unittest.TestCase):
             self.assertIn('ExtResource("1")', (staged / "tests/kas3_runner/TestRunner.tscn").read_text())
             self.assertIn('Suite.only.push("qa.SampleTest::runsOnDevice")', (staged / "tests/kas3_runner/Kas3EngineDriver.as").read_text())
             self.assertFalse((staged / "tests/kas3_runner/run_tests.gd").exists())
+            self.assertTrue((staged / "src/build/Helper.as").is_file())
+            self.assertFalse((staged / "build").exists())
 
             (staged / "tests/SampleTest.as").write_text(original + "\n")
             self.assertEqual(original, (project / "tests/SampleTest.as").read_text())

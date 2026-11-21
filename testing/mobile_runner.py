@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -31,8 +32,13 @@ _suite = _load("kas3_mobile_suite", _HERE / "simulator_suite.py")
 def stage_project(project_root, staged_root, case, filters):
     """Copy the project to staged_root and inject the generated TestRunner scene inside tests/."""
     # Exporters rewrite files in place. The stage must own every file it can modify.
-    shutil.copytree(project_root, staged_root, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns(".git", ".idea", ".run", ".godot", ".build", "build"))
+    project_root = Path(project_root).resolve()
+    excluded = {".git", ".idea", ".run", ".godot", ".build", "build"}
+
+    def ignore_root_only(path, names):
+        return excluded.intersection(names) if Path(path).resolve() == project_root else set()
+
+    shutil.copytree(project_root, staged_root, dirs_exist_ok=True, ignore=ignore_root_only)
     runner_dir = staged_root / "tests" / "kas3_runner"
     if runner_dir.exists():
         raise ValueError("tests/kas3_runner is reserved for the generated test scene.")
@@ -147,7 +153,7 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
         scene_path = stage_project(project_root, stage, case, filters)
         exports = (stage / "export_presets.cfg").read_text()
         game = (stage / "project.godot").read_text()
-        game, cfg, group, bundle = _suite.prepare(game, exports, preset, scene_path)
+        game, cfg, group, bundle = _suite.prepare(game, exports, preset, scene_path, folder=case["discover"])
         (stage / "project.godot").write_text(game)
         (stage / "export_presets.cfg").write_text(cfg)
 
@@ -166,6 +172,7 @@ def run_ios_simulator(project_root, case, filters, device, preset, godot):
             ],
             capture_output=True,
             text=True,
+            timeout=1200,
         )
         if build.returncode:
             sys.stderr.write(build.stdout + build.stderr)
@@ -207,7 +214,7 @@ def run_web(project, case, filters, preset, godot):
         output = Path(tmp) / "export"
         output.mkdir()
         product = web.export_stage(stage, native, godot, name, output)
-        return browser.run(web, product, chrome, case["marker"])
+        return browser.run(web, product, chrome, case["marker"], timeout=case.get("timeout", 120))
 
 
 def run_android(project_root, case, filters, device, preset, sdk_path, godot):
@@ -239,7 +246,7 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
         # A test APK must be installable alongside the developer's game.
         options = group + ".options"
         package = _suite.setting(exports, options, "package/unique_name")
-        if not re.fullmatch(r"[a-zA-Z][\w$]*(?:\.[a-zA-Z$][\w$]*)+", package, re.ASCII):
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+", package, re.ASCII):
             raise ValueError("Set package/unique_name in the Android export preset before running tests.")
         cfg = _suite.setting(exports, options, "package/unique_name", package + ".tests")
         cfg = _suite.include_test_folder(cfg, group, case["discover"])
@@ -253,19 +260,21 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
             check=True,
             timeout=180,
         )
-        subprocess.run(
+        game_export.run_export(
             [godot, "--headless", "--path", str(export_stage), "--export-debug", preset_name, str(apk)],
             env=env,
-            check=True,
             timeout=900,
         )
         android_package = _load("kas3_android_package", _HERE / "android_package.py")
         connection = [str(adb), "-s", serial]
         package, component = android_package.install(sdk, connection, apk, android_run)
+        quoted_pkg = shlex.quote(package)
 
         shell = [str(adb), "-s", serial, "shell"]
-        packages = subprocess.check_output([*shell, "pm", "list", "packages", "--user", "current", "-U", package], text=True, timeout=15)
-        uid = re.search(r"(?m)^package:" + re.escape(package) + r"\s+uid:(\d+)$", packages)
+        packages = subprocess.check_output(
+            [*shell, "pm", "list", "packages", "--user", "current", "-U", quoted_pkg], text=True, timeout=15
+        )
+        uid = re.search(r"(?m)^package:" + re.escape(package) + r"\s+uid:(\d+)\r?$", packages)
         if not uid:
             raise ValueError("Could not identify the installed Android test package.")
         since = subprocess.check_output([*shell, "date", "+%s.%N"], text=True, timeout=15).strip()
@@ -274,19 +283,37 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            errors="replace",
             bufsize=1,
         )
         marker = case.get("marker", "PASS discovered suite")
         done = threading.Event()
+        deadline = time.monotonic() + case.get("timeout", 120)
 
         def watch_pid():
             time.sleep(1.5)
             while not done.is_set():
-                if subprocess.run([str(adb), "-s", serial, "shell", "pidof", package], stdout=subprocess.DEVNULL, timeout=15).returncode != 0:
+                if time.monotonic() >= deadline:
                     done.set()
                     logcat.terminate()
                     return
-                time.sleep(0.5)
+                try:
+                    running = subprocess.run(
+                        [str(adb), "-s", serial, "shell", "pidof", quoted_pkg],
+                        stdout=subprocess.DEVNULL,
+                        timeout=15,
+                    ).returncode == 0
+                except (OSError, subprocess.SubprocessError):
+                    done.set()
+                    logcat.terminate()
+                    return
+                if not running:
+                    # Allow final logcat lines buffered by Android to flush before terminating logcat.
+                    done.wait(0.5)
+                    done.set()
+                    logcat.terminate()
+                    return
+                done.wait(0.5)
 
         watcher = threading.Thread(target=watch_pid, daemon=True)
         try:
@@ -307,7 +334,11 @@ def run_android(project_root, case, filters, device, preset, sdk_path, godot):
                     logcat.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     logcat.kill()
-            subprocess.run([str(adb), "-s", serial, "shell", "am", "force-stop", package], check=False, timeout=10)
+                    logcat.wait(timeout=2)
+            try:
+                subprocess.run([str(adb), "-s", serial, "shell", "am", "force-stop", quoted_pkg], check=False, timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                pass
 
 
 def main():
@@ -315,7 +346,7 @@ def main():
     parser.add_argument("runtime", choices=("ios-simulator", "android", "web"))
     parser.add_argument("project", type=Path)
     parser.add_argument("case_json", type=Path)
-    parser.add_argument("--godot", default="godot")
+    parser.add_argument("--godot", default=os.environ.get("KAS3_GODOT", "godot"))
     parser.add_argument("--device", default="")
     parser.add_argument("--preset", default="")
     parser.add_argument("--android-sdk", default="")

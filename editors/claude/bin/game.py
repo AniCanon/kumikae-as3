@@ -10,8 +10,8 @@ import tempfile
 import android_package
 import android_run
 import game_export
-from mobile_runner import resolve_android_sdk, resolve_ios_device
-from simulator_suite import platform_presets, select_preset
+from mobile_runner import resolve_android_device, resolve_android_sdk, resolve_ios_device
+from simulator_suite import platform_presets, select_preset, setting
 
 PLATFORMS = {"desktop": "macOS", "ios-simulator": "iOS", "android": "Android", "web": "Web"}
 
@@ -23,20 +23,25 @@ def preset_for(project, target, requested):
     return name
 
 
+def _ios_preset_details(project, preset_name):
+    cfg_path = project / "export_presets.cfg"
+    if not cfg_path.is_file():
+        return "", ""
+    cfg = cfg_path.read_text()
+    section, _ = select_preset(platform_presets(cfg, "iOS"), "iOS", preset_name)
+    try:
+        bundle = setting(cfg, section + ".options", "application/bundle_identifier")
+    except ValueError:
+        bundle = ""
+    return section, bundle
+
+
 def device_for(target, device):
     if target == "ios-simulator":
         return resolve_ios_device(device, require_booted=True)
     if target == "android":
         adb = resolve_android_sdk() / "platform-tools/adb"
-        rows = subprocess.check_output([adb, "devices"], text=True, timeout=15).splitlines()
-        devices = [row.split()[0] for row in rows if re.fullmatch(r"emulator-\d+\s+device", row)]
-        if not devices:
-            raise ValueError("Boot an ARM64 Android emulator before running the game.")
-        if device in devices:
-            return device
-        if device or len(devices) != 1:
-            raise ValueError("Choose a running emulator with --android-device from " + ", ".join(devices))
-        return devices[0]
+        return resolve_android_device(adb, device or "")
     return ""
 
 
@@ -54,9 +59,14 @@ def build(kit, project, target, preset, godot):
     output = Path(tempfile.mkdtemp(prefix=target + "-", dir=base))
     try:
         if target == "ios-simulator":
-            proc = subprocess.run(["sh", kit / "tools/build-ios-simulator.sh", project, output, godot,
-                                   kit / "ios-with-arm64-simulator.zip", kit / "ios", preset],
-                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=1200)
+            section, expected_bundle = _ios_preset_details(project, preset)
+            cmd = ["sh", kit / "tools/build-ios-simulator.sh", project, output, godot,
+                   kit / "ios-with-arm64-simulator.zip", kit / "ios", preset]
+            if section:
+                cmd.append(section)
+                if expected_bundle:
+                    cmd.append(expected_bundle)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=1200)
             if proc.returncode:
                 raise ValueError(proc.stdout.strip() or "iOS Simulator build failed.")
             lines = proc.stdout.strip().splitlines()

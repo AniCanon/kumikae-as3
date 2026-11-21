@@ -19,3 +19,11 @@ client.
 - **Plain JavaScript, no build step, one dependency.** Don't add a bundler, TypeScript or a second
   package.
 - **Don't commit `node_modules/`.**
+
+## Tests
+
+Run the unit tests with Node's built-in test runner:
+
+```sh
+node --test
+```

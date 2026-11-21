@@ -178,3 +178,100 @@ class TesterDistributionTest(unittest.TestCase):
         self.assertEqual([400, 200], outcomes)
         self.assertEqual("granted", grant["code"])
         self.assertEqual(query["code_challenge"][0], store_auth.b64(hashlib.sha256(grant["code_verifier"].encode()).digest()))
+
+    def test_deliver_accepts_resolved_artifact_inside_symlinked_temp_dir(self):
+        import tester_distribution
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as base:
+            real_root = Path(base).resolve()
+            game = real_root / "game"
+            game.mkdir()
+            key = real_root / "client.json"
+            key.write_text('{"installed":{"client_id":"cid"}}')
+            real_tmp = real_root / "real_tmp"
+            real_tmp.mkdir()
+            link_tmp = real_root / "link_tmp"
+            link_tmp.symlink_to(real_tmp)
+
+            class FakeTempDir:
+                def __init__(self, **_):
+                    self.name = str(link_tmp)
+                def __enter__(self):
+                    return self.name
+                def __exit__(self, *_):
+                    return False
+
+            def fake_export(_root, folder, *_args):
+                out = Path(folder) / "Game.aab"
+                out.write_bytes(b"aab")
+                return [str(out.resolve())]
+
+            data = {
+                "root": str(game),
+                "spec": {"platform": "Android", "identifier": "org.example.game", "version": "1.0", "build": "2"},
+                "account": {"file": str(key), "refresh": "tok"},
+                "target": "internal",
+                "label": "dev@example.com",
+                "job": {"platform": "Android", "store": True},
+                "godot": "godot",
+                "runtime": str(real_root),
+                "signing": {},
+            }
+            with patch.object(tester_distribution, "google_token", return_value="access"), \
+                    patch.object(tester_distribution, "request", return_value={"email": "dev@example.com"}), \
+                    patch.object(tester_distribution.tempfile, "TemporaryDirectory", FakeTempDir), \
+                    patch.object(tester_distribution.game_export, "export", side_effect=fake_export), \
+                    patch.object(tester_distribution.store_play, "deliver", return_value="ok") as deliver:
+                self.assertEqual("ok", tester_distribution.run("deliver", data))
+                deliver.assert_called_once()
+
+    def test_apple_token_validates_der_signature_bounds(self):
+        import subprocess
+        from unittest.mock import patch
+        import store_auth
+        account = {"keyId": "ABCDE12345", "issuer": "12345678-1234-1234-1234-1234567890ab", "file": "/tmp/key.p8"}
+        r_bytes = b"\x00" + b"\x01" * 32
+        s_bytes = b"\x02" * 32
+        der_body = bytes([2, len(r_bytes)]) + r_bytes + bytes([2, len(s_bytes)]) + s_bytes
+        valid_der = bytes([0x30, len(der_body)]) + der_body
+        with patch.object(store_auth.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, valid_der, b"")):
+            token = store_auth.apple_token(account)
+            self.assertEqual(3, len(token.split(".")))
+        for bad in (
+            b"\x30\x06\x02\x20\x01\x02\x03\x04",
+            b"\x30\x46\x02\x22" + b"\x01" * 34 + b"\x02\x20" + b"\x02" * 32,
+            b"\x30\x81\x44\x02\x20" + b"\x01" * 32 + b"\x02\x20" + b"\x02" * 32,
+        ):
+            with self.subTest(bad=bad), \
+                    patch.object(store_auth.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, bad, b"")):
+                with self.assertRaisesRegex(ValueError, "Invalid Apple signing key"):
+                    store_auth.apple_token(account)
+
+    def test_xcodebuild_failure_does_not_leak_auth_key_details(self):
+        import subprocess
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            account = {"file": "/secret/path/AuthKey_SECRET.p8", "issuer": "secret-issuer-uuid", "keyId": "SECRETKEY1"}
+            spec = {"identifier": "org.example.game", "version": "1.0", "build": "1", "team": "TEAM123456"}
+            err = subprocess.CalledProcessError(65, ["/usr/bin/xcodebuild", "-authenticationKeyPath", account["file"]])
+            with patch.object(store_apple.subprocess, "run", side_effect=err):
+                with self.assertRaises(ValueError) as ctx:
+                    store_apple.upload(root / "Game.xcodeproj", root, account, spec)
+            self.assertNotIn("AuthKey_SECRET", str(ctx.exception))
+            self.assertIn("65", str(ctx.exception))
+
+    def test_store_http_rejects_oversized_response_and_unexpected_host(self):
+        from unittest.mock import MagicMock, patch
+        import store_http
+        with self.assertRaisesRegex(ValueError, "Unexpected store endpoint"):
+            store_http.request("GET", "https://example.com/v1/apps")
+        fake_response = MagicMock(status=200, reason="OK")
+        fake_response.read.return_value = b"x" * (2_000_000 + 1)
+        fake_conn = MagicMock()
+        fake_conn.getresponse.return_value = fake_response
+        with patch.object(store_http.http.client, "HTTPSConnection", return_value=fake_conn):
+            with self.assertRaisesRegex(store_http.StoreError, "2 MB"):
+                store_http.request("GET", "https://api.appstoreconnect.apple.com/v1/apps")

@@ -8,6 +8,13 @@
   "categories": ["Programming Languages"],
   "main": "./extension.js",
   "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In untrusted workspaces, kas3.serverPath is restricted to application settings and workspace kas3.declarations are ignored.",
+      "restrictedConfigurations": ["kas3.serverPath", "kas3.declarations"]
+    }
+  },
   "contributes": {
     "languages": [
       {
@@ -29,6 +36,7 @@
       "properties": {
         "kas3.serverPath": {
           "type": "string",
+          "scope": "application",
           "default": "kas3c",
           "description": "The kas3c program: a full path, or a name found on the PATH."
         },

@@ -236,6 +236,7 @@ def methods(compiler, path):
 
 
 def expand_target(root, target, compiler):
+    root = Path(root).resolve()
     folder = (root / target["discover"]).resolve()
     if not folder.is_relative_to(root) or not folder.is_dir():
         raise ValueError("Choose a fixture directory inside the project.")
@@ -325,8 +326,8 @@ def _generate_adapters(folder, case):
         class_hooks = hooks_by_class.get(fqcn, {})
         before_calls = "".join(f"instance.{name}();\n" for name in class_hooks.get("before", []))
         after_calls = "".join(f"instance.{name}();\n" for name in class_hooks.get("after", []))
-        before_class_calls = "".join(f"{fixture}.{name}(); " for name in class_hooks.get("beforeClass", []))
-        after_class_calls = "".join(f"{fixture}.{name}(); " for name in class_hooks.get("afterClass", []))
+        before_class_calls = "".join(f"{fqcn}.{name}(); " for name in class_hooks.get("beforeClass", []))
+        after_class_calls = "".join(f"{fqcn}.{name}(); " for name in class_hooks.get("afterClass", []))
         adapter_name = f"Kas3DiscoveredCase{number}"
         cases_switch = []
         setup_lines = [f"suite = new Suite({json.dumps(suite)});"]
@@ -368,8 +369,7 @@ def _generate_adapters(folder, case):
         adapter_path = folder / f"{adapter_name}.as"
         adapter_path.write_text(adapter_code)
         adapters.append(str(adapter_path))
-        fixture_import = ("import " + fqcn + ";") if "." in fqcn and (before_class_calls or after_class_calls) else ""
-        suite_setup.append((fixture_import, setup_lines))
+        suite_setup.append(("", setup_lines))
     return adapters, suite_setup
 
 
