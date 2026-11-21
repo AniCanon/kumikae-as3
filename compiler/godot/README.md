@@ -35,7 +35,8 @@ For how the result looks to someone writing scripts, read
   no engine descriptions. The generator adds hand-written AS3 examples for `Node.getNode` and
   `Node.queueFree`. The language-server tests compile the examples returned by completion.
 - **Names.** Methods, properties, signals and parameters are lowerCamel, with acronyms in capitals
-  (`getAABB`). A name AS3 reserves gets a trailing underscore. Five class names that AS3 already uses get
+  (`getAABB`). The generator reads reserved words from the [compiler’s token table](../src/token.h).
+  A name AS3 reserves gets a trailing underscore. Five class names that AS3 already uses get
   a `Godot` prefix, such as `GodotObject`. A getter and a setter become one property.
 - **Integers.** A Godot integer is `Int64`. It's an `int` or a `uint` only where Godot's description says
   it's narrower: by a width mark, or by belonging to a type that stores 32-bit integers, such as

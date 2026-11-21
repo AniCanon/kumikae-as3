@@ -72,6 +72,9 @@ Errors as you type, completion, signature help, go to definition, find reference
 from the compiler's language server. Bracket pairing and indentation are the plugin's own. See
 [Completion and typing help](../completion.md).
 
+File and package names follow the compiler’s reserved-word list, bundled when the plugin is built.
+For example, you can create `native.as`, while `class` is reserved.
+
 ## Create a project
 
 Choose **File > New Project > Kumikae AS3 Game**. On an Apple silicon Mac the wizard checks for a stable

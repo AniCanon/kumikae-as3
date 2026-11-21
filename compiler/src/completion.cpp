@@ -394,10 +394,11 @@ class Completer {
 		queries_.statement_templates(unit_, offset_, found_);
 		// Typing a keyword can turn a recovery gap into a known statement start.
 		incomplete_ |= prefix_.empty();
-		if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
+		const auto &self = completion_keywords::KW_THIS;
+		if (class_ && !is_static && starts_with_any_case(self.name, prefix_)) {
 			Completion item;
-			item.name = "this";
-			item.documentation = "The current instance of the class.";
+			item.name = self.name;
+			item.documentation = self.documentation;
 			item.is_keyword = true;
 			found_.push_back(std::move(item));
 		}
