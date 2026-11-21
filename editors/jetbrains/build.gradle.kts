@@ -145,6 +145,23 @@ if (providers.gradleProperty("uiProbe").isPresent) {
 // named with -Pkas3Root=...), so that a new project runs without anything else being set up. Without a
 // build the plugin is made without them and looks for them on the computer.
 val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../..").path)
+tasks.processResources {
+    val header = "compiler/src/token.h"
+    val tokens = file(kas3Root.get()).resolve(header).takeIf { it.isFile } ?: rootDir.resolve("../../$header")
+    inputs.file(tokens)
+    from(tokens) {
+        rename { "as3-reserved-words.txt" }
+        val keyword = Regex("""^\s*X\s*\(\s*Kw\w+\s*,(.*)""")
+        val spelling = Regex("""\s*"'(\w+)'"\s*\)\s*\\?\s*""")
+        filter { line ->
+            keyword.matchEntire(line)?.let { entry ->
+                requireNotNull(spelling.matchEntire(entry.groupValues[1])) {
+                    "Unrecognized AS3 keyword spelling: $line"
+                }.groupValues[1]
+            }
+        }
+    }
+}
 tasks.withType<PrepareSandboxTask>().configureEach {
     val root = file(kas3Root.get())
     from(rootDir.resolve("../../testing")) {
