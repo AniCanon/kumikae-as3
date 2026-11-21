@@ -26,6 +26,7 @@ internal fun ExportSettings(
     controller: SettingsController,
     choose: (GameResourceKind, (String) -> Unit) -> Unit,
     addTarget: (() -> Unit)?,
+    targetSettings: Map<String, () -> Unit>,
     release: ((ProjectSettings, ExportPreset) -> Unit)?,
     configureKey: ((ExportPreset) -> Unit)?,
     hasKey: (ExportPreset) -> Boolean,
@@ -45,6 +46,13 @@ internal fun ExportSettings(
             }
             if (addTarget != null) {
                 Button("Add target…", addTarget, SwingModifier.east().enabled(!controller.dirty))
+            }
+        }
+        if (targetSettings.isNotEmpty()) {
+            SettingsActions {
+                for ((target, open) in targetSettings) {
+                    Button("$target settings…", open, SwingModifier.enabled(!controller.dirty))
+                }
             }
         }
     }

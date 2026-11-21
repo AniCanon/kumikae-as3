@@ -93,6 +93,7 @@ internal object UiProbeProjectExperience {
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
         var chosenResource = ""
+        var targetSettingsOpened = false
         var distributed = ""
         var released = ""
         var portal = ""
@@ -115,6 +116,7 @@ internal object UiProbeProjectExperience {
                         distribute = { _, preset -> distributed = preset.platform },
                         release = { _, preset -> released = preset.platform },
                         addTarget = {},
+                        targetSettings = mapOf("Example platform" to { targetSettingsOpened = true }),
                         export = { _, _ -> },
                         openStore = { portal = it },
                         configureKey = { keyPreset = it.name },
@@ -144,6 +146,8 @@ internal object UiProbeProjectExperience {
             await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
+            click(panel, "Example platform settings…")
+            check(targetSettingsOpened)
             fun combos() = descendants(panel).filterIsInstance<JComboBox<*>>()
             await { combos().any { it.selectedItem == IosExecutionMode.Automatic } }
             edt {

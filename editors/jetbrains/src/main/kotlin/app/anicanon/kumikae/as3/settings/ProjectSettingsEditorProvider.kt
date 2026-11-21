@@ -2,6 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 import androidx.compose.runtime.mutableStateMapOf
 import app.anicanon.kumikae.as3.panel.BackgroundWorker
+import app.anicanon.kumikae.as3.project.GameTargetContribution
 import app.anicanon.kumikae.as3.project.showAddGameTarget
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.ide.BrowserUtil
@@ -89,6 +90,9 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
         if (!accepted) Messages.showInfoMessage(project, "Checking this project’s signing settings.", "Android Signing")
     }
 
+    private val targetSettings = GameTargetContribution.EP.extensionList.filter { it.settingsAction.isNotBlank() }
+        .associate { target -> target.label to { target.openSettings(project, gameFile) } }
+
     private val panel = composePanel(this) {
         ProjectSettingsView(
             controller,
@@ -117,6 +121,7 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
                     },
                 )
             },
+            targetSettings = targetSettings,
             addTarget = {
                 showAddGameTarget(project, gameFile.parent) { controller.reload() }
             },
