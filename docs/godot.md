@@ -29,7 +29,7 @@ has a compile error, Godot prints the errors and no script loads.
 
 Open an existing `.as` file from Godot's **FileSystem** panel to edit it in the **Script** workspace.
 Godot colors ActionScript syntax and suggests keywords, locals, types and members as you type.
-Completion uses the current script's unsaved text and the other scripts saved in the project.
+Completion uses unsaved text in open ActionScript tabs and the project's saved scripts.
 Use **Edit → Completion Query** to request suggestions by hand.
 If a tab opens with a previously selected highlighter, choose **Edit → Syntax Highlighter → ActionScript**.
 

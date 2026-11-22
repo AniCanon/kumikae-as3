@@ -9,6 +9,10 @@
 #include <utility>
 #include <vector>
 
+namespace godot {
+class Script;
+}
+
 class AS3SyntaxHighlighter : public godot::EditorSyntaxHighlighter {
 	GDCLASS(AS3SyntaxHighlighter, godot::EditorSyntaxHighlighter)
 
@@ -47,6 +51,8 @@ class AS3ScriptEditor : public godot::EditorPlugin {
 	godot::Ref<AS3ScriptSaver> saver_;
 	void files_changed();
 	void files_reloaded(const godot::PackedStringArray &p_paths);
+	void script_changed(const godot::Ref<godot::Script> &p_script);
+	void script_closed(const godot::Ref<godot::Script> &p_script);
 
 protected:
 	static void _bind_methods() {}
@@ -58,5 +64,8 @@ public:
 
 namespace kas3 {
 void forget_editor_sources();
+void track_editor_buffer(uint64_t p_script, uint64_t p_editor);
+void forget_editor_buffer(uint64_t p_script);
+void forget_editor_buffers();
 }
 #endif

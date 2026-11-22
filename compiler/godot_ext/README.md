@@ -49,8 +49,9 @@ nothing differently for the editor, so one library serves both.
 ## How it works
 
 The desktop Script editor registers an ActionScript syntax highlighter based on the front-end lexer.
-Completion uses a separate incremental compilation with the active editor buffer overlaid on the project's
-saved sources. It reads files through Godot. Saving or a filesystem change invalidates the saved sources.
+Completion uses a separate incremental compilation with open editor buffers overlaid on the project's
+saved sources. It reads files through Godot. Saving or a filesystem change marks the saved sources for
+refresh on the editor thread.
 The editor turns compiler candidates into Godot's insertions at the caret.
 
 - **One program for each project.** Every `.as` file under the project is compiled together when the first

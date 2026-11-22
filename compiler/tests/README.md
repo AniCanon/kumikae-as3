@@ -97,8 +97,9 @@ every run shares the test project.
 
 - **`godot_project/`** holds AS3 scripts and GDScript drivers. A driver prints what the AS3 script gave
   beside what GDScript gives for the same thing, and the two must agree.
-- **`script_editor.gd`** opens a script in the headless editor and checks highlighting, completion in
-  unsaved text, and saving the file. It edits a temporary copy of the test project.
+- **`script_editor.gd`** opens scripts in the headless editor and checks highlighting, completion across
+  unsaved tabs, discarding edits, and saving from the editor and a worker. It edits a temporary copy of
+  the test project.
 - **`godot_native/`** holds a script that Godot runs on the interpreter and as native code. The two must
   print the same.
 - **`play_godot.py`** tests the extension building a program library on Play: a project played twice,

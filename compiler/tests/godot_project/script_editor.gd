@@ -70,6 +70,31 @@ func run() -> void:
 	ask(code, 4, 12)
 	check(code.get_code_completion_options().is_empty(), "comments do not show completions")
 
+	EditorInterface.edit_script(helper)
+	var helper_code := scripts.get_current_editor().get_base_editor() as CodeEdit
+	helper_code.text = helper_code.text.replace("hello()", "helloFromTab()")
+	EditorInterface.edit_script(script)
+	ask(code, 8, code.get_line(8).length())
+	check(has_completion(code, "helloFromTab", CodeEdit.KIND_FUNCTION),
+		"completion reads another tab's unsaved code without a request in that tab")
+	check(not has_completion(code, "hello", CodeEdit.KIND_FUNCTION), "the unsaved tab replaces the saved declaration")
+	check(scripts.close_file(helper.resource_path) == OK, "the helper tab closes and discards its edit")
+	ask(code, 8, code.get_line(8).length())
+	check(has_completion(code, "hello", CodeEdit.KIND_FUNCTION), "discarding a tab restores the saved declaration")
+	check(not has_completion(code, "helloFromTab", CodeEdit.KIND_FUNCTION), "discarded declarations stop completing")
+
+	helper.source_code = FileAccess.get_file_as_string("res://Plain.as").replace("hello()", "helloSaved()")
+	var save_path := ProjectSettings.globalize_path("res://Plain.as")
+	var writer := Thread.new()
+	# An absolute path exercises the saver without Godot's editor-only res:// save callback on the worker.
+	var started := writer.start(func() -> Error: return ResourceSaver.save(helper, save_path))
+	check(started == OK, "the helper save starts on a worker")
+	if started == OK:
+		ask(code, 8, code.get_line(8).length())
+		check(writer.wait_to_finish() == OK, "the helper saves on the worker")
+		ask(code, 8, code.get_line(8).length())
+		check(has_completion(code, "helloSaved", CodeEdit.KIND_FUNCTION), "completion sees the worker's saved declaration")
+
 	code.set_line(5, '    public function tryIt():void { var pattern:RegExp = /"/; var ratio:Number = 4 / 2;')
 	var pattern := code.get_line(5).find("/")
 	var division := code.get_line(5).rfind("/")
