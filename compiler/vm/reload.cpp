@@ -430,31 +430,73 @@ std::vector<uint8_t> Reload::reached(const Interpreter &p_program, const std::ve
 	return classes;
 }
 
+namespace {
+
+bool library_container(const ir::Class &p_class) {
+	return (p_class.element != Kind::Void || p_class.table) && p_class.fields.empty() && p_class.methods.empty() &&
+			p_class.base == ir::NONE && p_class.constructor == ir::NONE;
+}
+
+uint32_t keep_engine_type(const ir::EngineName &p_type, ir::Module &p_new) {
+	for (uint32_t i = 0; i < p_new.engine_names.size(); ++i) {
+		if (p_new.engine_names[i].key == p_type.key) {
+			return i;
+		}
+	}
+	p_new.engine_names.push_back(p_type);
+	return static_cast<uint32_t>(p_new.engine_names.size() - 1);
+}
+
+} // namespace
+
 bool Reload::keep_containers(const ir::Module &p_old, const std::vector<uint8_t> &p_live, ir::Module *r_new) {
-	std::unordered_set<std::string> named;
-	for (const ir::Class &klass : r_new->classes) {
-		named.insert(klass.name);
+	std::unordered_map<std::string, uint32_t> named;
+	for (uint32_t i = 0; i < r_new->classes.size(); ++i) {
+		named.emplace(r_new->classes[i].name, i);
 	}
-	bool added = false;
-	for (size_t i = 0; i < p_old.classes.size() && i < p_live.size(); i++) {
-		const ir::Class &klass = p_old.classes[i];
-		// A container of the library: a name and what its elements are, with no code of its own to move.
-		const bool container = (klass.element != Kind::Void || klass.table) && klass.fields.empty() && klass.methods.empty() &&
-				klass.base == ir::NONE && klass.constructor == ir::NONE;
-		if (!p_live[i] || !container || named.count(klass.name)) {
-			continue;
-		}
-		const uint32_t index = static_cast<uint32_t>(r_new->classes.size());
-		r_new->classes.push_back(klass);
-		added = true;
-		uint32_t *kept = klass.array ? &r_new->array_class : klass.dictionary ? &r_new->dictionary_class
-				: klass.table													 ? &r_new->object_class
-																				 : nullptr;
-		if (kept && *kept == ir::NONE) {
-			*kept = index;
+	std::vector<uint8_t> needed(p_old.classes.size());
+	std::vector<uint32_t> pending;
+	for (uint32_t i = 0; i < p_live.size() && i < needed.size(); ++i) {
+		// An empty nested collection still checks the type of a future write.
+		uint32_t id = i;
+		while (p_live[i] && id < needed.size() && !needed[id] && library_container(p_old.classes[id])) {
+			needed[id] = 1;
+			pending.push_back(id);
+			const ir::Class &klass = p_old.classes[id];
+			id = klass.element == Kind::Obj ? klass.element_check : ir::NONE;
 		}
 	}
-	return added;
+	const size_t initial = named.size();
+	size_t previous;
+	do {
+		previous = named.size();
+		for (uint32_t id : pending) {
+			const ir::Class &klass = p_old.classes[id];
+			if (named.count(klass.name)) {
+				continue;
+			}
+			uint32_t check = klass.element_check;
+			if (klass.element == Kind::Obj && check != ir::NONE) {
+				const auto target = named.find(p_old.classes[check].name);
+				if (target == named.end()) {
+					continue; // A missing script class cannot be recreated. A nested container may be added this round.
+				}
+				check = target->second;
+			} else if (ir::is_engine(klass.element) && check != ir::NONE) {
+				check = keep_engine_type(p_old.engine_names[check], *r_new);
+			}
+			const uint32_t index = static_cast<uint32_t>(r_new->classes.size());
+			named.emplace(klass.name, index);
+			r_new->classes.push_back(klass);
+			r_new->classes.back().element_check = check;
+			uint32_t *known = klass.array ? &r_new->array_class : klass.dictionary ? &r_new->dictionary_class
+					: klass.table ? &r_new->object_class : nullptr;
+			if (known && *known == ir::NONE) {
+				*known = index;
+			}
+		}
+	} while (named.size() != previous);
+	return named.size() != initial;
 }
 
 uint32_t Reload::function(uint32_t p_old) const {

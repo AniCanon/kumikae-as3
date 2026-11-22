@@ -157,6 +157,11 @@ bool function_valid(const Module &p_module, const Function &p_fn) {
 }
 
 bool class_valid(const Module &p_module, const Class &p_class) {
+	if (p_class.fixed_array() && (p_class.name.size() == 2 || p_class.element == Kind::Void || p_class.array ||
+			p_class.table || p_class.dictionary || p_class.is_interface || p_class.base != NONE || !p_class.fields.empty() ||
+			!p_class.methods.empty() || p_class.constructor != NONE)) {
+		return false;
+	}
 	const auto optional_fn = [&](uint32_t id) { return optional_index(id, p_module.functions.size()); };
 	const auto valid_fn = [&](uint32_t id) { return id < p_module.functions.size(); };
 	if (!optional_fn(p_class.constructor) || !optional_fn(p_class.static_init) || !optional_fn(p_class.to_string) ||

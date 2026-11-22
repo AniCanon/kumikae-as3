@@ -348,13 +348,20 @@ Expr *Parser::parse_new() {
 	}
 	Token keyword = advance();
 	ArrayLit *size = at(TokenKind::LBracket) ? static_cast<ArrayLit *>(parse_array_literal()) : nullptr;
-	const bool fixed = size && (at(TokenKind::Identifier) || at(TokenKind::Star) || at(TokenKind::KwVoid) ||
+	const bool fixed = size && !current_.newline_before && (at(TokenKind::Identifier) || at(TokenKind::Star) || at(TokenKind::KwVoid) ||
 			(at(TokenKind::LBracket) && peek2().kind == TokenKind::RBracket));
 	if (fixed || (!size && accept(TokenKind::Less))) {
 		VectorLit *vector = node<VectorLit>(keyword.offset);
 		uint32_t height = fixed ? last_height_ : 0;
 		vector->fixed_array = fixed;
-		vector->element_type = parse_type();
+		if (fixed) {
+			TypeRef *array_type = node<TypeRef>(size->offset);
+			array_type->form = TypeRef::FixedArray;
+			array_type->argument = parse_type();
+			vector->element_type = finish(array_type);
+		} else {
+			vector->element_type = parse_type();
+		}
 		if (fixed && size->elements.count) {
 			if (size->elements.count != 1 || !size->elements[0]) {
 				error_at(size->offset, "a fixed array requires one length");

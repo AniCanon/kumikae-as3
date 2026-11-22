@@ -50,6 +50,15 @@ static void test_conversions_accepted() {
 			{});
 }
 
+static void test_fixed_arrays() {
+	expect(program("var a:[]Base = new [count] Base; var b:[]Sub = /*!*/a; var c:[]int = /*!*/ints;"
+				   "var d:Vector.<Base> = /*!*/a; a./*!*/length = 1; a./*!*/fixed = false; a./*!*/push(sub);"
+				   "var e:[]Base = new []Base { /*!*/other }; a[0] = /*!*/other;"),
+			{ UNRELATED("[]Base", "[]Sub"), UNRELATED("Vector.<int>", "[]int"), UNRELATED("[]Base", "Vector.<Base>"),
+					"'length' is read-only", "'[]Base' has no member 'fixed'", "'[]Base' has no member 'push'",
+					UNRELATED("Other", "Base"), UNRELATED("Other", "Base") });
+}
+
 static void test_callback_signatures() {
 	expect(program("var f:(int)=>String = /*!*/fn; f = /*!*/any; f = /*!*/function(x:String):int { return 1; };"
 				   "f = /*!*/function(x:int = 1):String { return label; }; f = /*!*/function(...args):String { return label; };"
@@ -555,6 +564,7 @@ int main() {
 			{ "an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it",
 					"an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it" });
 	test_conversions_accepted();
+	test_fixed_arrays();
 	test_callback_signatures();
 	test_conversions_rejected();
 	test_cast_advice();

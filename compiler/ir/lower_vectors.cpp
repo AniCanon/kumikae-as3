@@ -110,7 +110,11 @@ uint32_t Vectors::vector_literal(Expr *p_literal, const List<Expr *> &p_elements
 	if (p_literal->type->kind == Type::FixedArray) {
 		Expr *written = static_cast<VectorLit *>(p_literal)->length;
 		if (written) {
-			length = l_.expression(written, Kind::U32);
+			// Check the whole number before narrowing it: an invalid length must never wrap to a smaller array.
+			Kind kind = Kind::Void;
+			l_.value_kind(written, &kind);
+			length = kind == Kind::U32 || kind == Kind::U8 ? l_.expression(written, Kind::U32)
+					: l_.convert(l_.expression(written, Kind::I64), Kind::U32, written->offset);
 		} else {
 			length = l_.reg(Kind::U32);
 			l_.emit(Op::ConstU32, position, length, p_elements.count);

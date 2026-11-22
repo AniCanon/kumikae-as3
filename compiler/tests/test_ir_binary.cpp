@@ -76,6 +76,9 @@ static void test_round_trip_program_and_execution() {
 			public class Main extends Base {
 				public function Main() {
 					var nums:Vector.<int> = new <int>[10, 20, 30];
+					var nums2:[]int = new []int { 9 };
+					var alias:* = nums2;
+					try { alias.fixed = false; } catch (e:ReferenceError) { trace(nums2[0], alias is []int); }
 					var signed:int = -1;
 					var bytes:Vector.<byte> = new <byte>[signed];
 					trace(int(bytes[0]));
@@ -113,7 +116,7 @@ static void test_round_trip_program_and_execution() {
 	CHECK_EQ(ir::print(decoded), ir::print(original));
 	CHECK_EQ(ir::fingerprint(decoded), ir::fingerprint(original));
 	CHECK_EQ(run_program(decoded), run_program(original));
-	CHECK_EQ(run_program(decoded), std::string("255\n16777216 16777217\nhi as3:2 60 boom\ndone\n"));
+	CHECK_EQ(run_program(decoded), std::string("9 true\n255\n16777216 16777217\nhi as3:2 60 boom\ndone\n"));
 }
 
 static void test_round_trip_godot_script_metadata() {
@@ -217,6 +220,9 @@ static void test_rejects_invalid_references() {
 	CHECK(invalid(broken));
 	broken = original;
 	broken.classes.front().constructor = static_cast<uint32_t>(broken.functions.size());
+	CHECK(invalid(broken));
+	broken = original;
+	broken.classes.front().name = "[]int";
 	CHECK(invalid(broken));
 	// Empty function body or missing terminating instruction.
 	broken = original;

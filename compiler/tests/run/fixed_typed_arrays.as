@@ -14,11 +14,18 @@ package {
             try { alias[size] = 1; } catch (e:RangeError) { trace("dynamic bounds"); }
             trace(nums.length, nums[0], alias is Vector.<int>);
             var ordinary:Vector.<int> = new Vector.<int>(1, true);
+            trace(alias is []int, alias is []uint, (alias as []int) === nums);
             alias = ordinary;
             alias.fixed = false;
             trace(ordinary.push(8));
             var nested:[][]int = new [][]int { nums, new []int { 3, 4 } };
             trace(nested[0][1], nested[1][0], nested[1].length);
+            var dynamicRows:* = nested;
+            try { dynamicRows[0] = ordinary; } catch (e:TypeError) { trace("element"); }
+            trace(nested[0] === nums);
+            for each (var invalid:* in [-1, 4294967296, 2.5, NaN]) {
+                try { var bad:[]int = new [invalid] int; } catch (e:RangeError) { trace("bad length"); }
+            }
             try { var wrong:[]int = alias; } catch (e:TypeError) { trace("nominal"); }
         }
     }

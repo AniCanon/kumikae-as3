@@ -114,7 +114,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			r[p_in.a] = of_bool(vector->fixed);
 			break;
 		case Op::VecSetFixed:
-			vector->fixed = r[p_in.b].b;
+			vector_set_fixed(library_, vector, r[p_in.b].b);
 			break;
 		default:
 			break;

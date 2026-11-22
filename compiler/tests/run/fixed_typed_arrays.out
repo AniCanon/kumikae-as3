@@ -5,6 +5,13 @@ push
 typed bounds
 dynamic bounds
 3 7 false
+true false true
 2
 19 3 2
+element
+true
+bad length
+bad length
+bad length
+bad length
 nominal

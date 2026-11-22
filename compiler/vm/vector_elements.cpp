@@ -45,6 +45,14 @@ void raise_range(Library &p_library, double p_index, uint32_t p_length) {
 			"Error #1125: The index " + number_to_string(p_index) + " is out of range " + std::to_string(p_length) + ".");
 }
 
+void vector_set_fixed(Library &p_library, Vector *p_vector, bool p_fixed) {
+	if (p_library.class_of(p_vector).fixed_array()) {
+		p_library.runner.raise(p_library.module().reference_error_class, "Error #1074: A fixed array always has a fixed length.");
+		return;
+	}
+	p_vector->fixed = p_fixed;
+}
+
 bool length_is_fixed(Library &p_library, const Vector *p_vector) {
 	if (p_vector->fixed) {
 		p_library.runner.raise(p_library.module().range_error_class, "Error #1126: Cannot change the length of a fixed Vector.");

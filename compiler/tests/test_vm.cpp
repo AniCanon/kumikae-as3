@@ -2727,11 +2727,14 @@ static void test_static_changes() {
 static void test_reload_kept_containers() {
 	const char *before = "package { public class Bag {\n"
 						 "  public var flags:* = new <Boolean>[true, false]; public var none:* = new Vector.<uint>();\n"
+						 "  public var rows:* = new [][]int { new []int { 7 } }; public var empty:* = new [1] []String;\n"
 						 "  public var list:* = [1, \"two\"]; public var table:* = { a: 1 };\n"
 						 "} }\n";
 	const char *after = "package { public class Bag {\n"
-						"  public var flags:*; public var none:*; public var list:*; public var table:*;\n"
-						"  public function tell():String { return String(flags) + \"|\" + none.length + \"|\" + list + \"|\" + table.a; }\n"
+						"  public var flags:*; public var none:*; public var list:*; public var table:*; public var rows:*; public var empty:*;\n"
+						"  public function tell():String { var saved:* = rows[0]; rows[0] = saved;\n"
+						"    try { rows[0] = [8]; } catch (e:TypeError) { try { rows.length = 0; } catch (f:RangeError) {\n"
+						"      return rows[0][0] + \"|\" + String(flags) + \"|\" + none.length + \"|\" + list + \"|\" + table.a; } } return \"wrong type or length\"; }\n"
 						"} }\n";
 	ir::Module old_module, new_module, bare_module;
 	compile(before, &old_module, "Bag.as");
@@ -2751,6 +2754,7 @@ static void test_reload_kept_containers() {
 		}
 		const std::vector<uint8_t> live = vm::Reload::reached(running, { bag });
 		vm::Reload::keep_containers(old_module, live, &new_module);
+		CHECK(class_named(new_module, "[]String") != ir::NONE);
 		vm::Interpreter fresh(new_module, recorder);
 		vm::Object *moved = nullptr;
 		{
@@ -2763,7 +2767,7 @@ static void test_reload_kept_containers() {
 		if (moved) {
 			vm::Slot result;
 			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
-			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("true,false|0|1,two|1"));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("7|true,false|0|1,two|1"));
 			fresh.discard(ir::Kind::Str, result);
 			fresh.release_object(moved);
 		}

@@ -160,6 +160,7 @@ Vector *array_new(Library &p_library, uint32_t p_class, const Slot *p_values, si
 // filled, AS3's RangeError #1126 (true: the length is fixed) and #1125.
 bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length);
 bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from);
+void vector_set_fixed(Library &p_library, Vector *p_vector, bool p_fixed);
 bool length_is_fixed(Library &p_library, const Vector *p_vector);
 void raise_range(Library &p_library, double p_index, uint32_t p_length);
 

@@ -135,17 +135,15 @@ const Type *Typer::literal_type(Expr *p_expression) {
 				store(literal->length, uint_);
 			}
 			list(literal->elements);
-			const Type *element = compilation_.type_of(literal->element_type);
-			if (literal->fixed_array && (element->kind == Type::Void || element->kind == Type::Callback)) {
-				error(literal->element_type->offset, "a fixed array element must be a storable value type");
-			}
+			const Type *type = compilation_.type_of(literal->element_type);
+			const Type *element = literal->fixed_array ? type->element : type;
 			for (Expr *each : literal->elements) {
 				if (literal->fixed_array) {
 					store(each, element);
 				}
 				no_null_place(each, element);
 			}
-			return compilation_.vector_type(element, literal->fixed_array);
+			return literal->fixed_array ? type : compilation_.vector_type(element);
 		}
 		default:
 			return unknown_;
