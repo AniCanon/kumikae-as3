@@ -45,8 +45,16 @@ void FunctionWriter::forget_whole(uint32_t p_register) {
 	text_exact_[p_register] = false;
 }
 
-// F64ToI32 or F64ToU32 of a register whose whole-number sum is known: the sum, in the integer's own type.
 bool FunctionWriter::whole_conversion(const Instruction &p_in) {
+	if (p_in.op == Op::I64ToU32) {
+		// Fixed array lengths check the range without entering the interpreter on every allocation.
+		line("if (const auto converted = kas3::vm::wide_to_uint32(" + reg(p_in.b) + ")) {");
+		line("\t" + reg(p_in.a) + " = *converted;");
+		line("} else");
+		by_thunk(p_in);
+		return true;
+	}
+	// F64ToI32 or F64ToU32 of a known whole-number sum uses the integer's own type.
 	if ((p_in.op != Op::F64ToI32 && p_in.op != Op::F64ToU32) || whole_[p_in.b].expression.empty()) {
 		return false;
 	}

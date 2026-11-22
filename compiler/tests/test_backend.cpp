@@ -602,7 +602,21 @@ void a_typed_callback_uses_the_typed_entry() {
 	CHECK(text && text->find("call_value(c,") == std::string::npos);
 }
 
+void checked_uint_conversion_keeps_its_error_path() {
+	ir::Module module = module_of({ ir::Kind::I64, ir::Kind::U32 },
+			{ ir::Instruction{ ir::Op::I64ToU32, 1, 0, 0, 0 } });
+	module.functions[0].parameters = 1;
+	module.functions[0].required = 1;
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK(made.unsupported.empty());
+	const std::string *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("if (const auto converted = kas3::vm::wide_to_uint32(r0)) {") != std::string::npos);
+	CHECK(text && text->find("r1 = *converted;") != std::string::npos);
+	CHECK(text && text->find("thunk(c,") != std::string::npos);
+}
+
 int main() {
+	checked_uint_conversion_keeps_its_error_path();
 	a_typed_callback_uses_the_typed_entry();
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
