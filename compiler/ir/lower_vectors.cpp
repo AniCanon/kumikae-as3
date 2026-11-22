@@ -185,11 +185,12 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	return place;
 }
 
-void Lowerer::store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value) {
+void Lowerer::store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value, bool p_engine) {
 	const Type *declared = p_loop->declaration && p_loop->declaration->declarators.count == 1
 			? compilation_.type_of(p_loop->declaration->declarators[0].type)
 			: p_loop->target ? p_loop->target->type : nullptr;
-	const bool checked = kind_at(p_value) == Kind::Any && declared && p_target.kind != Kind::Any;
+	const bool checked = kind_at(p_value) == Kind::Any && declared && p_target.kind != Kind::Any &&
+			(p_engine || p_loop->collection->type->contains_fixed_array() || declared->contains_fixed_array());
 	store(p_target, checked ? from_untyped(p_value, declared, p_target.kind, p_loop->offset)
 			: convert(p_value, p_target.kind, p_loop->offset), p_loop->offset);
 }
@@ -311,8 +312,8 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		value = p_loop->element ? l_.engine_reg(element, p_loop->element) : l_.reg(Kind::Any);
 		l_.emit(Op::HostIndexGet, position, value, collection, key);
 	}
-	// An untyped element is stored as an assignment stores it: checked against what the variable is declared.
-	l_.store_iteration(target, p_loop, value);
+	// An untyped engine element is checked against the declared loop variable.
+	l_.store_iteration(target, p_loop, value, true);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();

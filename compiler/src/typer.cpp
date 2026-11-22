@@ -57,7 +57,7 @@ void Typer::for_in(ForIn *p_loop) {
 		const Type *variable = p_loop->declaration && p_loop->declaration->declarators.count == 1
 				? compilation_.type_of(p_loop->declaration->declarators[0].type)
 				: p_loop->target ? p_loop->target->type : nullptr;
-		if (collection->kind == Type::FixedArray || (collection->typed_sequence() && variable && variable->kind == Type::FixedArray)) {
+		if (collection->typed_sequence() && (collection->contains_fixed_array() || (variable && variable->contains_fixed_array()))) {
 			p_loop->element = collection->element;
 		} else if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
 			p_loop->element = rules->element;

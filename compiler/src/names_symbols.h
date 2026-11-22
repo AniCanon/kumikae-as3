@@ -73,6 +73,13 @@ struct Type {
 	};
 	Kind kind = Any;
 	bool typed_sequence() const { return kind == Vector || kind == FixedArray; }
+	bool contains_fixed_array() const {
+		const Type *type = this;
+		while (type && type->kind == Vector) {
+			type = type->element;
+		}
+		return type && type->kind == FixedArray;
+	}
 	Symbol *symbol = nullptr; // For Instance.
 	std::vector<const Type *> parameters; // For Callback; element is its return type.
 	const Type *element = nullptr; // For Vector and ClassObject.
