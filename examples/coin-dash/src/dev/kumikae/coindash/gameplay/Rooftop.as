@@ -1,23 +1,33 @@
 package dev.kumikae.coindash.gameplay {
+    import dev.kumikae.coindash.config.InputAction;
     import dev.kumikae.coindash.config.RoundRules;
+    import dev.kumikae.coindash.entities.Coin;
     import dev.kumikae.coindash.entities.Player;
     import dev.kumikae.coindash.entities.Scanner;
     import dev.kumikae.coindash.presentation.Hud;
+    import dev.kumikae.coindash.presentation.SoundBank;
     import dev.kumikae.coindash.storage.Ledger;
-    import godot.*;
+    import godot.Engine;
+    import godot.Input;
+    import godot.Node2D;
+    import godot.Rect2;
+    import godot.Vector2;
 
+    /** Root rooftop coordinator: wired via typed [Export] scene references and compile-time [Signal]s. */
     public class Rooftop extends Node2D {
         private static const POINTER_EASE_RADIUS:Number = 12;
         private static const POINTER_TOP:Number = 160;
         private static const POINTER_BOTTOM:Number = 460;
 
         [Export] public var cruiseSpeed:Number = 295;
+        [Export] public var rider:Player;
+        [Export] public var silver:Coin;
+        [Export] public var gold:Coin;
+        [Export] public var scanner:Scanner;
+        [Export] public var hud:Hud;
+        [Export] public var sounds:SoundBank;
+
         private var run:Round = new Round();
-        private var hud:Hud;
-        private var rider:Player;
-        private var silver:Area2D;
-        private var gold:Area2D;
-        private var scanner:Scanner;
         private var best:int = 0;
         private var deck:Rect2 = new Rect2(91, 193, 778, 255);
         private var silverStop:int = 0;
@@ -33,19 +43,28 @@ package dev.kumikae.coindash.gameplay {
         ];
 
         override public function _ready():void {
-            if (Engine.isEditorHint()) return;
-            rider = getNode("Player") as Player;
-            silver = getNode("Silver") as Area2D;
-            gold = getNode("Gold") as Area2D;
-            scanner = getNode("Scanner") as Scanner;
-            hud = new Hud(getNode("HUD") as Control);
-            silver.bodyEntered.add(takeSilver);
-            gold.bodyEntered.add(takeGold);
-            (getNode("HUD/Menu/Action") as Button).pressed.add(startRun);
-            (getNode("HUD/Burst") as Button).pressed.add(startDash);
+            if (Engine.isEditorHint()) {
+                return;
+            }
+            silver.collected.add(takeSilver);
+            gold.collected.add(takeGold);
+            hud.startRequested.add(startRun);
+            hud.dashRequested.add(startDash);
             best = Ledger.loadBest();
             resetDeck();
             hud.update(run, best);
+        }
+
+        public function startRun():void {
+            run.start();
+            resetDeck();
+            hud.playing();
+            hud.update(run, best);
+            sounds.playStart();
+        }
+
+        public function currentPhase():int {
+            return run.phase;
         }
 
         private function resetDeck():void {
@@ -57,56 +76,59 @@ package dev.kumikae.coindash.gameplay {
             scanner.resetPatrol();
         }
 
-        public function startRun():void {
-            run.start();
-            resetDeck();
-            hud.playing();
-            hud.update(run, best);
-            cue("Start");
-        }
-
         private function startDash():void {
-            if (!run.dash()) return;
-            cue("Dash");
+            if (!run.dash()) {
+                return;
+            }
+            sounds.playDash();
         }
 
         override public function _physicsProcess(delta:Number):void {
-            if (Engine.isEditorHint() || hud == null) return;
-            if (Input.isActionJustPressed("restart") ||
-                (run.phase != Round.RUNNING && Input.isActionJustPressed("ui_accept"))) {
+            if (Engine.isEditorHint() || hud == null) {
+                return;
+            }
+            if (Input.isActionJustPressed(InputAction.RESTART) ||
+                (run.phase != Round.RUNNING && Input.isActionJustPressed(InputAction.DASH))) {
                 startRun();
                 return;
             }
-            if (run.phase != Round.RUNNING) return;
+            if (run.phase != Round.RUNNING) {
+                return;
+            }
             var lastSecond:int = int(Math.ceil(run.seconds));
             run.tick(delta);
             if (run.phase == Round.RUNNING) {
                 drive(delta);
                 if (run.phase == Round.RUNNING && run.seconds <= RoundRules.COUNTDOWN_WARNING_SECONDS &&
                     int(Math.ceil(run.seconds)) < lastSecond) {
-                    cue("Tick");
+                    sounds.playTick();
                 }
             }
-            if (run.phase == Round.FINISHED) finish();
+            if (run.phase == Round.FINISHED) {
+                finish();
+            }
             hud.update(run, best);
             hud.animate(delta);
         }
 
         private function drive(delta:Number):void {
-            if (Input.isActionJustPressed("ui_accept")) startDash();
+            if (Input.isActionJustPressed(InputAction.DASH)) {
+                startDash();
+            }
             rider.drive(steering(), run.boost > 0, cruiseSpeed, deck);
             scanner.sweep(delta);
             if (scanner.covers(rider.position) && run.hit()) {
                 hud.showPenalty(rider.position);
                 rider.position = dock;
                 rider.velocity = Vector2.ZERO;
-                cue("Hit");
+                sounds.playHit();
             }
             rider.showGrace(run.grace);
         }
 
         private function steering():Vector2 {
-            var direction:Vector2 = Input.getVector("move_left", "move_right", "move_up", "move_down");
+            var direction:Vector2 = Input.getVector(
+                InputAction.MOVE_LEFT, InputAction.MOVE_RIGHT, InputAction.MOVE_UP, InputAction.MOVE_DOWN);
             if (Input.isMouseButtonPressed(1)) {
                 var pointer:Vector2 = getLocalMousePosition();
                 if (pointer.y > POINTER_TOP && pointer.y < POINTER_BOTTOM) {
@@ -116,22 +138,26 @@ package dev.kumikae.coindash.gameplay {
             return direction;
         }
 
-        private function takeSilver(body:Node2D):void {
-            if (body != rider || run.phase != Round.RUNNING) return;
+        private function takeSilver():void {
+            if (run.phase != Round.RUNNING) {
+                return;
+            }
             run.collectSilver();
             hud.showSilver(silver.position);
             silverStop = (silverStop + 1) % silverRoute.length;
             silver.position = silverRoute[silverStop];
-            cue("Silver");
+            sounds.playSilver();
         }
 
-        private function takeGold(body:Node2D):void {
-            if (body != rider || run.phase != Round.RUNNING) return;
+        private function takeGold():void {
+            if (run.phase != Round.RUNNING) {
+                return;
+            }
             run.collectGold();
             hud.showGold(gold.position);
             goldStop = (goldStop + 1) % goldRoute.length;
             gold.position = goldRoute[goldStop];
-            cue("Gold");
+            sounds.playGold();
         }
 
         private function finish():void {
@@ -141,14 +167,9 @@ package dev.kumikae.coindash.gameplay {
                 Ledger.saveBest(best);
             }
             rider.velocity = Vector2.ZERO;
-            rider.modulate = Color.WHITE;
+            rider.clearGrace();
             hud.finished(run, newRecord);
-            cue("Finish");
-        }
-
-        private function cue(name:String):void {
-            if (DisplayServer.getName() == "headless") return;
-            (getNode("Audio/" + name) as AudioStreamPlayer).play();
+            sounds.playFinish();
         }
     }
 }

@@ -1,0 +1,293 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/dev/kumikae/coindash/presentation/Hud.as" id="Hud"]
+[ext_resource type="Theme" path="res://assets/game-theme.tres" id="Theme"]
+
+[node name="Hud" type="CanvasLayer" node_paths=PackedStringArray("scoreLabel", "clockLabel", "recordLabel", "timeBar", "menuPanel", "eyebrowLabel", "titleLabel", "summaryLabel", "briefLabel", "actionButton", "burstButton", "keysLabel", "popupLabel")]
+script = ExtResource("Hud")
+scoreLabel = NodePath("Root/Score")
+clockLabel = NodePath("Root/Clock")
+recordLabel = NodePath("Root/Record")
+timeBar = NodePath("Root/TimeBar")
+menuPanel = NodePath("Root/Menu")
+eyebrowLabel = NodePath("Root/Menu/Eyebrow")
+titleLabel = NodePath("Root/Menu/Title")
+summaryLabel = NodePath("Root/Menu/Summary")
+briefLabel = NodePath("Root/Menu/Brief")
+actionButton = NodePath("Root/Menu/Action")
+burstButton = NodePath("Root/Burst")
+keysLabel = NodePath("Root/Keys")
+popupLabel = NodePath("Root/Popup")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("Theme")
+
+[node name="BrandPlate" type="ColorRect" parent="Root"]
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 255.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9333)
+
+[node name="BrandAccent" type="ColorRect" parent="Root"]
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 29.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(1.0, 0.6588, 0.451, 1.0)
+
+[node name="Brand" type="Label" parent="Root"]
+offset_left = 42.0
+offset_top = 15.0
+offset_right = 252.0
+offset_bottom = 58.0
+mouse_filter = 2
+theme_type_variation = &"BrandTitle"
+text = "COIN DASH"
+vertical_alignment = 1
+
+[node name="Location" type="Label" parent="Root"]
+offset_left = 44.0
+offset_top = 55.0
+offset_right = 234.0
+offset_bottom = 73.0
+mouse_filter = 2
+theme_type_variation = &"BrandSub"
+text = "PORT MERIDIAN   /   ROOFTOPS"
+vertical_alignment = 1
+
+[node name="Board" type="ColorRect" parent="Root"]
+offset_left = 535.0
+offset_top = 16.0
+offset_right = 936.0
+offset_bottom = 82.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9569)
+
+[node name="ScoreName" type="Label" parent="Root"]
+offset_left = 555.0
+offset_top = 21.0
+offset_right = 690.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_type_variation = &"StatLabel"
+text = "SCORE"
+vertical_alignment = 1
+
+[node name="Score" type="Label" parent="Root"]
+offset_left = 555.0
+offset_top = 36.0
+offset_right = 690.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_type_variation = &"StatScore"
+text = "00"
+vertical_alignment = 1
+
+[node name="RecordName" type="Label" parent="Root"]
+offset_left = 658.0
+offset_top = 21.0
+offset_right = 793.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_type_variation = &"StatLabel"
+text = "BEST"
+vertical_alignment = 1
+
+[node name="Record" type="Label" parent="Root"]
+offset_left = 658.0
+offset_top = 36.0
+offset_right = 793.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_type_variation = &"StatValue"
+text = "00"
+vertical_alignment = 1
+
+[node name="ClockName" type="Label" parent="Root"]
+offset_left = 785.0
+offset_top = 21.0
+offset_right = 920.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_type_variation = &"StatLabel"
+text = "TIME  /  SEC"
+vertical_alignment = 1
+
+[node name="Clock" type="Label" parent="Root"]
+offset_left = 785.0
+offset_top = 36.0
+offset_right = 920.0
+offset_bottom = 75.0
+mouse_filter = 2
+theme_type_variation = &"StatValue"
+vertical_alignment = 1
+
+[node name="DividerScore" type="ColorRect" parent="Root"]
+offset_left = 638.0
+offset_top = 28.0
+offset_right = 639.0
+offset_bottom = 68.0
+mouse_filter = 2
+color = Color(0.3961, 0.5451, 0.5725, 1.0)
+
+[node name="DividerBest" type="ColorRect" parent="Root"]
+offset_left = 761.0
+offset_top = 28.0
+offset_right = 762.0
+offset_bottom = 68.0
+mouse_filter = 2
+color = Color(0.3961, 0.5451, 0.5725, 1.0)
+
+[node name="TimeTrack" type="ColorRect" parent="Root"]
+offset_left = 785.0
+offset_top = 74.0
+offset_right = 917.0
+offset_bottom = 77.0
+mouse_filter = 2
+color = Color(0.2118, 0.3294, 0.3765, 1.0)
+
+[node name="TimeBar" type="ColorRect" parent="Root"]
+offset_left = 785.0
+offset_top = 74.0
+offset_right = 917.0
+offset_bottom = 77.0
+mouse_filter = 2
+color = Color(1.0, 0.6588, 0.451, 1.0)
+
+[node name="Popup" type="Label" parent="Root"]
+visible = false
+offset_right = 140.0
+offset_bottom = 30.0
+mouse_filter = 2
+theme_type_variation = &"PopupLabel"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Burst" type="Button" parent="Root"]
+visible = false
+offset_left = 785.0
+offset_top = 484.0
+offset_right = 936.0
+offset_bottom = 521.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+text = "DASH  ›"
+
+[node name="KeyStrip" type="ColorRect" parent="Root"]
+offset_left = 24.0
+offset_top = 484.0
+offset_right = 524.0
+offset_bottom = 521.0
+mouse_filter = 2
+color = Color(0.0627, 0.1216, 0.2039, 0.9333)
+
+[node name="Keys" type="Label" parent="Root"]
+offset_left = 38.0
+offset_top = 484.0
+offset_right = 512.0
+offset_bottom = 521.0
+mouse_filter = 2
+theme_type_variation = &"KeysLabel"
+text = "WASD / ARROWS   MOVE      ·      SPACE   DASH      ·      R   RESTART"
+vertical_alignment = 1
+
+[node name="Menu" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Shadow" type="ColorRect" parent="Root/Menu"]
+offset_left = 106.0
+offset_top = 161.0
+offset_right = 596.0
+offset_bottom = 444.0
+mouse_filter = 2
+color = Color(0.0353, 0.0745, 0.1137, 0.6863)
+
+[node name="Sheet" type="ColorRect" parent="Root/Menu"]
+offset_left = 100.0
+offset_top = 155.0
+offset_right = 590.0
+offset_bottom = 438.0
+mouse_filter = 2
+color = Color(0.0627, 0.1412, 0.2196, 0.9882)
+
+[node name="Binding" type="ColorRect" parent="Root/Menu"]
+offset_left = 100.0
+offset_top = 155.0
+offset_right = 590.0
+offset_bottom = 159.0
+mouse_filter = 2
+color = Color(1.0, 0.6824, 0.451, 1.0)
+
+[node name="Eyebrow" type="Label" parent="Root/Menu"]
+offset_left = 125.0
+offset_top = 175.0
+offset_right = 562.0
+offset_bottom = 199.0
+mouse_filter = 2
+theme_type_variation = &"EyebrowLabel"
+text = "PORT MERIDIAN    /    NIGHT SHIFT"
+vertical_alignment = 1
+
+[node name="Title" type="Label" parent="Root/Menu"]
+offset_left = 121.0
+offset_top = 197.0
+offset_right = 572.0
+offset_bottom = 273.0
+mouse_filter = 2
+theme_type_variation = &"MenuTitle"
+text = "COIN DASH"
+vertical_alignment = 1
+
+[node name="Summary" type="Label" parent="Root/Menu"]
+offset_left = 126.0
+offset_top = 279.0
+offset_right = 566.0
+offset_bottom = 308.0
+mouse_filter = 2
+theme_type_variation = &"MenuSummary"
+vertical_alignment = 1
+
+[node name="Brief" type="Label" parent="Root/Menu"]
+offset_left = 126.0
+offset_top = 309.0
+offset_right = 581.0
+offset_bottom = 334.0
+mouse_filter = 2
+theme_type_variation = &"MenuBrief"
+vertical_alignment = 1
+
+[node name="Action" type="Button" parent="Root/Menu"]
+offset_left = 126.0
+offset_top = 354.0
+offset_right = 381.0
+offset_bottom = 406.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_type_variation = &"ActionButton"
+text = "START RUN    [ SPACE ]"
+
+[node name="Credit" type="Label" parent="Root/Menu"]
+offset_left = 396.0
+offset_top = 354.0
+offset_right = 577.0
+offset_bottom = 406.0
+mouse_filter = 2
+theme_type_variation = &"MenuCredit"
+text = "Built with ActionScript 3"
+vertical_alignment = 1

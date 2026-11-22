@@ -62,8 +62,10 @@ class FunctionWriter {
 	};
 	std::vector<Whole> whole_;
 	// A String register that holds a constant of the program, by the string's number (NONE otherwise): what
-	// Godot takes as a name is then one the host built once.
+	// Godot takes as a name is then one the host built once. `text_exact_` is false when the string arrived
+	// from a static const global (guarded by a pointer comparison in case of circular static init).
 	std::vector<uint32_t> text_;
+	std::vector<bool> text_exact_;
 	// What stands for a register while the instruction being written is one the library runs: a value
 	// held inline is boxed into a handle for it (function_engine.cpp). Empty: the register itself.
 	std::vector<std::string> shadow_;
@@ -271,7 +273,7 @@ class FunctionWriter {
 	// Whether a register holds a handle on one of Godot's values or objects of exactly that type.
 	bool holds_handle(uint32_t p_register, std::string_view p_type) const;
 	std::string object_behind(uint32_t p_register);
-	std::optional<std::string> bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard);
+	std::optional<std::string> bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard, std::string *r_inside);
 	bool engine(const ir::Instruction &p_in);
 	bool engine_alias(const ir::Instruction &p_in);
 	bool engine_inline(const ir::Instruction &p_in);

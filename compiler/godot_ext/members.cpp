@@ -107,6 +107,9 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 			break;
 		case ir::Kind::Obj:
 			type = script_object_type(p_module, p_class, &class_name);
+			if (type == Variant::OBJECT && p_class < p_module.classes.size()) {
+				object_hint(p_module.classes[p_class].native_base, &class_name, &hint, &hint_string);
+			}
 			break;
 		default:
 			type = -1; // Any value.

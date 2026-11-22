@@ -354,9 +354,6 @@ bool Typer::godot_storable(const Type *p_type, bool p_in_node) const {
 		return found == godot_->definitions.end() ? nullptr : found->second;
 	};
 	Symbol *symbol = p_type->symbol;
-	if (godot_class(symbol->name) != symbol) {
-		return false; // Not one of Godot's.
-	}
 	const auto extends = [&](Symbol *p_base) {
 		for (Symbol *at = symbol; at && at->klass && p_base; at = at->klass->base) {
 			if (at == p_base) {
@@ -365,10 +362,13 @@ bool Typer::godot_storable(const Type *p_type, bool p_in_node) const {
 		}
 		return false;
 	};
-	if (!extends(godot_class("GodotObject"))) {
-		return symbol->name != "Signal" && symbol->name != "RID";
+	if (extends(godot_class("GodotObject"))) {
+		return extends(godot_class("Resource")) || (p_in_node && extends(godot_class("Node")));
 	}
-	return extends(godot_class("Resource")) || (p_in_node && extends(godot_class("Node")));
+	if (godot_class(symbol->name) != symbol) {
+		return false; // Not one of Godot's.
+	}
+	return symbol->name != "Signal" && symbol->name != "RID";
 }
 
 // One of Godot's values a scene can store (a Vector2, a Color, a GodotArray): storable, and not an object.

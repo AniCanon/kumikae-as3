@@ -65,6 +65,8 @@ def assemble(native, destination):
         configure_starter_web(starter, native)
         shutil.copytree(example / "src", starter / "src")
         shutil.copytree(example / "assets", starter / "assets")
+        if (example / "scenes").is_dir():
+            shutil.copytree(example / "scenes", starter / "scenes", ignore=shutil.ignore_patterns("*.uid"))
         shutil.copytree(example / "tests", starter / "tests", ignore=shutil.ignore_patterns("*.uid"))
         shutil.copy2(ROOT / "LICENSE", package)
         shutil.copy2(ROOT / "compiler/godot/NOTICE.md", package / "GODOT-NOTICE.md")

@@ -42,6 +42,7 @@ struct HandleHead {
 inline constexpr uint8_t HANDLE_UNKNOWN = 0;
 inline constexpr uint8_t HANDLE_SHARED = 1;
 inline constexpr uint8_t HANDLE_COPIED = 2;
+inline constexpr uint8_t HANDLE_BORROWED = 3;
 inline HandleHead *head_of(void *p_handle) {
 	return static_cast<HandleHead *>(p_handle) - 1;
 }
@@ -87,6 +88,8 @@ inline constexpr uint8_t GIVEN_FLAG = 2;
 inline constexpr uint8_t GIVEN_HANDLE = 3;
 inline constexpr uint8_t GIVEN_PARTS = 4; // And the number of the type (Parts) added to it.
 
+inline constexpr size_t MOST_DEFAULTS = 4;
+
 // What the host worked out for one place the program asks the engine for something (Program::uses). Empty
 // where it could not, or where the place is not one generated code calls directly: the library's way,
 // through its thunk, is then the only one.
@@ -98,7 +101,7 @@ struct Resolved {
 	// A handle on a singleton, on a constant's value, or on the zero of the type a method gives in a handle
 	// (EngineApi::call_kept): the host's own, borrowed, never let go of by generated code.
 	void *handle = nullptr;
-	uint64_t defaults[2] = { 0, 0 }; // The parameters the call leaves out, as Godot declares them, bare.
+	uint64_t defaults[MOST_DEFAULTS] = { 0, 0, 0, 0 }; // The parameters the call leaves out, as Godot declares them, bare.
 	// For a method of one of Godot's values that a handle keeps (a Dictionary's `is_empty`): the number a
 	// handle on such a value starts with, and where the handle keeps the value, in bytes from its start
 	// (value_in()). 0 where the host could not make sure of either.

@@ -1,9 +1,10 @@
 package dev.kumikae.coindash.tests {
-    import dev.kumikae.coindash.entities.Scanner;
-    import dev.kumikae.coindash.gameplay.Round;
     import app.anicanon.kumikae.testing.Assert;
     import app.anicanon.kumikae.testing.TestScene;
-    import godot.*;
+    import dev.kumikae.coindash.entities.Scanner;
+    import dev.kumikae.coindash.gameplay.Rooftop;
+    import dev.kumikae.coindash.gameplay.Round;
+    import godot.Vector2;
 
     public class CoinPickupTest {
         [Test]
@@ -39,8 +40,8 @@ package dev.kumikae.coindash.tests {
 
         [Test]
         public function scannerPatrolResetsToItsScenePosition():void {
-            var scene:Node = TestScene.instantiate("res://main.tscn");
-            var scanner:Scanner = scene.getNode("Scanner") as Scanner;
+            var rooftop:Rooftop = TestScene.instantiate("res://main.tscn") as Rooftop;
+            var scanner:Scanner = rooftop.scanner;
             var dock:Vector2 = scanner.position;
             scanner.sweep(1);
             Assert.assertTrue(scanner.position.x > dock.x);
@@ -53,21 +54,21 @@ package dev.kumikae.coindash.tests {
 
         [Test]
         public function pickupUpdatesHud():void {
-            var scene:Node = TestScene.instantiate("res://main.tscn");
-            scene.call("startRun");
-            var coin:Area2D = scene.getNode("Silver") as Area2D;
-            var gold:Area2D = scene.getNode("Gold") as Area2D;
-            var player:CharacterBody2D = scene.getNode("Player") as CharacterBody2D;
-            var score:Label = scene.getNode("HUD/Score") as Label;
-            player.position = coin.position;
+            var rooftop:Rooftop = TestScene.instantiate("res://main.tscn") as Rooftop;
+            Assert.assertTrue(rooftop.hud.isMenuVisible());
+            rooftop.hud.startRequested.emit();
+            Assert.assertFalse(rooftop.hud.isMenuVisible());
+            Assert.assertEquals(Round.RUNNING, rooftop.currentPhase());
+
+            rooftop.rider.position = rooftop.silver.position;
             TestScene.until(function():Boolean {
-                return score.text == "01";
+                return rooftop.hud.scoreText() == "01";
             }, 3000, function():void {
-                player.position = gold.position;
+                rooftop.rider.position = rooftop.gold.position;
             }).until(function():Boolean {
-                return score.text == "04";
+                return rooftop.hud.scoreText() == "04";
             }, 3000, function():void {
-                Assert.assertEquals("04", score.text);
+                Assert.assertEquals("04", rooftop.hud.scoreText());
             });
         }
     }

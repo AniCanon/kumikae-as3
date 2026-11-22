@@ -51,22 +51,18 @@ struct ObjectCache {
 };
 
 // One per thread, the host's. Generated code keeps no state of its own: what changes as a program runs is
-// reached through this.
-struct Context {
+// reached through this. Main-thread hot fields are packed first; cross-thread atomics written by the time
+// limit watch or Godot worker threads sit on their own cache line to prevent false sharing.
+struct alignas(64) Context {
 	bool failing = false; // An error is on its way out: `pending` holds it.
-	// Set by the host's watch on how long a call from outside has run, from a thread of its own
-	// (runtime/time_limit.h): a function reads it once in ROUNDS times round its loops (alarmed), and asks
-	// overdue() when it is set.
-	std::atomic<bool> alarm{ false };
 	// The host remembers what objects are constructed with (vm/constructions.h): a program library built
 	// to tell says so as a constructor begins (constructing).
 	bool remembers = false;
-	Slot pending{}; // What was thrown, untyped, with a reference of its own.
+	// A function the engine called failed: its error may be carried for a call generated code made on bare
+	// values, which asks (engine.h, call_failed) and is given it.
+	bool listener_failed = false;
 	uint32_t depth = 0; // Generated functions in progress.
-	// Where the thread's stack is nearly used up, as an address: a function whose frame is below it does
-	// not go on (stack_low). 0 where the host does not know the stack's size. The watch puts it above
-	// every frame to have the clock looked at where a function is entered, so it is read as it stands.
-	std::atomic<uintptr_t> stack_floor{ 0 };
+	Slot pending{}; // What was thrown, untyped, with a reference of its own.
 	StackFrame *frames = nullptr; // The innermost of them, where they are kept.
 	Slot *globals = nullptr; // Static fields and package variables, by the module's numbers.
 	Str *const *strings = nullptr; // The program's string constants.
@@ -75,19 +71,12 @@ struct Context {
 	const ClassInfo *classes = nullptr; // The program's, here too: a call through a method table starts from it.
 	const Program *program = nullptr;
 	const Api *api = nullptr; // The runtime's functions, as a program library reaches them.
-	// The engine, where the host has one (runtime/engine.h): its entry points, what the host worked out
-	// for each place the program asks it for something (never null: empty entries with no engine), and
-	// Godot's names for the Strings the program gives where a name is taken, each built once.
-	// How many script instances the engine has freed: a function that keeps its script's own Godot object
-	// looks it up again when this has moved (engine.h, owner_object). Counted from any thread: Godot may
-	// free an object on one of its workers.
-	std::atomic<uint32_t> freed{ 0 };
-	// A function the engine called failed: its error may be carried for a call generated code made on bare
-	// values, which asks (engine.h, call_failed) and is given it.
-	bool listener_failed = false;
 	// How many of Godot's objects that the host found behind a handle (HandleHead::object) Godot has freed
 	// since: the host's own count, which moves from any thread. Null with no engine.
 	const std::atomic<uint64_t> *gone = nullptr;
+	// The engine, where the host has one (runtime/engine.h): its entry points, what the host worked out
+	// for each place the program asks it for something (never null: empty entries with no engine), and
+	// Godot's names for the Strings the program gives where a name is taken, each built once.
 	const EngineApi *engine = nullptr;
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;
@@ -105,6 +94,18 @@ struct Context {
 	// keeps of each its arguments as they come and nothing more. The next are remembered where they are
 	// made (remembered_here), with no word to the host.
 	const uint8_t *class_tells = nullptr;
+	// Set by the host's watch on how long a call from outside has run, from a thread of its own
+	// (runtime/time_limit.h): a function reads it once in ROUNDS times round its loops (alarmed), and asks
+	// overdue() when it is set.
+	alignas(64) std::atomic<bool> alarm{ false };
+	// How many script instances the engine has freed: a function that keeps its script's own Godot object
+	// looks it up again when this has moved (engine.h, owner_object). Counted from any thread: Godot may
+	// free an object on one of its workers.
+	std::atomic<uint32_t> freed{ 0 };
+	// Where the thread's stack is nearly used up, as an address: a function whose frame is below it does
+	// not go on (stack_low). 0 where the host does not know the stack's size. The watch puts it above
+	// every frame to have the clock looked at where a function is entered, so it is read as it stands.
+	std::atomic<uintptr_t> stack_floor{ 0 };
 };
 
 // What the first slot of an object's record says (vm::Constructions::Record, whose numbers these are):

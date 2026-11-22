@@ -36,11 +36,11 @@ state of the project changes.
 
 ### Inside Godot
 
-- **[Coin Dash](../examples/coin-dash/README.md)** is a playable ActionScript 3 example under `dev.kumikae.coindash` with physics pickups, a moving hazard, a dash and a saved best score.
+- **[Coin Dash](../examples/coin-dash/README.md)** is a playable ActionScript 3 example under `dev.kumikae.coindash` with modular scenes, a shared theme, typed `[Export]` actor and UI wiring, compile-time `[Signal]`s, physics pickups, a moving hazard, a dash and a saved best score.
 
 - **Scripts on nodes:** properties, methods, signals, singletons, constants, static methods and global
   functions, with what Godot returns checked against its declared type.
-- **`[Export]` and `[Signal]`.**
+- **`[Export]` and `[Signal]`,** including `[Export]` fields typed as your own `Node` and `Resource` script classes.
 - **Hot reload** that keeps state and updates live objects in place. See [Hot reload](hot-reload.md).
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
 - **iOS:** the interpreter runs in the Simulator and on a device. Rider can sign, install and run a game on a paired iPhone or iPad.

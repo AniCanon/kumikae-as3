@@ -28,10 +28,11 @@ package game {
     public class Player extends CharacterBody2D {
         [Export] public var speed:Number = 300;
         [Export] public var jumpSpeed:Number = 400;
+        [Export] public var hitbox:Area2D;
         [Signal] public var died:Signal;
 
         override public function _ready():void {
-            (getNode("Hitbox") as Area2D).bodyEntered.add(onBodyEntered);
+            hitbox.bodyEntered.add(onBodyEntered);
         }
 
         override public function _physicsProcess(delta:Number):void {
@@ -54,8 +55,9 @@ package game {
 
 - **The class extends a Godot class.** Attach the script to a `CharacterBody2D` node and Godot calls
   `_ready` and `_physicsProcess`.
-- **`[Export]` shows a field in the inspector,** and `[Signal]` declares a signal other scripts can listen
-  to. Both are ordinary AS3 metadata tags.
+- **`[Export]` shows a field in the inspector,** including fields typed as Godot nodes, resources, or your
+  own `Node` and `Resource` script classes, and `[Signal]` declares a signal other scripts can listen to.
+  Both are ordinary AS3 metadata tags.
 - **Godot's API reads as AS3.** Methods are lowerCamel (`moveAndSlide`), Godot's properties are AS3
   properties (`velocity`), and a signal is a property you add a listener to (`bodyEntered.add`).
 - **`velocity.x = ...` changes the body's velocity.** The compiler writes the changed vector back.

@@ -42,6 +42,7 @@ void FunctionWriter::forget_whole(uint32_t p_register) {
 	}
 	whole_[p_register] = Whole();
 	text_[p_register] = NONE;
+	text_exact_[p_register] = false;
 }
 
 // F64ToI32 or F64ToU32 of a register whose whole-number sum is known: the sum, in the integer's own type.

@@ -33,7 +33,7 @@ output is the same to the byte.
 |---|---|
 | `generate` | The entry point. Returns the files, or the first thing that can't be translated |
 | `support` | What is refused, decided before anything is written |
-| `facts` | What is known about every function before any is written: which can't fail, which fields each reads or writes, and which functions a virtual call can reach |
+| `facts` | What is known about every function and global before any is written: which functions can't fail, which fields each reads or writes, which functions a virtual call can reach, and which `static const String` globals hold one literal |
 | `names` | Identifiers, C++ types and literals |
 | `function_writer` | One function: registers as locals, ownership, labels, error paths and handlers |
 | `patterns.h`, `function_simple.cpp` | Operations that are one C++ statement, as a table |
@@ -98,7 +98,8 @@ to give a wrong answer if the proof were wrong.
 |---|---|---|
 | Values held inline | A Godot value with parts, such as `Vector2`, that can't be `null` is a plain struct in a local, laid out as Godot lays it out. | `tests/godot_native/Probe.as` |
 | Inline math | For `Vector2` and `Vector3`, the arithmetic operators, `normalized()`, `length()`, `dot()` and `cross()` are the runtime's own code, identical to Godot's to the last bit. | `Probe.as` |
-| Method binds on bare values | A property or method of a Godot object is called through Godot's method bind, with no boxed values and no lookup by name. | `Probe.as` |
+| Method binds on bare values | A property or method of a Godot object is called through Godot's method bind, with no boxed values and no lookup by name. Handle-held values with parts (such as a `Color` constant) are unboxed inline, and up to four omitted default arguments are filled from what Godot declares. | `Probe.as` |
+| Constant string names across classes | A `static const String` initialized to a single literal across the program reuses a cached Godot `StringName` on method binds and dictionary lookups, guarded by a pointer check. | `Probe.as` |
 | Fields read through their handle | A field that holds a value or a signal, read only to be used at once, is used through the field's own handle. | `Probe.as`, `fields()` |
 | Handles kept | A register given the same object again keeps the handle it has. | `Probe.as`, `fieldObjects()` |
 | Results made in place | A `Dictionary`, `Array`, `Callable` or `RID` that Godot returns is written straight into a new handle. | `Probe.as`, `inHandles()` |

@@ -75,6 +75,9 @@ struct Facts {
 	std::vector<bool> ends_alone;
 	// Per class: its first use runs nothing: neither it nor a class it extends gives static fields values.
 	std::vector<bool> starts_quietly;
+	// Per global: for a static const String only ever assigned a single string literal in the module, that
+	// literal's index in module.strings (or NONE).
+	std::vector<uint32_t> const_strings;
 };
 
 // Whether an instruction may run code that nothing here looks into. One that cannot is arithmetic, flow,
