@@ -11,6 +11,9 @@ package dev.kumikae.coindash.entities {
         private static const DASH_SPEED:Number = 780;
         private static const AIM_DEAD_ZONE:Number = 0.1;
         private static const BLINK_RATE:Number = 12;
+        private static const POSES:[][]Rect2 = new [][]Rect2 {
+            makePose(1, 0), makePose(1, 1), makePose(-1, 0), makePose(-1, 1)
+        };
 
         private var heading:Vector2 = Vector2.RIGHT;
         private var dashHeading:Vector2 = Vector2.RIGHT;
@@ -20,7 +23,6 @@ package dev.kumikae.coindash.entities {
         private var facing:int = 1;
         private var poseIndex:int = 0;
         private var drawnPose:int = -1;
-        private var poses:[][]Rect2 = new [4] []Rect2;
 
         public function resetAt(dock:Vector2):void {
             position = dock;
@@ -72,11 +74,11 @@ package dev.kumikae.coindash.entities {
             modulate = blinking ? Palette.PLAYER_GRACE : Color.WHITE;
         }
 
-        private function pixel(direction:int, x:int, y:int, w:int, h:int):Rect2 {
+        private static function pixel(direction:int, x:int, y:int, w:int, h:int):Rect2 {
             return new Rect2(direction > 0 ? x : -x - w, y, w, h);
         }
 
-        private function makePose(direction:int, lift:int):[]Rect2 {
+        private static function makePose(direction:int, lift:int):[]Rect2 {
             return new []Rect2 {
                 pixel(direction, -10, -21 + lift, 17, 4),
                 pixel(direction, -13, -17 + lift, 24, 14),
@@ -104,11 +106,7 @@ package dev.kumikae.coindash.entities {
                 drawLine(tail, Vector2.ZERO, Palette.PLAYER_SUIT, 7);
                 drawLine(tail * 0.75, Vector2.ZERO, Palette.PLAYER_LIGHT, 3);
             }
-            var pose:[]Rect2 = poses[poseIndex];
-            if (pose == null) {
-                pose = makePose(facing, poseIndex % 2);
-                poses[poseIndex] = pose;
-            }
+            var pose:[]Rect2 = POSES[poseIndex];
             drawRect(pose[0], Palette.PLAYER_INK);
             drawRect(pose[1], Palette.PLAYER_INK);
             drawRect(pose[2], Palette.PLAYER_SUIT);

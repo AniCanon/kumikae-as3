@@ -38,7 +38,7 @@ Scenes and theme are split cleanly: `main.tscn` instances [scenes/Hud.tscn](scen
 
 The scene-and-actor split follows the play state and player in the Flash game *Mode*. Actor-specific tuning stays with the actor, so the scanner’s beam drawing and collision check use one length. [Mode play state](https://github.com/AdamAtomic/Mode/blob/master/src/PlayState.as) · [Mode player](https://github.com/AdamAtomic/Mode/blob/master/src/Player.as)
 
-To try hot reload, change the scarf shape in `Player._draw` and save during a run. The score and clock carry on as you edit. [How hot reload works](../../docs/hot-reload.md)
+To try hot reload, change the scarf shape in `Player.makePose` and save during a run. The score and clock carry on as you edit. [How hot reload works](../../docs/hot-reload.md)
 
 ## Run the gameplay tests
 
