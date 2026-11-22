@@ -67,8 +67,7 @@ TypeRef *Parser::parse_type() {
 			} while (accept(TokenKind::Comma));
 		}
 		expect_close(TokenKind::RParen, open);
-		expect(TokenKind::Assign, "'=>'");
-		expect(TokenKind::Greater, "'=>'");
+		expect(TokenKind::Arrow, "'=>'");
 		type->parameters = to_list(parameters);
 		type->argument = parse_type();
 	} else if (at(TokenKind::KwVoid)) {

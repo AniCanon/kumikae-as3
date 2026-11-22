@@ -18,6 +18,13 @@ std::string written_type(const Compilation &p_compilation, const TypeRef *p_type
 	if (!p_type || p_type->form == TypeRef::Any) {
 		return "*";
 	}
+	if (p_type->form == TypeRef::Callback) {
+		std::string text = "(";
+		for (uint32_t i = 0; i < p_type->parameters.count; ++i) {
+			text += (i ? ", " : "") + written_type(p_compilation, p_type->parameters[i], p_context);
+		}
+		return text + ")=>" + written_type(p_compilation, p_type->argument, p_context);
+	}
 	if (p_type->form == TypeRef::Void) {
 		return "void";
 	}

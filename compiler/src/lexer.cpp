@@ -228,6 +228,7 @@ constexpr Punctuation PUNCTUATION[] = {
 	{ "%", TokenKind::Percent },
 	{ "===", TokenKind::StrictEqual },
 	{ "==", TokenKind::Equal },
+	{ "=>", TokenKind::Arrow },
 	{ "=", TokenKind::Assign },
 	{ "!==", TokenKind::StrictNotEqual },
 	{ "!=", TokenKind::NotEqual },

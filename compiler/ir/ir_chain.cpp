@@ -63,6 +63,9 @@ constexpr const char *does(Op p_op) {
 			return "asks for the date";
 		case Op::Trace:
 			return "prints";
+		case Op::CallTypedFunction:
+		case Op::CallFunction:
+			return "calls a function value";
 		case Op::CallInterface:
 			return "calls a method of another object";
 		default:

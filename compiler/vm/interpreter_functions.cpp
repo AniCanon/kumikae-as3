@@ -193,15 +193,12 @@ void Interpreter::typed_call(const Function &p_function, const Instruction &p_in
 	const Function &callee = module_.functions[target];
 	const auto &list = p_function.argument_lists[p_in.c];
 	const Kind result = p_in.a == NONE ? Kind::Void : p_function.registers[p_in.a];
-	const size_t first = callee.is_static ? 0 : 1;
-	if (callee.result != result || callee.rest || callee.parameters != first + list.size() || callee.required != callee.parameters ||
-			!std::equal(list.begin(), list.end(), callee.registers.begin() + first,
-					[&](uint32_t p_register, Kind p_kind) { return p_function.registers[p_register] == p_kind; })) {
+	if (!matches_callback(callee, result, list.size(), [&](size_t i) { return p_function.registers[list[i]]; })) {
 		raise(module_.type_error_class, "the Function does not match the callback signature");
 		return;
 	}
 	SpareSlots values(spare_slots_);
-	if (first) {
+	if (!callee.is_static) {
 		values->push_back(own_field(value, ir::FUNCTION_FIRST));
 	}
 	for (uint32_t arg : list) {

@@ -22,7 +22,7 @@ const Type *Typer::join(const Type *p_a, const Type *p_b) const {
 	}
 	auto nullable = [&](const Type *p_type) {
 		return (p_type->kind == Type::Instance && !numeric(p_type) && p_type != boolean_) ||
-				p_type->kind == Type::Vector || p_type->kind == Type::ClassObject;
+				p_type->kind == Type::Vector || p_type->kind == Type::Callback || p_type->kind == Type::ClassObject;
 	};
 	if (p_a->kind == Type::Null && nullable(p_b)) {
 		return p_b;
@@ -169,31 +169,35 @@ auto Typer::fits(const Type *p_from, const Type *p_to) const -> Typer::Fit {
 	return narrower ? Fit::Cast : Fit::No;
 }
 
+bool Typer::callback_fits(Expr *p_value, const Type *p_to) {
+	if (p_value->type == p_to || p_value->type->kind == Type::Null) {
+		return true;
+	}
+	FunctionDecl *decl = nullptr;
+	if (p_value->kind == NodeKind::FunctionExpr) {
+		decl = static_cast<FunctionExpr *>(p_value)->function;
+	} else {
+		Symbol *symbol = p_value->kind == NodeKind::Name ? static_cast<Name *>(p_value)->symbol :
+				p_value->kind == NodeKind::Member ? static_cast<Member *>(p_value)->resolved() : nullptr;
+		if (symbol && (symbol->kind == SymbolKind::Function || symbol->kind == SymbolKind::Method)) {
+			decl = static_cast<FunctionDecl *>(symbol->node);
+		}
+	}
+	bool matches = decl && decl->parameters.count == p_to->parameters.size() && compilation_.type_of(decl->return_type) == p_to->element;
+	for (size_t i = 0; matches && i < p_to->parameters.size(); ++i) {
+		const Parameter &param = decl->parameters[i];
+		matches = !param.is_rest && !param.default_value && compilation_.type_of(param.type) == p_to->parameters[i];
+	}
+	return matches;
+}
+
 void Typer::store(Expr *p_value, const Type *p_to) {
 	// Which type Adobe's compiler gives `a = b` used as a value is not known, so it is not judged.
 	if (!p_value || !p_value->type || !p_to || (p_value->kind == NodeKind::Assign && p_to->kind != Type::Callback)) {
 		return;
 	}
 	if (p_to->kind == Type::Callback) {
-		if (p_value->type == p_to || p_value->type->kind == Type::Null) {
-			return;
-		}
-		FunctionDecl *decl = nullptr;
-		if (p_value->kind == NodeKind::FunctionExpr) {
-			decl = static_cast<FunctionExpr *>(p_value)->function;
-		} else {
-			Symbol *symbol = p_value->kind == NodeKind::Name ? static_cast<Name *>(p_value)->symbol :
-					p_value->kind == NodeKind::Member ? static_cast<Member *>(p_value)->resolved() : nullptr;
-			if (symbol && (symbol->kind == SymbolKind::Function || symbol->kind == SymbolKind::Method)) {
-				decl = static_cast<FunctionDecl *>(symbol->node);
-			}
-		}
-		bool matches = decl && decl->parameters.count == p_to->parameters.size() && compilation_.type_of(decl->return_type) == p_to->element;
-		for (size_t i = 0; matches && i < p_to->parameters.size(); ++i) {
-			const Parameter &param = decl->parameters[i];
-			matches = !param.is_rest && !param.default_value && compilation_.type_of(param.type) == p_to->parameters[i];
-		}
-		if (!matches) {
+		if (!callback_fits(p_value, p_to)) {
 			error(p_value->offset, "callback requires the exact signature " + quoted(compilation_.type_name(p_to)));
 		}
 		return;

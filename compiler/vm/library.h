@@ -176,9 +176,24 @@ Object *make_function(Library &p_library, uint32_t p_function, Object *p_first);
 Object *make_method(Library &p_library, uint32_t p_method, Object *p_object);
 // A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
 int32_t function_length(const ir::Module &p_module, Object *p_function);
+// Check the raw Slot signature before a call through a callback. A value can also arrive through a dynamic call.
+template <typename ArgumentKind>
+bool matches_callback(const ir::Function &p_target, ir::Kind p_result, size_t p_count, ArgumentKind p_kind) {
+	const size_t first = p_target.is_static ? 0 : 1;
+	if (p_target.result != p_result || p_target.rest || p_target.parameters != first + p_count || p_target.required != p_target.parameters) {
+		return false;
+	}
+	for (size_t i = 0; i < p_count; ++i) {
+		if (p_target.registers[first + i] != p_kind(i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool typed_function_matches(const ir::Function &p_target, ir::Kind p_result, const ir::Kind *p_arguments, size_t p_count);
 // The function value a register of the kind holds. Null, with AS3's TypeError raised, for anything else:
 // #1009 for nothing, #1006 for a value that is no function.
-bool typed_function_matches(const ir::Function &p_target, ir::Kind p_result, const ir::Kind *p_arguments, size_t p_count);
 Object *function_in(Library &p_library, ir::Kind p_kind, Slot p_value);
 // What such a call starts with, written to r_values (room for one more than p_count): what the function
 // takes first, if anything, then each argument with a reference of its own. How many were written, or

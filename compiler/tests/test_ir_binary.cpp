@@ -82,7 +82,7 @@ static void test_round_trip_program_and_execution() {
 					var singles:Vector.<float> = new <float>[16777217];
 					trace(singles[0] + float(1), singles[0] + 1);
 					var sum:int = 0;
-					var add:Function = function(v:int):void { sum += v; };
+					var add:(int)=>void = function(v:int):void { sum += v; };
 					for each (var n:int in nums) {
 						add(n);
 					}
@@ -101,6 +101,7 @@ static void test_round_trip_program_and_execution() {
 	CHECK(lower_files({ { "Main.as", main_src }, { "Base.as", base }, { "Greeter.as", greeter } }, false, &original));
 
 	const std::string listing = ir::print(original);
+	CHECK(listing.find("CallTypedFunction") != std::string::npos);
 	CHECK(listing.find("I32ToU8") != std::string::npos);
 	CHECK(listing.find("U8ToI32") != std::string::npos);
 	const std::vector<uint8_t> bytes = ir::write_binary(original);
@@ -187,6 +188,13 @@ static void test_rejects_invalid_references() {
 		return ir::read_binary(bytes.data(), bytes.size(), &decoded).has_value();
 	};
 	ir::Module broken = original;
+	auto &fn = broken.functions.front();
+	fn.registers.push_back(ir::Kind::F64);
+	const uint32_t not_function = static_cast<uint32_t>(fn.registers.size() - 1);
+	fn.argument_lists.push_back({});
+	fn.code.front() = { ir::Op::CallTypedFunction, ir::NONE, not_function, static_cast<uint32_t>(fn.argument_lists.size() - 1), 0 };
+	CHECK(invalid(broken));
+	broken = original;
 	broken.functions.front().code.front() = { ir::Op::U32ToU8, 0, 0, 0, 0 };
 	CHECK(invalid(broken));
 	broken = original;

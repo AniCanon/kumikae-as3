@@ -61,7 +61,7 @@ uint32_t Lowerer::declared_class(TypeRef *p_type) {
 		return vector_class(type).value_or(NONE);
 	}
 	uint32_t index = NONE;
-	if (type && type->kind == Type::Instance && class_index(type->symbol, &index)) {
+	if (type && (type->kind == Type::Instance || type->kind == Type::Callback) && class_index(type->symbol, &index)) {
 		return index; // A class of the program, or Function or an Error class, made when first named.
 	}
 	return NONE;

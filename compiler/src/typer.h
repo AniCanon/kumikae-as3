@@ -78,6 +78,7 @@ class Typer {
 	// flash.utils.Dictionary becomes a Godot dictionary. Nothing converts on the way back.
 	bool converts_to_engine(const Type *p_from, const Type *p_to) const;
 
+	bool callback_fits(Expr *p_value, const Type *p_to);
 	Fit fits(const Type *p_from, const Type *p_to) const;
 
 	// Reports a value that does not fit where it is stored or passed.

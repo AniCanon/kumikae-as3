@@ -60,6 +60,15 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 		return false;
 	}
 	switch (p_in.op) {
+		case Op::CallTypedFunction: {
+			const auto scalar = [](Kind p_kind) {
+				return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64 || p_kind == Kind::U8 ||
+						is_floating(p_kind) || p_kind == Kind::Bool || p_kind == Kind::Str;
+			};
+			const auto &args = p_fn.argument_lists[p_in.c];
+			return p_fn.registers[p_in.b] == Kind::Obj && (p_in.a == NONE || scalar(p_fn.registers[p_in.a])) &&
+					std::all_of(args.begin(), args.end(), [&](uint32_t p_reg) { return p_reg < p_fn.registers.size() && scalar(p_fn.registers[p_reg]); });
+		}
 		case Op::ConstU32:
 			return p_fn.registers[p_in.a] != Kind::U8 || p_in.b <= UINT8_MAX;
 		case Op::ConstF64:

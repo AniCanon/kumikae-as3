@@ -50,6 +50,17 @@ static void test_conversions_accepted() {
 			{});
 }
 
+static void test_callback_signatures() {
+	expect(program("var f:(int)=>String = /*!*/fn; f = /*!*/any; f = /*!*/function(x:String):int { return 1; };"
+				   "f = /*!*/function(x:int = 1):String { return label; }; f = /*!*/function(...args):String { return label; };"
+				   "/*!*/f(); f(/*!*/label); f./*!*/apply(null, []); var nested:(/*!*/Sub)=>void;"),
+			{ "callback requires the exact signature '(int)=>String'", "callback requires the exact signature '(int)=>String'",
+					"callback requires the exact signature '(int)=>String'", "callback requires the exact signature '(int)=>String'",
+					"callback requires the exact signature '(int)=>String'", "callback takes 1 argument but received 0",
+					UNRELATED("String", "int"), "store the callback in a Function to use its members",
+					"a callback signature requires a scalar or String type; only the result can be void" });
+}
+
 static void test_conversions_rejected() {
 	expect(program("var a:String = /*!*/1; var b:Number = /*!*/\"5\"; var c:int = /*!*/true; var d:Sub = /*!*/base;\n"
 				   "var e:String = /*!*/obj; var f:Base = /*!*/other; var g:Shape = /*!*/base; var h:Sub = /*!*/shape;\n"
@@ -544,6 +555,7 @@ int main() {
 			{ "an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it",
 					"an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it" });
 	test_conversions_accepted();
+	test_callback_signatures();
 	test_conversions_rejected();
 	test_cast_advice();
 	test_stores();
