@@ -25,6 +25,14 @@ Every `.as` file in the project is part of one program, except files in folders 
 dot and files in the project's [test folders](#project-settings-and-environment-variables). If any script
 has a compile error, Godot prints the errors and no script loads.
 
+## Edit scripts in Godot
+
+Open an existing `.as` file from Godot's **FileSystem** panel to edit it in the **Script** workspace.
+Godot colors ActionScript syntax and suggests keywords, locals, types and members as you type.
+Completion uses unsaved text in open ActionScript tabs and the project's saved scripts.
+Use **Edit → Completion Query** to request suggestions by hand.
+If a tab opens with a previously selected highlighter, choose **Edit → Syntax Highlighter → ActionScript**.
+
 ## Write a script
 
 A script is a class that extends a Godot class. Attach the `.as` file to a node of that class, as you

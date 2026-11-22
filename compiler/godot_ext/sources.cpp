@@ -59,9 +59,12 @@ bool excluded_script(std::string_view p_path) {
 
 // Whether a folder under the scripts' root is not part of this run's program: its name starts with a dot,
 // or it holds the project's tests and the game is what runs.
-static bool skipped(const String &p_folder, const String &p_name) {
+static bool skipped(const String &p_folder, const String &p_name, bool p_include_tests = false) {
 	if (p_name.begins_with(".")) {
 		return true;
+	}
+	if (p_include_tests) {
+		return false;
 	}
 	const std::string place = p_folder.path_join(p_name).utf8().get_data();
 	const CharString root = scripts_root().utf8();
@@ -83,7 +86,7 @@ std::string project_path(std::string_view p_file, const String &p_root) {
 
 // Every .as file under a folder, by where it is. Folders and files whose name starts with a dot are not
 // part of a project, and its tests' folders are not part of the game (skipped()).
-void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) {
+void collect_scripts(const String &p_folder, std::vector<std::string> &r_files, bool p_include_tests) {
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
 	if (folder.is_null() || folder->file_exists(".gdignore")) {
 		return;
@@ -94,8 +97,8 @@ void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) 
 		}
 	}
 	for (const String &name : folder->get_directories()) {
-		if (!skipped(p_folder, name)) {
-			collect_scripts(p_folder.path_join(name), r_files);
+		if (!skipped(p_folder, name, p_include_tests)) {
+			collect_scripts(p_folder.path_join(name), r_files, p_include_tests);
 		}
 	}
 }

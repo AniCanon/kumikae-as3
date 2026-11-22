@@ -1,5 +1,4 @@
-// ActionScript 3 as a Godot scripting language. For now only what Godot needs to attach scripts and call
-// their methods: the editor features (templates, completion, the debugger) answer "nothing".
+// ActionScript 3 as a Godot scripting language.
 #pragma once
 
 #include "callable.h"
@@ -41,17 +40,18 @@ protected:
 
 public:
 	static AS3Language *singleton;
+	static constexpr const char *NAME = "ActionScript";
 
-	godot::String _get_name() const override { return "ActionScript"; }
+	godot::String _get_name() const override { return NAME; }
 	void _init() override {}
 	godot::String _get_type() const override { return "AS3Script"; }
 	godot::String _get_extension() const override { return "as"; }
 	void _finish() override {}
 	godot::PackedStringArray _get_reserved_words() const override { return {}; }
 	bool _is_control_flow_keyword(const godot::String &) const override { return false; }
-	godot::PackedStringArray _get_comment_delimiters() const override { return {}; }
-	godot::PackedStringArray _get_doc_comment_delimiters() const override { return {}; }
-	godot::PackedStringArray _get_string_delimiters() const override { return {}; }
+	godot::PackedStringArray _get_comment_delimiters() const override { return godot::PackedStringArray({ "//", "/* */" }); }
+	godot::PackedStringArray _get_doc_comment_delimiters() const override { return godot::PackedStringArray({ "/** */" }); }
+	godot::PackedStringArray _get_string_delimiters() const override { return godot::PackedStringArray({ "\" \"", "' '" }); }
 	godot::Ref<godot::Script> _make_template(const godot::String &, const godot::String &,
 			const godot::String &) const override {
 		return {};
@@ -79,9 +79,7 @@ public:
 		return godot::OK;
 	}
 	bool _overrides_external_editor() override { return false; }
-	godot::Dictionary _complete_code(const godot::String &, const godot::String &, godot::Object *) const override {
-		return {};
-	}
+	godot::Dictionary _complete_code(const godot::String &p_code, const godot::String &p_path, godot::Object *) const override;
 	godot::Dictionary _lookup_code(const godot::String &, const godot::String &, const godot::String &,
 			godot::Object *) const override {
 		return {};

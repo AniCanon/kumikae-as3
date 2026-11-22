@@ -69,6 +69,8 @@ state of the project changes.
 
 ### Editors and tools
 
+- **Godot Script editor:** syntax highlighting, contextual completion and saving for ActionScript files
+  on desktop.
 - **Language server:** errors as you type, completion, signature help, go to definition, find references,
   hover and outline. Completion includes Godot reference summaries, AS3 library and keyword descriptions,
   and ASDoc from the project. Selected API entries include compile-checked AS3 examples. A change to a
