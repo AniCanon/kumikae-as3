@@ -38,7 +38,28 @@ bool is_whole(Kind p_kind) {
 }
 
 bool is_number(Kind p_kind) {
-	return is_whole(p_kind) || p_kind == Kind::F64 || p_kind == Kind::Bool;
+	return p_kind == Kind::U8 || is_whole(p_kind) || ir::is_floating(p_kind) || p_kind == Kind::Bool;
+}
+
+struct VectorPlaces {
+	const char *type;
+	const char *accessor;
+};
+
+VectorPlaces places_for(Kind p_storage) {
+	switch (p_storage) {
+		case Kind::U8: return { "uint8_t", "bytes_in" };
+		case Kind::F32: return { "float", "floats_in" };
+		case Kind::I32: return { "int32_t", "numbers_in" };
+		default: return { "Slot", "slots_in" };
+	}
+}
+
+Kind storage_for(Kind p_element) {
+	if (is_whole(p_element)) {
+		return Kind::I32;
+	}
+	return p_element == Kind::U8 || p_element == Kind::F32 ? p_element : Kind::Void;
 }
 
 } // namespace
@@ -51,13 +72,15 @@ bool FunctionWriter::reads_in_place(uint32_t p_register) const {
 
 // Whether a register's vector holds ints or uints, by the elements read out of it and stored in it: each
 // place is then four bytes, the number itself (runtime/fast.h).
-bool FunctionWriter::narrow_vector(uint32_t p_vector) const {
+Kind FunctionWriter::vector_storage(uint32_t p_vector) const {
 	for (const Instruction &in : function_.code) {
-		if ((in.op == Op::VecGet && in.b == p_vector && is_whole(kind(in.a))) || (in.op == Op::VecSet && in.a == p_vector && is_whole(kind(in.c)))) {
-			return true;
+		const Kind element = in.op == Op::VecGet && in.b == p_vector ? kind(in.a) : in.op == Op::VecSet && in.a == p_vector ? kind(in.c) : Kind::Void;
+		const Kind storage = storage_for(element);
+		if (storage != Kind::Void) {
+			return storage;
 		}
 	}
-	return false;
+	return Kind::Void;
 }
 
 // The vector registers the loop indexes, if it is one to write twice: none otherwise.
@@ -84,7 +107,9 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 	// vector's class: nothing is known of its places.
 	for (const Instruction &in : function_.code) {
 		const uint32_t vector = in.op == Op::VecGet ? in.b : in.op == Op::VecSet ? in.a : NONE;
-		if (vector != NONE && vectors.count(vector) && narrow_vector(vector) != is_whole(kind(in.op == Op::VecGet ? in.a : in.c))) {
+		const Kind element = vector == NONE ? Kind::Void : kind(in.op == Op::VecGet ? in.a : in.c);
+		const Kind storage = storage_for(element);
+		if (vector != NONE && vectors.count(vector) && vector_storage(vector) != storage) {
 			return {};
 		}
 	}
@@ -156,7 +181,7 @@ std::string FunctionWriter::twice_declared() const {
 	std::string out;
 	for (uint32_t each : vectors) {
 		const std::string number = std::to_string(each);
-		out += std::string("\t") + (narrow_vector(each) ? "int32_t" : "Slot") + " *d" + number + " = nullptr;\n\tuint32_t n" + number + " = 0;\n\t(void)d" + number +
+		out += std::string("\t") + places_for(vector_storage(each)).type + " *d" + number + " = nullptr;\n\tuint32_t n" + number + " = 0;\n\t(void)d" + number +
 				"; (void)n" + number + ";\n";
 	}
 	return out;
@@ -186,15 +211,23 @@ bool FunctionWriter::fast_vector(const Instruction &p_in) {
 				return false;
 			}
 			// A place of ints or uints is the number; any other is a slot.
-			line(reg(p_in.a) + " = " + (narrow_vector(p_in.b) ? "static_cast<" + std::string(type_of(kind(p_in.a))) + ">(" + element(p_in.b, p_in.c) + ")"
+			line(reg(p_in.a) + " = " + (vector_storage(p_in.b) != Kind::Void ? "static_cast<" + std::string(type_of(kind(p_in.a))) + ">(" + element(p_in.b, p_in.c) + ")"
 															  : from_slot(kind(p_in.a), element(p_in.b, p_in.c))) + ";");
 			return true;
-		case Op::VecSet:
+		case Op::VecSet: {
 			if (!local(p_in.a)) {
 				return false;
 			}
-			line(element(p_in.a, p_in.b) + " = " + (narrow_vector(p_in.a) ? "static_cast<int32_t>(" + reg(p_in.c) + ")" : "slot(" + reg(p_in.c) + ")") + ";");
+			const Kind storage = vector_storage(p_in.a);
+			std::string value = reg(p_in.c);
+			if (storage == Kind::I32) {
+				value = "static_cast<int32_t>(" + value + ")";
+			} else if (storage == Kind::Void) {
+				value = "slot(" + value + ")";
+			}
+			line(element(p_in.a, p_in.b) + " = " + value + ";");
 			return true;
+		}
 		default:
 			return false;
 	}
@@ -217,7 +250,9 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 	for (uint32_t each : p_loop.vectors) {
 		const std::string number = std::to_string(each);
 		// A register that borrows a field may not have been read into yet: the field itself is what it will hold.
-		const std::string held = (borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each)) + (narrow_vector(each) ? "/n" : "/s");
+		const std::string vector = borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each);
+		const VectorPlaces layout = places_for(vector_storage(each));
+		const std::string held = vector + "/" + layout.type;
 		// Two registers read from one field hold one vector: the second's places are the first's, said so
 		// that the C++ compiler knows them for the same memory (`y[i] = a * x[i] + y[i]` reads `y` twice).
 		const auto same = std::find_if(found.begin(), found.end(), [&](const auto &p_each) { return p_each.first == held; });
@@ -227,9 +262,8 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 			continue;
 		}
 		found.emplace_back(held, number);
-		const std::string vector = held.substr(0, held.size() - 2);
 		// No places: no vector, one with no room yet, or one whose places are not what the loop reads there.
-		places += "\td" + number + " = " + (narrow_vector(each) ? "numbers_in(" : "slots_in(") + vector + ");\n";
+		places += "\td" + number + " = " + layout.accessor + "(" + vector + ");\n";
 		missing += (missing.empty() ? "!d" : " || !d") + number;
 		lengths += "\tn" + number + " = static_cast<Vector *>(" + vector + ")->length;\n";
 	}

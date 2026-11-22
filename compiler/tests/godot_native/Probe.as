@@ -10,6 +10,8 @@ package {
 		private var log:Array = [];
 		private var heard:Array = [];
 		[Signal] public var struck:Signal;
+		[Export] public var singlePrecision:float = 16777217;
+		[Export] public var singleByte:byte = 300;
 
 		// A function value that gives one of Godot's values or objects, called every way there is, and
 		// `arguments` of a function whose parameters are such values.
@@ -658,6 +660,41 @@ package {
 				return none.length;
 			}
 			return fail(depth - 1) + 1;
+		}
+
+		public function tabStops(target:Label, values:Array):void {
+			var stops:Vector.<Number> = new Vector.<Number>();
+			for (var i:int = 0; i < values.length; i++) {
+				stops.push(values[i]);
+			}
+			target.tabStops = stops;
+		}
+		public function integerStops(target:Label):void {
+			target.tabStops = new <int>[-3, 16777217];
+		}
+
+		public function floatStops(target:Label, values:Array):void {
+			var stops:Vector.<float> = new Vector.<float>();
+			for (var i:int = 0; i < values.length; i++) {
+				stops.push(float(values[i]));
+			}
+			target.tabStops = stops;
+		}
+
+		public function floatEcho(value:float):float {
+			return value;
+		}
+
+		public function byteBuffer(target:StreamPeerBuffer, values:Array):void {
+			var bytes:Vector.<byte> = new Vector.<byte>();
+			for (var i:int = 0; i < values.length; i++) {
+				bytes.push(byte(values[i]));
+			}
+			target.dataArray = bytes;
+		}
+
+		public function byteEcho(value:byte):byte {
+			return value;
 		}
 
 		private function scaled(value:int, by:Number):Number {

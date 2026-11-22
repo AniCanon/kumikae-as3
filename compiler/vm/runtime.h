@@ -55,8 +55,8 @@ inline Slot &slot_at(Object *p_object, size_t p_slot) {
 
 class Entries; // vm/table.h
 
-// A Vector.<T>: an object whose class says what its elements are. They are held like fields: untagged
-// slots of that one kind, but in a vector of ints or of uints, whose places are the numbers themselves.
+// A Vector.<T> or fixed array: an object whose class says what its elements are. They are held like fields: untagged
+// slots of that one kind, except where a byte, int, uint or float fits in a smaller place.
 struct Vector : Object {
 	uint32_t length;
 	uint32_t capacity; // Places there is room for; those from `length` on are zero.
@@ -66,12 +66,11 @@ struct Vector : Object {
 	// is the vector's class that says so (ir::Class::element_bare); here it is beside the length for code
 	// that reads an element without the class.
 	uint8_t bare;
-	// Each place is four bytes, the int or the uint itself, where every other vector's is a slot of eight:
-	// a vector of ints or of uints (the class says so: narrow_places(), fields.h). Half the memory, and
-	// what Godot's own array of 32-bit integers holds.
-	bool narrow;
-	// The places: slots (slots_of()), or four-byte numbers (numbers_of()) in a narrow vector. Nothing
-	// reads them as the one that are the other: place() and set_place() are for code that takes either.
+	bool narrow; // Elements use fewer bytes than a Slot.
+	bool floating; // Four-byte float places.
+	bool bytes; // One-byte unsigned places.
+	bool inline_places; // The element storage is part of the same allocation.
+	// Access elements through place() and set_place() when their layout is not known.
 	void *places;
 	Entries *properties; // An Array's properties other than its indices, once it has any (vm/table.h).
 };
@@ -83,9 +82,18 @@ inline Slot *slots_of(const Vector *p_vector) {
 inline int32_t *numbers_of(const Vector *p_vector) {
 	return static_cast<int32_t *>(p_vector->places);
 }
+inline uint8_t *bytes_of(const Vector *p_vector) {
+	return static_cast<uint8_t *>(p_vector->places);
+}
+inline float *floats_of(const Vector *p_vector) {
+	return static_cast<float *>(p_vector->places);
+}
 // How many bytes a place of the vector takes.
+inline size_t place_size(bool p_bytes, bool p_narrow) {
+	return p_bytes ? sizeof(uint8_t) : p_narrow ? sizeof(int32_t) : sizeof(Slot);
+}
 inline size_t place_size(const Vector *p_vector) {
-	return p_vector->narrow ? sizeof(int32_t) : sizeof(Slot);
+	return place_size(p_vector->bytes, p_vector->narrow);
 }
 // What a place holds, as a slot of the element's kind holds it (an int or a uint in the slot's first four
 // bytes, the rest zero), and a place given what such a slot holds. Nothing is counted by either.
@@ -95,11 +103,21 @@ inline Slot place(const Vector *p_vector, size_t p_index) {
 	}
 	Slot slot;
 	slot.bits = 0;
-	slot.i = numbers_of(p_vector)[p_index];
+	if (p_vector->bytes) {
+		slot.u = bytes_of(p_vector)[p_index];
+	} else if (p_vector->floating) {
+		slot.d = floats_of(p_vector)[p_index];
+	} else {
+		slot.i = numbers_of(p_vector)[p_index];
+	}
 	return slot;
 }
 inline void set_place(Vector *p_vector, size_t p_index, Slot p_value) {
-	if (p_vector->narrow) {
+	if (p_vector->bytes) {
+		bytes_of(p_vector)[p_index] = static_cast<uint8_t>(p_value.u);
+	} else if (p_vector->floating) {
+		floats_of(p_vector)[p_index] = static_cast<float>(p_value.d);
+	} else if (p_vector->narrow) {
 		numbers_of(p_vector)[p_index] = p_value.i;
 	} else {
 		slots_of(p_vector)[p_index] = p_value;
@@ -109,7 +127,11 @@ inline void set_place(Vector *p_vector, size_t p_index, Slot p_value) {
 // one vector or between two whose places are the same size. Nothing is counted. Here, and not called: a
 // push() empties one place and moves none.
 inline void clear_places(Vector *p_vector, size_t p_from, size_t p_to) {
-	if (p_vector->narrow) {
+	if (p_vector->bytes) {
+		std::fill(bytes_of(p_vector) + p_from, bytes_of(p_vector) + p_to, uint8_t{0});
+	} else if (p_vector->floating) {
+		std::fill(floats_of(p_vector) + p_from, floats_of(p_vector) + p_to, 0.0f);
+	} else if (p_vector->narrow) {
 		std::fill(numbers_of(p_vector) + p_from, numbers_of(p_vector) + p_to, 0);
 	} else {
 		std::fill(slots_of(p_vector) + p_from, slots_of(p_vector) + p_to, Slot());
@@ -163,7 +185,9 @@ Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
 void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
 // One reference; `p_length` elements, all zero; p_bare is what its class says its places hold whole
 // (Vector::bare), p_narrow whether they are four bytes each (Vector::narrow). Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list);
+enum class VectorPlaces : uint8_t { Separate, Inline };
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list,
+		bool p_bytes = false, VectorPlaces p_places = VectorPlaces::Separate);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.

@@ -24,6 +24,8 @@ static void accepts(const std::string &p_source, const char *p_base, const char 
 
 static void qualified_defaults() {
 	const char *child = "package child { public class Player extends a.b.Other { override function st| } }";
+	accepts(child, "package a.b { public class Other { public function step(f:(int,String)=>void):void {} } }",
+			"step", "step(f:(int, String)=>void):void");
 	for (const char *value : { "VALUE", "Other.VALUE", "a.b.Other.VALUE" }) {
 		const auto base = std::string("package a.b { public class Other { public static const VALUE:int=7; ") +
 				"public function step(n:int=" + value + "):void {} } }";

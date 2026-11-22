@@ -18,7 +18,7 @@ const Type *Typer::index_type(Expr *p_expression) {
 	Index *index = static_cast<Index *>(p_expression);
 	const Type *object = expression(index->object);
 	const Type *key = expression(index->index);
-	if (object->kind == Type::Vector) {
+	if (object->typed_sequence()) {
 		// Only a number reaches the elements; `v["length"]` is a property.
 		return numeric(key) ? object->element : (key->kind == Type::Unknown ? unknown_ : any_);
 	}
@@ -63,7 +63,7 @@ const Type *Typer::assign_type(Expr *p_expression) {
 		store(assign->value, target);
 		if (assign->target->kind == NodeKind::Index) {
 			const Type *holder = static_cast<Index *>(assign->target)->object ? static_cast<Index *>(assign->target)->object->type : nullptr;
-			no_null_place(assign->value, holder && holder->kind == Type::Vector ? holder->element : nullptr);
+			no_null_place(assign->value, holder && holder->typed_sequence() ? holder->element : nullptr);
 		}
 	}
 	if (target->kind == Type::Unknown) {
@@ -130,12 +130,20 @@ const Type *Typer::literal_type(Expr *p_expression) {
 			return object_;
 		case NodeKind::VectorLit: {
 			VectorLit *literal = static_cast<VectorLit *>(p_expression);
+			if (literal->length) {
+				expression(literal->length);
+				store(literal->length, uint_);
+			}
 			list(literal->elements);
-			const Type *element = compilation_.type_of(literal->element_type);
-			for (const Expr *each : literal->elements) {
+			const Type *type = compilation_.type_of(literal->element_type);
+			const Type *element = literal->fixed_array ? type->element : type;
+			for (Expr *each : literal->elements) {
+				if (literal->fixed_array || element->contains_fixed_array() || (each && each->type && each->type->contains_fixed_array())) {
+					store(each, element);
+				}
 				no_null_place(each, element);
 			}
-			return compilation_.vector_type(element);
+			return literal->fixed_array ? type : compilation_.vector_type(element);
 		}
 		default:
 			return unknown_;
@@ -144,6 +152,9 @@ const Type *Typer::literal_type(Expr *p_expression) {
 
 // `Vector.<T>` written as a value: the class of vectors of T.
 const Type *Typer::applied_type(TypeApply *p_apply) {
+	if (!p_apply->base) {
+		return compilation_.class_object_type(compilation_.type_of(p_apply->argument));
+	}
 	const Type *base = expression(p_apply->base);
 	if (base->kind == Type::ClassObject && base->element->kind == Type::Vector) {
 		return compilation_.class_object_type(compilation_.vector_type(compilation_.type_of(p_apply->argument)));

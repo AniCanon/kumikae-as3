@@ -1,6 +1,7 @@
 #include "ir_binary_check.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace kas3::ir {
 
@@ -58,6 +59,43 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 			!operand_valid(p_module, p_fn, shape[2], p_in.c)) {
 		return false;
 	}
+	switch (p_in.op) {
+		case Op::CallTypedFunction: {
+			const auto scalar = [](Kind p_kind) {
+				return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64 || p_kind == Kind::U8 ||
+						is_floating(p_kind) || p_kind == Kind::Bool || p_kind == Kind::Str;
+			};
+			const auto &args = p_fn.argument_lists[p_in.c];
+			return p_fn.registers[p_in.b] == Kind::Obj && (p_in.a == NONE || scalar(p_fn.registers[p_in.a])) &&
+					std::all_of(args.begin(), args.end(), [&](uint32_t p_reg) { return p_reg < p_fn.registers.size() && scalar(p_fn.registers[p_reg]); });
+		}
+		case Op::ConstU32:
+			return p_fn.registers[p_in.a] != Kind::U8 || p_in.b <= UINT8_MAX;
+		case Op::ConstF64:
+			if (p_fn.registers[p_in.a] == Kind::F32) {
+				const double value = p_module.numbers[p_in.b];
+				return std::isnan(value) || static_cast<float>(value) == value;
+			}
+			break;
+		case Op::I32ToU8:
+			return p_fn.registers[p_in.a] == Kind::U8 && p_fn.registers[p_in.b] == Kind::I32;
+		case Op::U8ToI32:
+			return p_fn.registers[p_in.a] == Kind::I32 && p_fn.registers[p_in.b] == Kind::U8;
+		case Op::U32ToU8:
+			return p_fn.registers[p_in.a] == Kind::U8 && p_fn.registers[p_in.b] == Kind::U32;
+		case Op::U8ToU32:
+			return p_fn.registers[p_in.a] == Kind::U32 && p_fn.registers[p_in.b] == Kind::U8;
+		case Op::I64ToF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::I64;
+		case Op::F64ToF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::F64;
+		case Op::F32ToF64:
+			return p_fn.registers[p_in.a] == Kind::F64 && p_fn.registers[p_in.b] == Kind::F32;
+		case Op::AddF32: case Op::SubF32: case Op::MulF32: case Op::DivF32: case Op::ModF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::F32 && p_fn.registers[p_in.c] == Kind::F32;
+		default:
+			break;
+	}
 	if (p_in.op == Op::FromAny) {
 		return type_check_valid(p_module, p_fn.registers[p_in.a], p_in.c);
 	}
@@ -109,7 +147,7 @@ bool function_valid(const Module &p_module, const Function &p_fn) {
 		}
 	}
 	for (const Handler &h : p_fn.handlers) {
-		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || any_is_code(h.type);
+		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || (h.type >= ANY_IS_INT && h.type <= ANY_IS_BOOLEAN);
 		if (h.start > h.end || h.end > p_fn.code.size() || h.target >= p_fn.code.size() || h.reg >= p_fn.registers.size() ||
 				!valid_type) {
 			return false;
@@ -119,6 +157,11 @@ bool function_valid(const Module &p_module, const Function &p_fn) {
 }
 
 bool class_valid(const Module &p_module, const Class &p_class) {
+	if (p_class.fixed_array() && (p_class.name.size() == 2 || p_class.element == Kind::Void || p_class.array ||
+			p_class.table || p_class.dictionary || p_class.is_interface || p_class.base != NONE || !p_class.fields.empty() ||
+			!p_class.methods.empty() || p_class.constructor != NONE)) {
+		return false;
+	}
 	const auto optional_fn = [&](uint32_t id) { return optional_index(id, p_module.functions.size()); };
 	const auto valid_fn = [&](uint32_t id) { return id < p_module.functions.size(); };
 	if (!optional_fn(p_class.constructor) || !optional_fn(p_class.static_init) || !optional_fn(p_class.to_string) ||

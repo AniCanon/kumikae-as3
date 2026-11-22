@@ -75,7 +75,7 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 		*r_value = share(Kind::Any, p_vector->properties->value_at(*at));
 		return true;
 	}
-	if (p_key.text == "fixed" && !klass.array) {
+	if (p_key.text == "fixed" && !klass.array && !klass.fixed_array()) {
 		Slot fixed;
 		fixed.bits = 0;
 		fixed.b = p_vector->fixed;
@@ -199,7 +199,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		const Vector *vector = static_cast<const Vector *>(object);
 		const bool element = p_key.index && *p_key.index < vector->length &&
 				(!klass->array || !any::is_hole(slots_of(vector)[*p_key.index]));
-		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
+		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed" && !klass->fixed_array()) ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (klass) {
 		// A getter or a setter is a property of the object as a field is (avmplus looks through the traits).

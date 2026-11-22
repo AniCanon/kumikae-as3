@@ -6,6 +6,12 @@
 // X(name, result, (parameters), (arguments)): the context is always first.
 #pragma once
 
+#include <cstdint>
+
+namespace kas3::ir {
+enum class Kind : uint8_t;
+}
+
 #define KAS3_RUNTIME_API(X) \
 	/* The library's functions of plain values (direct.h). */ \
 	X(text_call, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
@@ -106,7 +112,9 @@
 	X(math_pow, double, (Context *c, double p_base, double p_power), (c, p_base, p_power)) \
 	X(math_min, double, (Context *c, double p_a, double p_b), (c, p_a, p_b)) \
 	X(math_max, double, (Context *c, double p_a, double p_b), (c, p_a, p_b)) \
-	X(math_random, double, (Context *c), (c))
+	X(math_random, double, (Context *c), (c)) \
+	X(call_typed_value, bool, (Context *c, Object *p_function, Slot *p_arguments, uint32_t p_count, const ir::Kind *p_kinds, ir::Kind p_result, Slot *r_result), \
+			(c, p_function, p_arguments, p_count, p_kinds, p_result, r_result))
 
 namespace kas3 {
 namespace rt {

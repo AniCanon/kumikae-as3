@@ -6,7 +6,19 @@ tree that `src/` gives.
 
 **Depends on:** `src/` only. It includes no Godot header and nothing from `vm/`.
 
+Fixed-length arrays have distinct class names, including the element type (`[]int`, for example). They use the vector allocation, index and length instructions. Packed modules and generated programs retain that class identity.
+
+A float register has kind `F32`. Binary32 arithmetic and conversions have their own instructions.
+The kind and instructions follow the existing wire values, so earlier modules retain their encoding.
+Loading a module that uses float requires a runtime that recognizes the appended kind and instructions.
+
+A byte register has kind `U8`. The VM slot uses its unsigned integer member. Conversion to a byte
+keeps the low eight bits of an unsigned integer, and arithmetic widens it before operating.
+The byte kind and its integer conversions also use appended wire values.
+
 ## The IR
+
+`CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.
 
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,
   so values carry no tags.

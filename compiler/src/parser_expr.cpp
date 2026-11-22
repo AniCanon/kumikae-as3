@@ -178,7 +178,15 @@ Expr *Parser::parse_binary(int p_min_level) {
 			break;
 		}
 		advance();
-		Expr *right = parse_binary(level + 1);
+		Expr *right;
+		if ((op == TokenKind::KwIs || op == TokenKind::KwAs) && at(TokenKind::LBracket) && peek2().kind == TokenKind::RBracket) {
+			TypeApply *apply = node<TypeApply>(current_.offset);
+			apply->argument = parse_type();
+			right = finish(apply);
+			last_height_ = 1;
+		} else {
+			right = parse_binary(level + 1);
+		}
 		uint32_t taller = std::max(height, last_height_) + 1;
 		if (taller > MAX_CHAIN) {
 			report_too_long(right->offset);
@@ -281,7 +289,10 @@ Member *Parser::parse_member_link(Expr *p_object) {
 
 // A primary expression followed by any number of `.name`, `[index]`, `.<Type>` and, if allowed, `(args)`.
 Expr *Parser::parse_call_member(bool p_allow_calls) {
-	Expr *left = parse_primary();
+	return parse_member_tail(parse_primary(), p_allow_calls);
+}
+
+Expr *Parser::parse_member_tail(Expr *left, bool p_allow_calls) {
 	uint32_t height = last_height_;
 	for (;;) {
 		Expr *link = nullptr;
@@ -336,19 +347,41 @@ Expr *Parser::parse_new() {
 		return missing_expression();
 	}
 	Token keyword = advance();
-	// `new <int>[1, 2]` is a vector literal.
-	if (at(TokenKind::Less)) {
-		advance();
+	ArrayLit *size = at(TokenKind::LBracket) ? static_cast<ArrayLit *>(parse_array_literal()) : nullptr;
+	const bool fixed = size && !current_.newline_before && (at(TokenKind::Identifier) || at(TokenKind::Star) || at(TokenKind::KwVoid) ||
+			(at(TokenKind::LBracket) && peek2().kind == TokenKind::RBracket));
+	if (fixed || (!size && accept(TokenKind::Less))) {
 		VectorLit *vector = node<VectorLit>(keyword.offset);
-		vector->element_type = parse_type();
-		expect_type_close();
-		uint32_t height = 0;
+		uint32_t height = fixed ? last_height_ : 0;
+		vector->fixed_array = fixed;
+		if (fixed) {
+			TypeRef *array_type = node<TypeRef>(size->offset);
+			array_type->form = TypeRef::FixedArray;
+			array_type->argument = parse_type();
+			vector->element_type = finish(array_type);
+		} else {
+			vector->element_type = parse_type();
+		}
+		if (fixed && size->elements.count) {
+			if (size->elements.count != 1 || !size->elements[0]) {
+				error_at(size->offset, "a fixed array requires one length");
+			}
+			vector->length = size->elements[0];
+			grow(height + 1);
+			leave();
+			return finish(vector);
+		}
+		if (!fixed) {
+			expect_type_close();
+		}
+		TokenKind start = fixed ? TokenKind::LBrace : TokenKind::LBracket;
+		TokenKind end = fixed ? TokenKind::RBrace : TokenKind::RBracket;
 		std::vector<Expr *> elements;
-		if (at(TokenKind::LBracket)) {
+		if (at(start)) {
 			Token open = advance();
 			Restore allow_in(no_in_, false);
 			Restore brackets(bracket_ends_initializer_, false);
-			while (!at(TokenKind::RBracket) && !at(TokenKind::EndOfFile)) {
+			while (!at(end) && !at(TokenKind::EndOfFile)) {
 				uint32_t before = current_.offset;
 				elements.push_back(parse_assignment());
 				height = std::max(height, last_height_);
@@ -356,9 +389,9 @@ Expr *Parser::parse_new() {
 					break;
 				}
 			}
-			expect_close(TokenKind::RBracket, open);
+			expect_close(end, open);
 		} else {
-			error_expected("'['");
+			error_expected(fixed ? "'{'" : "'['");
 		}
 		vector->elements = to_list(elements);
 		grow(height + 1);
@@ -366,7 +399,7 @@ Expr *Parser::parse_new() {
 		return finish(vector);
 	}
 	New *create = node<New>(keyword.offset);
-	create->callee = parse_call_member(false);
+	create->callee = size ? parse_member_tail(size, false) : parse_call_member(false);
 	uint32_t height = last_height_;
 	if (at(TokenKind::LParen)) {
 		uint32_t arguments_height = 0;

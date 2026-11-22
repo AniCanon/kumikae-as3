@@ -169,7 +169,7 @@ class FunctionWriter {
 	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
 	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
 	bool reads_in_place(uint32_t p_register) const;
-	bool narrow_vector(uint32_t p_vector) const;
+	ir::Kind vector_storage(uint32_t p_vector) const;
 	void find_twice();
 	bool fast_vector(const ir::Instruction &p_in);
 	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.
@@ -255,6 +255,7 @@ class FunctionWriter {
 	// p_looks_first: the depth is looked at here, for a callee that may not count it itself. p_may_fail:
 	// an error is looked for afterwards.
 	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::vector<Target> &p_targets, bool p_looks_first, bool p_may_fail);
+	void call_typed(const ir::Instruction &p_in);
 	void call_through_table(const ir::Instruction &p_in);
 	// What the call at an instruction does, itself and through what it calls: the function called by its
 	// name, or every function a method table may hold there. Null where nothing is known (and while the

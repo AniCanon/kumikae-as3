@@ -175,7 +175,7 @@ std::string write_header(const ir::Module &p_module) {
 		const std::string name = class_name(p_module, i);
 		out += "struct " + name + " : " + (klass.base == NONE ? std::string("Object") : class_name(p_module, klass.base)) + " {\n";
 		for (size_t field = inherited; field < klass.fields.size(); field++) {
-			out += "\talignas(8) " + declared(klass.fields[field].kind, field_name(klass, static_cast<uint32_t>(field))) + ";\n";
+			out += "\talignas(8) " + declared(klass.fields[field].kind == Kind::F32 ? Kind::F64 : klass.fields[field].kind, field_name(klass, static_cast<uint32_t>(field))) + ";\n";
 		}
 		out += "};\nstatic_assert(sizeof(" + name + ") == sizeof(Object) + " + std::to_string(SLOT_BYTES * klass.fields.size()) +
 				", \"a field takes one slot, after the header\");\n\n";

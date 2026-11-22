@@ -36,6 +36,7 @@ class Reload {
 	Interpreter &to_;
 	std::unordered_map<std::string_view, uint32_t> classes_; // In the new program, by name.
 	std::unordered_map<std::string_view, uint32_t> functions_;
+	std::unordered_set<std::string_view> ambiguous_functions_;
 	std::unordered_map<Object *, Object *> moved_; // Each holds one reference to the new object.
 	std::string missing_;
 	std::vector<uint8_t> missing_classes_; // By class of the old program: an object of it had no place.
@@ -47,6 +48,8 @@ class Reload {
 	std::unordered_map<Object *, uint32_t> carried_;
 
 	// An object of the class has no place in the new program: said, and null.
+	uint32_t matching_closure(const ir::Function &p_before) const;
+	std::optional<uint32_t> callback_target(Object *p_old) const;
 	Object *lost(uint32_t p_old_class);
 	// A static field or package variable of the old program, and whether a class of it has had its static
 	// fields given their values: where the old program's code is native (vm/native_code.h), native code

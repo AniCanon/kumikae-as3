@@ -64,14 +64,20 @@ void Functions::make_environment(FunctionDecl *p_decl) {
 	std::sort(captured.begin(), captured.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->offset < p_b->offset; });
 	Class klass;
 	klass.name = l_.fn().name + "$environment";
-	klass.fields.push_back({ "$outer", Kind::Obj });
+	klass.fields.push_back({ "$outer", Kind::Obj, l_.chain_.empty() ? NONE : l_.chain_.front().klass });
 	if (keeps_this) {
 		l_.own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
-		klass.fields.push_back({ "$this", Kind::Obj });
+		klass.fields.push_back({ "$this", Kind::Obj, l_.fn().owner });
 	}
 	for (const Symbol *symbol : captured) {
 		l_.own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
-		klass.fields.push_back({ std::string(symbol->name), l_.kind_at(l_.locals_[symbol]) });
+		const uint32_t local = l_.locals_[symbol];
+		const Kind kind = l_.kind_at(local);
+		const bool declared = symbol->kind == SymbolKind::Local || (symbol->kind == SymbolKind::Parameter && !symbol->is_rest);
+		klass.fields.push_back({ symbol->name, kind, declared && kind == Kind::Obj ? l_.declared_class(symbol->type) : NONE });
+		if (is_engine(kind) && local < l_.fn().engine_types.size()) {
+			klass.fields.back().engine_type = l_.fn().engine_types[local];
+		}
 	}
 	l_.module_.classes.push_back(std::move(klass));
 	l_.own_layout_.klass = static_cast<uint32_t>(l_.module_.classes.size()) - 1;
@@ -231,6 +237,13 @@ void Functions::lower_pending_functions() {
 		FunctionDecl *decl = pending.decl;
 		l_.result_type_ = decl->return_type ? l_.compilation_.type_of(decl->return_type) : l_.compilation_.any_type();
 		Bodies(l_).parameters(decl);
+		if (!l_.chain_.empty()) {
+			auto &classes = l_.fn().parameter_classes;
+			if (classes.empty()) {
+				classes.resize(1);
+			}
+			classes[0] = l_.chain_.front().klass;
+		}
 		l_.fn().locals[0].name = "$environment";
 		l_.fn().result = decl->return_type ? l_.written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {

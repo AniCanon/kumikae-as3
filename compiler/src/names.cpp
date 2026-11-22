@@ -377,6 +377,10 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_in_block) {
 	p_symbol->package = p_unit.package;
 	p_symbol->file_private = !p_in_block;
+	if (p_unit.is_builtin && (p_symbol->name == "float" || p_symbol->name == "byte")) {
+		(p_symbol->name == "float" ? float_ : byte_) = p_symbol;
+		return;
+	}
 	auto &table = p_in_block ? p_unit.package->definitions : p_unit.helpers;
 	auto inserted = table.emplace(p_symbol->name, p_symbol);
 	if (!inserted.second && p_in_block) {

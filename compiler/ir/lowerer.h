@@ -32,6 +32,8 @@ class Lowerer {
 	Symbol *int_ = nullptr;
 	Symbol *uint_ = nullptr;
 	Symbol *int64_ = nullptr;
+	Symbol *byte_ = nullptr;
+	Symbol *float_ = nullptr;
 	Symbol *number_ = nullptr;
 	Symbol *math_ = nullptr;
 	Symbol *boolean_ = nullptr;
@@ -202,7 +204,7 @@ class Lowerer {
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
 	// Vectors: a Vector.<T>, or an Array (a vector of untyped elements with rules of its own). The class of
 	// a Vector.<T> is made the first time the type is met; nothing if its elements are of a kind not held.
-	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
+	bool is_vector(const Type *p_type) const { return p_type && (p_type->typed_sequence() || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// What an untyped value stored where p_type is declared is checked against (FromAny's third operand):
 	// nothing if the type can't be checked here.
@@ -279,6 +281,7 @@ class Lowerer {
 	uint32_t load(const Place &p_place, uint32_t p_position);
 
 	void store(const Place &p_place, uint32_t p_value, uint32_t p_position);
+	void store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value, bool p_engine = false);
 	void store_engine(const Place &p_place, uint32_t p_value, uint32_t p_position);
 
 	// The class a `new`, `is`, `as` or conversion names.

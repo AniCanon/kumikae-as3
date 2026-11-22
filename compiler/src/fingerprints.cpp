@@ -25,6 +25,9 @@ uint64_t resolved(const TypeRef *p_type) {
 	uint64_t hash = 1;
 	for (; p_type; p_type = p_type->argument) {
 		hash = mix(mix(hash, p_type->form), pointer(p_type->symbol));
+		for (TypeRef *parameter : p_type->parameters) {
+			hash = mix(hash, resolved(parameter));
+		}
 	}
 	return hash;
 }

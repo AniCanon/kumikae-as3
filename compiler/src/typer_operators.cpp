@@ -45,9 +45,9 @@ const Type *Typer::unary(Unary *p_unary) {
 			if (operand->kind == Type::Any) {
 				return any_; // A Number, or what Godot's own `-` gives for one of Godot's values, decided when it runs.
 			}
-			return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
+			return operand == int64_ || operand == float_ ? operand : (primitive(operand) ? number_ : unknown_);
 		case TokenKind::Plus:
-			return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
+			return operand == int64_ || operand == float_ ? operand : (primitive(operand) ? number_ : unknown_);
 		default:
 			return unknown_;
 	}
@@ -58,7 +58,7 @@ const Type *Typer::object_arithmetic(TokenKind p_op, const Type *p_left, const T
 	// by its valueOf() or its text: beside `+` a String or a Number, decided then; with `-`, `*`, `/`
 	// and `%` a Number.
 	const auto as3_object = [&](const Type *p_type) {
-		return !primitive(p_type) && (p_type->kind == Type::Vector ||
+		return !primitive(p_type) && (p_type->typed_sequence() ||
 				(p_type->kind == Type::Instance && p_type->symbol && p_type->symbol->unit && p_type->symbol->unit->source.path() != GODOT_DECLARATIONS_PATH));
 	};
 	if ((as3_object(p_left) || as3_object(p_right)) && (primitive(p_left) || as3_object(p_left)) && (primitive(p_right) || as3_object(p_right))) {
@@ -134,7 +134,7 @@ const Type *Typer::primitive_arithmetic(TokenKind p_op, const Type *p_left, cons
 			if (p_left->kind == Type::Any || p_right->kind == Type::Any) {
 				return any_; // A string or a number, decided when it runs.
 			}
-			return number_;
+			return p_left == float_ && p_right == float_ ? float_ : number_;
 		case TokenKind::Amp:
 		case TokenKind::Pipe:
 		case TokenKind::Caret:
@@ -161,7 +161,7 @@ const Type *Typer::primitive_arithmetic(TokenKind p_op, const Type *p_left, cons
 				// A Number, or what Godot's own operator gives for one of Godot's values, decided when it runs.
 				return any_;
 			}
-			return number_;
+			return p_left == float_ && p_right == float_ ? float_ : number_;
 		default:
 			// AS3 computes int + int as a Number; the wrap to 32 bits happens when it is stored in an int.
 			return number_;
@@ -202,6 +202,14 @@ const Type *Typer::binary(Binary *p_binary) {
 		right = int64_;
 	} else if (p_binary->op != TokenKind::Slash && right == int64_ && read_wide_literal(p_binary->left).state == WideLiteral::State::Fits) {
 		left = int64_;
+	}
+	if ((p_binary->op == TokenKind::KwIs || p_binary->op == TokenKind::KwAs) && right->kind == Type::ClassObject && right->element == byte_) {
+		error(p_binary->right->offset, "an untyped byte is an int; use 'byte(value)' to convert it");
+		return p_binary->op == TokenKind::KwIs ? boolean_ : unknown_;
+	}
+	if ((p_binary->op == TokenKind::KwIs || p_binary->op == TokenKind::KwAs) && right->kind == Type::ClassObject && right->element == float_) {
+		error(p_binary->right->offset, "an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it");
+		return p_binary->op == TokenKind::KwIs ? boolean_ : unknown_;
 	}
 	switch (p_binary->op) {
 		case TokenKind::Less:

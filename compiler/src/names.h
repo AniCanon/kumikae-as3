@@ -127,6 +127,8 @@ class Compilation {
 	Package *top_level_ = nullptr;
 	Symbol *object_ = nullptr;
 	Symbol *vector_ = nullptr;
+	Symbol *byte_ = nullptr;
+	Symbol *float_ = nullptr; // Offered only after ordinary AS3 lookup finds nothing.
 	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
 	std::unique_ptr<Tracking> tracking_; // Set by prepare(): what an incremental compilation keeps.
@@ -137,7 +139,9 @@ class Compilation {
 	size_t broken_files_ = 0;
 	std::deque<Type> types_;
 	std::unordered_map<const Symbol *, const Type *> instance_types_;
+	std::vector<const Type *> callback_types_;
 	std::unordered_map<const Type *, const Type *> vector_types_;
+	std::unordered_map<const Type *, const Type *> fixed_array_types_;
 	std::unordered_map<const Type *, const Type *> class_object_types_;
 	Type any_, void_, null_, unknown_;
 
@@ -243,7 +247,7 @@ public:
 	const Type *null_type() const { return &null_; }
 	const Type *unknown_type() const { return &unknown_; }
 	const Type *instance_type(Symbol *p_class); // Vector.<*> for the Vector class itself.
-	const Type *vector_type(const Type *p_element);
+	const Type *vector_type(const Type *p_element, bool p_fixed_array = false);
 	const Type *class_object_type(const Type *p_instance);
 	// The type a written type means. p_element is what `T` stands for inside Vector's declaration.
 	const Type *type_of(const TypeRef *p_type, const Type *p_element = nullptr);

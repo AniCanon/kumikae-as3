@@ -1,0 +1,1 @@
+vector_erased_iteration.as:5:13: error: converting an untyped value to an object here is not supported by the interpreter yet

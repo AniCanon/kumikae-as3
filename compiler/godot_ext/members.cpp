@@ -84,8 +84,16 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 	String hint_string;
 	int usage = p_exported ? PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE : PROPERTY_USAGE_SCRIPT_VARIABLE;
 	switch (p_kind) {
+		case ir::Kind::F32:
 		case ir::Kind::F64:
 			type = Variant::FLOAT;
+			break;
+		case ir::Kind::U8:
+			type = Variant::INT;
+			if (p_exported) {
+				hint = PROPERTY_HINT_RANGE;
+				hint_string = "0,255,1";
+			}
 			break;
 		case ir::Kind::I32:
 		case ir::Kind::U32:
@@ -482,7 +490,7 @@ bool field_default(uint32_t p_class, const StringName &p_name, Variant *r_value)
 	if (!field.exported || first.form == ir::Constant::Form::None) {
 		return false;
 	}
-	vm::Slot slot = vm::empty_value(field.kind == ir::Kind::F64, field.starts_null);
+	vm::Slot slot = vm::empty_value(field.kind == ir::Kind::F64 || field.kind == ir::Kind::F32, field.starts_null);
 	switch (first.form) {
 		case ir::Constant::Form::Empty:
 			break;
@@ -492,8 +500,12 @@ bool field_default(uint32_t p_class, const StringName &p_name, Variant *r_value)
 			slot.bits = 0;
 			if (field.kind == ir::Kind::F64) {
 				slot.d = first.number;
+			} else if (field.kind == ir::Kind::F32) {
+				slot.d = static_cast<float>(first.number);
 			} else if (field.kind == ir::Kind::I32) {
 				slot.i = vm::to_int32(first.number);
+			} else if (field.kind == ir::Kind::U8) {
+				slot.u = static_cast<uint8_t>(vm::to_uint32(first.number));
 			} else if (field.kind == ir::Kind::U32) {
 				slot.u = vm::to_uint32(first.number);
 			} else if (field.kind == ir::Kind::I64 && std::isfinite(first.number)) {

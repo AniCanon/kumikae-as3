@@ -96,7 +96,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			const Kind index = p_function.registers[p_in.b];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->length);
 			if (at && vector->narrow) {
-				numbers_of(vector)[*at] = r[p_in.c].i;
+				set_place(vector, *at, r[p_in.c]);
 			} else if (at && !vector->bare) {
 				put(kind, slots_of(vector)[*at], share(kind, r[p_in.c]));
 			} else {
@@ -114,7 +114,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			r[p_in.a] = of_bool(vector->fixed);
 			break;
 		case Op::VecSetFixed:
-			vector->fixed = r[p_in.b].b;
+			vector_set_fixed(library_, vector, r[p_in.b].b);
 			break;
 		default:
 			break;

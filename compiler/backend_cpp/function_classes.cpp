@@ -142,7 +142,7 @@ std::string FunctionWriter::field_of(uint32_t p_object, uint32_t p_slot, Kind p_
 			module_.classes[of].fields[p_slot].kind == p_kind) {
 		return "static_cast<" + class_name(module_, of) + " *>(" + reg(p_object) + ")->" + field_name(module_.classes[of], p_slot);
 	}
-	return "field<" + std::string(type_of(p_kind)) + ">(" + reg(p_object) + ", " + std::to_string(p_slot) + ")";
+	return "field<" + std::string(type_of(p_kind == Kind::F32 ? Kind::F64 : p_kind)) + ">(" + reg(p_object) + ", " + std::to_string(p_slot) + ")";
 }
 
 } // namespace backend_cpp

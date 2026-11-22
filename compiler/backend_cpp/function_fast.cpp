@@ -76,6 +76,16 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.c)) {
 				return false;
 			}
+			if (kind(p_in.a) == Kind::U8) {
+				line("if (uint8_t *const e = byte_element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+				line("\t" + reg(p_in.a) + " = *e;");
+				break;
+			}
+			if (kind(p_in.a) == Kind::F32) {
+				line("if (float *const e = float_element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+				line("\t" + reg(p_in.a) + " = *e;");
+				break;
+			}
 			if (whole(p_in.a)) {
 				// A vector of ints or of uints holds each in four bytes (runtime/fast.h, number()).
 				line("if (const int32_t *const e = number(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
@@ -90,6 +100,16 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.
 			if (!whole(p_in.b)) {
 				return false;
+			}
+			if (kind(p_in.c) == Kind::U8) {
+				line("if (uint8_t *const e = byte_element(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+				line("\t*e = " + reg(p_in.c) + ";");
+				break;
+			}
+			if (kind(p_in.c) == Kind::F32) {
+				line("if (float *const e = float_element(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+				line("\t*e = " + reg(p_in.c) + ";");
+				break;
 			}
 			if (whole(p_in.c)) {
 				line("if (int32_t *const e = number_to_write(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
@@ -111,6 +131,9 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			const std::string length = "static_cast<Vector *>(" + reg(list[0]) + ")->length";
+			if (kind(list[1]) == Kind::U8 || kind(list[1]) == Kind::F32) {
+				return false;
+			}
 			if (whole(list[1])) {
 				line("if (int32_t *const e = number_room(" + reg(list[0]) + ")) {");
 				line("\t*e = static_cast<int32_t>(" + reg(list[1]) + ");");

@@ -87,6 +87,52 @@ func _emits_said(from: int) -> void:
 		print("PROBE emits ", emits.rows[at][0], "=", emits.rows[at][1])
 
 
+func _float32(probe: Node2D) -> void:
+	var label := Label.new()
+	# Halfway values around 1 round to opposite even neighbors. Compare bytes to distinguish signed zeros.
+	var halfway := pow(2.0, -24)
+	var negative_zero := PackedByteArray([0, 0, 0, 128]).decode_float(0)
+	var stops := [0.0, negative_zero, 1.0 + halfway, 1.0 + 3.0 * halfway, pow(2.0, -149), INF, -INF]
+	probe.call("tabStops", label, stops)
+	print("PROBE float32 bits=", label.tab_stops.to_byte_array() == PackedFloat32Array(stops).to_byte_array())
+	probe.call("tabStops", label, [NAN])
+	print("PROBE float32 NaN=", label.tab_stops.size() == 1 and is_nan(label.tab_stops[0]))
+	probe.call("tabStops", label, [])
+	print("PROBE float32 empty=", label.tab_stops.is_empty())
+	probe.call("integerStops", label)
+	print("PROBE integer float32 bits=", label.tab_stops.to_byte_array() == PackedFloat32Array([-3, 16777217]).to_byte_array())
+	probe.call("floatStops", label, stops)
+	print("PROBE packed float bits=", label.tab_stops.to_byte_array() == PackedFloat32Array(stops).to_byte_array())
+	probe.call("floatStops", label, [NAN])
+	print("PROBE packed float NaN=", label.tab_stops.size() == 1 and is_nan(label.tab_stops[0]))
+	probe.call("floatStops", label, [])
+	print("PROBE packed float empty=", label.tab_stops.is_empty())
+	var rounded := float(PackedFloat32Array([1.0 + 3.0 * halfway])[0])
+	print("PROBE float from Godot number=", probe.call("floatEcho", 1.0 + 3.0 * halfway) == rounded)
+	print("PROBE float from Godot integer=", probe.call("floatEcho", 16777217) == 16777216.0)
+	print("PROBE float inspector default=", probe.get_script().get_property_default_value("singlePrecision") == 16777216.0
+			and probe.get("singlePrecision") == 16777216.0)
+	probe.set("singlePrecision", 1.0 + 3.0 * halfway)
+	print("PROBE float field from Godot=", probe.get("singlePrecision") == rounded)
+	label.free()
+
+
+func _bytes(probe: Node2D) -> void:
+	var buffer := StreamPeerBuffer.new()
+	probe.call("byteBuffer", buffer, [-1, 256, 8.75, NAN, INF, 255, 0])
+	print("PROBE packed byte values=", buffer.data_array == PackedByteArray([255, 0, 8, 0, 0, 255, 0]))
+	probe.call("byteBuffer", buffer, [])
+	print("PROBE packed byte empty=", buffer.data_array.is_empty())
+	print("PROBE byte from Godot integer=", probe.call("byteEcho", 255) == 255)
+	print("PROBE byte from Godot number=", probe.call("byteEcho", 42.0) == 42)
+	print("PROBE byte inspector default=", probe.get_script().get_property_default_value("singleByte") == 44
+			and probe.get("singleByte") == 44)
+	probe.set("singleByte", 19)
+	print("PROBE byte field from Godot=", probe.get("singleByte") == 19)
+	probe.set("singleByte", 256)
+	print("PROBE byte field rejects out of range=", probe.get("singleByte") == 19)
+
+
 func _initialize() -> void:
 	var probe := Node2D.new()
 	probe.set_script(load("res://Probe.as"))
@@ -115,6 +161,8 @@ func _initialize() -> void:
 	waiting = probe
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
+	_float32(probe)
+	_bytes(probe)
 	_enter()
 	_places()
 	_loops()

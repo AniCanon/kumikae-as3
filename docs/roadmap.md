@@ -22,16 +22,21 @@ state of the project changes.
 - **Parser, name resolution and type checking** for ActionScript 3, checked against about 190,000 lines of
   open-source AS3.
 - **Godot's whole API as typed AS3:** 1,036 classes, with operators on `Vector2` and the other math types,
-  and Godot's 64-bit integers as an `Int64` type.
+  Godot's 64-bit integers as `Int64`, and opt-in binary32 arithmetic with `float` and `Vector.<float>`.
 - **Every error has a file, a line and a column.**
 
 ### The language at run time
+
+- **Fixed-length typed arrays.** `[]T` supports allocation by length, list initialization, indexed reads and writes, and nominal runtime type checks.
+
+- **Typed callbacks** such as `(int)=>int` check scalar signatures and carry arguments and results in their declared register kinds.
 
 - **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`
   and `continue`.
 - **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.
 - **The standard library:** `String`, `Number`, `Math`, `JSON`, `Date`, `RegExp`, and the top-level
   functions.
+- **Opt-in `byte` and `Vector.<byte>`.** Byte vectors store one byte per element and copy directly to Godot's `PackedByteArray`.
 - **AS3's runtime errors,** with stack traces that name the `.as` file and line.
 
 ### Inside Godot

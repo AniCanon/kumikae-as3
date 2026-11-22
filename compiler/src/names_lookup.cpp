@@ -55,6 +55,10 @@ static void add_match(const Compilation &p_compilation, const Context &p_from, S
 // a library's `Object` is the library's.
 Found Compilation::lookup_package_level(const Context &p_from, std::string_view p_name) const {
 	Found found;
+	if (p_from.unit->is_builtin && (p_name == "float" || p_name == "byte")) {
+		found.first = builtin(p_name);
+		return found;
+	}
 	bool ordered = p_from.unit->is_declaration;
 	add_match(*this, p_from, find_in(p_from.unit->helpers, p_name), found);
 	add_match(*this, p_from, find_in(p_from.package->definitions, p_name), found);
@@ -86,6 +90,9 @@ Found Compilation::lookup_package_level(const Context &p_from, std::string_view 
 			}
 		}
 	}
+	if (!found.first && !found.hidden && !found.suppressed && (p_name == "float" || p_name == "byte")) {
+		found.first = builtin(p_name);
+	}
 	return found;
 }
 
@@ -105,6 +112,32 @@ std::string Compilation::ambiguous_message(std::string_view p_name, const Found 
 }
 
 Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
+	if (p_type && p_type->form == TypeRef::FixedArray) {
+		resolve_type(p_from, p_type->argument);
+		if (p_type->argument->form == TypeRef::Void || p_type->argument->form == TypeRef::Callback) {
+			p_from.unit->diagnostics.error(p_type->argument->offset, "a fixed array element must be a storable value type");
+		}
+		return nullptr;
+	}
+	if (p_type && p_type->form == TypeRef::Callback) {
+		auto component = [&](TypeRef *p_part, bool p_result) {
+			Symbol *symbol = resolve_type(p_from, p_part);
+			if (p_result && p_part->form == TypeRef::Void) {
+				return;
+			}
+			for (std::string_view name : { "int", "uint", "byte", "Int64", "float", "Number", "Boolean", "String" }) {
+				if (symbol && symbol == builtin(name)) {
+					return;
+				}
+			}
+			p_from.unit->diagnostics.error(p_part->offset, "a callback signature requires a scalar or String type; only the result can be void");
+		};
+		for (TypeRef *part : p_type->parameters) {
+			component(part, false);
+		}
+		component(p_type->argument, true);
+		return p_type->symbol = builtin("Function");
+	}
 	if (!p_type || p_type->form == TypeRef::Any || p_type->form == TypeRef::Void || p_type->name.count == 0) {
 		return nullptr;
 	}

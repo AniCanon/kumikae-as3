@@ -278,7 +278,7 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		if (klass.array) {
 			return set_entry(properties_of(p_vector), p_key, p_value);
 		}
-		if (p_key.text == "fixed") {
+		if (p_key.text == "fixed" && !klass.fixed_array()) {
 			p_vector->fixed = any::to_boolean(p_value);
 			return true;
 		}

@@ -63,13 +63,13 @@ uint32_t Operators::comparison(Binary *p_binary) {
 		l_.emit(with_equal ? Op::LeF64 : Op::LtF64, position, out, swap_sides ? zero : order, swap_sides ? order : zero);
 		return out;
 	}
-	if ((left_kind == Kind::I64 && right_kind == Kind::F64) || (left_kind == Kind::F64 && right_kind == Kind::I64)) {
+	if ((left_kind == Kind::I64 && is_floating(right_kind)) || (is_floating(left_kind) && right_kind == Kind::I64)) {
 		// Exactly: neither side is converted to the other's type.
 		uint32_t a = l_.settled(l_.expression(left, Kind::Void), right, position);
 		uint32_t b = l_.expression(right, Kind::Void);
 		bool wide_first = left_kind == Kind::I64;
 		uint32_t order = l_.reg(Kind::F64);
-		l_.emit(Op::CmpI64F64, position, order, wide_first ? a : b, wide_first ? b : a);
+		l_.emit(Op::CmpI64F64, position, order, wide_first ? a : b, l_.convert(wide_first ? b : a, Kind::F64, position));
 		uint32_t zero = l_.reg(Kind::F64);
 		l_.emit(Op::ConstF64, position, zero, l_.number(0));
 		// `order` places the Int64 against the Number. Not-a-number makes every comparison false.
@@ -135,7 +135,7 @@ uint32_t Operators::wide_equality(Binary *p_binary) {
 		uint32_t x = l_.settled(l_.expression(left, Kind::Void), right, position);
 		uint32_t y = l_.expression(right, Kind::Void);
 		uint32_t order = l_.reg(Kind::F64);
-		l_.emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
+		l_.emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, l_.convert(x_kind == Kind::I64 ? y : x, Kind::F64, position));
 		uint32_t zero = l_.reg(Kind::F64);
 		l_.emit(Op::ConstF64, position, zero, l_.number(0));
 		l_.emit(Op::EqF64, position, out, order, zero);

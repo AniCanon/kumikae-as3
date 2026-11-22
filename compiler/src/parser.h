@@ -137,6 +137,7 @@ private:
 	Expr *parse_postfix();
 	Member *parse_member_link(Expr *p_object);
 	Expr *parse_call_member(bool p_allow_calls);
+	Expr *parse_member_tail(Expr *left, bool p_allow_calls);
 	Expr *parse_parenthesized();
 	Expr *parse_primary();
 	Expr *parse_new();

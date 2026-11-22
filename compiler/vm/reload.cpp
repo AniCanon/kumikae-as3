@@ -20,7 +20,15 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 		classes_.emplace(fresh.classes[i].name, (uint32_t)i);
 	}
 	for (size_t i = 0; i < fresh.functions.size(); i++) {
-		functions_.emplace(fresh.functions[i].name, (uint32_t)i); // The first of a name: a getter before its setter.
+		if (!functions_.emplace(fresh.functions[i].name, static_cast<uint32_t>(i)).second) {
+			ambiguous_functions_.insert(fresh.functions[i].name);
+		}
+	}
+	std::unordered_set<std::string_view> prior_names;
+	for (const auto &prior : from_.module_.functions) {
+		if (!prior_names.insert(prior.name).second) {
+			ambiguous_functions_.insert(prior.name);
+		}
 	}
 	// The new program does not start over: what ran at the start of the old one has run.
 	to_.started_ = from_.started_;
@@ -126,6 +134,78 @@ Object *Reload::lost(uint32_t p_old_class) {
 	return nullptr;
 }
 
+// A Function holds a module-local index. Rebind by name and check that an instance method still has
+// its receiver, or that a closure still has every environment its new body expects.
+std::optional<uint32_t> Reload::callback_target(Object *p_old) const {
+	const uint32_t old = static_cast<uint32_t>(own_field(p_old, ir::FUNCTION_INDEX).i);
+	uint32_t target = function(old);
+	if (target == ir::NONE) {
+		return std::nullopt;
+	}
+	const ir::Function &before = from_.module_.functions[old];
+	if (ambiguous_functions_.count(before.name)) {
+		// Sibling anonymous expressions share their printed name. A source position alone can
+		// identify a different sibling after insertion. Require a matching body.
+		target = matching_closure(before);
+		if (target == ir::NONE) {
+			return std::nullopt;
+		}
+	}
+	const ir::Function &after = to_.module_.functions[target];
+	if (before.is_static != after.is_static || (before.owner == ir::NONE) != (after.owner == ir::NONE)) {
+		return std::nullopt;
+	}
+	if (!after.is_static && after.owner == ir::NONE) {
+		Object *environment = static_cast<Object *>(own_field(p_old, ir::FUNCTION_FIRST).p);
+		uint32_t expected = after.parameter_classes.empty() ? ir::NONE : after.parameter_classes[0];
+		while (expected != ir::NONE) {
+			const ir::Class &layout = to_.module_.classes[expected];
+			if (!environment || from_.module_.classes[environment->klass].name != layout.name || layout.fields.empty()) {
+				return std::nullopt;
+			}
+			const ir::Class &old_layout = from_.module_.classes[environment->klass];
+			if (classes_.at(old_layout.name) != expected || old_layout.fields.size() != layout.fields.size()) {
+				return std::nullopt;
+			}
+			for (size_t i = 0; i < layout.fields.size(); ++i) {
+				const ir::Field &prior = old_layout.fields[i], &current = layout.fields[i];
+				if (prior.name != current.name || prior.kind != current.kind || prior.engine_type != current.engine_type ||
+						(prior.klass == ir::NONE) != (current.klass == ir::NONE) ||
+						(prior.klass != ir::NONE && from_.module_.classes[prior.klass].name != to_.module_.classes[current.klass].name)) {
+					return std::nullopt;
+				}
+			}
+			environment = static_cast<Object *>(own_field(environment, 0).p);
+			expected = layout.fields[0].klass;
+		}
+	}
+	return target;
+}
+
+uint32_t Reload::matching_closure(const ir::Function &p_before) const {
+	if (p_before.file >= from_.module_.files.size() || p_before.code.empty() || p_before.code.front().op == ir::Op::Native) {
+		return ir::NONE;
+	}
+	const std::string body = ir::print(from_.module_, p_before);
+	const std::string &file = from_.module_.files[p_before.file];
+	uint32_t target = ir::NONE;
+	size_t matches = 0, old_matches = 0;
+	for (const ir::Function &prior : from_.module_.functions) {
+		if (prior.name == p_before.name && prior.file == p_before.file && ir::print(from_.module_, prior) == body) {
+			++old_matches;
+		}
+	}
+	for (uint32_t i = 0; i < to_.module_.functions.size(); ++i) {
+		const ir::Function &candidate = to_.module_.functions[i];
+		if (candidate.name == p_before.name && candidate.file < to_.module_.files.size() &&
+				to_.module_.files[candidate.file] == file && ir::print(to_.module_, candidate) == body) {
+			++matches;
+			target = i;
+		}
+	}
+	return matches == 1 && old_matches == 1 ? target : ir::NONE;
+}
+
 Object *Reload::object(Object *p_old) {
 	if (!p_old) {
 		return nullptr;
@@ -168,6 +248,13 @@ Object *Reload::object(Object *p_old) {
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
+	std::optional<uint32_t> callback;
+	if (p_old->klass == from_.module_.function_class) {
+		callback = callback_target(p_old);
+		if (!callback) {
+			return lost(p_old->klass);
+		}
+	}
 	Object *fresh = new_object(named->second, to_.heap_.object_slots(named->second), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
@@ -176,6 +263,9 @@ Object *Reload::object(Object *p_old) {
 	moved_.emplace(p_old, fresh);
 	retain(fresh);
 	carry_fields(p_old, fresh);
+	if (callback) {
+		own_field(fresh, ir::FUNCTION_INDEX).i = static_cast<int32_t>(*callback);
+	}
 	carry_record(p_old, fresh);
 	return fresh;
 }
@@ -224,7 +314,7 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 	for (size_t i = 0; i < new_class.fields.size(); i++) {
 		const ir::Field &field = new_class.fields[i];
 		if (named[i] == ir::NONE) {
-			vm::field(new_class, p_fresh, i) = empty_value(field.kind == Kind::F64, field.starts_null);
+			vm::field(new_class, p_fresh, i) = empty_value(ir::is_floating(field.kind), field.starts_null);
 		} else if (old_class.fields[named[i]].kind == field.kind) {
 			vm::field(new_class, p_fresh, i) = carry_into(field.kind, field.klass, field.engine_type, vm::field(old_class, p_old, named[i]));
 		}
@@ -288,7 +378,7 @@ void Reload::constants_again(const std::string &p_class) {
 	for (size_t i = 0; i < globals.size() && i < to_.globals_.size(); i++) {
 		if (own(globals[i]) && !globals[i].is_const) {
 			kept.emplace_back(i, to_.globals_[i]);
-			to_.globals_[i] = empty_value(globals[i].kind == Kind::F64, globals[i].starts_null);
+			to_.globals_[i] = empty_value(ir::is_floating(globals[i].kind), globals[i].starts_null);
 		}
 	}
 	(void)to_.call(klass.static_init, nullptr, 0); // An error in it is reported as on the class's first use.
@@ -343,31 +433,73 @@ std::vector<uint8_t> Reload::reached(const Interpreter &p_program, const std::ve
 	return classes;
 }
 
+namespace {
+
+bool library_container(const ir::Class &p_class) {
+	return (p_class.element != Kind::Void || p_class.table) && p_class.fields.empty() && p_class.methods.empty() &&
+			p_class.base == ir::NONE && p_class.constructor == ir::NONE;
+}
+
+uint32_t keep_engine_type(const ir::EngineName &p_type, ir::Module &p_new) {
+	for (uint32_t i = 0; i < p_new.engine_names.size(); ++i) {
+		if (p_new.engine_names[i].key == p_type.key) {
+			return i;
+		}
+	}
+	p_new.engine_names.push_back(p_type);
+	return static_cast<uint32_t>(p_new.engine_names.size() - 1);
+}
+
+} // namespace
+
 bool Reload::keep_containers(const ir::Module &p_old, const std::vector<uint8_t> &p_live, ir::Module *r_new) {
-	std::unordered_set<std::string> named;
-	for (const ir::Class &klass : r_new->classes) {
-		named.insert(klass.name);
+	std::unordered_map<std::string, uint32_t> named;
+	for (uint32_t i = 0; i < r_new->classes.size(); ++i) {
+		named.emplace(r_new->classes[i].name, i);
 	}
-	bool added = false;
-	for (size_t i = 0; i < p_old.classes.size() && i < p_live.size(); i++) {
-		const ir::Class &klass = p_old.classes[i];
-		// A container of the library: a name and what its elements are, with no code of its own to move.
-		const bool container = (klass.element != Kind::Void || klass.table) && klass.fields.empty() && klass.methods.empty() &&
-				klass.base == ir::NONE && klass.constructor == ir::NONE;
-		if (!p_live[i] || !container || named.count(klass.name)) {
-			continue;
-		}
-		const uint32_t index = static_cast<uint32_t>(r_new->classes.size());
-		r_new->classes.push_back(klass);
-		added = true;
-		uint32_t *kept = klass.array ? &r_new->array_class : klass.dictionary ? &r_new->dictionary_class
-				: klass.table													 ? &r_new->object_class
-																				 : nullptr;
-		if (kept && *kept == ir::NONE) {
-			*kept = index;
+	std::vector<uint8_t> needed(p_old.classes.size());
+	std::vector<uint32_t> pending;
+	for (uint32_t i = 0; i < p_live.size() && i < needed.size(); ++i) {
+		// An empty nested collection still checks the type of a future write.
+		uint32_t id = i;
+		while (p_live[i] && id < needed.size() && !needed[id] && library_container(p_old.classes[id])) {
+			needed[id] = 1;
+			pending.push_back(id);
+			const ir::Class &klass = p_old.classes[id];
+			id = klass.element == Kind::Obj ? klass.element_check : ir::NONE;
 		}
 	}
-	return added;
+	const size_t initial = named.size();
+	size_t previous;
+	do {
+		previous = named.size();
+		for (uint32_t id : pending) {
+			const ir::Class &klass = p_old.classes[id];
+			if (named.count(klass.name)) {
+				continue;
+			}
+			uint32_t check = klass.element_check;
+			if (klass.element == Kind::Obj && check != ir::NONE) {
+				const auto target = named.find(p_old.classes[check].name);
+				if (target == named.end()) {
+					continue; // A missing script class cannot be recreated. A nested container may be added this round.
+				}
+				check = target->second;
+			} else if (ir::is_engine(klass.element) && check != ir::NONE) {
+				check = keep_engine_type(p_old.engine_names[check], *r_new);
+			}
+			const uint32_t index = static_cast<uint32_t>(r_new->classes.size());
+			named.emplace(klass.name, index);
+			r_new->classes.push_back(klass);
+			r_new->classes.back().element_check = check;
+			uint32_t *known = klass.array ? &r_new->array_class : klass.dictionary ? &r_new->dictionary_class
+					: klass.table ? &r_new->object_class : nullptr;
+			if (known && *known == ir::NONE) {
+				*known = index;
+			}
+		}
+	} while (named.size() != previous);
+	return named.size() != initial;
 }
 
 uint32_t Reload::function(uint32_t p_old) const {

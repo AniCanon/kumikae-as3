@@ -25,7 +25,7 @@ std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 
 // An index of any kind a register may declare for it, as a Number: what an error about it says.
 double index_number(Kind p_kind, Slot p_index) {
-	return p_kind == Kind::I32 ? p_index.i : p_kind == Kind::U32 ? static_cast<double>(p_index.u) : p_index.d;
+	return p_kind == Kind::I32 ? p_index.i : (p_kind == Kind::U32 || p_kind == Kind::U8) ? static_cast<double>(p_index.u) : p_index.d;
 }
 
 } // namespace
@@ -34,7 +34,7 @@ std::optional<uint32_t> element_index(Kind p_kind, Slot p_index, uint32_t p_limi
 	if (p_kind == Kind::I32) {
 		return p_index.i >= 0 && static_cast<uint32_t>(p_index.i) < p_limit ? std::optional<uint32_t>(static_cast<uint32_t>(p_index.i)) : std::nullopt;
 	}
-	if (p_kind == Kind::U32) {
+	if (p_kind == Kind::U32 || p_kind == Kind::U8) {
 		return p_index.u < p_limit ? std::optional<uint32_t>(p_index.u) : std::nullopt;
 	}
 	return element_index(p_index.d, p_limit);
@@ -43,6 +43,14 @@ std::optional<uint32_t> element_index(Kind p_kind, Slot p_index, uint32_t p_limi
 void raise_range(Library &p_library, double p_index, uint32_t p_length) {
 	p_library.runner.raise(p_library.module().range_error_class,
 			"Error #1125: The index " + number_to_string(p_index) + " is out of range " + std::to_string(p_length) + ".");
+}
+
+void vector_set_fixed(Library &p_library, Vector *p_vector, bool p_fixed) {
+	if (p_library.class_of(p_vector).fixed_array()) {
+		p_library.runner.raise(p_library.module().reference_error_class, "Error #1074: A fixed array always has a fixed length.");
+		return;
+	}
+	p_vector->fixed = p_fixed;
 }
 
 bool length_is_fixed(Library &p_library, const Vector *p_vector) {
@@ -179,7 +187,7 @@ bool place_for(Library &p_library, const ir::Class &p_class, Slot p_value, Slot 
 
 bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_value) {
 	if (p_vector->narrow) {
-		numbers_of(p_vector)[p_index] = p_value.i; // The number itself: nothing is counted.
+		set_place(p_vector, p_index, p_value); // The number itself: nothing is counted.
 		return true;
 	}
 	const ir::Class &klass = p_library.class_of(p_vector);
@@ -195,7 +203,7 @@ bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot 
 bool put_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_owned) {
 	const ir::Class &klass = p_library.class_of(p_vector);
 	if (p_vector->narrow) {
-		numbers_of(p_vector)[p_index] = p_owned.i;
+		set_place(p_vector, p_index, p_owned);
 		return true;
 	}
 	if (klass.element_bare == ir::Bare::None) {

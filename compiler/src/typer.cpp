@@ -54,15 +54,17 @@ void Typer::for_in(ForIn *p_loop) {
 		// Over one of Godot's collections that says what it holds: each element is stored in the
 		// variable as an assignment stores it, and checked as one is.
 		const Described *rules = described(collection);
-		if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
+		const Type *variable = p_loop->declaration && p_loop->declaration->declarators.count == 1
+				? compilation_.type_of(p_loop->declaration->declarators[0].type)
+				: p_loop->target ? p_loop->target->type : nullptr;
+		if (collection->typed_sequence() && (collection->contains_fixed_array() || (variable && variable->contains_fixed_array()))) {
+			p_loop->element = collection->element;
+		} else if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
 			p_loop->element = rules->element;
-			const Type *variable = p_loop->declaration && p_loop->declaration->declarators.count == 1
-					? compilation_.type_of(p_loop->declaration->declarators[0].type)
-					: p_loop->target ? p_loop->target->type : nullptr;
-			if (variable && fits(p_loop->element, variable) != Fit::Yes) {
-				error(p_loop->collection->offset, "can't use a value of type " + quoted(compilation_.type_name(p_loop->element)) +
-														" where " + quoted(compilation_.type_name(variable)) + " is expected");
-			}
+		}
+		if (p_loop->element && variable && fits(p_loop->element, variable) != Fit::Yes) {
+			error(p_loop->collection->offset, "can't use a value of type " + quoted(compilation_.type_name(p_loop->element)) +
+					" where " + quoted(compilation_.type_name(variable)) + " is expected");
 		}
 	}
 	statement(p_loop->body);
@@ -248,6 +250,8 @@ Typer::Typer(Compilation &p_compilation, Unit &p_unit) :
 	unknown_ = compilation_.unknown_type();
 	int_ = builtin("int");
 	uint_ = builtin("uint");
+	byte_ = builtin("byte");
+	float_ = builtin("float");
 	number_ = builtin("Number");
 	int64_ = builtin("Int64");
 	boolean_ = builtin("Boolean");

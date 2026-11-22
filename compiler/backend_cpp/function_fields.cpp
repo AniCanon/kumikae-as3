@@ -110,8 +110,8 @@ std::optional<std::string> FunctionWriter::kept_local(uint32_t p_object, uint32_
 
 std::string FunctionWriter::kept_declared() const {
 	std::string out;
-	const ir::Class &klass = module_.classes[function_.owner == NONE ? 0 : function_.owner];
 	for (const Kept &each : kept_) {
+		const ir::Class &klass = module_.classes[function_.owner];
 		out += "\t" + declared(klass.fields[each.slot].kind, "k" + std::to_string(each.slot)) + " = " + own_field(each.slot) + ";\n";
 	}
 	return out;

@@ -74,7 +74,7 @@ const ir::LibraryMethod *LibraryCall::find(const Interpreter &p_vm, Slot p_holde
 		on = ir::ON_TEXT;
 	} else if (const Object *object = p_vm.held_object(p_holder)) {
 		const ir::Class &klass = p_vm.module_.classes[object->klass];
-		on = klass.array ? ir::ON_ARRAY : klass.element != Kind::Void ? ir::ON_VECTOR : object->klass == p_vm.module_.function_class ? ir::ON_FUNCTION : 0;
+		on = klass.array ? ir::ON_ARRAY : klass.element != Kind::Void && !klass.fixed_array() ? ir::ON_VECTOR : object->klass == p_vm.module_.function_class ? ir::ON_FUNCTION : 0;
 	}
 	return on ? ir::library_method(p_name, on) : nullptr;
 }

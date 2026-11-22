@@ -109,6 +109,9 @@ public:
 	// A written type and its type arguments (`Vector.<Particle>`): each name is looked up.
 	void type_ref(const TypeRef *p_type) {
 		for (; p_type; p_type = p_type->argument) {
+			for (TypeRef *parameter : p_type->parameters) {
+				type_ref(parameter);
+			}
 			if (p_type->name.count) {
 				push(on_name(p_type->name[p_type->name.count - 1]));
 				symbol(p_type->symbol);

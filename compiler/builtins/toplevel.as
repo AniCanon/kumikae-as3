@@ -117,6 +117,34 @@ package {
 		public native function valueOf():Int64;
 	}
 
+	/** An unsigned eight-bit integer. Numeric stores keep the low eight bits. */
+	public final native class byte {
+		public native function byte(num:Object = 0);
+		public native function toExponential(fractionDigits:uint = 0):String;
+		/** Formats the number with the requested number of digits after the decimal point. */
+		public native function toFixed(fractionDigits:uint = 0):String;
+		/** Formats the number to the requested number of significant digits. */
+		public native function toPrecision(precision:uint = 0):String;
+		/** Formats the number in the given radix, from 2 through 36. */
+		public native function toString(radix:uint = 10):String;
+		/** Returns the underlying value. */
+		public native function valueOf():byte;
+	}
+
+	/** An IEEE 754 single-precision floating-point number. */
+	public final native class float {
+		public native function float(num:Object = 0);
+		public native function toExponential(fractionDigits:uint = 0):String;
+		/** Formats the number with the requested number of digits after the decimal point. */
+		public native function toFixed(fractionDigits:uint = 0):String;
+		/** Formats the number to the requested number of significant digits. */
+		public native function toPrecision(precision:uint = 0):String;
+		/** Formats the number in the given radix, from 2 through 36. */
+		public native function toString(radix:uint = 10):String;
+		/** Returns the underlying value. */
+		public native function valueOf():float;
+	}
+
 	/** A double-precision floating-point number. */
 	public final native class Number {
 		/** The largest finite Number value. */

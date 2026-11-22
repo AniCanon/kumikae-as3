@@ -168,6 +168,7 @@ static void test_completion() {
 
 static void test_completion_scopes_and_context() {
 	CHECK(complete("package { public class Player { public var point:Vec|; } }").has("Vector2"));
+	CHECK(complete("package { public class Player { public var speed:fl|; } }").has("float"));
 	CHECK(complete("package { import godot.*; public class Player extends Node2D { override function _ph| } }").has("_physicsProcess"));
 	for (const char *body : { "var first:int, second: /* type */ |;", "try {} catch (problem: |) {}", "var items:Vector.<|>;" }) {
 		const Offered types = complete(player(body));

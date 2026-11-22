@@ -433,8 +433,9 @@ void Typer::export_field(VarDecl *p_decl) {
 		}
 		// Godot's inspector is told the first value, so it is a constant: `new` makes one only of Godot's values.
 		const Expr *first = declarator.initializer;
-		if (!first && type == number_) {
-			error(declarator.offset, quoted(declarator.name) + " is an [Export] Number, so its first value is written: a Number " +
+		if (!first && (type == number_ || type == float_)) {
+			const std::string name = compilation_.type_name(type);
+			error(declarator.offset, quoted(declarator.name) + " is an [Export] " + name + ", so its first value is written: a " + name + " " +
 					"starts as NaN, which Godot's inspector can't show");
 		}
 		if (first && (!export_constant(first) || (first->kind == NodeKind::New && !godot_value(first->type)))) {

@@ -190,7 +190,7 @@ void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	}
 	// From an empty vector: undefined, made the element type, as AVM2 does: NaN for a Number, 0 for the
 	// other numbers, false, null for the rest, and undefined itself for untyped elements.
-	Slot element = empty_value(kind == Kind::F64, false);
+	Slot element = empty_value(ir::is_floating(kind), false);
 	if (length != 0) {
 		// A hole taken out is undefined, as any read of one is. A value the place held whole leaves as a handle;
 		// any other takes the place's own reference with it.
@@ -342,7 +342,11 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_find(p_library, vector, call);
 			break;
 		case VectorMethod::Reverse:
-			if (vector->narrow) {
+			if (vector->bytes) {
+				std::reverse(bytes_of(vector), bytes_of(vector) + vector->length);
+			} else if (vector->floating) {
+				std::reverse(floats_of(vector), floats_of(vector) + vector->length);
+			} else if (vector->narrow) {
 				std::reverse(numbers_of(vector), numbers_of(vector) + vector->length);
 			} else {
 				std::reverse(slots_of(vector), slots_of(vector) + vector->length);

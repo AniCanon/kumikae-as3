@@ -162,6 +162,15 @@ const Type *Typer::member_type(const Type *p_object, Member *p_member) {
 			return unknown_;
 		case Type::ClassObject:
 			return static_member_type(p_object, p_member);
+		case Type::Callback:
+			error(p_member->name_offset, "store the callback in a Function to use its members");
+			return unknown_;
+		case Type::FixedArray:
+			if (p_member->name == "length") {
+				return uint_;
+			}
+			error(p_member->name_offset, quoted(compilation_.type_name(p_object)) + " has no member " + quoted(p_member->name));
+			return unknown_;
 		case Type::Instance:
 		case Type::Vector: {
 			bool vector = p_object->kind == Type::Vector;

@@ -10,7 +10,7 @@ namespace ir {
 namespace {
 
 constexpr uint8_t MAGIC[4] = { 'K', 'A', 'S', '3' };
-constexpr uint8_t KIND_MAX = static_cast<uint8_t>(Kind::Any);
+constexpr uint8_t KIND_MAX = static_cast<uint8_t>(Kind::U8);
 constexpr uint8_t BARE_MAX = static_cast<uint8_t>(Bare::Vector2i);
 constexpr uint8_t FORM_MAX = static_cast<uint8_t>(Constant::Form::Value);
 constexpr uint8_t OP_MAX = OP_COUNT - 1;

@@ -38,7 +38,7 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 		inner = module_.classes[*vector_class(p_type->element)].name;
 	}
 	Class klass;
-	klass.name = "Vector.<" + inner + ">";
+	klass.name = p_type->kind == Type::FixedArray ? "[]" + inner : "Vector.<" + inner + ">";
 	klass.element = element;
 	klass.element_check = check_for(p_type->element, element).value_or(NONE); // Before the class is added: it may add others.
 	if (element == Kind::Val && of && is_godot(of)) {
@@ -61,7 +61,7 @@ uint32_t Lowerer::declared_class(TypeRef *p_type) {
 		return vector_class(type).value_or(NONE);
 	}
 	uint32_t index = NONE;
-	if (type && type->kind == Type::Instance && class_index(type->symbol, &index)) {
+	if (type && (type->kind == Type::Instance || type->kind == Type::Callback) && class_index(type->symbol, &index)) {
 		return index; // A class of the program, or Function or an Error class, made when first named.
 	}
 	return NONE;
@@ -106,7 +106,23 @@ uint32_t Vectors::vector_literal(Expr *p_literal, const List<Expr *> &p_elements
 	}
 	// Made empty, then filled in order: each element is worked out after the ones before it are stored.
 	const uint32_t out = l_.reg(Kind::Obj);
-	l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ l_.default_value(Kind::U32, position), l_.default_value(Kind::Bool, position) }));
+	uint32_t length;
+	if (p_literal->type->kind == Type::FixedArray) {
+		Expr *written = static_cast<VectorLit *>(p_literal)->length;
+		if (written) {
+			// Check the whole number before narrowing it: an invalid length must never wrap to a smaller array.
+			Kind kind = Kind::Void;
+			l_.value_kind(written, &kind);
+			length = kind == Kind::U32 || kind == Kind::U8 ? l_.expression(written, Kind::U32)
+					: l_.convert(l_.expression(written, Kind::I64), Kind::U32, written->offset);
+		} else {
+			length = l_.reg(Kind::U32);
+			l_.emit(Op::ConstU32, position, length, p_elements.count);
+		}
+	} else {
+		length = l_.default_value(Kind::U32, position);
+	}
+	l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ length, l_.default_value(Kind::Bool, position) }));
 	uint32_t at = 0;
 	for (Expr *element : p_elements) {
 		// A hole in an Array's, `[1,,2]`, is undefined.
@@ -169,6 +185,16 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	return place;
 }
 
+void Lowerer::store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value, bool p_engine) {
+	const Type *declared = p_loop->declaration && p_loop->declaration->declarators.count == 1
+			? compilation_.type_of(p_loop->declaration->declarators[0].type)
+			: p_loop->target ? p_loop->target->type : nullptr;
+	const bool checked = kind_at(p_value) == Kind::Any && declared && p_target.kind != Kind::Any &&
+			(p_engine || p_loop->collection->type->contains_fixed_array() || declared->contains_fixed_array());
+	store(p_target, checked ? from_untyped(p_value, declared, p_target.kind, p_loop->offset)
+			: convert(p_value, p_target.kind, p_loop->offset), p_loop->offset);
+}
+
 // for each (x in vector) and for (i in vector): the elements, or their indices, first to last. The length
 // is read again each time round, as in Flash: an element added inside the loop is reached. An Array's
 // indices are Strings, as its keys are in AS3, and an element that is undefined is passed over: an Array
@@ -216,7 +242,7 @@ void Vectors::vector_loop(ForIn *p_loop) {
 			hole = l_.emit(Op::JumpIf, position, is_missing, 0);
 		}
 	}
-	l_.store(target, l_.convert(value, target.kind, position), position);
+	l_.store_iteration(target, p_loop, value);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();
@@ -247,13 +273,10 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		return;
 	}
 	Place target;
-	const Type *declared = nullptr;
 	if (p_loop->declaration && p_loop->declaration->declarators.count == 1) {
 		target = l_.place_of_symbol(p_loop->declaration->declarators[0].symbol, 0, p_loop->declaration->declarators[0].offset);
-		declared = p_loop->declaration->declarators[0].type ? l_.compilation_.type_of(p_loop->declaration->declarators[0].type) : nullptr;
 	} else if (p_loop->target) {
 		target = l_.place_of(p_loop->target);
-		declared = p_loop->target->type;
 	} else {
 		l_.refuse(position, "this loop variable");
 		return;
@@ -289,9 +312,8 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		value = p_loop->element ? l_.engine_reg(element, p_loop->element) : l_.reg(Kind::Any);
 		l_.emit(Op::HostIndexGet, position, value, collection, key);
 	}
-	// An untyped element is stored as an assignment stores it: checked against what the variable is declared.
-	const bool checked = l_.kind_at(value) == Kind::Any && declared && target.kind != Kind::Any;
-	l_.store(target, checked ? l_.from_untyped(value, declared, target.kind, position) : l_.convert(value, target.kind, position), position);
+	// An untyped engine element is checked against the declared loop variable.
+	l_.store_iteration(target, p_loop, value, true);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();

@@ -136,6 +136,7 @@ void Resolver::literal(Expr *p_expression) {
 			break;
 		case NodeKind::VectorLit:
 			type(static_cast<VectorLit *>(p_expression)->element_type);
+			expression(static_cast<VectorLit *>(p_expression)->length);
 			expressions(static_cast<VectorLit *>(p_expression)->elements);
 			break;
 		default:

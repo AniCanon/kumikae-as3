@@ -30,6 +30,9 @@ void walk(Node *p_node, F &&p_visit) {
 	};
 	switch (p_node->kind) {
 		case NodeKind::TypeRef:
+			for (TypeRef *part : static_cast<TypeRef *>(p_node)->parameters) {
+				walk(part, p_visit);
+			}
 			walk(static_cast<TypeRef *>(p_node)->argument, p_visit);
 			break;
 		case NodeKind::NumberLit:
@@ -55,6 +58,7 @@ void walk(Node *p_node, F &&p_visit) {
 			break;
 		case NodeKind::VectorLit:
 			walk(static_cast<VectorLit *>(p_node)->element_type, p_visit);
+			walk(static_cast<VectorLit *>(p_node)->length, p_visit);
 			each(static_cast<VectorLit *>(p_node)->elements);
 			break;
 		case NodeKind::FunctionExpr:

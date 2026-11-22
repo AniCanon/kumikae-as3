@@ -11,6 +11,9 @@ package dev.kumikae.coindash.entities {
         private static const DASH_SPEED:Number = 780;
         private static const AIM_DEAD_ZONE:Number = 0.1;
         private static const BLINK_RATE:Number = 12;
+        private static const POSES:[][]Rect2 = new [][]Rect2 {
+            makePose(1, 0), makePose(1, 1), makePose(-1, 0), makePose(-1, 1)
+        };
 
         private var heading:Vector2 = Vector2.RIGHT;
         private var dashHeading:Vector2 = Vector2.RIGHT;
@@ -18,6 +21,8 @@ package dev.kumikae.coindash.entities {
         private var blinking:Boolean = false;
         private var step:Number = 0;
         private var facing:int = 1;
+        private var poseIndex:int = 0;
+        private var drawnPose:int = -1;
 
         public function resetAt(dock:Vector2):void {
             position = dock;
@@ -55,7 +60,10 @@ package dev.kumikae.coindash.entities {
                 facing = -1;
             }
             step += delta * (velocity.length() > 20 ? 16 : 3);
-            queueRedraw();
+            poseIndex = (facing > 0 ? 0 : 2) + (sin(step) > 0 ? 1 : 0);
+            if (dashing || poseIndex != drawnPose) {
+                queueRedraw();
+            }
         }
 
         private function setBlinking(next:Boolean):void {
@@ -66,32 +74,53 @@ package dev.kumikae.coindash.entities {
             modulate = blinking ? Palette.PLAYER_GRACE : Color.WHITE;
         }
 
-        private function pixel(x:Number, y:Number, w:Number, h:Number, color:Color):void {
-            drawRect(new Rect2(facing > 0 ? x : -x - w, y, w, h), color);
+        private static function pixel(direction:int, x:int, y:int, w:int, h:int):Rect2 {
+            return new Rect2(direction > 0 ? x : -x - w, y, w, h);
+        }
+
+        private static function makePose(direction:int, lift:int):[]Rect2 {
+            return new []Rect2 {
+                pixel(direction, -10, -21 + lift, 17, 4),
+                pixel(direction, -13, -17 + lift, 24, 14),
+                pixel(direction, -11, -17 + lift, 20, 9),
+                pixel(direction, -8, -20 + lift, 14, 5),
+                pixel(direction, -2, -15 + lift, 14, 7),
+                pixel(direction, 1, -14 + lift, 10, 3),
+                pixel(direction, -10, -5, 18, 13),
+                pixel(direction, -7, -4, 12, 10),
+                pixel(direction, -8, -5, 16, 4),
+                pixel(direction, -15, -5 + lift, 8, 3),
+                pixel(direction, -20, -7 + lift * 2, 6, 3),
+                pixel(direction, -12, 0, 5, 6),
+                pixel(direction, -8 - lift * 2, 7 - lift, 7, 5),
+                pixel(direction, 2 + lift * 2, 6 + lift, 7, 5)
+            };
         }
 
         override public function _draw():void {
-            var lift:int = sin(step) > 0 ? 1 : 0;
+            // Dash trails depend on velocity. Redraw once more after a dash to clear the trail.
+            drawnPose = dashing ? -1 : poseIndex;
             drawRect(new Rect2(-12, 10, 24, 4), Palette.PLAYER_SHADOW);
             if (dashing && velocity.length() > 0) {
                 var tail:Vector2 = velocity.normalized() * -36;
                 drawLine(tail, Vector2.ZERO, Palette.PLAYER_SUIT, 7);
                 drawLine(tail * 0.75, Vector2.ZERO, Palette.PLAYER_LIGHT, 3);
             }
-            pixel(-10, -21 + lift, 17, 4, Palette.PLAYER_INK);
-            pixel(-13, -17 + lift, 24, 14, Palette.PLAYER_INK);
-            pixel(-11, -17 + lift, 20, 9, Palette.PLAYER_SUIT);
-            pixel(-8, -20 + lift, 14, 5, Palette.PLAYER_LIGHT);
-            pixel(-2, -15 + lift, 14, 7, Palette.PLAYER_INK);
-            pixel(1, -14 + lift, 10, 3, Palette.PLAYER_LIGHT);
-            pixel(-10, -5, 18, 13, Palette.PLAYER_INK);
-            pixel(-7, -4, 12, 10, Palette.PLAYER_SUIT);
-            pixel(-8, -5, 16, 4, Palette.PLAYER_SCARF);
-            pixel(-15, -5 + lift, 8, 3, Palette.PLAYER_SCARF);
-            pixel(-20, -7 + lift * 2, 6, 3, Palette.PLAYER_SCARF);
-            pixel(-12, 0, 5, 6, Palette.PLAYER_LIGHT);
-            pixel(-8 - lift * 2, 7 - lift, 7, 5, Palette.PLAYER_INK);
-            pixel(2 + lift * 2, 6 + lift, 7, 5, Palette.PLAYER_INK);
+            var pose:[]Rect2 = POSES[poseIndex];
+            drawRect(pose[0], Palette.PLAYER_INK);
+            drawRect(pose[1], Palette.PLAYER_INK);
+            drawRect(pose[2], Palette.PLAYER_SUIT);
+            drawRect(pose[3], Palette.PLAYER_LIGHT);
+            drawRect(pose[4], Palette.PLAYER_INK);
+            drawRect(pose[5], Palette.PLAYER_LIGHT);
+            drawRect(pose[6], Palette.PLAYER_INK);
+            drawRect(pose[7], Palette.PLAYER_SUIT);
+            drawRect(pose[8], Palette.PLAYER_SCARF);
+            drawRect(pose[9], Palette.PLAYER_SCARF);
+            drawRect(pose[10], Palette.PLAYER_SCARF);
+            drawRect(pose[11], Palette.PLAYER_LIGHT);
+            drawRect(pose[12], Palette.PLAYER_INK);
+            drawRect(pose[13], Palette.PLAYER_INK);
         }
     }
 }

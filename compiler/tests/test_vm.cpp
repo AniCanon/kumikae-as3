@@ -4,6 +4,7 @@
 #include "any.h"
 #include "builtins.h"
 #include "interpreter.h"
+#include "ir_binary.h"
 #include "reload.h"
 #include "table.h"
 #include "lower.h"
@@ -1326,6 +1327,10 @@ static void test_vector_of_values() {
 						 "    try { v.unshift(v[1], none); } catch (d:TypeError) { said += \"|\" + v.length; }\n"
 						 "    v.reverse(); target.points = v.concat(v.slice(1)); v.length = 1; return said; }\n"
 						 "  public var path:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];\n"
+						 "  private var bytes:Vector.<byte> = new <byte>[0, 255, 256];\n"
+						 "  public function byteSum():uint { return bytes[0] + bytes[1] + bytes[2]; }\n"
+						 "  private var xs:Vector.<float> = new <float>[16777217, -0.0];\n"
+						 "  public function single():Boolean { return xs[0] == 16777216 && 1 / xs[1] < 0; }\n"
 						 "  public function give(target:Line2D):void { target.points = path; }\n"
 						 "} }\n";
 	Compilation compilation;
@@ -1382,6 +1387,10 @@ static void test_vector_of_values() {
 		if (moved) {
 			argument.p = engine.box();
 			engine.log.clear();
+			CHECK(fresh.call_method(moved, "byteSum", nullptr, 0, &result));
+			CHECK_EQ(result.u, 255u);
+			CHECK(fresh.call_method(moved, "single", nullptr, 0, &result));
+			CHECK(result.b);
 			CHECK(fresh.call_method(moved, "give", &argument, 1, &result));
 			CHECK(engine.log.find("collection PackedVector2Array[(1, 2), (3, 4)] -> ") != std::string::npos);
 			engine.drop(argument.p);
@@ -2719,11 +2728,14 @@ static void test_static_changes() {
 static void test_reload_kept_containers() {
 	const char *before = "package { public class Bag {\n"
 						 "  public var flags:* = new <Boolean>[true, false]; public var none:* = new Vector.<uint>();\n"
+						 "  public var rows:* = new [][]int { new []int { 7 } }; public var empty:* = new [1] []String;\n"
 						 "  public var list:* = [1, \"two\"]; public var table:* = { a: 1 };\n"
 						 "} }\n";
 	const char *after = "package { public class Bag {\n"
-						"  public var flags:*; public var none:*; public var list:*; public var table:*;\n"
-						"  public function tell():String { return String(flags) + \"|\" + none.length + \"|\" + list + \"|\" + table.a; }\n"
+						"  public var flags:*; public var none:*; public var list:*; public var table:*; public var rows:*; public var empty:*;\n"
+						"  public function tell():String { var saved:* = rows[0]; rows[0] = saved;\n"
+						"    try { rows[0] = [8]; } catch (e:TypeError) { try { rows.length = 0; } catch (f:RangeError) {\n"
+						"      return rows[0][0] + \"|\" + String(flags) + \"|\" + none.length + \"|\" + list + \"|\" + table.a; } } return \"wrong type or length\"; }\n"
 						"} }\n";
 	ir::Module old_module, new_module, bare_module;
 	compile(before, &old_module, "Bag.as");
@@ -2743,6 +2755,7 @@ static void test_reload_kept_containers() {
 		}
 		const std::vector<uint8_t> live = vm::Reload::reached(running, { bag });
 		vm::Reload::keep_containers(old_module, live, &new_module);
+		CHECK(class_named(new_module, "[]String") != ir::NONE);
 		vm::Interpreter fresh(new_module, recorder);
 		vm::Object *moved = nullptr;
 		{
@@ -2754,9 +2767,12 @@ static void test_reload_kept_containers() {
 		running.release_object(bag);
 		if (moved) {
 			vm::Slot result;
-			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
-			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("true,false|0|1,two|1"));
-			fresh.discard(ir::Kind::Str, result);
+			const bool ok = fresh.call_method(moved, "tell", nullptr, 0, &result);
+			CHECK(ok);
+			if (ok && result.p) {
+				CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("7|true,false|0|1,two|1"));
+				fresh.discard(ir::Kind::Str, result);
+			}
 			fresh.release_object(moved);
 		}
 		CHECK_EQ(recorder.errors, std::string());
@@ -2993,6 +3009,107 @@ static void test_reload() {
 		running.release_object(object);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// A held callback follows its method or closure into the new module even when its index moves.
+static void test_reload_callbacks() {
+	const std::string head = "package { public class Counter { public var bound:()=>int; public var closure:()=>int; public var legacy:Function; ";
+	const std::string body = "public function Counter() { bound = step; closure = make(10); legacy = make(20); } "
+			"public function make(n:int):()=>int { return function():int { return ++n; }; } "
+			"public function run():int { return bound() + closure() + int(legacy()); } ";
+	ir::Module before, after;
+	compile((head + body + "public function step():int { return 1; } } }").c_str(), &before);
+	compile((head + "public function another():int { return 100; } " + body + "public function step():int { return 2; } } }").c_str(), &after);
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	vm::Slot answer;
+	CHECK(old.call_method(original, "run", nullptr, 0, &answer));
+	CHECK_EQ(answer.i, 33);
+	vm::Interpreter fresh(after, recorder);
+	vm::Reload reload(old, fresh);
+	vm::Object *moved = reload.object(original);
+	CHECK(moved != nullptr);
+	if (moved) {
+		CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+		CHECK_EQ(answer.i, 36);
+		fresh.release_object(moved);
+	}
+	old.release_object(original);
+}
+
+static void test_reload_capture_type_change() {
+	const std::string head = "package { public class Counter { public var f:Function; ";
+	const std::string source = "public var oldType:[]int; public function Counter() { var values:";
+	const std::string body = "; f = function():uint { return values.length; }; } public function run():uint { return f(); } } }";
+	ir::Module written, before;
+	compile((head + source + "[]int = new [1] int" + body).c_str(), &written);
+	const auto packed = ir::write_binary(written);
+	CHECK(!ir::read_binary(packed.data(), packed.size(), &before));
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	auto migrate = [&](const std::string &p_type, bool p_compatible) {
+		ir::Module after;
+		compile((head + "public var earlier:[]String; " + source + p_type + body).c_str(), &after);
+		CHECK(class_named(before, "[]int") != class_named(after, "[]int"));
+		vm::Interpreter fresh(after, recorder);
+		vm::Reload reload(old, fresh);
+		vm::Object *moved = reload.object(original);
+		CHECK_EQ(reload.missing(), p_compatible ? std::string() : std::string("Function"));
+		if (p_compatible && moved) {
+			vm::Slot answer;
+			CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+			CHECK_EQ(answer.u, 1u);
+		}
+		fresh.release_object(moved);
+	};
+	migrate("[]int = new [2] int", true);
+	migrate("Vector.<int> = new Vector.<int>(2)", false);
+	old.release_object(original);
+}
+
+static void test_reload_callback_identity() {
+	const std::string head = "package { public class Counter { public var f:Function; public function Counter() { ";
+	const std::string tail = "} public function run():int { return f(); } } }";
+	const std::string one = "f = function():int { return 1; }; ";
+	const std::string two = "f = function():int { return 2; }; ";
+	ir::Module before, after;
+	compile((head + one + two + tail).c_str(), &before);
+	compile((head + two + one + tail).c_str(), &after);
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	auto migrate = [&](const ir::Module &p_after, bool p_matches) {
+		vm::Interpreter fresh(p_after, recorder);
+		vm::Reload reload(old, fresh);
+		vm::Object *moved = reload.object(original);
+		CHECK_EQ(reload.missing(), p_matches ? std::string() : std::string("Function"));
+		if (moved && p_matches) {
+			vm::Slot answer;
+			CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+			CHECK_EQ(answer.i, 2);
+		}
+		fresh.release_object(moved);
+	};
+	migrate(after, true);
+	after = ir::Module();
+	compile((head + one + "f = function():int { return 3; }; " + tail).c_str(), &after);
+	migrate(after, false); // A new sibling at the old position does not prove identity.
+	for (auto &fn : before.functions) {
+		if (fn.name.find("/function") != std::string::npos) {
+			fn.code = { { ir::Op::Native } };
+		}
+	}
+	migrate(after, false); // Native stubs have no comparable bodies.
+	for (auto &fn : before.functions) {
+		fn.file = ir::NONE;
+	}
+	migrate(after, false); // A synthetic function may carry no source file.
+	old.release_object(original);
 }
 
 static void test_loop_markers() {
@@ -4037,6 +4154,9 @@ int main() {
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
+	test_reload_callbacks();
+	test_reload_capture_type_change();
+	test_reload_callback_identity();
 	test_entries();
 	test_reload_tables();
 	test_run_once_changes();

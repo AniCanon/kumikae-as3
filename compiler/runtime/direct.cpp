@@ -305,7 +305,9 @@ void vector_fixed(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_
 
 void vector_set_fixed(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *) {
 	if (Vector *vector = vector_in(c, p_values)) {
-		vector->fixed = p_values[1].b;
+		const Direct direct(c);
+		vm::Library library = direct.library();
+		vm::vector_set_fixed(library, vector, p_values[1].b);
 	}
 }
 

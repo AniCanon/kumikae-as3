@@ -80,6 +80,7 @@ namespace kas3 {
 	X(Percent, "'%'") \
 	X(PlusPlus, "'++'") \
 	X(MinusMinus, "'--'") \
+	X(Arrow, "'=>'") \
 	X(Assign, "'='") \
 	X(PlusAssign, "'+='") \
 	X(MinusAssign, "'-='") \

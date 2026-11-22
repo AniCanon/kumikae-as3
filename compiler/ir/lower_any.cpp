@@ -241,7 +241,7 @@ std::optional<uint32_t> Lowerer::check_for(const Type *p_type, Kind p_kind) {
 	if (starts_null_type(p_kind, p_type)) {
 		return 0;
 	}
-	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+	const Symbol *symbol = p_type && (p_type->kind == Type::Instance || p_type->kind == Type::Callback) ? p_type->symbol : nullptr;
 	uint32_t check = NONE;
 	if (is_engine(p_kind)) {
 		return symbol && is_godot(symbol) && engine_name(symbol, std::string_view(), &check) ? check : NONE;

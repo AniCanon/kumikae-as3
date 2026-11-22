@@ -66,10 +66,12 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 	switch (p_kind) {
 		case ir::Kind::I32:
 			return Variant((int64_t)p_slot.i);
+		case ir::Kind::U8:
 		case ir::Kind::U32:
 			return Variant((int64_t)p_slot.u);
 		case ir::Kind::I64:
 			return Variant(p_slot.l);
+		case ir::Kind::F32:
 		case ir::Kind::F64:
 			return Variant(p_slot.d);
 		case ir::Kind::Bool:
@@ -121,6 +123,8 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 	Variant::Type type = p_value.get_type();
 	bool number = type == Variant::INT || type == Variant::FLOAT;
 	switch (p_kind) {
+		case ir::Kind::F32:
+			return number;
 		case ir::Kind::F64: {
 			// One of Godot's integers is taken as a Number only if the Number holds the very same value.
 			if (type != Variant::INT) {
@@ -136,6 +140,10 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			}
 			double value = type == Variant::FLOAT ? (double)p_value : 0.5;
 			return value >= -9223372036854775808.0 && value < 9223372036854775808.0 && value == (double)(int64_t)value;
+		}
+		case ir::Kind::U8: {
+			const double value = number ? static_cast<double>(p_value) : -1.0;
+			return value >= 0 && value <= UINT8_MAX && value == static_cast<uint8_t>(value);
 		}
 		case ir::Kind::I32:
 		case ir::Kind::U32: {
@@ -183,10 +191,11 @@ bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p
 	}
 	if (!arrives(p_wanted.kind, p_wanted.type, p_value)) {
 		CharString got = Variant::get_type_name(p_value.get_type()).utf8();
-		if ((p_wanted.kind == ir::Kind::I32 || p_wanted.kind == ir::Kind::U32) && (p_value.get_type() == Variant::INT || p_value.get_type() == Variant::FLOAT)) {
+		if ((p_wanted.kind == ir::Kind::I32 || p_wanted.kind == ir::Kind::U32 || p_wanted.kind == ir::Kind::U8) &&
+				(p_value.get_type() == Variant::INT || p_value.get_type() == Variant::FLOAT)) {
 			CharString number = p_value.stringify().utf8();
 			*r_error = "Godot's '" + std::string(p_from) + "' gave " + std::string(number.get_data()) + ", which does not fit " +
-					(p_wanted.kind == ir::Kind::I32 ? "an int" : "a uint");
+					(p_wanted.kind == ir::Kind::I32 ? "an int" : p_wanted.kind == ir::Kind::U32 ? "a uint" : "a byte");
 			return false;
 		}
 		if (p_wanted.kind == ir::Kind::F64 && p_value.get_type() == Variant::INT) {
@@ -214,11 +223,19 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 		case ir::Kind::I32:
 			slot.i = (int32_t)(int64_t)p_value;
 			break;
+		case ir::Kind::U8:
 		case ir::Kind::U32:
 			slot.u = (uint32_t)(int64_t)p_value;
 			break;
 		case ir::Kind::I64:
 			slot.l = p_value.get_type() == Variant::FLOAT ? (int64_t)(double)p_value : (int64_t)p_value;
+			break;
+		case ir::Kind::F32:
+			if (p_value.get_type() == Variant::INT) {
+				slot.d = static_cast<float>(static_cast<int64_t>(p_value));
+			} else {
+				slot.d = static_cast<float>(static_cast<double>(p_value));
+			}
 			break;
 		case ir::Kind::F64:
 			slot.d = (double)p_value;

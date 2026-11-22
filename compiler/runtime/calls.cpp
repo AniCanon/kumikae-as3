@@ -67,15 +67,21 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 				r_value->i = tag == AnyTag::Int ? vm::any::to_int_payload(p_any) : vm::to_int32(vm::any::to_number_payload(p_any));
 			}
 			return number;
+		case Kind::U8:
+			if (number) {
+				r_value->u = static_cast<uint8_t>(vm::to_uint32(vm::any::to_number(p_any)));
+			}
+			return number;
 		case Kind::U32:
 			if (number) {
 				r_value->u = vm::to_uint32(vm::any::to_number(p_any));
 			}
 			return number;
+		case Kind::F32:
 		case Kind::F64:
 			// A whole number past an int is held in a box (number_to_any): a Number all the same.
 			if (number || tag == AnyTag::Wide) {
-				r_value->d = vm::any::to_number(p_any);
+				r_value->d = static_cast<Kind>(p_kind) == Kind::F32 ? vm::any::to_float(p_any) : vm::any::to_number(p_any);
 			}
 			return number || tag == AnyTag::Wide;
 		case Kind::Bool:
@@ -121,6 +127,7 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 		case Kind::I32:
 			*r_any = vm::any::integer(p_result.i);
 			return true;
+		case Kind::U8:
 		case Kind::U32:
 			*r_any = to_any(c, p_result.u);
 			return true;
@@ -136,6 +143,7 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 		case Kind::Any:
 			*r_any = p_result;
 			return true;
+		case Kind::F32:
 		case Kind::F64:
 			if (number_to_any(c, p_result.d, r_any)) {
 				return true;
@@ -226,6 +234,25 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 	callee.entry(c, values, first + p_count, &result);
 	if (!c->failing) {
 		result_to_any(c, static_cast<Kind>(callee.result), result, r_result);
+	}
+	return true;
+}
+
+bool call_typed_value(Context *c, Object *p_function, Slot *p_arguments, uint32_t p_count, const Kind *p_kinds, Kind p_result, Slot *r_result) {
+	const Program &program = *c->program;
+	if (!p_function || p_function->klass != program.known.function) {
+		return false;
+	}
+	const uint32_t index = static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX));
+	if (index >= program.function_count || !vm::typed_function_matches(c->host->module.functions[index], p_result, p_kinds, p_count)) {
+		return false;
+	}
+	const FunctionInfo &callee = program.functions[index];
+	if (callee.is_static) {
+		callee.entry(c, p_arguments + 1, p_count, r_result);
+	} else {
+		p_arguments[0] = slot(field<Object *>(p_function, ir::FUNCTION_FIRST));
+		callee.entry(c, p_arguments, p_count + 1, r_result);
 	}
 	return true;
 }

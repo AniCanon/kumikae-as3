@@ -34,16 +34,17 @@ const Type *Compilation::instance_type(Symbol *p_class) {
 	return type;
 }
 
-const Type *Compilation::vector_type(const Type *p_element) {
-	auto found = vector_types_.find(p_element);
-	if (found != vector_types_.end()) {
+const Type *Compilation::vector_type(const Type *p_element, bool p_fixed_array) {
+	auto &types = p_fixed_array ? fixed_array_types_ : vector_types_;
+	auto found = types.find(p_element);
+	if (found != types.end()) {
 		return found->second;
 	}
 	types_.emplace_back();
 	Type *type = &types_.back();
-	type->kind = Type::Vector;
+	type->kind = p_fixed_array ? Type::FixedArray : Type::Vector;
 	type->element = p_element;
-	vector_types_.emplace(p_element, type);
+	types.emplace(p_element, type);
 	return type;
 }
 
@@ -68,6 +69,29 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 	if (p_type->form == TypeRef::Void) {
 		return &void_;
 	}
+	if (p_type->form == TypeRef::FixedArray) {
+		return vector_type(type_of(p_type->argument, p_element), true);
+	}
+	if (p_type->form == TypeRef::Callback) {
+		std::vector<const Type *> parameters;
+		for (TypeRef *part : p_type->parameters) {
+			parameters.push_back(type_of(part));
+		}
+		const Type *result = type_of(p_type->argument);
+		for (const Type *known : callback_types_) {
+			if (known->element == result && known->parameters == parameters) {
+				return known;
+			}
+		}
+		types_.emplace_back();
+		Type *type = &types_.back();
+		type->kind = Type::Callback;
+		type->symbol = p_type->symbol;
+		type->element = result;
+		type->parameters = std::move(parameters);
+		callback_types_.push_back(type);
+		return type;
+	}
 	if (!p_type->symbol) {
 		return &unknown_;
 	}
@@ -81,6 +105,12 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 }
 
 Symbol *Compilation::builtin(std::string_view p_name) const {
+	if (p_name == "byte") {
+		return byte_;
+	}
+	if (p_name == "float") {
+		return float_;
+	}
 	auto found = top_level_->definitions.find(p_name);
 	return found != top_level_->definitions.end() && found->second->unit->is_builtin ? found->second : nullptr;
 }
@@ -104,9 +134,19 @@ std::string Compilation::type_name(const Type *p_type) const {
 				return prefix + "?" + suffix;
 			case Type::Instance:
 				return prefix + std::string(p_type->symbol->name) + suffix;
+			case Type::FixedArray:
+				prefix += "[]";
+				break;
 			case Type::Vector:
 				prefix += "Vector.<";
 				suffix = ">" + suffix;
+				break;
+			case Type::Callback:
+				prefix += "(";
+				for (size_t i = 0; i < p_type->parameters.size(); ++i) {
+					prefix += (i ? ", " : "") + type_name(p_type->parameters[i]);
+				}
+				prefix += ")=>";
 				break;
 			case Type::ClassObject:
 				prefix += "Class.<";

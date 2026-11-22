@@ -8,6 +8,8 @@ Only the host differs. This folder also holds AS3's standard library, which nati
 
 ## The host
 
+A typed callback uses its Function object’s target and bound receiver or closure environment. The interpreter checks the target signature and passes raw slots into the new frame. A mismatching target from dynamic code raises `TypeError`.
+
 The interpreter knows where it runs only through four interfaces, gathered in `host.h`:
 
 | Interface | What it gives |
@@ -86,9 +88,12 @@ host that keeps nothing gets the request by name instead.
   When hot reload remembers constructor arguments, each object has room for them after its own slots.
 - Untyped values use three low address bits for pointer kinds. On 64-bit targets one more bit records
   a tag in the top byte. On wasm32 that fourth bit belongs to the address.
-- **A `Vector.<int>` or `Vector.<uint>` stores four bytes for each element.** Every other vector stores an
-  eight-byte slot. Reach a vector's places through `place()`, `set_place()`, `move_places()` and
-  `clear_places()` in `runtime.h`. Nothing else names the memory.
+- **A `Vector.<byte>` stores one byte per element.** The int, uint and float vectors use four bytes
+  per element. Other vectors use an eight-byte slot. Use `place()`, `set_place()`, `move_places()`
+  and `clear_places()` in `runtime.h` to access any layout. Scalar bytes use the slot's unsigned
+  integer member. A scalar float uses its double member to hold the exact widened binary32 value.
+- **A fixed array allocates its header and element storage together.** It uses the same packed
+  element widths as a vector. Its storage is never reserved again.
 - **A `Vector.<Vector2>` or `Vector.<Vector2i>` stores each value in place:** eight bytes, never a handle
   and never `null`. A value crosses into a register through `read_element()` and back through
   `write_element()`. Storing `null` is TypeError #1034.

@@ -150,6 +150,8 @@ struct Class {
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
+	// The nominal name is carried into packs, reload and generated programs. No AS3 identifier starts with '['.
+	bool fixed_array() const { return name.size() >= 2 && name[0] == '[' && name[1] == ']'; }
 	// Object and flash.utils.Dictionary: objects that are vm::Table, keyed by text (a Dictionary also by the
 	// identity of an object), with no fields.
 	bool table = false;

@@ -32,7 +32,7 @@ inline Slot *element(Object *p_vector, int32_t p_index) {
 }
 inline int32_t *number(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && vector->narrow && p_index < vector->length ? vm::numbers_of(vector) + p_index : nullptr;
+	return vector && vector->narrow && !vector->floating && !vector->bytes && p_index < vector->length ? vm::numbers_of(vector) + p_index : nullptr;
 }
 inline int32_t *number(Object *p_vector, int32_t p_index) {
 	return number(p_vector, static_cast<uint32_t>(p_index));
@@ -42,8 +42,24 @@ inline int32_t *number(Object *p_vector, int32_t p_index) {
 inline Slot *slots_in(Object *p_vector) {
 	return p_vector ? vm::slots_of(static_cast<Vector *>(p_vector)) : nullptr;
 }
+inline uint8_t *bytes_in(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->bytes ? vm::bytes_of(vector) : nullptr;
+}
+inline uint8_t *byte_element(Object *p_vector, uint32_t p_index) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->bytes && p_index < vector->length ? vm::bytes_of(vector) + p_index : nullptr;
+}
+inline float *floats_in(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->floating ? vm::floats_of(vector) : nullptr;
+}
+inline float *float_element(Object *p_vector, uint32_t p_index) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->floating && p_index < vector->length ? vm::floats_of(vector) + p_index : nullptr;
+}
 inline int32_t *numbers_in(Object *p_vector) {
-	return p_vector && static_cast<Vector *>(p_vector)->narrow ? vm::numbers_of(static_cast<Vector *>(p_vector)) : nullptr;
+	return p_vector && static_cast<Vector *>(p_vector)->narrow && !static_cast<Vector *>(p_vector)->floating && !static_cast<Vector *>(p_vector)->bytes ? vm::numbers_of(static_cast<Vector *>(p_vector)) : nullptr;
 }
 
 // The vector, if its places hold what the code that asks reads and writes there: one of Godot's values
@@ -127,7 +143,7 @@ inline int32_t *number_to_write(Context *c, Object *p_vector, uint32_t p_index) 
 	if (int32_t *const there = number(p_vector, p_index)) {
 		return there;
 	}
-	return p_vector && static_cast<Vector *>(p_vector)->narrow ? static_cast<int32_t *>(element_added(c, p_vector, p_index)) : nullptr;
+	return p_vector && static_cast<Vector *>(p_vector)->narrow && !static_cast<Vector *>(p_vector)->floating && !static_cast<Vector *>(p_vector)->bytes ? static_cast<int32_t *>(element_added(c, p_vector, p_index)) : nullptr;
 }
 inline int32_t *number_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : number_to_write(c, p_vector, static_cast<uint32_t>(p_index));
@@ -146,7 +162,7 @@ inline Slot *push_room(Object *p_vector) {
 // The same in a vector of ints or of uints.
 inline int32_t *number_room(Object *p_vector) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return KAS3_LIKELY(has_room(vector) && vector->narrow) ? vm::numbers_of(vector) + vector->length : nullptr;
+	return KAS3_LIKELY(has_room(vector) && vector->narrow && !vector->floating && !vector->bytes) ? vm::numbers_of(vector) + vector->length : nullptr;
 }
 
 // What holds a property, and a key that is a String: null for a register that holds anything else.

@@ -28,7 +28,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	class_used_.assign(module_.classes.size(), 0);
 	globals_.resize(module_.globals.size());
 	for (size_t i = 0; i < globals_.size(); i++) {
-		globals_[i] = empty_value(module_.globals[i].kind == Kind::F64, module_.globals[i].starts_null);
+		globals_[i] = empty_value(ir::is_floating(module_.globals[i].kind), module_.globals[i].starts_null);
 	}
 	prepare_engine();
 }

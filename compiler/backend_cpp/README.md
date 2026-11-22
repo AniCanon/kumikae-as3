@@ -38,7 +38,7 @@ output is the same to the byte.
 | `function_writer` | One function: registers as locals, ownership, labels, error paths and handlers |
 | `patterns.h`, `function_simple.cpp` | Operations that are one C++ statement, as a table |
 | `function_objects.cpp`, `function_classes.cpp`, `function_fields.cpp` | Fields, static fields and classes |
-| `function_calls.cpp` | Direct calls, virtual calls and interface calls |
+| `function_calls.cpp` | Direct, virtual, interface and typed callback calls |
 | `function_fast.cpp`, `function_library.cpp` | Library operations with an inline fast path, and direct calls into the library |
 | `function_loops.cpp`, `function_whole.cpp` | Loops over vectors, and 32-bit integer arithmetic |
 | `function_rounds.cpp` | Where a loop goes round: the look at the host's alarm that stops a loop without end, and loops counted by a whole number |
@@ -54,7 +54,8 @@ output is the same to the byte.
 - **A register is a C++ local of its kind's type:** `int32_t`, `uint32_t`, `double`, `bool`, `int64_t`,
   `Str *`, `Object *`, or `Slot` for an untyped value.
 - **A call between the program's functions is a C++ call.** A virtual call goes through the class's method
-  table, and an interface call through its interface table.
+  table, and an interface call through its interface table. A typed callback passes typed slots to
+  its target's native entry after the runtime checks the signature.
 - **A class is a C++ struct.** A field of an object whose class is known is written through the struct, so
   the C++ compiler knows that a write to `vx` leaves `mass` unchanged.
 - **Reference counts change only in `retain(c, x)` and `release(c, x)`.** A register that holds a string,

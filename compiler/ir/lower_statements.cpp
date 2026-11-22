@@ -94,7 +94,7 @@ void Statements::declare_locals(Node *p_body) {
 			l_.locals_[declarator.symbol] = local;
 			l_.fn().locals.push_back({ std::string(declarator.name), local });
 			// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
-			if (kind == Kind::F64) {
+			if (is_floating(kind)) {
 				l_.emit(Op::ConstF64, declarator.offset, local, l_.number(std::numeric_limits<double>::quiet_NaN()));
 			} else if (l_.starts_null_type(kind, l_.compilation_.type_of(declarator.type))) {
 				l_.emit(Op::AnyConst, declarator.offset, local, 1); // An Object starts null; a `*` undefined.
@@ -202,8 +202,10 @@ bool Lowerer::can_be_equal(Kind p_a, Kind p_b) {
 	const auto family = [](Kind p_kind) {
 		switch (p_kind) {
 			case Kind::I32:
+			case Kind::U8:
 			case Kind::U32:
 			case Kind::F64:
+			case Kind::F32:
 			case Kind::I64:
 				return 0;
 			case Kind::Val:

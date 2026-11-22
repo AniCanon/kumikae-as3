@@ -48,21 +48,26 @@ inline Slot &owner_field(Object *p_object) {
 inline ir::Kind place_kind(const ir::Class &p_class) {
 	return p_class.element_bare == ir::Bare::None ? p_class.element : ir::Kind::Void;
 }
-// Whether each place of a vector of the class is four bytes, the number itself: a vector of ints or of
-// uints (Vector::narrow). An Array's elements are untyped, and a vector of Numbers holds eight bytes each.
+// A packed numeric vector stores one or four bytes per place. Other vectors store a full slot.
 inline bool narrow_places(const ir::Class &p_class) {
-	return p_class.element == ir::Kind::I32 || p_class.element == ir::Kind::U32;
+	return p_class.element == ir::Kind::U8 || p_class.element == ir::Kind::F32 || p_class.element == ir::Kind::I32 || p_class.element == ir::Kind::U32;
 }
 
 // A new vector of a class: new_vector(), told what the class says its places hold.
 inline Vector *new_vector_of(const ir::Class &p_class, uint32_t p_index, uint32_t p_length, bool p_fixed, Object *p_list) {
-	return new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), narrow_places(p_class), p_list);
+	const VectorPlaces places = p_class.fixed_array() ? VectorPlaces::Inline : VectorPlaces::Separate;
+	Vector *vector = new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), narrow_places(p_class), p_list,
+			p_class.element == ir::Kind::U8, places);
+	if (vector) {
+		vector->floating = p_class.element == ir::Kind::F32;
+	}
+	return vector;
 }
 
 // Every field as it is before anything is written to it (empty_value()).
 inline void reset_fields(const ir::Class &p_class, Object *p_object) {
 	for (uint32_t i = 0; i < p_class.fields.size(); i++) {
-		field(p_class, p_object, i) = empty_value(p_class.fields[i].kind == ir::Kind::F64, p_class.fields[i].starts_null);
+		field(p_class, p_object, i) = empty_value(ir::is_floating(p_class.fields[i].kind), p_class.fields[i].starts_null);
 	}
 }
 

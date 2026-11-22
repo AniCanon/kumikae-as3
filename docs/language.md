@@ -97,6 +97,79 @@ reaches the construct, with an error that says `is not supported by the interpre
 
 ## Additions to AS3
 
+### Fixed-length typed arrays
+
+Use `[]T` to declare an array whose length is fixed when you create it. Allocate by length with
+`new [length] T`, or list the initial values in braces. The syntax opts in wherever you write it.
+
+```actionscript
+var scores:[]int = new [4] int;
+scores[0] = 12;
+var names:[]String = new []String { "Ada", "Jo" };
+var rounds:[][]int = new [][]int { scores, new []int { 7, 5 } };
+```
+
+Indices run from zero through `length - 1`. Read the length with `scores.length`.
+Writing past the end raises `RangeError`, including through a variable typed `*`.
+Length must be a nonnegative whole number that fits a `uint`. A request that exceeds the
+runtime allocation limit raises an error. Each new element has the same initial value and
+storage width as an element of `Vector.<T>`.
+
+The array type includes its element type. For example, `value is []int` checks for the exact
+array type, and `value as []int` returns the array or `null`. Assigning a `Vector.<int>` to
+a field typed `[]int` is a type error even when the vector has its `fixed` flag set. An
+array exposes its indices and read-only `length`. To store functions, use `[]Function`.
+Typed callback signatures and `void` cannot be array element types.
+
+### Typed callbacks
+
+Write the parameter types in parentheses and the result after `=>`.
+
+```actionscript
+function counter(start:int):(int)=>int {
+    return function(step:int):int { return start += step; };
+}
+var next:(int)=>int = counter(10);
+trace(next(2), next(3)); // 12 15
+```
+
+A callback can hold a function expression, a script method bound to its receiver, a package function,
+another callback with the same signature, or `null`. Bindings require an exact match, including the
+result. Calls check the number and types of arguments and perform the same scalar conversions as
+a named call. Write `()=>void` for a callback that takes no arguments and returns nothing.
+
+Callback parameters and results can use `Boolean`, `byte`, `int`, `uint`, `Int64`, `float`, `Number`
+and `String`. The result can also be `void`. Targets take a fixed number of required parameters. Their
+bodies can use `arguments`. A callback can be passed, returned or stored in a field. Assign it to
+`Function` to use `.call`, `.apply` or other Function members. An assignment from an erased
+`Function`, `Object` or `*` to a callback is a compile error. If dynamic code supplies a function
+through a method argument or field, calling it through the annotation checks the signature at runtime.
+A mismatch raises `TypeError`.
+
+### Other additions
+
+- **`byte`.** Declare an unsigned eight-bit integer with `var b:byte` or convert a value with
+  `byte(value)`. Assignments, arguments and returns truncate toward zero and keep the low eight bits.
+  For example, `byte(-1.9)` gives 255 and `byte(256)` gives 0. NaN, infinity and null convert to zero.
+  Scalar variables start at zero. Arithmetic follows the existing integer promotion rules, so
+  `byte(255) + byte(1)` gives the Number 256. Storing that result in a byte gives zero.
+  An untyped byte holds an int. Existing declarations named `byte` keep their meaning.
+  Godot passes a byte to an AS3 method or exported field as a whole number from 0 through 255.
+- **`Vector.<byte>`.** Each element uses one contiguous byte and starts at zero. Indexed writes and
+  vector methods apply the same conversion as scalar stores. Each `Vector.<uint>` or `Vector.<int>`
+  element continues to occupy four bytes.
+- **`float`.** Use `var x:float` or `float(value)` for IEEE 754 single precision. Assignment, arguments,
+  returns and vector writes round to binary32, including when the input is an `Int64`. Two float operands
+  produce a float for `+`, `-`, `*`, `/` and `%`. With an `int`, `uint`, `Int64` or `Number` operand,
+  these operations use the existing `Number` rules. Literals keep their ordinary types. For example,
+  `float(16777216) + float(1)` gives 16777216, while `float(16777216) + 1` gives 16777217.
+  Scalar variables start at NaN. `float()` and `float(null)` give positive zero. Conversions preserve
+  signed zero, infinities and NaN. At a `*` or `Object` boundary a float becomes a Number. Use
+  `is Number` to test that value and `float(value)` to recover single precision. Formatting uses
+  Number's methods on the rounded value. Existing AS3 declarations named `float` keep their meaning.
+- **`Vector.<float>`.** Each element occupies four contiguous bytes and starts at positive zero.
+  `Vector.<Number>` uses eight bytes per element. Assign a float vector to a Godot
+  `PackedFloat32Array` to copy the packed values.
 - **`Int64`.** A 64-bit integer type, because Godot's integers have 64 bits. Arithmetic on it wraps at 64
   bits, `/` gives a `Number`, and a comparison with a `Number` is exact. An `Int64` converts to `int`,
   `uint` or `Number` where one is expected, and raises a `RangeError` if the value doesn't fit. Writing

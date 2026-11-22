@@ -22,7 +22,7 @@ const Type *Typer::join(const Type *p_a, const Type *p_b) const {
 	}
 	auto nullable = [&](const Type *p_type) {
 		return (p_type->kind == Type::Instance && !numeric(p_type) && p_type != boolean_) ||
-				p_type->kind == Type::Vector || p_type->kind == Type::ClassObject;
+				p_type->typed_sequence() || p_type->kind == Type::Callback || p_type->kind == Type::ClassObject;
 	};
 	if (p_a->kind == Type::Null && nullable(p_b)) {
 		return p_b;
@@ -95,7 +95,7 @@ bool Typer::converts_to_engine(const Type *p_from, const Type *p_to) const {
 	}
 	std::string_view name = p_to->symbol->name;
 	if (name == "GodotArray") {
-		return p_from == array_ || p_from->kind == Type::Vector;
+		return p_from == array_ || p_from->typed_sequence();
 	}
 	if (name == "GodotDictionary") {
 		return p_from == object_ || p_from == dictionary_;
@@ -109,7 +109,7 @@ bool Typer::converts_to_engine(const Type *p_from, const Type *p_to) const {
 	if (p_from == array_) {
 		return true; // Its elements are checked when it is converted.
 	}
-	if (p_from->kind != Type::Vector) {
+	if (!p_from->typed_sequence()) {
 		return false;
 	}
 	std::string_view element = name.substr(head.size(), name.size() - head.size() - tail.size());
@@ -146,8 +146,8 @@ auto Typer::fits(const Type *p_from, const Type *p_to) const -> Typer::Fit {
 	if (p_to->kind == Type::ClassObject || p_to->kind == Type::Null) {
 		return Fit::Yes; // Not a type that can be written.
 	}
-	if (p_from->kind == Type::Vector || p_to->kind == Type::Vector) {
-		if (p_from->kind == Type::Vector && p_to->kind == Type::Vector) {
+	if (p_from->typed_sequence() || p_to->typed_sequence()) {
+		if (p_from->typed_sequence() && p_to->typed_sequence()) {
 			// Vectors of different element types are unrelated, even when the elements are related.
 			return Fit::No;
 		}
@@ -169,9 +169,41 @@ auto Typer::fits(const Type *p_from, const Type *p_to) const -> Typer::Fit {
 	return narrower ? Fit::Cast : Fit::No;
 }
 
+bool Typer::callback_fits(Expr *p_value, const Type *p_to) {
+	if (p_value->type == p_to || p_value->type->kind == Type::Null) {
+		return true;
+	}
+	FunctionDecl *decl = nullptr;
+	if (p_value->kind == NodeKind::FunctionExpr) {
+		decl = static_cast<FunctionExpr *>(p_value)->function;
+	} else {
+		Symbol *symbol = p_value->kind == NodeKind::Name ? static_cast<Name *>(p_value)->symbol :
+				p_value->kind == NodeKind::Member ? static_cast<Member *>(p_value)->resolved() : nullptr;
+		if (symbol && (symbol->kind == SymbolKind::Function || symbol->kind == SymbolKind::Method)) {
+			decl = static_cast<FunctionDecl *>(symbol->node);
+		}
+	}
+	bool matches = decl && decl->parameters.count == p_to->parameters.size() && compilation_.type_of(decl->return_type) == p_to->element;
+	for (size_t i = 0; matches && i < p_to->parameters.size(); ++i) {
+		const Parameter &param = decl->parameters[i];
+		matches = !param.is_rest && !param.default_value && compilation_.type_of(param.type) == p_to->parameters[i];
+	}
+	return matches;
+}
+
 void Typer::store(Expr *p_value, const Type *p_to) {
 	// Which type Adobe's compiler gives `a = b` used as a value is not known, so it is not judged.
-	if (!p_value || !p_value->type || !p_to || p_value->kind == NodeKind::Assign) {
+	if (!p_value || !p_value->type || !p_to) {
+		return;
+	}
+	if (p_value->kind == NodeKind::Assign && p_to->kind != Type::Callback &&
+			!p_to->contains_fixed_array() && !p_value->type->contains_fixed_array()) {
+		return;
+	}
+	if (p_to->kind == Type::Callback) {
+		if (!callback_fits(p_value, p_to)) {
+			error(p_value->offset, "callback requires the exact signature " + quoted(compilation_.type_name(p_to)));
+		}
 		return;
 	}
 	if (p_to == int64_) {
@@ -220,6 +252,10 @@ void Typer::written(Expr *p_target) {
 		symbol = static_cast<Name *>(p_target)->symbol;
 	} else if (p_target->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(p_target);
+		if (member->object && member->object->type && member->object->type->kind == Type::FixedArray && member->name == "length") {
+			error(member->name_offset, "'length' is read-only");
+			return;
+		}
 		symbol = member->resolved();
 		offset = member->name_offset;
 		own_object = member->object && member->object->kind == NodeKind::ThisExpr;

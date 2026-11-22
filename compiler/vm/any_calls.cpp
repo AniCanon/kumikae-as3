@@ -64,8 +64,10 @@ Slot to_any(Library &p_library, Kind p_kind, Slot p_value) {
 	switch (p_kind) {
 		case Kind::I32:
 			return any::integer(p_value.i);
+		case Kind::U8:
 		case Kind::U32:
 			return p_value.u <= static_cast<uint32_t>(INT32_MAX) ? any::integer(static_cast<int32_t>(p_value.u)) : any::number(p_value.u);
+		case Kind::F32:
 		case Kind::F64:
 			return any_number(p_library, p_value.d);
 		case Kind::Bool:
@@ -98,7 +100,7 @@ Slot to_any(Library &p_library, Kind p_kind, Slot p_value) {
 // A store of an untyped value into a register of another kind: AS3's coercion. False if it raised.
 bool from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_out) {
 	r_out->bits = 0;
-	const bool numeric = p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64 || p_kind == Kind::I64;
+	const bool numeric = p_kind == Kind::U8 || p_kind == Kind::I32 || p_kind == Kind::U32 || ir::is_floating(p_kind) || p_kind == Kind::I64;
 	if (numeric && (any::tag(p_value) == AnyTag::Object || any::is_engine(p_value))) {
 		// An object as a number: its text, then that as a number (ECMAScript's ToPrimitive).
 		Slot primitive;
@@ -119,9 +121,15 @@ bool from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, S
 			r_out->i = tag == AnyTag::Wide ? (int32_t)(uint32_t)(uint64_t) static_cast<Wide *>(any::pointer(p_value))->value
 										   : to_int32(any::to_number(p_value));
 			return true;
+		case Kind::U8:
+			r_out->u = tag == AnyTag::Wide ? static_cast<uint8_t>(static_cast<Wide *>(any::pointer(p_value))->value) : static_cast<uint8_t>(to_uint32(any::to_number(p_value)));
+			return true;
 		case Kind::U32:
 			r_out->u = tag == AnyTag::Wide ? (uint32_t)(uint64_t) static_cast<Wide *>(any::pointer(p_value))->value
 										   : to_uint32(any::to_number(p_value));
+			return true;
+		case Kind::F32:
+			r_out->d = any::to_float(p_value);
 			return true;
 		case Kind::F64:
 			r_out->d = any::to_number(p_value);

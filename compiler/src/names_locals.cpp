@@ -18,6 +18,22 @@ bool same_type(const TypeRef *p_a, const TypeRef *p_b) {
 		if (a == TypeRef::Any || a == TypeRef::Void) {
 			return true;
 		}
+		if (a == TypeRef::FixedArray) {
+			p_a = p_a->argument;
+			p_b = p_b->argument;
+			continue;
+		}
+		if (a == TypeRef::Callback) {
+			if (p_a->parameters.count != p_b->parameters.count) {
+				return false;
+			}
+			for (uint32_t i = 0; i < p_a->parameters.count; ++i) {
+				if (!same_type(p_a->parameters[i], p_b->parameters[i])) {
+					return false;
+				}
+			}
+			return same_type(p_a->argument, p_b->argument);
+		}
 		if (!p_a->symbol || !p_b->symbol) {
 			return true;
 		}

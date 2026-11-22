@@ -284,7 +284,7 @@ std::optional<uint32_t> Lowerer::library_call(Call *p_call, Symbol *p_function) 
 		return library.string_method();
 	}
 	Kind number = Kind::Void;
-	if (owner && (owner == number_ || owner == int_ || owner == uint_ || owner == int64_ || owner == boolean_) && on_value &&
+	if (owner && (owner == byte_ || owner == float_ || owner == number_ || owner == int_ || owner == uint_ || owner == int64_ || owner == boolean_) && on_value &&
 			kind_of_class(owner, &number)) {
 		if (owner == boolean_) {
 			const uint32_t value = expression(library.object(), Kind::Bool);

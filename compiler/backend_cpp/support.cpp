@@ -21,6 +21,10 @@ bool fits(char p_wanted, Kind p_kind) {
 	switch (p_wanted) {
 		case 'n':
 			return p_kind == Kind::I32 || p_kind == Kind::U32;
+		case 'y':
+			return p_kind == Kind::U8;
+		case 'g':
+			return p_kind == Kind::F32;
 		case 'f':
 			return p_kind == Kind::F64;
 		case 'b':

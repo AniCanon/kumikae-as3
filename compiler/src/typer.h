@@ -27,6 +27,8 @@ class Typer {
 	const Type *unknown_;
 	const Type *int_;
 	const Type *uint_;
+	const Type *byte_;
+	const Type *float_;
 	const Type *number_;
 	const Type *int64_;
 	const Type *boolean_;
@@ -46,9 +48,9 @@ class Typer {
 
 
 
-	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == number_ || p_type == int64_; }
+	bool numeric(const Type *p_type) const { return p_type == byte_ || p_type == int_ || p_type == uint_ || p_type == float_ || p_type == number_ || p_type == int64_; }
 	// The types that hold whole numbers only.
-	bool integral(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == int64_; }
+	bool integral(const Type *p_type) const { return p_type == byte_ || p_type == int_ || p_type == uint_ || p_type == int64_; }
 	// The types that AS3's arithmetic is defined on without calling into a class.
 	bool primitive(const Type *p_type) const;
 
@@ -76,6 +78,7 @@ class Typer {
 	// flash.utils.Dictionary becomes a Godot dictionary. Nothing converts on the way back.
 	bool converts_to_engine(const Type *p_from, const Type *p_to) const;
 
+	bool callback_fits(Expr *p_value, const Type *p_to);
 	Fit fits(const Type *p_from, const Type *p_to) const;
 
 	// Reports a value that does not fit where it is stored or passed.

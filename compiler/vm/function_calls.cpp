@@ -124,6 +124,10 @@ int32_t function_length(const ir::Module &p_module, Object *p_function) {
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
+bool typed_function_matches(const Function &p_target, Kind p_result, const Kind *p_arguments, size_t p_count) {
+	return matches_callback(p_target, p_result, p_count, [&](size_t i) { return p_arguments[i]; });
+}
+
 Object *function_in(Library &p_library, Kind p_kind, Slot p_value) {
 	Object *object = nullptr;
 	if (p_kind == Kind::Any) {

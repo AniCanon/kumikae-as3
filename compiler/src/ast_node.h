@@ -53,11 +53,12 @@ struct Stmt : Node {};
 
 struct TypeRef : Node {
 	static const NodeKind KIND = NodeKind::TypeRef;
-	enum Form : uint8_t { Any, Void, Named, Applied }; // `*`, `void`, `a.b.C`, `Vector.<T>`
+	enum Form : uint8_t { Any, Void, Named, Applied, FixedArray, Callback }; // `*`, `void`, `a.b.C`, `Vector.<T>`
 	Form form = Any;
 	uint32_t completion_begin = 0; // After the token that introduced this type, including a missing type.
 	List<std::string_view> name; // Dotted parts, for Named and Applied.
 	List<uint32_t> name_offsets; // Where each part starts.
+	List<TypeRef *> parameters; // For a callback; argument holds its result.
 	TypeRef *argument = nullptr; // For Applied.
 	Symbol *symbol = nullptr; // The class or interface, for Named and Applied.
 };

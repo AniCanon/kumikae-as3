@@ -364,6 +364,42 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				assign(Kind::Str, r[in.a], string);
 				break;
 			}
+			case Op::I32ToU8:
+				r[in.a].u = static_cast<uint8_t>(r[in.b].i);
+				break;
+			case Op::U8ToI32:
+				r[in.a].i = static_cast<int32_t>(r[in.b].u);
+				break;
+			case Op::U32ToU8:
+				r[in.a].u = static_cast<uint8_t>(r[in.b].u);
+				break;
+			case Op::U8ToU32:
+				r[in.a].u = r[in.b].u;
+				break;
+			case Op::I64ToF32:
+				r[in.a].d = static_cast<float>(r[in.b].l);
+				break;
+			case Op::F64ToF32:
+				r[in.a].d = static_cast<float>(r[in.b].d);
+				break;
+			case Op::F32ToF64:
+				r[in.a].d = r[in.b].d;
+				break;
+			case Op::AddF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) + static_cast<float>(r[in.c].d);
+				break;
+			case Op::SubF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) - static_cast<float>(r[in.c].d);
+				break;
+			case Op::MulF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) * static_cast<float>(r[in.c].d);
+				break;
+			case Op::DivF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) / static_cast<float>(r[in.c].d);
+				break;
+			case Op::ModF32:
+				r[in.a].d = std::fmod(static_cast<float>(r[in.b].d), static_cast<float>(r[in.c].d));
+				break;
 			case Op::AddF64:
 				r[in.a].d = r[in.b].d + r[in.c].d;
 				break;
@@ -650,6 +686,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::MakeFunction:
 			case Op::MakeMethod:
 			case Op::MakeInterfaceMethod:
+			case Op::CallTypedFunction:
 			case Op::CallFunction:
 			case Op::FunctionToCallable:
 			case Op::CallbackThis:

@@ -3,6 +3,8 @@
 #include "lower_library.h"
 #include "lower_members.h"
 
+#include <cmath>
+
 namespace kas3 {
 namespace ir {
 
@@ -74,7 +76,12 @@ static Constant first_value(const Expr *p_written, Kind p_kind, const Type *p_ty
 		out.form = Constant::Form::Empty;
 	} else if (number) {
 		out.form = Constant::Form::Number;
-		out.number = (negative ? -1 : 1) * p_number(number);
+		const double value = (negative ? -1 : 1) * p_number(number);
+		out.number = p_kind == Kind::F32 ? static_cast<float>(value) : value;
+		if (p_kind == Kind::U8) {
+			const double low = std::isfinite(value) ? std::fmod(std::trunc(value), 256.0) : 0;
+			out.number = low < 0 ? low + 256 : low;
+		}
 	} else if (p_written->kind == NodeKind::New && p_written->type && p_written->type->symbol && export_constant(p_written)) {
 		const std::optional<std::string> godot = godot_name(p_written->type->symbol->name, std::string_view());
 		out.form = godot ? Constant::Form::Value : Constant::Form::None;

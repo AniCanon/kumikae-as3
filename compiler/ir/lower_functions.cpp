@@ -103,6 +103,21 @@ uint32_t Functions::value_call(Call *p_call, Kind p_want) {
 		l_.refuse(p_call->callee->offset, "calling a value of type '" + l_.compilation_.type_name(p_call->callee->type) + "'");
 		return l_.default_value(p_want, position);
 	}
+	if (const Type *type = p_call->callee->type; type && type->kind == Type::Callback) {
+		std::vector<uint32_t> list;
+		for (uint32_t i = 0; i < p_call->arguments.count; ++i) {
+			const Type *parameter = type->parameters[i];
+			Kind kind = Kind::Void;
+			l_.kind_of(parameter, &kind);
+			const uint32_t argument = l_.typed(p_call->arguments[i], parameter, kind);
+			list.push_back(l_.settled(argument, Lowerer::writer(p_call->arguments, i + 1), position));
+		}
+		Kind result = Kind::Void;
+		l_.kind_of(type->element, &result);
+		const uint32_t out = result == Kind::Void ? NONE : l_.reg(result);
+		l_.emit(Op::CallTypedFunction, position, out, value, l_.arguments(std::move(list)));
+		return out;
+	}
 	use_argument_error();
 	std::vector<uint32_t> list;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {

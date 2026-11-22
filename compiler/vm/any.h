@@ -152,6 +152,7 @@ bool is_engine(Slot p_value);
 // ECMAScript's conversions, where they need nothing outside the value. A script object or a Godot value
 // is not a number (NaN), and is true.
 double to_number(Slot p_value);
+float to_float(Slot p_value);
 bool to_boolean(Slot p_value);
 const char *type_of(Slot p_value);
 // The text of a value that needs nothing outside it; nothing for a script object or a Godot value or
