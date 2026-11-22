@@ -1,0 +1,48 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/dev/kumikae/coindash/presentation/SoundBank.as" id="SoundBank"]
+[ext_resource type="AudioStream" path="res://assets/start.wav" id="Start"]
+[ext_resource type="AudioStream" path="res://assets/silver.wav" id="Silver"]
+[ext_resource type="AudioStream" path="res://assets/gold.wav" id="Gold"]
+[ext_resource type="AudioStream" path="res://assets/hit.wav" id="Hit"]
+[ext_resource type="AudioStream" path="res://assets/dash.wav" id="Dash"]
+[ext_resource type="AudioStream" path="res://assets/tick.wav" id="Tick"]
+[ext_resource type="AudioStream" path="res://assets/finish.wav" id="Finish"]
+
+[node name="SoundBank" type="Node" node_paths=PackedStringArray("startPlayer", "silverPlayer", "goldPlayer", "hitPlayer", "dashPlayer", "tickPlayer", "finishPlayer")]
+script = ExtResource("SoundBank")
+startPlayer = NodePath("Start")
+silverPlayer = NodePath("Silver")
+goldPlayer = NodePath("Gold")
+hitPlayer = NodePath("Hit")
+dashPlayer = NodePath("Dash")
+tickPlayer = NodePath("Tick")
+finishPlayer = NodePath("Finish")
+
+[node name="Start" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Start")
+volume_db = -8.0
+
+[node name="Silver" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Silver")
+volume_db = -8.0
+
+[node name="Gold" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Gold")
+volume_db = -8.0
+
+[node name="Hit" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Hit")
+volume_db = -8.0
+
+[node name="Dash" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Dash")
+volume_db = -8.0
+
+[node name="Tick" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Tick")
+volume_db = -8.0
+
+[node name="Finish" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("Finish")
+volume_db = -8.0

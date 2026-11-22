@@ -28,11 +28,13 @@ The source root is `src/`. Each public ActionScript 3 class lives in the directo
 
 | Under `dev.kumikae.coindash` | What to change here |
 |---|---|
-| [config](src/dev/kumikae/coindash/config/RoundRules.as) | Round length, pickup values, hit penalty and dash timing. The HUD reads these same rules. |
-| [gameplay](src/dev/kumikae/coindash/gameplay) | `Round` tracks the clock and pickups. `Rooftop` connects the scene, maps input and places the pickup routes. |
-| [entities](src/dev/kumikae/coindash/entities) | `Player` steers and dashes. `Scanner` owns its patrol, beam and hit test. Each actor draws its own sprite. |
-| [presentation](src/dev/kumikae/coindash/presentation/Hud.as) | Scoreboard, menus and pickup feedback. |
+| [config](src/dev/kumikae/coindash/config) | `RoundRules` owns round length, pickup values, hit penalty and dash timing. `InputAction` holds the action names. |
+| [gameplay](src/dev/kumikae/coindash/gameplay) | `Round` is pure ActionScript 3 simulation. `Rooftop` connects typed `[Export]` actors, `[Signal]`s, input and pickup routes. |
+| [entities](src/dev/kumikae/coindash/entities) | `Player` steers and dashes. `Coin` emits `collected`. `Scanner` owns its patrol, beam and hit test. Each actor draws itself with cached `Palette` colors. |
+| [presentation](src/dev/kumikae/coindash/presentation) | `Hud` (`CanvasLayer`, dirty-checked scoreboard, menus and `[Signal]` buttons), `SoundBank` (typed audio triggers) and `Palette` (shared colors). |
 | [storage](src/dev/kumikae/coindash/storage/Ledger.as) | Loading and saving the best score. |
+
+Scenes and theme are split cleanly: `main.tscn` instances [scenes/Hud.tscn](scenes/Hud.tscn) and [scenes/SoundBank.tscn](scenes/SoundBank.tscn), styled by [assets/game-theme.tres](assets/game-theme.tres), with every dependency wired through typed `[Export]` node references and compile-time `[Signal]`s — zero `getNode()` lookups or stringly-typed `.call()` bridges.
 
 The scene-and-actor split follows the play state and player in the Flash game *Mode*. Actor-specific tuning stays with the actor, so the scanner’s beam drawing and collision check use one length. [Mode play state](https://github.com/AdamAtomic/Mode/blob/master/src/PlayState.as) · [Mode player](https://github.com/AdamAtomic/Mode/blob/master/src/Player.as)
 
@@ -44,4 +46,4 @@ To try hot reload, change the scarf shape in `Player._draw` and save during a ru
 python3 testing/runner.py examples/coin-dash/kas3-tests.json --compiler compiler/build/kas3c --require-pass
 ```
 
-The ActionScript 3 tests cover the buzzer, restart, dash immunity, hit penalty, the scanner’s patrol reset and silver and gold pickups through Godot physics. The [Claude Code plugin](../../editors/claude/README.md) also packages this project as its standalone starter.
+The ActionScript 3 tests cover the buzzer, restart, dash immunity, hit penalty, the scanner’s patrol reset, HUD signal wiring and silver and gold pickups through Godot physics. The [Claude Code plugin](../../editors/claude/README.md) also packages this project as its standalone starter.
