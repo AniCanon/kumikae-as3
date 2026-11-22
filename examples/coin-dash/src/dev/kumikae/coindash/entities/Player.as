@@ -66,8 +66,29 @@ package dev.kumikae.coindash.entities {
             modulate = blinking ? Palette.PLAYER_GRACE : Color.WHITE;
         }
 
-        private function pixel(x:Number, y:Number, w:Number, h:Number, color:Color):void {
-            drawRect(new Rect2(facing > 0 ? x : -x - w, y, w, h), color);
+        private var poses:[][]Rect2 = new [4] []Rect2;
+
+        private function pixel(direction:int, x:int, y:int, w:int, h:int):Rect2 {
+            return new Rect2(direction > 0 ? x : -x - w, y, w, h);
+        }
+
+        private function makePose(direction:int, lift:int):[]Rect2 {
+            return new []Rect2 {
+                pixel(direction, -10, -21 + lift, 17, 4),
+                pixel(direction, -13, -17 + lift, 24, 14),
+                pixel(direction, -11, -17 + lift, 20, 9),
+                pixel(direction, -8, -20 + lift, 14, 5),
+                pixel(direction, -2, -15 + lift, 14, 7),
+                pixel(direction, 1, -14 + lift, 10, 3),
+                pixel(direction, -10, -5, 18, 13),
+                pixel(direction, -7, -4, 12, 10),
+                pixel(direction, -8, -5, 16, 4),
+                pixel(direction, -15, -5 + lift, 8, 3),
+                pixel(direction, -20, -7 + lift * 2, 6, 3),
+                pixel(direction, -12, 0, 5, 6),
+                pixel(direction, -8 - lift * 2, 7 - lift, 7, 5),
+                pixel(direction, 2 + lift * 2, 6 + lift, 7, 5)
+            };
         }
 
         override public function _draw():void {
@@ -78,20 +99,26 @@ package dev.kumikae.coindash.entities {
                 drawLine(tail, Vector2.ZERO, Palette.PLAYER_SUIT, 7);
                 drawLine(tail * 0.75, Vector2.ZERO, Palette.PLAYER_LIGHT, 3);
             }
-            pixel(-10, -21 + lift, 17, 4, Palette.PLAYER_INK);
-            pixel(-13, -17 + lift, 24, 14, Palette.PLAYER_INK);
-            pixel(-11, -17 + lift, 20, 9, Palette.PLAYER_SUIT);
-            pixel(-8, -20 + lift, 14, 5, Palette.PLAYER_LIGHT);
-            pixel(-2, -15 + lift, 14, 7, Palette.PLAYER_INK);
-            pixel(1, -14 + lift, 10, 3, Palette.PLAYER_LIGHT);
-            pixel(-10, -5, 18, 13, Palette.PLAYER_INK);
-            pixel(-7, -4, 12, 10, Palette.PLAYER_SUIT);
-            pixel(-8, -5, 16, 4, Palette.PLAYER_SCARF);
-            pixel(-15, -5 + lift, 8, 3, Palette.PLAYER_SCARF);
-            pixel(-20, -7 + lift * 2, 6, 3, Palette.PLAYER_SCARF);
-            pixel(-12, 0, 5, 6, Palette.PLAYER_LIGHT);
-            pixel(-8 - lift * 2, 7 - lift, 7, 5, Palette.PLAYER_INK);
-            pixel(2 + lift * 2, 6 + lift, 7, 5, Palette.PLAYER_INK);
+            var index:int = (facing > 0 ? 0 : 2) + lift;
+            var pose:[]Rect2 = poses[index];
+            if (pose == null) {
+                pose = makePose(facing, lift);
+                poses[index] = pose;
+            }
+            drawRect(pose[0], Palette.PLAYER_INK);
+            drawRect(pose[1], Palette.PLAYER_INK);
+            drawRect(pose[2], Palette.PLAYER_SUIT);
+            drawRect(pose[3], Palette.PLAYER_LIGHT);
+            drawRect(pose[4], Palette.PLAYER_INK);
+            drawRect(pose[5], Palette.PLAYER_LIGHT);
+            drawRect(pose[6], Palette.PLAYER_INK);
+            drawRect(pose[7], Palette.PLAYER_SUIT);
+            drawRect(pose[8], Palette.PLAYER_SCARF);
+            drawRect(pose[9], Palette.PLAYER_SCARF);
+            drawRect(pose[10], Palette.PLAYER_SCARF);
+            drawRect(pose[11], Palette.PLAYER_LIGHT);
+            drawRect(pose[12], Palette.PLAYER_INK);
+            drawRect(pose[13], Palette.PLAYER_INK);
         }
     }
 }
