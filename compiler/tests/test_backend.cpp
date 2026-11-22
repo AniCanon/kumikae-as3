@@ -584,7 +584,26 @@ void one_vector_read_twice_has_its_places_once() {
 	CHECK(has("if (KAS3_UNLIKELY(!d2)) goto L1;"));
 }
 
+void a_typed_callback_uses_the_typed_entry() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module = module_of({ Kind::Obj, Kind::I32, Kind::F64, Kind::Str },
+			{ ir::Instruction{ Op::CallTypedFunction, 3, 0, 0, 0 },
+					ir::Instruction{ Op::CallTypedFunction, ir::NONE, 0, 1, 0 } });
+	module.functions[0].parameters = 3;
+	module.functions[0].required = 3;
+	module.functions[0].argument_lists = { { 1, 2 }, {} };
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK(made.unsupported.empty());
+	const std::string *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("Slot a[] = { empty(), slot(r1), slot(r2) };") != std::string::npos);
+	CHECK(text && text->find("call_typed_value(c, r0, a, 2, kinds,") != std::string::npos);
+	CHECK(text && text->find("call_typed_value(c, r0, a, 0, nullptr,") != std::string::npos);
+	CHECK(text && text->find("call_value(c,") == std::string::npos);
+}
+
 int main() {
+	a_typed_callback_uses_the_typed_entry();
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
 	what_is_left_to_the_library_is_one_statement();

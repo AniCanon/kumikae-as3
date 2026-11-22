@@ -164,7 +164,44 @@ const ir::Function *FunctionWriter::callee_of(const Instruction &p_in) const {
 	return nullptr;
 }
 
+void FunctionWriter::call_typed(const Instruction &p_in) {
+	const std::vector<uint32_t> &arguments = function_.argument_lists[p_in.c];
+	const bool kept = p_in.a != NONE;
+	const Kind result = kept ? kind(p_in.a) : Kind::Void;
+	const auto kind_literal = [](Kind p_kind) {
+		return "static_cast<kas3::ir::Kind>(" + std::to_string(static_cast<uint8_t>(p_kind)) + ")";
+	};
+	std::string values = "empty()"; // The bound receiver, if the callback has one, goes first.
+	std::string kinds;
+	for (uint32_t argument : arguments) {
+		values += ", slot(" + reg(argument) + ")";
+		kinds += (kinds.empty() ? "" : ", ") + kind_literal(kind(argument));
+	}
+	mark();
+	line("{");
+	line("Slot a[] = { " + values + " };");
+	if (!arguments.empty()) {
+		line("static constexpr kas3::ir::Kind kinds[] = { " + kinds + " };");
+	}
+	if (kept) {
+		line("Slot w = empty();");
+	}
+	line("if (call_typed_value(c, " + reg(p_in.b) + ", a, " + std::to_string(arguments.size()) + ", " +
+			(arguments.empty() ? "nullptr" : "kinds") + ", " + kind_literal(result) + ", " + (kept ? "&w" : "nullptr") + ")) {");
+	check();
+	if (kept) {
+		put(p_in.a, from_slot(result, "w"));
+	}
+	line("} else");
+	by_thunk(p_in);
+	line("}");
+}
+
 bool FunctionWriter::call(const Instruction &p_in) {
+	if (p_in.op == Op::CallTypedFunction) {
+		call_typed(p_in);
+		return true;
+	}
 	if (p_in.op == Op::Call) {
 		const bool quiet = facts_ && facts_->functions[p_in.b].quiet;
 		call_function(p_in, module_.functions[p_in.b], { Target{ "", function_name(module_, p_in.b) } }, quiet, !quiet);

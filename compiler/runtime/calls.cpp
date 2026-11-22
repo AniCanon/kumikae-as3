@@ -238,6 +238,25 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 	return true;
 }
 
+bool call_typed_value(Context *c, Object *p_function, Slot *p_arguments, uint32_t p_count, const Kind *p_kinds, Kind p_result, Slot *r_result) {
+	const Program &program = *c->program;
+	if (!p_function || p_function->klass != program.known.function) {
+		return false;
+	}
+	const uint32_t index = static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX));
+	if (index >= program.function_count || !vm::typed_function_matches(c->host->module.functions[index], p_result, p_kinds, p_count)) {
+		return false;
+	}
+	const FunctionInfo &callee = program.functions[index];
+	if (callee.is_static) {
+		callee.entry(c, p_arguments + 1, p_count, r_result);
+	} else {
+		p_arguments[0] = slot(field<Object *>(p_function, ir::FUNCTION_FIRST));
+		callee.entry(c, p_arguments, p_count + 1, r_result);
+	}
+	return true;
+}
+
 bool object_text(Context *c, Object *p_object, Str **r_text) {
 	if (!p_object) {
 		return false;
