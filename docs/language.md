@@ -97,6 +97,33 @@ reaches the construct, with an error that says `is not supported by the interpre
 
 ## Additions to AS3
 
+### Typed callbacks
+
+Write the parameter types in parentheses and the result after `=>`.
+
+```actionscript
+function counter(start:int):(int)=>int {
+    return function(step:int):int { return start += step; };
+}
+var next:(int)=>int = counter(10);
+trace(next(2), next(3)); // 12 15
+```
+
+A callback can hold a function expression, a script method bound to its receiver, a package function,
+another callback with the same signature, or `null`. Bindings require an exact match, including the
+result. Calls check the number and types of arguments and perform the same scalar conversions as
+a named call. Write `()=>void` for a callback that takes no arguments and returns nothing.
+
+Callback parameters and results can use `Boolean`, `byte`, `int`, `uint`, `Int64`, `float`, `Number`
+and `String`. The result can also be `void`. Targets take a fixed number of required parameters. Their
+bodies can use `arguments`. A callback can be passed, returned or stored in a field. Assign it to
+`Function` to use `.call`, `.apply` or other Function members. An assignment from an erased
+`Function`, `Object` or `*` to a callback is a compile error. If dynamic code supplies a function
+through a method argument or field, calling it through the annotation checks the signature at runtime.
+A mismatch raises `TypeError`.
+
+### Other additions
+
 - **`byte`.** Declare an unsigned eight-bit integer with `var b:byte` or convert a value with
   `byte(value)`. Assignments, arguments and returns truncate toward zero and keep the low eight bits.
   For example, `byte(-1.9)` gives 255 and `byte(256)` gives 0. NaN, infinity and null convert to zero.

@@ -1,5 +1,7 @@
 # `src/`: the front end
 
+Callback annotations such as `(int, String)=>void` are interned by their complete signature. Binding checks the declared target, and calling checks the arguments against that signature.
+
 The front end turns source text into a checked syntax tree. It holds the lexer, the parser, name resolution
 and the type checker, plus the queries an editor asks. `kas3c check`, the lowerer and the language server
 all read its result.

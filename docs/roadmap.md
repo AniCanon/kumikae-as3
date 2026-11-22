@@ -27,6 +27,8 @@ state of the project changes.
 
 ### The language at run time
 
+- **Typed callbacks** such as `(int)=>int` check scalar signatures and carry arguments and results in their declared register kinds.
+
 - **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`
   and `continue`.
 - **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.

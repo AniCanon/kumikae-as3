@@ -8,6 +8,8 @@ Only the host differs. This folder also holds AS3's standard library, which nati
 
 ## The host
 
+A typed callback uses its Function object’s target and bound receiver or closure environment. The interpreter checks the target signature and passes raw slots into the new frame. A mismatching target from dynamic code raises `TypeError`.
+
 The interpreter knows where it runs only through four interfaces, gathered in `host.h`:
 
 | Interface | What it gives |

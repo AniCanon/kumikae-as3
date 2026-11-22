@@ -16,6 +16,8 @@ The byte kind and its integer conversions also use appended wire values.
 
 ## The IR
 
+`CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.
+
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,
   so values carry no tags.
 - **Plain data.** A module holds no pointers into the syntax tree. It can be compared, printed and
