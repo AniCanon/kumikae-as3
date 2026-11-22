@@ -71,6 +71,7 @@ void place(Variant *r_place, ir::Kind p_kind, const vm::Slot &p_slot) {
 		case ir::Kind::I32:
 			new (r_place) Variant(static_cast<int64_t>(p_slot.i));
 			return;
+		case ir::Kind::U8:
 		case ir::Kind::U32:
 			new (r_place) Variant(static_cast<int64_t>(p_slot.u));
 			return;
@@ -299,6 +300,16 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 	bool ok = true;
 	if (p_class.element_bare != ir::Bare::None) {
 		ok = bare_collection(p_type, p_class.element_bare, p_vector, &made, r_error);
+	} else if (p_type == "PackedByteArray" && p_kind == ir::Kind::U8 && p_vector->bytes) {
+		PackedByteArray packed;
+		if (p_vector->length) {
+			if (packed.resize(p_vector->length) != OK) {
+				*r_error = "could not allocate a PackedByteArray";
+				return nullptr;
+			}
+			std::memcpy(packed.ptrw(), vm::bytes_of(p_vector), p_vector->length);
+		}
+		made = packed;
 	} else if (p_type == "PackedByteArray") {
 		ok = whole_numbers<PackedByteArray>(p_kind, p_vector, 0, 255, "a byte", &made, r_error);
 	} else if (p_type == "PackedInt32Array") {

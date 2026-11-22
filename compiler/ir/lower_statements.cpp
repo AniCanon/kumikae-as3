@@ -202,6 +202,7 @@ bool Lowerer::can_be_equal(Kind p_a, Kind p_b) {
 	const auto family = [](Kind p_kind) {
 		switch (p_kind) {
 			case Kind::I32:
+			case Kind::U8:
 			case Kind::U32:
 			case Kind::F64:
 			case Kind::F32:

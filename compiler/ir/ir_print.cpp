@@ -12,6 +12,8 @@ const char *kind_name(Kind p_kind) {
 			return "void";
 		case Kind::I32:
 			return "int";
+		case Kind::U8:
+			return "byte";
 		case Kind::U32:
 			return "uint";
 		case Kind::I64:

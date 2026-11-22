@@ -42,6 +42,7 @@ std::string_view type_of(Kind p_kind) {
 	switch (p_kind) {
 		case Kind::I32:
 			return "int32_t";
+		case Kind::U8:
 		case Kind::U32:
 			return "uint32_t";
 		case Kind::F32:
@@ -94,6 +95,7 @@ std::string_view slot_member(Kind p_kind) {
 	switch (p_kind) {
 		case Kind::I32:
 			return "i";
+		case Kind::U8:
 		case Kind::U32:
 			return "u";
 		case Kind::F32:

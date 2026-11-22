@@ -11,6 +11,7 @@ package {
 		private var heard:Array = [];
 		[Signal] public var struck:Signal;
 		[Export] public var singlePrecision:float = 16777217;
+		[Export] public var singleByte:byte = 300;
 
 		// A function value that gives one of Godot's values or objects, called every way there is, and
 		// `arguments` of a function whose parameters are such values.
@@ -681,6 +682,18 @@ package {
 		}
 
 		public function floatEcho(value:float):float {
+			return value;
+		}
+
+		public function byteBuffer(target:StreamPeerBuffer, values:Array):void {
+			var bytes:Vector.<byte> = new Vector.<byte>();
+			for (var i:int = 0; i < values.length; i++) {
+				bytes.push(byte(values[i]));
+			}
+			target.dataArray = bytes;
+		}
+
+		public function byteEcho(value:byte):byte {
 			return value;
 		}
 

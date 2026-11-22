@@ -22,6 +22,7 @@ enum class Kind : uint8_t {
 	I64, // Int64: Godot's own integer
 	Any, // `*` or `Object`: any value, with what it is beside it (vm/any.h)
 	F32, // float
+	U8, // byte
 };
 
 inline constexpr bool is_floating(Kind p_kind) {
@@ -193,7 +194,8 @@ inline bool is_held(Kind p_kind) {
 	   (HostOperate, by Module::subtract_operator and the rest); where Godot has none for what they hold, \
 	   and for everything else, it is AS3's: both made Numbers (which may run a valueOf()). */ \
 	X(AnySub, "RRR") X(AnyMul, "RRR") X(AnyDiv, "RRR") X(AnyMod, "RRR") X(AnyNeg, "RR-") \
-	X(F64ToF32, "RR-") X(F32ToF64, "RR-") X(AddF32, "RRR") X(SubF32, "RRR") X(MulF32, "RRR") X(DivF32, "RRR") X(ModF32, "RRR") X(I64ToF32, "RR-")
+	X(F64ToF32, "RR-") X(F32ToF64, "RR-") X(AddF32, "RRR") X(SubF32, "RRR") X(MulF32, "RRR") X(DivF32, "RRR") X(ModF32, "RRR") X(I64ToF32, "RR-") \
+	X(U32ToU8, "RR-") X(U8ToU32, "RR-") X(I32ToU8, "RR-") X(U8ToI32, "RR-")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

@@ -203,6 +203,10 @@ const Type *Typer::binary(Binary *p_binary) {
 	} else if (p_binary->op != TokenKind::Slash && right == int64_ && read_wide_literal(p_binary->left).state == WideLiteral::State::Fits) {
 		left = int64_;
 	}
+	if ((p_binary->op == TokenKind::KwIs || p_binary->op == TokenKind::KwAs) && right->kind == Type::ClassObject && right->element == byte_) {
+		error(p_binary->right->offset, "an untyped byte is an int; use 'byte(value)' to convert it");
+		return p_binary->op == TokenKind::KwIs ? boolean_ : unknown_;
+	}
 	if ((p_binary->op == TokenKind::KwIs || p_binary->op == TokenKind::KwAs) && right->kind == Type::ClassObject && right->element == float_) {
 		error(p_binary->right->offset, "an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it");
 		return p_binary->op == TokenKind::KwIs ? boolean_ : unknown_;

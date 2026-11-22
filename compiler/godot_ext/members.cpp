@@ -88,6 +88,13 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 		case ir::Kind::F64:
 			type = Variant::FLOAT;
 			break;
+		case ir::Kind::U8:
+			type = Variant::INT;
+			if (p_exported) {
+				hint = PROPERTY_HINT_RANGE;
+				hint_string = "0,255,1";
+			}
+			break;
 		case ir::Kind::I32:
 		case ir::Kind::U32:
 		case ir::Kind::I64:
@@ -497,6 +504,8 @@ bool field_default(uint32_t p_class, const StringName &p_name, Variant *r_value)
 				slot.d = static_cast<float>(first.number);
 			} else if (field.kind == ir::Kind::I32) {
 				slot.i = vm::to_int32(first.number);
+			} else if (field.kind == ir::Kind::U8) {
+				slot.u = static_cast<uint8_t>(vm::to_uint32(first.number));
 			} else if (field.kind == ir::Kind::U32) {
 				slot.u = vm::to_uint32(first.number);
 			} else if (field.kind == ir::Kind::I64 && std::isfinite(first.number)) {

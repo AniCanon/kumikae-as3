@@ -18,6 +18,7 @@ namespace {
 constexpr bool repeatable(Op p_op) {
 	switch (p_op) {
 		case Op::Stmt: case Op::ConstI32: case Op::ConstU32: case Op::ConstF64: case Op::ConstBool: case Op::ConstStr: case Op::ConstNull:
+		case Op::I32ToU8: case Op::U8ToI32: case Op::U32ToU8: case Op::U8ToU32:
 		case Op::I64ToF32: case Op::F32ToF64: case Op::F64ToF32: case Op::AddF32: case Op::SubF32: case Op::MulF32: case Op::DivF32: case Op::ModF32:
 		case Op::Move: case Op::I32ToF64: case Op::U32ToF64: case Op::BoolToF64: case Op::StrToF64: case Op::F64ToI32: case Op::F64ToU32:
 		case Op::I32ToU32: case Op::U32ToI32: case Op::I32ToBool: case Op::U32ToBool: case Op::F64ToBool: case Op::StrToBool:

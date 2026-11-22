@@ -217,6 +217,13 @@ static void test_vectors() {
 	CHECK_EQ(live_objects(), objects);
 	// A vector of ints or of uints: each place is four bytes, the number itself, and a place read as a slot
 	// holds it in its first four bytes with nothing after them. The sanitizer build holds the room to that.
+	Vector *bytes = new_vector(7, 3, false, 0, true, nullptr, true);
+	CHECK(bytes && place_size(bytes) == 1);
+	bytes_of(bytes)[2] = 255;
+	CHECK(vector_reserve(bytes, 1000));
+	CHECK_EQ(place(bytes, 2).bits, uint64_t{255});
+	CHECK_EQ(bytes_of(bytes)[999], 0);
+	free_vector(bytes);
 	Vector *narrow = new_vector(7, 3, false, 0, true, nullptr);
 	CHECK(narrow && narrow->narrow && place_size(narrow) == 4);
 	CHECK_EQ(place_size(vector == nullptr ? narrow : narrow), sizeof(int32_t));

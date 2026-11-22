@@ -67,6 +67,11 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 				r_value->i = tag == AnyTag::Int ? vm::any::to_int_payload(p_any) : vm::to_int32(vm::any::to_number_payload(p_any));
 			}
 			return number;
+		case Kind::U8:
+			if (number) {
+				r_value->u = static_cast<uint8_t>(vm::to_uint32(vm::any::to_number(p_any)));
+			}
+			return number;
 		case Kind::U32:
 			if (number) {
 				r_value->u = vm::to_uint32(vm::any::to_number(p_any));
@@ -122,6 +127,7 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 		case Kind::I32:
 			*r_any = vm::any::integer(p_result.i);
 			return true;
+		case Kind::U8:
 		case Kind::U32:
 			*r_any = to_any(c, p_result.u);
 			return true;

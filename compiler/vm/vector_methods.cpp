@@ -342,7 +342,9 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_find(p_library, vector, call);
 			break;
 		case VectorMethod::Reverse:
-			if (vector->floating) {
+			if (vector->bytes) {
+				std::reverse(bytes_of(vector), bytes_of(vector) + vector->length);
+			} else if (vector->floating) {
 				std::reverse(floats_of(vector), floats_of(vector) + vector->length);
 			} else if (vector->narrow) {
 				std::reverse(numbers_of(vector), numbers_of(vector) + vector->length);

@@ -76,6 +76,11 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.c)) {
 				return false;
 			}
+			if (kind(p_in.a) == Kind::U8) {
+				line("if (uint8_t *const e = byte_element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+				line("\t" + reg(p_in.a) + " = *e;");
+				break;
+			}
 			if (kind(p_in.a) == Kind::F32) {
 				line("if (float *const e = float_element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
 				line("\t" + reg(p_in.a) + " = *e;");
@@ -95,6 +100,11 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.
 			if (!whole(p_in.b)) {
 				return false;
+			}
+			if (kind(p_in.c) == Kind::U8) {
+				line("if (uint8_t *const e = byte_element(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+				line("\t*e = " + reg(p_in.c) + ";");
+				break;
 			}
 			if (kind(p_in.c) == Kind::F32) {
 				line("if (float *const e = float_element(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
@@ -121,7 +131,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			const std::string length = "static_cast<Vector *>(" + reg(list[0]) + ")->length";
-			if (kind(list[1]) == Kind::F32) {
+			if (kind(list[1]) == Kind::U8 || kind(list[1]) == Kind::F32) {
 				return false;
 			}
 			if (whole(list[1])) {

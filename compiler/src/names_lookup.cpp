@@ -55,8 +55,8 @@ static void add_match(const Compilation &p_compilation, const Context &p_from, S
 // a library's `Object` is the library's.
 Found Compilation::lookup_package_level(const Context &p_from, std::string_view p_name) const {
 	Found found;
-	if (p_from.unit->is_builtin && p_name == "float") {
-		found.first = float_;
+	if (p_from.unit->is_builtin && (p_name == "float" || p_name == "byte")) {
+		found.first = builtin(p_name);
 		return found;
 	}
 	bool ordered = p_from.unit->is_declaration;
@@ -90,8 +90,8 @@ Found Compilation::lookup_package_level(const Context &p_from, std::string_view 
 			}
 		}
 	}
-	if (!found.first && !found.hidden && !found.suppressed && p_name == "float") {
-		found.first = float_;
+	if (!found.first && !found.hidden && !found.suppressed && (p_name == "float" || p_name == "byte")) {
+		found.first = builtin(p_name);
 	}
 	return found;
 }

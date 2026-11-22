@@ -10,6 +10,10 @@ A float register has kind `F32`. Binary32 arithmetic and conversions have their 
 The kind and instructions follow the existing wire values, so earlier modules retain their encoding.
 Loading a module that uses float requires a runtime that recognizes the appended kind and instructions.
 
+A byte register has kind `U8`. The VM slot uses its unsigned integer member. Conversion to a byte
+keeps the low eight bits of an unsigned integer, and arithmetic widens it before operating.
+The byte kind and its integer conversions also use appended wire values.
+
 ## The IR
 
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,

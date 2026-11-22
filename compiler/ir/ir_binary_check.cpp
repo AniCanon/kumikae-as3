@@ -60,12 +60,22 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 		return false;
 	}
 	switch (p_in.op) {
+		case Op::ConstU32:
+			return p_fn.registers[p_in.a] != Kind::U8 || p_in.b <= UINT8_MAX;
 		case Op::ConstF64:
 			if (p_fn.registers[p_in.a] == Kind::F32) {
 				const double value = p_module.numbers[p_in.b];
 				return std::isnan(value) || static_cast<float>(value) == value;
 			}
 			break;
+		case Op::I32ToU8:
+			return p_fn.registers[p_in.a] == Kind::U8 && p_fn.registers[p_in.b] == Kind::I32;
+		case Op::U8ToI32:
+			return p_fn.registers[p_in.a] == Kind::I32 && p_fn.registers[p_in.b] == Kind::U8;
+		case Op::U32ToU8:
+			return p_fn.registers[p_in.a] == Kind::U8 && p_fn.registers[p_in.b] == Kind::U32;
+		case Op::U8ToU32:
+			return p_fn.registers[p_in.a] == Kind::U32 && p_fn.registers[p_in.b] == Kind::U8;
 		case Op::I64ToF32:
 			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::I64;
 		case Op::F64ToF32:

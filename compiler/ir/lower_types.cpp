@@ -43,6 +43,8 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::U32;
 	} else if (symbol == int64_) {
 		*r_kind = Kind::I64;
+	} else if (symbol == byte_) {
+		*r_kind = Kind::U8;
 	} else if (symbol == float_) {
 		*r_kind = Kind::F32;
 	} else if (symbol == number_) {
@@ -259,6 +261,7 @@ uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position, const Type *p_
 		case Kind::I32:
 			emit(Op::ConstI32, p_position, out, 0);
 			break;
+		case Kind::U8:
 		case Kind::U32:
 			emit(Op::ConstU32, p_position, out, 0);
 			break;
@@ -331,6 +334,19 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 	Kind from = kind_at(p_reg);
 	if (from == p_to || p_to == Kind::Void) {
 		return p_reg;
+	}
+	if (p_to == Kind::U8 || from == Kind::U8) {
+		if (p_to == Kind::U8) {
+			const bool signed_input = from == Kind::I32;
+			const uint32_t whole = signed_input ? p_reg : convert(p_reg, Kind::U32, p_position, true);
+			const uint32_t out = reg(Kind::U8);
+			emit(signed_input ? Op::I32ToU8 : Op::U32ToU8, p_position, out, whole);
+			return out;
+		}
+		const bool signed_output = p_to == Kind::I32;
+		const uint32_t whole = reg(signed_output ? Kind::I32 : Kind::U32);
+		emit(signed_output ? Op::U8ToI32 : Op::U8ToU32, p_position, whole, p_reg);
+		return convert(whole, p_to, p_position, p_written);
 	}
 	if (p_to == Kind::F32 || from == Kind::F32) {
 		if (p_to == Kind::F32) {
@@ -538,6 +554,8 @@ bool Lowerer::kind_of_class(const Symbol *p_class, Kind *r_kind) {
 		*r_kind = Kind::U32;
 	} else if (p_class == int64_) {
 		*r_kind = Kind::I64;
+	} else if (p_class == byte_) {
+		*r_kind = Kind::U8;
 	} else if (p_class == float_) {
 		*r_kind = Kind::F32;
 	} else if (p_class == number_) {
@@ -553,11 +571,11 @@ bool Lowerer::kind_of_class(const Symbol *p_class, Kind *r_kind) {
 }
 
 bool Lowerer::is_numeric(Kind p_kind) {
-	return p_kind == Kind::I32 || p_kind == Kind::U32 || is_floating(p_kind) || p_kind == Kind::I64;
+	return p_kind == Kind::U8 || p_kind == Kind::I32 || p_kind == Kind::U32 || is_floating(p_kind) || p_kind == Kind::I64;
 }
 
 bool Lowerer::is_integral(Kind p_kind) {
-	return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64;
+	return p_kind == Kind::U8 || p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64;
 }
 
 bool Lowerer::is_string_type(const Type *p_type) const {

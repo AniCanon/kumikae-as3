@@ -117,6 +117,22 @@ func _float32(probe: Node2D) -> void:
 	label.free()
 
 
+func _bytes(probe: Node2D) -> void:
+	var buffer := StreamPeerBuffer.new()
+	probe.call("byteBuffer", buffer, [-1, 256, 8.75, NAN, INF, 255, 0])
+	print("PROBE packed byte values=", buffer.data_array == PackedByteArray([255, 0, 8, 0, 0, 255, 0]))
+	probe.call("byteBuffer", buffer, [])
+	print("PROBE packed byte empty=", buffer.data_array.is_empty())
+	print("PROBE byte from Godot integer=", probe.call("byteEcho", 255) == 255)
+	print("PROBE byte from Godot number=", probe.call("byteEcho", 42.0) == 42)
+	print("PROBE byte inspector default=", probe.get_script().get_property_default_value("singleByte") == 44
+			and probe.get("singleByte") == 44)
+	probe.set("singleByte", 19)
+	print("PROBE byte field from Godot=", probe.get("singleByte") == 19)
+	probe.set("singleByte", 256)
+	print("PROBE byte field rejects out of range=", probe.get("singleByte") == 19)
+
+
 func _initialize() -> void:
 	var probe := Node2D.new()
 	probe.set_script(load("res://Probe.as"))
@@ -146,6 +162,7 @@ func _initialize() -> void:
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
 	_float32(probe)
+	_bytes(probe)
 	_enter()
 	_places()
 	_loops()

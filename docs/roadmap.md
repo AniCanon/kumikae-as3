@@ -32,6 +32,7 @@ state of the project changes.
 - **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.
 - **The standard library:** `String`, `Number`, `Math`, `JSON`, `Date`, `RegExp`, and the top-level
   functions.
+- **Opt-in `byte` and `Vector.<byte>`.** Byte vectors store one byte per element and copy directly to Godot's `PackedByteArray`.
 - **AS3's runtime errors,** with stack traces that name the `.as` file and line.
 
 ### Inside Godot

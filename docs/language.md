@@ -97,6 +97,16 @@ reaches the construct, with an error that says `is not supported by the interpre
 
 ## Additions to AS3
 
+- **`byte`.** Declare an unsigned eight-bit integer with `var b:byte` or convert a value with
+  `byte(value)`. Assignments, arguments and returns truncate toward zero and keep the low eight bits.
+  For example, `byte(-1.9)` gives 255 and `byte(256)` gives 0. NaN, infinity and null convert to zero.
+  Scalar variables start at zero. Arithmetic follows the existing integer promotion rules, so
+  `byte(255) + byte(1)` gives the Number 256. Storing that result in a byte gives zero.
+  An untyped byte holds an int. Existing declarations named `byte` keep their meaning.
+  Godot passes a byte to an AS3 method or exported field as a whole number from 0 through 255.
+- **`Vector.<byte>`.** Each element uses one contiguous byte and starts at zero. Indexed writes and
+  vector methods apply the same conversion as scalar stores. Each `Vector.<uint>` or `Vector.<int>`
+  element continues to occupy four bytes.
 - **`float`.** Use `var x:float` or `float(value)` for IEEE 754 single precision. Assignment, arguments,
   returns and vector writes round to binary32, including when the input is an `Int64`. Two float operands
   produce a float for `+`, `-`, `*`, `/` and `%`. With an `int`, `uint`, `Int64` or `Number` operand,

@@ -112,7 +112,7 @@ uint32_t Operators::logical(Binary *p_binary, Kind p_want) {
 		Kind b = Lowerer::is_null(right) ? Kind::Void : l_.natural(right);
 		if (a != b && Lowerer::is_integral(a) && Lowerer::is_integral(b) && (a == Kind::I64 || b == Kind::I64)) {
 			a = b = Kind::I64; // An Int64 holds both, as the checker took it.
-		} else if (a != b && (a == Kind::F32 || b == Kind::F32) && Lowerer::is_numeric(a) && Lowerer::is_numeric(b)) {
+		} else if (a != b && (a == Kind::F32 || b == Kind::F32 || a == Kind::U8 || b == Kind::U8) && Lowerer::is_numeric(a) && Lowerer::is_numeric(b)) {
 			a = b = Kind::F64;
 		}
 		kind = a == Kind::Void ? b : a;

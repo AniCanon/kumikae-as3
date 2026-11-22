@@ -248,6 +248,7 @@ Typer::Typer(Compilation &p_compilation, Unit &p_unit) :
 	unknown_ = compilation_.unknown_type();
 	int_ = builtin("int");
 	uint_ = builtin("uint");
+	byte_ = builtin("byte");
 	float_ = builtin("float");
 	number_ = builtin("Number");
 	int64_ = builtin("Int64");

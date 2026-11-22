@@ -25,7 +25,7 @@ std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 
 // An index of any kind a register may declare for it, as a Number: what an error about it says.
 double index_number(Kind p_kind, Slot p_index) {
-	return p_kind == Kind::I32 ? p_index.i : p_kind == Kind::U32 ? static_cast<double>(p_index.u) : p_index.d;
+	return p_kind == Kind::I32 ? p_index.i : (p_kind == Kind::U32 || p_kind == Kind::U8) ? static_cast<double>(p_index.u) : p_index.d;
 }
 
 } // namespace
@@ -34,7 +34,7 @@ std::optional<uint32_t> element_index(Kind p_kind, Slot p_index, uint32_t p_limi
 	if (p_kind == Kind::I32) {
 		return p_index.i >= 0 && static_cast<uint32_t>(p_index.i) < p_limit ? std::optional<uint32_t>(static_cast<uint32_t>(p_index.i)) : std::nullopt;
 	}
-	if (p_kind == Kind::U32) {
+	if (p_kind == Kind::U32 || p_kind == Kind::U8) {
 		return p_index.u < p_limit ? std::optional<uint32_t>(p_index.u) : std::nullopt;
 	}
 	return element_index(p_index.d, p_limit);

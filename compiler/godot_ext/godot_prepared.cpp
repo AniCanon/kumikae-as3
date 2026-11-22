@@ -56,6 +56,7 @@ std::optional<int> type_held(const ir::Function &p_function, uint32_t p_register
 		case ir::Kind::F32:
 		case ir::Kind::F64:
 			return (int)Variant::FLOAT;
+		case ir::Kind::U8:
 		case ir::Kind::I32:
 		case ir::Kind::U32:
 		case ir::Kind::I64:
@@ -106,12 +107,13 @@ const void *bare(const vm::Argument &p_operand, int p_type, Scalar *r_scalar) {
 	switch (p_type) {
 		case Variant::FLOAT: {
 			const bool real = kind == ir::Kind::F64 || kind == ir::Kind::F32;
-			r_scalar->number = real ? p_operand.slot.d : kind == ir::Kind::I32 ? p_operand.slot.i : kind == ir::Kind::U32 ? p_operand.slot.u : 0.0;
-			return real || kind == ir::Kind::I32 || kind == ir::Kind::U32 ? r_scalar : nullptr;
+			const bool unsigned_whole = kind == ir::Kind::U32 || kind == ir::Kind::U8;
+			r_scalar->number = real ? p_operand.slot.d : kind == ir::Kind::I32 ? p_operand.slot.i : unsigned_whole ? p_operand.slot.u : 0.0;
+			return real || kind == ir::Kind::I32 || unsigned_whole ? r_scalar : nullptr;
 		}
 		case Variant::INT:
 			r_scalar->integer = kind == ir::Kind::I64 ? p_operand.slot.l : kind == ir::Kind::I32 ? p_operand.slot.i : (int64_t)p_operand.slot.u;
-			return kind == ir::Kind::I64 || kind == ir::Kind::I32 || kind == ir::Kind::U32 ? r_scalar : nullptr;
+			return kind == ir::Kind::I64 || kind == ir::Kind::I32 || kind == ir::Kind::U32 || kind == ir::Kind::U8 ? r_scalar : nullptr;
 		case Variant::BOOL:
 			r_scalar->boolean = p_operand.slot.b;
 			return kind == ir::Kind::Bool ? r_scalar : nullptr;
@@ -447,7 +449,7 @@ std::unique_ptr<Worked> operator_of(const ir::Function &p_function, const ir::In
 	const std::optional<int> left = type_held(p_function, list[0]);
 	const std::optional<int> right = list.size() == 2 ? type_held(p_function, list[1]) : std::optional<int>((int)Variant::NIL);
 	const std::optional<int> result = out == ir::Kind::Bool ? std::optional<int>((int)Variant::BOOL) : type_held(p_function, p_in.a);
-	if (list.size() > 2 || p_words.size() < 2 || !left || !right || !result || (out == ir::Kind::I32 || out == ir::Kind::U32)) {
+	if (list.size() > 2 || p_words.size() < 2 || !left || !right || !result || (out == ir::Kind::I32 || out == ir::Kind::U32 || out == ir::Kind::U8)) {
 		return nullptr;
 	}
 	// Godot checks a whole-number divisor for zero only where it can say so (its checked evaluate): dividing

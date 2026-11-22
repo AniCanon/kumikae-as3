@@ -132,7 +132,7 @@ void free_object(Object *p_object) {
 	std::free(p_object);
 }
 
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list) {
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list, bool p_bytes) {
 	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
 	if (!memory) {
 		return nullptr;
@@ -143,6 +143,7 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 	vector->fixed = p_fixed;
 	vector->bare = p_bare;
 	vector->narrow = p_narrow;
+	vector->bytes = p_bytes;
 	objects_alive++;
 	if (!vector_reserve(vector, p_length)) {
 		free_vector(vector);

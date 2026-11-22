@@ -81,6 +81,9 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 }
 
 Symbol *Compilation::builtin(std::string_view p_name) const {
+	if (p_name == "byte") {
+		return byte_;
+	}
 	if (p_name == "float") {
 		return float_;
 	}

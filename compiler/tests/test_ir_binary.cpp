@@ -76,6 +76,9 @@ static void test_round_trip_program_and_execution() {
 			public class Main extends Base {
 				public function Main() {
 					var nums:Vector.<int> = new <int>[10, 20, 30];
+					var signed:int = -1;
+					var bytes:Vector.<byte> = new <byte>[signed];
+					trace(int(bytes[0]));
 					var singles:Vector.<float> = new <float>[16777217];
 					trace(singles[0] + float(1), singles[0] + 1);
 					var sum:int = 0;
@@ -97,6 +100,9 @@ static void test_round_trip_program_and_execution() {
 	ir::Module original;
 	CHECK(lower_files({ { "Main.as", main_src }, { "Base.as", base }, { "Greeter.as", greeter } }, false, &original));
 
+	const std::string listing = ir::print(original);
+	CHECK(listing.find("I32ToU8") != std::string::npos);
+	CHECK(listing.find("U8ToI32") != std::string::npos);
 	const std::vector<uint8_t> bytes = ir::write_binary(original);
 	CHECK(!bytes.empty());
 
@@ -106,7 +112,7 @@ static void test_round_trip_program_and_execution() {
 	CHECK_EQ(ir::print(decoded), ir::print(original));
 	CHECK_EQ(ir::fingerprint(decoded), ir::fingerprint(original));
 	CHECK_EQ(run_program(decoded), run_program(original));
-	CHECK_EQ(run_program(decoded), std::string("16777216 16777217\nhi as3:2 60 boom\ndone\n"));
+	CHECK_EQ(run_program(decoded), std::string("255\n16777216 16777217\nhi as3:2 60 boom\ndone\n"));
 }
 
 static void test_round_trip_godot_script_metadata() {
@@ -181,6 +187,14 @@ static void test_rejects_invalid_references() {
 		return ir::read_binary(bytes.data(), bytes.size(), &decoded).has_value();
 	};
 	ir::Module broken = original;
+	broken.functions.front().code.front() = { ir::Op::U32ToU8, 0, 0, 0, 0 };
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().registers.push_back(ir::Kind::U8);
+	const uint32_t byte = static_cast<uint32_t>(broken.functions.front().registers.size() - 1);
+	broken.functions.front().code.front() = { ir::Op::ConstU32, byte, 256, 0, 0 };
+	CHECK(invalid(broken));
+	broken = original;
 	broken.functions.front().registers.push_back(ir::Kind::F32);
 	const uint32_t single = static_cast<uint32_t>(broken.functions.front().registers.size() - 1);
 	const uint32_t number = static_cast<uint32_t>(broken.numbers.size());

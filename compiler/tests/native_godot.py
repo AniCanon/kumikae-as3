@@ -140,7 +140,9 @@ class Runner:
                                line.lstrip().startswith("at ") or line.lstrip().startswith("at: ")]
                 for case in ("float32 bits", "float32 NaN", "float32 empty", "integer float32 bits",
                              "packed float bits", "packed float NaN", "packed float empty",
-                             "float from Godot number", "float from Godot integer", "float inspector default", "float field from Godot"):
+                             "float from Godot number", "float from Godot integer", "float inspector default", "float field from Godot",
+                             "packed byte values", "packed byte empty", "byte from Godot integer", "byte from Godot number",
+                             "byte inspector default", "byte field from Godot", "byte field rejects out of range"):
                     self.check("%s: %s" % (label, case), "PROBE %s=true" % case in said[label], text[-600:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")

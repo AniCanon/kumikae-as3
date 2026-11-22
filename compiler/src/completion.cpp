@@ -151,6 +151,9 @@ class Completer {
 				sorted.push_back(p_symbol);
 			}
 		};
+		if (Symbol *byte = compilation_.builtin("byte")) {
+			take(byte);
+		}
 		if (Symbol *single = compilation_.builtin("float")) {
 			take(single);
 		}
