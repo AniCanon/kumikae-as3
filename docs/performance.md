@@ -90,12 +90,17 @@ last.
 ### Call Godot directly
 
 - **Typed calls, prepared once.** Each call into Godot is resolved to Godot's own function pointer the first
-  time it runs. After that, arguments pass as plain values, with no boxing and no lookup by name.
+  time it runs. After that, arguments pass as plain values, with no boxing and no lookup by name. Values held
+  in a handle (such as a `Color` constant or a `Rect2` field) are unboxed inline for the call, up to four
+  omitted default arguments are filled from what Godot declares, and a `static const String` initialized to a
+  single literal across the program reuses a cached `StringName`.
 - **Signals go straight to the engine.** `emit()` calls Godot's emit function with values built where Godot
   reads them. A listener that receives exactly the types it declares is entered with no conversion.
 - **Node handles are shared, not copied.** A script's reference to a node is one shared handle. The node
   behind it is cached, and Godot notifies the runtime when a node is freed, so the cache is never stale. A
-  freed node is still an AS3 error, never a crash.
+  freed node is still an AS3 error, never a crash. Borrowed script-owner handles are flagged inline in the
+  handle header rather than looked up in a side table, and cross-thread runtime atomics sit on their own
+  cache line to avoid false sharing with the main thread.
 
 ### Keep values where they're used
 

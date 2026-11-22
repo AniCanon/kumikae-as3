@@ -45,12 +45,10 @@ package game {
     public class Door extends Area2D {
         [Export] public var openTime:Number = 0.5;
         [Export] public var tint:Color = new Color(1, 0.8, 0.2);
+        [Export] public var timer:Timer;
         [Signal] public var opened:Signal;
 
-        private var timer:Timer;
-
         override public function _ready():void {
-            timer = getNode("Timer") as Timer;
             timer.timeout.add(onTimeout);
             bodyEntered.addOnce(onBodyEntered);
         }
@@ -294,7 +292,9 @@ The field must be:
 
 - A public instance field of a class that extends a Godot class.
 - Of a type Godot can store: a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`,
-  or, in a node's script, a `Node`.
+  or, in a node's script, a `Node`. That includes your own AS3 script classes that extend `Resource` or
+  `Node` (for example `[Export] public var hud:Hud;` or `[Export] public var rider:Player;`), so scenes can
+  wire script references in the inspector with full compile-time typing and no `getNode()` casts.
 - Given a constant as its first value: a number, a string, a Boolean, `null`, nothing, or a Godot value
   made from numbers, such as `new Vector2(1, 2)`.
 
