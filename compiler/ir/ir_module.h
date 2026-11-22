@@ -151,7 +151,7 @@ struct Class {
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
 	// The nominal name is carried into packs, reload and generated programs. No AS3 identifier starts with '['.
-	bool fixed_array() const { return name.compare(0, 2, "[]") == 0; }
+	bool fixed_array() const { return name.size() >= 2 && name[0] == '[' && name[1] == ']'; }
 	// Object and flash.utils.Dictionary: objects that are vm::Table, keyed by text (a Dictionary also by the
 	// identity of an object), with no fields.
 	bool table = false;
