@@ -3,6 +3,7 @@
 #include "check.h"
 
 #include "any.h"
+#include "fields.h"
 #include "json_text.h"
 #include "number_text.h"
 #include "numeric.h"
@@ -244,6 +245,52 @@ static void test_vectors() {
 	clear_places(narrow, 0, 1000);
 	CHECK_EQ(numbers_of(narrow)[1], 0);
 	free_vector(narrow);
+	CHECK_EQ(live_objects(), objects);
+}
+
+static void test_fixed_array_allocation() {
+	const size_t objects = live_objects();
+	struct Shape {
+		const char *name;
+		kas3::ir::Kind kind;
+		size_t width;
+	};
+	const Shape shapes[] = {
+		{ "[]byte", kas3::ir::Kind::U8, 1 },
+		{ "[]float", kas3::ir::Kind::F32, 4 },
+		{ "[]int", kas3::ir::Kind::I32, 4 },
+		{ "[]String", kas3::ir::Kind::Str, sizeof(Slot) },
+	};
+	for (const auto &[name, kind, width] : shapes) {
+		kas3::ir::Class klass;
+		klass.name = name;
+		klass.element = kind;
+		Vector *array = new_vector_of(klass, 7, 3, true, nullptr);
+		CHECK(array);
+		if (!array) {
+			continue;
+		}
+		CHECK(array->fixed && array->length == 3 && array->capacity == 3);
+		CHECK_EQ(array->places, static_cast<void *>(array + 1));
+		CHECK_EQ(place_size(array), width);
+		CHECK_EQ(place(array, 2).bits, uint64_t{0});
+		CHECK(!vector_reserve(array, 4));
+		CHECK_EQ(array->length, 3u);
+		free_vector(array);
+	}
+
+	kas3::ir::Class empty_class;
+	empty_class.name = "[]int";
+	empty_class.element = kas3::ir::Kind::I32;
+	Vector *empty = new_vector_of(empty_class, 7, 0, true, nullptr);
+	CHECK(empty && empty->length == 0 && empty->capacity == 0 && !empty->places);
+	if (empty) {
+		CHECK(!vector_reserve(empty, 1));
+		free_vector(empty);
+	}
+	fail_allocations(1);
+	CHECK(!new_vector_of(empty_class, 7, 3, true, nullptr));
+	fail_allocations(0);
 	CHECK_EQ(live_objects(), objects);
 }
 
@@ -769,6 +816,7 @@ int main() {
 	test_long_text();
 	test_any();
 	test_vectors();
+	test_fixed_array_allocation();
 	test_math();
 	test_integers();
 	test_number_text();

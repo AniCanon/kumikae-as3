@@ -132,20 +132,34 @@ void free_object(Object *p_object) {
 	std::free(p_object);
 }
 
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list, bool p_bytes) {
-	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list,
+		bool p_bytes, VectorPlaces p_places) {
+	const bool inline_places = p_places == VectorPlaces::Inline;
+	size_t bytes = sizeof(Vector);
+	if (inline_places) {
+		const size_t width = place_size(p_bytes, p_narrow);
+		if (p_length > (SIZE_MAX - bytes) / width) {
+			return nullptr;
+		}
+		bytes += p_length * width;
+	}
+	void *memory = allocation_fails() ? nullptr : std::calloc(1, bytes);
 	if (!memory) {
 		return nullptr;
 	}
 	Vector *vector = new (memory) Vector();
 	vector->references = 1;
 	vector->klass = p_class;
-	vector->fixed = p_fixed;
+	vector->fixed = p_fixed || inline_places;
 	vector->bare = p_bare;
 	vector->narrow = p_narrow;
 	vector->bytes = p_bytes;
+	vector->inline_places = inline_places;
 	objects_alive++;
-	if (!vector_reserve(vector, p_length)) {
+	if (inline_places) {
+		vector->places = p_length ? vector + 1 : nullptr;
+		vector->capacity = p_length;
+	} else if (!vector_reserve(vector, p_length)) {
 		free_vector(vector);
 		return nullptr;
 	}
@@ -159,6 +173,9 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	if (p_capacity <= p_vector->capacity) {
 		return true;
+	}
+	if (p_vector->inline_places) {
+		return false;
 	}
 	// Half as much again, so that a run of pushes copies each element a bounded number of times.
 	const uint64_t grown = (uint64_t)p_vector->capacity + p_vector->capacity / 2;
@@ -179,7 +196,9 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 
 void free_vector(Vector *p_vector) {
 	list_remove(p_vector);
-	std::free(p_vector->places);
+	if (!p_vector->inline_places) {
+		std::free(p_vector->places);
+	}
 	objects_alive--;
 	std::free(p_vector);
 }

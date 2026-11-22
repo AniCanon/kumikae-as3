@@ -55,7 +55,7 @@ inline Slot &slot_at(Object *p_object, size_t p_slot) {
 
 class Entries; // vm/table.h
 
-// A Vector.<T>: an object whose class says what its elements are. They are held like fields: untagged
+// A Vector.<T> or fixed array: an object whose class says what its elements are. They are held like fields: untagged
 // slots of that one kind, except where a byte, int, uint or float fits in a smaller place.
 struct Vector : Object {
 	uint32_t length;
@@ -69,6 +69,7 @@ struct Vector : Object {
 	bool narrow; // Elements use fewer bytes than a Slot.
 	bool floating; // Four-byte float places.
 	bool bytes; // One-byte unsigned places.
+	bool inline_places; // The element storage is part of the same allocation.
 	// Access elements through place() and set_place() when their layout is not known.
 	void *places;
 	Entries *properties; // An Array's properties other than its indices, once it has any (vm/table.h).
@@ -88,8 +89,11 @@ inline float *floats_of(const Vector *p_vector) {
 	return static_cast<float *>(p_vector->places);
 }
 // How many bytes a place of the vector takes.
+inline size_t place_size(bool p_bytes, bool p_narrow) {
+	return p_bytes ? sizeof(uint8_t) : p_narrow ? sizeof(int32_t) : sizeof(Slot);
+}
 inline size_t place_size(const Vector *p_vector) {
-	return p_vector->bytes ? sizeof(uint8_t) : p_vector->narrow ? sizeof(int32_t) : sizeof(Slot);
+	return place_size(p_vector->bytes, p_vector->narrow);
 }
 // What a place holds, as a slot of the element's kind holds it (an int or a uint in the slot's first four
 // bytes, the rest zero), and a place given what such a slot holds. Nothing is counted by either.
@@ -181,7 +185,9 @@ Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
 void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
 // One reference; `p_length` elements, all zero; p_bare is what its class says its places hold whole
 // (Vector::bare), p_narrow whether they are four bytes each (Vector::narrow). Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list, bool p_bytes = false);
+enum class VectorPlaces : uint8_t { Separate, Inline };
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list,
+		bool p_bytes = false, VectorPlaces p_places = VectorPlaces::Separate);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.

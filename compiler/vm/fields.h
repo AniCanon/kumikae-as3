@@ -55,7 +55,9 @@ inline bool narrow_places(const ir::Class &p_class) {
 
 // A new vector of a class: new_vector(), told what the class says its places hold.
 inline Vector *new_vector_of(const ir::Class &p_class, uint32_t p_index, uint32_t p_length, bool p_fixed, Object *p_list) {
-	Vector *vector = new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), narrow_places(p_class), p_list, p_class.element == ir::Kind::U8);
+	const VectorPlaces places = p_class.name.compare(0, 2, "[]") == 0 ? VectorPlaces::Inline : VectorPlaces::Separate;
+	Vector *vector = new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), narrow_places(p_class), p_list,
+			p_class.element == ir::Kind::U8, places);
 	if (vector) {
 		vector->floating = p_class.element == ir::Kind::F32;
 	}

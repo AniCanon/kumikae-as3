@@ -92,6 +92,8 @@ host that keeps nothing gets the request by name instead.
   per element. Other vectors use an eight-byte slot. Use `place()`, `set_place()`, `move_places()`
   and `clear_places()` in `runtime.h` to access any layout. Scalar bytes use the slot's unsigned
   integer member. A scalar float uses its double member to hold the exact widened binary32 value.
+- **A fixed array allocates its header and element storage together.** It uses the same packed
+  element widths as a vector. Its storage is never reserved again.
 - **A `Vector.<Vector2>` or `Vector.<Vector2i>` stores each value in place:** eight bytes, never a handle
   and never `null`. A value crosses into a register through `read_element()` and back through
   `write_element()`. Storing `null` is TypeError #1034.
