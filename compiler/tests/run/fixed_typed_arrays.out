@@ -5,6 +5,7 @@ push
 typed bounds
 dynamic bounds
 3 7 false
+false true false
 true false true
 2
 19 3 2

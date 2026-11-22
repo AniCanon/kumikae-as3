@@ -13,6 +13,7 @@ package {
             try { nums[size] = 1; } catch (e:RangeError) { trace("typed bounds"); }
             try { alias[size] = 1; } catch (e:RangeError) { trace("dynamic bounds"); }
             trace(nums.length, nums[0], alias is Vector.<int>);
+            trace(7 is []int, (7 as []int) === null, "word" is []String);
             var ordinary:Vector.<int> = new Vector.<int>(1, true);
             trace(alias is []int, alias is []uint, (alias as []int) === nums);
             alias = ordinary;
