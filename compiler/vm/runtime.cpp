@@ -159,9 +159,13 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 	if (inline_places) {
 		vector->places = p_length ? vector + 1 : nullptr;
 		vector->capacity = p_length;
-	} else if (!vector_reserve(vector, p_length)) {
-		free_vector(vector);
-		return nullptr;
+	} else if (p_length) {
+		vector->places = allocation_fails() ? nullptr : std::calloc(p_length, place_size(vector));
+		if (!vector->places) {
+			free_vector(vector);
+			return nullptr;
+		}
+		vector->capacity = p_length;
 	}
 	vector->length = p_length;
 	if (p_list) {
