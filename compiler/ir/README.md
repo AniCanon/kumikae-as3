@@ -6,6 +6,8 @@ tree that `src/` gives.
 
 **Depends on:** `src/` only. It includes no Godot header and nothing from `vm/`.
 
+Fixed-length arrays have distinct class names, including the element type (`[]int`, for example). They use the vector allocation, index and length instructions. Packed modules and generated programs retain that class identity.
+
 A float register has kind `F32`. Binary32 arithmetic and conversions have their own instructions.
 The kind and instructions follow the existing wire values, so earlier modules retain their encoding.
 Loading a module that uses float requires a runtime that recognizes the appended kind and instructions.

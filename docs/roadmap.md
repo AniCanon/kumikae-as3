@@ -27,6 +27,8 @@ state of the project changes.
 
 ### The language at run time
 
+- **Fixed-length typed arrays.** `[]T` supports allocation by length, list initialization, indexed reads and writes, and nominal runtime type checks.
+
 - **Typed callbacks** such as `(int)=>int` check scalar signatures and carry arguments and results in their declared register kinds.
 
 - **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`

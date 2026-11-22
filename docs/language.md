@@ -97,6 +97,30 @@ reaches the construct, with an error that says `is not supported by the interpre
 
 ## Additions to AS3
 
+### Fixed-length typed arrays
+
+Use `[]T` to declare an array whose length is fixed when you create it. Allocate by length with
+`new [length] T`, or list the initial values in braces. The syntax opts in wherever you write it.
+
+```actionscript
+var scores:[]int = new [4] int;
+scores[0] = 12;
+var names:[]String = new []String { "Ada", "Jo" };
+var rounds:[][]int = new [][]int { scores, new []int { 7, 5 } };
+```
+
+Indices run from zero through `length - 1`. Read the length with `scores.length`.
+Writing past the end raises `RangeError`, including through a variable typed `*`.
+Length must be a nonnegative whole number that fits a `uint`. A request that exceeds the
+runtime allocation limit raises an error. Each new element has the same initial value and
+storage width as an element of `Vector.<T>`.
+
+The array type includes its element type. For example, `value is []int` checks for the exact
+array type, and `value as []int` returns the array or `null`. Assigning a `Vector.<int>` to
+a field typed `[]int` is a type error even when the vector has its `fixed` flag set. An
+array exposes its indices and read-only `length`. To store functions, use `[]Function`.
+Typed callback signatures and `void` cannot be array element types.
+
 ### Typed callbacks
 
 Write the parameter types in parentheses and the result after `=>`.
