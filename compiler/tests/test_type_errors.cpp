@@ -51,6 +51,12 @@ static void test_conversions_accepted() {
 }
 
 static void test_fixed_arrays() {
+	expect(program("var row:[]int; var a:[]int = /*!*/ints = new Vector.<int>();"
+				   "var b:Vector.<int> = /*!*/row = new [2] int;"
+				   "var c:Vector.<[]int> = new <[]int>[/*!*/ints];"
+				   "var d:Vector.<Vector.<int>> = new <Vector.<int>>[/*!*/row];"),
+			{ UNRELATED("Vector.<int>", "[]int"), UNRELATED("[]int", "Vector.<int>"),
+					UNRELATED("Vector.<int>", "[]int"), UNRELATED("[]int", "Vector.<int>") });
 	expect(program("var a:[]Base = new [count] Base; var b:[]Sub = /*!*/a; var c:[]int = /*!*/ints;"
 				   "var d:Vector.<Base> = /*!*/a; a./*!*/length = 1; a./*!*/fixed = false; a./*!*/push(sub);"
 				   "var e:[]Base = new []Base { /*!*/other }; a[0] = /*!*/other; for each (var v:Vector.<int> in /*!*/new [][]int {}) {}"),

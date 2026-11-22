@@ -193,7 +193,11 @@ bool Typer::callback_fits(Expr *p_value, const Type *p_to) {
 
 void Typer::store(Expr *p_value, const Type *p_to) {
 	// Which type Adobe's compiler gives `a = b` used as a value is not known, so it is not judged.
-	if (!p_value || !p_value->type || !p_to || (p_value->kind == NodeKind::Assign && p_to->kind != Type::Callback)) {
+	if (!p_value || !p_value->type || !p_to) {
+		return;
+	}
+	if (p_value->kind == NodeKind::Assign && p_to->kind != Type::Callback &&
+			!p_to->contains_fixed_array() && !p_value->type->contains_fixed_array()) {
 		return;
 	}
 	if (p_to->kind == Type::Callback) {

@@ -138,7 +138,7 @@ const Type *Typer::literal_type(Expr *p_expression) {
 			const Type *type = compilation_.type_of(literal->element_type);
 			const Type *element = literal->fixed_array ? type->element : type;
 			for (Expr *each : literal->elements) {
-				if (literal->fixed_array) {
+				if (literal->fixed_array || element->contains_fixed_array() || (each && each->type && each->type->contains_fixed_array())) {
 					store(each, element);
 				}
 				no_null_place(each, element);
