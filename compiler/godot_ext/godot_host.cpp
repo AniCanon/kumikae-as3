@@ -70,6 +70,7 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 			return Variant((int64_t)p_slot.u);
 		case ir::Kind::I64:
 			return Variant(p_slot.l);
+		case ir::Kind::F32:
 		case ir::Kind::F64:
 			return Variant(p_slot.d);
 		case ir::Kind::Bool:
@@ -121,6 +122,8 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 	Variant::Type type = p_value.get_type();
 	bool number = type == Variant::INT || type == Variant::FLOAT;
 	switch (p_kind) {
+		case ir::Kind::F32:
+			return number;
 		case ir::Kind::F64: {
 			// One of Godot's integers is taken as a Number only if the Number holds the very same value.
 			if (type != Variant::INT) {
@@ -219,6 +222,13 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 			break;
 		case ir::Kind::I64:
 			slot.l = p_value.get_type() == Variant::FLOAT ? (int64_t)(double)p_value : (int64_t)p_value;
+			break;
+		case ir::Kind::F32:
+			if (p_value.get_type() == Variant::INT) {
+				slot.d = static_cast<float>(static_cast<int64_t>(p_value));
+			} else {
+				slot.d = static_cast<float>(static_cast<double>(p_value));
+			}
 			break;
 		case ir::Kind::F64:
 			slot.d = (double)p_value;

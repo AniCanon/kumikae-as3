@@ -55,6 +55,10 @@ static void add_match(const Compilation &p_compilation, const Context &p_from, S
 // a library's `Object` is the library's.
 Found Compilation::lookup_package_level(const Context &p_from, std::string_view p_name) const {
 	Found found;
+	if (p_from.unit->is_builtin && p_name == "float") {
+		found.first = float_;
+		return found;
+	}
 	bool ordered = p_from.unit->is_declaration;
 	add_match(*this, p_from, find_in(p_from.unit->helpers, p_name), found);
 	add_match(*this, p_from, find_in(p_from.package->definitions, p_name), found);
@@ -85,6 +89,9 @@ Found Compilation::lookup_package_level(const Context &p_from, std::string_view 
 				found.suppressed |= failed == p_name;
 			}
 		}
+	}
+	if (!found.first && !found.hidden && !found.suppressed && p_name == "float") {
+		found.first = float_;
 	}
 	return found;
 }

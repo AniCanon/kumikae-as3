@@ -23,6 +23,7 @@ Slot of_bool(bool p_value) {
 // Whether two elements are the same value, as `===` has it.
 bool same_element(Kind p_kind, Slot p_a, Slot p_b) {
 	switch (p_kind) {
+		case Kind::F32:
 		case Kind::F64:
 			return p_a.d == p_b.d;
 		case Kind::Bool:

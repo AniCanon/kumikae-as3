@@ -364,6 +364,30 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				assign(Kind::Str, r[in.a], string);
 				break;
 			}
+			case Op::I64ToF32:
+				r[in.a].d = static_cast<float>(r[in.b].l);
+				break;
+			case Op::F64ToF32:
+				r[in.a].d = static_cast<float>(r[in.b].d);
+				break;
+			case Op::F32ToF64:
+				r[in.a].d = r[in.b].d;
+				break;
+			case Op::AddF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) + static_cast<float>(r[in.c].d);
+				break;
+			case Op::SubF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) - static_cast<float>(r[in.c].d);
+				break;
+			case Op::MulF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) * static_cast<float>(r[in.c].d);
+				break;
+			case Op::DivF32:
+				r[in.a].d = static_cast<float>(r[in.b].d) / static_cast<float>(r[in.c].d);
+				break;
+			case Op::ModF32:
+				r[in.a].d = std::fmod(static_cast<float>(r[in.b].d), static_cast<float>(r[in.c].d));
+				break;
 			case Op::AddF64:
 				r[in.a].d = r[in.b].d + r[in.c].d;
 				break;

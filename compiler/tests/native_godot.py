@@ -138,7 +138,9 @@ class Runner:
                 # What the probe gave, and the error Godot was told of with its trace.
                 said[label] = [line for line in text.split("\n") if line.startswith("PROBE ") or line.startswith("SCRIPT ERROR") or
                                line.lstrip().startswith("at ") or line.lstrip().startswith("at: ")]
-                for case in ("float32 bits", "float32 NaN", "float32 empty", "integer float32 bits"):
+                for case in ("float32 bits", "float32 NaN", "float32 empty", "integer float32 bits",
+                             "packed float bits", "packed float NaN", "packed float empty",
+                             "float from Godot number", "float from Godot integer", "float inspector default", "float field from Godot"):
                     self.check("%s: %s" % (label, case), "PROBE %s=true" % case in said[label], text[-600:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")

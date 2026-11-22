@@ -97,6 +97,18 @@ reaches the construct, with an error that says `is not supported by the interpre
 
 ## Additions to AS3
 
+- **`float`.** Use `var x:float` or `float(value)` for IEEE 754 single precision. Assignment, arguments,
+  returns and vector writes round to binary32, including when the input is an `Int64`. Two float operands
+  produce a float for `+`, `-`, `*`, `/` and `%`. With an `int`, `uint`, `Int64` or `Number` operand,
+  these operations use the existing `Number` rules. Literals keep their ordinary types. For example,
+  `float(16777216) + float(1)` gives 16777216, while `float(16777216) + 1` gives 16777217.
+  Scalar variables start at NaN. `float()` and `float(null)` give positive zero. Conversions preserve
+  signed zero, infinities and NaN. At a `*` or `Object` boundary a float becomes a Number. Use
+  `is Number` to test that value and `float(value)` to recover single precision. Formatting uses
+  Number's methods on the rounded value. Existing AS3 declarations named `float` keep their meaning.
+- **`Vector.<float>`.** Each element occupies four contiguous bytes and starts at positive zero.
+  `Vector.<Number>` uses eight bytes per element. Assign a float vector to a Godot
+  `PackedFloat32Array` to copy the packed values.
 - **`Int64`.** A 64-bit integer type, because Godot's integers have 64 bits. Arithmetic on it wraps at 64
   bits, `/` gives a `Number`, and a comparison with a `Number` is exact. An `Int64` converts to `int`,
   `uint` or `Number` where one is expected, and raises a `RangeError` if the value doesn't fit. Writing

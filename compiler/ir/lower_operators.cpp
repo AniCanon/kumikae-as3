@@ -22,6 +22,7 @@ struct Arithmetic {
 	TokenKind op;
 	TokenKind assign; // The same operator written with `=`.
 	Op narrow;
+	Op single; // Binary32 arithmetic, or Stmt for bitwise operators.
 	Kind operands;
 	Kind result;
 	Op wide; // Op::Stmt: none.
@@ -29,17 +30,17 @@ struct Arithmetic {
 };
 
 constexpr Arithmetic ARITHMETIC[] = {
-	{ TokenKind::Plus, TokenKind::PlusAssign, Op::AddF64, Kind::F64, Kind::F64, Op::AddI64, true },
-	{ TokenKind::Minus, TokenKind::MinusAssign, Op::SubF64, Kind::F64, Kind::F64, Op::SubI64, true },
-	{ TokenKind::Star, TokenKind::StarAssign, Op::MulF64, Kind::F64, Kind::F64, Op::MulI64, true },
-	{ TokenKind::Slash, TokenKind::SlashAssign, Op::DivF64, Kind::F64, Kind::F64, Op::Stmt, true },
-	{ TokenKind::Percent, TokenKind::PercentAssign, Op::ModF64, Kind::F64, Kind::F64, Op::ModI64, true },
-	{ TokenKind::Amp, TokenKind::AmpAssign, Op::BitAnd, Kind::I32, Kind::I32, Op::BitAndI64, false },
-	{ TokenKind::Pipe, TokenKind::PipeAssign, Op::BitOr, Kind::I32, Kind::I32, Op::BitOrI64, false },
-	{ TokenKind::Caret, TokenKind::CaretAssign, Op::BitXor, Kind::I32, Kind::I32, Op::BitXorI64, false },
-	{ TokenKind::ShiftLeft, TokenKind::ShiftLeftAssign, Op::Shl, Kind::I32, Kind::I32, Op::ShlI64, false },
-	{ TokenKind::ShiftRight, TokenKind::ShiftRightAssign, Op::Shr, Kind::I32, Kind::I32, Op::ShrI64, false },
-	{ TokenKind::ShiftRightUnsigned, TokenKind::ShiftRightUnsignedAssign, Op::UShr, Kind::I32, Kind::U32, Op::UShrI64, false },
+	{ TokenKind::Plus, TokenKind::PlusAssign, Op::AddF64, Op::AddF32, Kind::F64, Kind::F64, Op::AddI64, true },
+	{ TokenKind::Minus, TokenKind::MinusAssign, Op::SubF64, Op::SubF32, Kind::F64, Kind::F64, Op::SubI64, true },
+	{ TokenKind::Star, TokenKind::StarAssign, Op::MulF64, Op::MulF32, Kind::F64, Kind::F64, Op::MulI64, true },
+	{ TokenKind::Slash, TokenKind::SlashAssign, Op::DivF64, Op::DivF32, Kind::F64, Kind::F64, Op::Stmt, true },
+	{ TokenKind::Percent, TokenKind::PercentAssign, Op::ModF64, Op::ModF32, Kind::F64, Kind::F64, Op::ModI64, true },
+	{ TokenKind::Amp, TokenKind::AmpAssign, Op::BitAnd, Op::Stmt, Kind::I32, Kind::I32, Op::BitAndI64, false },
+	{ TokenKind::Pipe, TokenKind::PipeAssign, Op::BitOr, Op::Stmt, Kind::I32, Kind::I32, Op::BitOrI64, false },
+	{ TokenKind::Caret, TokenKind::CaretAssign, Op::BitXor, Op::Stmt, Kind::I32, Kind::I32, Op::BitXorI64, false },
+	{ TokenKind::ShiftLeft, TokenKind::ShiftLeftAssign, Op::Shl, Op::Stmt, Kind::I32, Kind::I32, Op::ShlI64, false },
+	{ TokenKind::ShiftRight, TokenKind::ShiftRightAssign, Op::Shr, Op::Stmt, Kind::I32, Kind::I32, Op::ShrI64, false },
+	{ TokenKind::ShiftRightUnsigned, TokenKind::ShiftRightUnsignedAssign, Op::UShr, Op::Stmt, Kind::I32, Kind::U32, Op::UShrI64, false },
 };
 
 const Arithmetic *arithmetic_of(TokenKind p_op) {
@@ -70,6 +71,11 @@ uint32_t Operators::operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, b
 	if (!how) {
 		l_.refuse(p_position, "this operator");
 		how = &ARITHMETIC[0];
+	}
+	if (how->single != Op::Stmt && l_.kind_at(p_left) == Kind::F32 && l_.kind_at(p_right) == Kind::F32) {
+		const uint32_t out = l_.reg(Kind::F32);
+		l_.emit(how->single, p_position, out, p_left, p_right);
+		return out;
 	}
 	// A shift is as wide as what is shifted; its count is only ever its low bits, so an Int64 count is cut.
 	const bool shift = how->narrow == Op::Shl || how->narrow == Op::Shr || how->narrow == Op::UShr;
@@ -106,6 +112,8 @@ uint32_t Operators::logical(Binary *p_binary, Kind p_want) {
 		Kind b = Lowerer::is_null(right) ? Kind::Void : l_.natural(right);
 		if (a != b && Lowerer::is_integral(a) && Lowerer::is_integral(b) && (a == Kind::I64 || b == Kind::I64)) {
 			a = b = Kind::I64; // An Int64 holds both, as the checker took it.
+		} else if (a != b && (a == Kind::F32 || b == Kind::F32) && Lowerer::is_numeric(a) && Lowerer::is_numeric(b)) {
+			a = b = Kind::F64;
 		}
 		kind = a == Kind::Void ? b : a;
 		if (a == Kind::Any || b == Kind::Any) {

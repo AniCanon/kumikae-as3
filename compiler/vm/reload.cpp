@@ -224,7 +224,7 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 	for (size_t i = 0; i < new_class.fields.size(); i++) {
 		const ir::Field &field = new_class.fields[i];
 		if (named[i] == ir::NONE) {
-			vm::field(new_class, p_fresh, i) = empty_value(field.kind == Kind::F64, field.starts_null);
+			vm::field(new_class, p_fresh, i) = empty_value(ir::is_floating(field.kind), field.starts_null);
 		} else if (old_class.fields[named[i]].kind == field.kind) {
 			vm::field(new_class, p_fresh, i) = carry_into(field.kind, field.klass, field.engine_type, vm::field(old_class, p_old, named[i]));
 		}
@@ -288,7 +288,7 @@ void Reload::constants_again(const std::string &p_class) {
 	for (size_t i = 0; i < globals.size() && i < to_.globals_.size(); i++) {
 		if (own(globals[i]) && !globals[i].is_const) {
 			kept.emplace_back(i, to_.globals_[i]);
-			to_.globals_[i] = empty_value(globals[i].kind == Kind::F64, globals[i].starts_null);
+			to_.globals_[i] = empty_value(ir::is_floating(globals[i].kind), globals[i].starts_null);
 		}
 	}
 	(void)to_.call(klass.static_init, nullptr, 0); // An error in it is reported as on the class's first use.

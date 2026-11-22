@@ -1326,6 +1326,8 @@ static void test_vector_of_values() {
 						 "    try { v.unshift(v[1], none); } catch (d:TypeError) { said += \"|\" + v.length; }\n"
 						 "    v.reverse(); target.points = v.concat(v.slice(1)); v.length = 1; return said; }\n"
 						 "  public var path:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];\n"
+						 "  private var xs:Vector.<float> = new <float>[16777217, -0.0];\n"
+						 "  public function single():Boolean { return xs[0] == 16777216 && 1 / xs[1] < 0; }\n"
 						 "  public function give(target:Line2D):void { target.points = path; }\n"
 						 "} }\n";
 	Compilation compilation;
@@ -1382,6 +1384,8 @@ static void test_vector_of_values() {
 		if (moved) {
 			argument.p = engine.box();
 			engine.log.clear();
+			CHECK(fresh.call_method(moved, "single", nullptr, 0, &result));
+			CHECK(result.b);
 			CHECK(fresh.call_method(moved, "give", &argument, 1, &result));
 			CHECK(engine.log.find("collection PackedVector2Array[(1, 2), (3, 4)] -> ") != std::string::npos);
 			engine.drop(argument.p);

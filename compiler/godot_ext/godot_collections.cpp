@@ -77,6 +77,7 @@ void place(Variant *r_place, ir::Kind p_kind, const vm::Slot &p_slot) {
 		case ir::Kind::I64:
 			new (r_place) Variant(p_slot.l);
 			return;
+		case ir::Kind::F32:
 		case ir::Kind::F64:
 			new (r_place) Variant(p_slot.d);
 			return;
@@ -304,7 +305,7 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 		ok = whole_numbers<PackedInt32Array>(p_kind, p_vector, INT32_MIN, INT32_MAX, "a 32-bit integer", &made, r_error);
 	} else if (p_type == "PackedInt64Array") {
 		ok = whole_numbers<PackedInt64Array>(p_kind, p_vector, INT64_MIN, INT64_MAX, "a 64-bit integer", &made, r_error);
-	} else if (p_type == "PackedFloat32Array" && p_kind == ir::Kind::F64 && !p_vector->narrow) {
+	} else if (p_type == "PackedFloat32Array" && ((p_kind == ir::Kind::F32 && p_vector->floating) || (p_kind == ir::Kind::F64 && !p_vector->narrow))) {
 		PackedFloat32Array packed;
 		if (p_vector->length) {
 			if (packed.resize(p_vector->length) != OK) {
@@ -312,9 +313,13 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 				return nullptr;
 			}
 			float *const elements = packed.ptrw();
-			const vm::Slot *const slots = vm::slots_of(p_vector);
-			for (uint32_t i = 0; i < p_vector->length; i++) {
-				elements[i] = static_cast<float>(slots[i].d);
+			if (p_kind == ir::Kind::F32) {
+				std::memcpy(elements, vm::floats_of(p_vector), p_vector->length * sizeof(float));
+			} else {
+				const vm::Slot *const slots = vm::slots_of(p_vector);
+				for (uint32_t i = 0; i < p_vector->length; i++) {
+					elements[i] = static_cast<float>(slots[i].d);
+				}
 			}
 		}
 		made = packed;

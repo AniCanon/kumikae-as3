@@ -72,10 +72,11 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 				r_value->u = vm::to_uint32(vm::any::to_number(p_any));
 			}
 			return number;
+		case Kind::F32:
 		case Kind::F64:
 			// A whole number past an int is held in a box (number_to_any): a Number all the same.
 			if (number || tag == AnyTag::Wide) {
-				r_value->d = vm::any::to_number(p_any);
+				r_value->d = static_cast<Kind>(p_kind) == Kind::F32 ? vm::any::to_float(p_any) : vm::any::to_number(p_any);
 			}
 			return number || tag == AnyTag::Wide;
 		case Kind::Bool:
@@ -136,6 +137,7 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 		case Kind::Any:
 			*r_any = p_result;
 			return true;
+		case Kind::F32:
 		case Kind::F64:
 			if (number_to_any(c, p_result.d, r_any)) {
 				return true;

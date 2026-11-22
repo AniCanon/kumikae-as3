@@ -21,6 +21,7 @@ namespace vm = kas3::vm;
 
 static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 	switch (p_kind) {
+		case ir::Kind::F32:
 		case ir::Kind::F64:
 			return GDEXTENSION_VARIANT_TYPE_FLOAT;
 		case ir::Kind::I32:

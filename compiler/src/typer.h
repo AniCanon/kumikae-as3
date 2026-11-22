@@ -27,6 +27,7 @@ class Typer {
 	const Type *unknown_;
 	const Type *int_;
 	const Type *uint_;
+	const Type *float_;
 	const Type *number_;
 	const Type *int64_;
 	const Type *boolean_;
@@ -46,7 +47,7 @@ class Typer {
 
 
 
-	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == number_ || p_type == int64_; }
+	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == float_ || p_type == number_ || p_type == int64_; }
 	// The types that hold whole numbers only.
 	bool integral(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == int64_; }
 	// The types that AS3's arithmetic is defined on without calling into a class.

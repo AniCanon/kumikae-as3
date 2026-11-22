@@ -28,7 +28,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
-		globals[i] = vm::empty_value(static_cast<Kind>(program.globals[i].kind) == Kind::F64, program.globals[i].starts_null);
+		globals[i] = vm::empty_value(ir::is_floating(static_cast<Kind>(program.globals[i].kind)), program.globals[i].starts_null);
 	}
 	for (uint32_t i = 0; i < program.string_count; i++) {
 		strings.push_back(vm::new_string(std::string_view(program.strings[i].data, program.strings[i].size)));
@@ -55,7 +55,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		uint32_t numbers = 0;
 		for (size_t at = 0; at < klass.fields.size() && plain; at++) {
 			plain = !ir::is_held(klass.fields[at].kind);
-			numbers |= klass.fields[at].kind == Kind::F64 ? uint32_t(1) << at : 0;
+			numbers |= ir::is_floating(klass.fields[at].kind) ? uint32_t(1) << at : 0;
 		}
 		class_cached.push_back(plain ? static_cast<uint8_t>(slots + 1) : 0);
 		// Generated code keeps the record of an object whose arguments are numbers and Booleans, where the

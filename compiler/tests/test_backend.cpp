@@ -519,6 +519,17 @@ void an_int_in_a_vector_is_four_bytes() {
 	CHECK(has("d0[static_cast<uint32_t>(r2)] = static_cast<int32_t>(r3);"));
 }
 
+void float_arithmetic_keeps_packed_places_in_a_loop() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module = module_of({ Kind::Obj, Kind::I32, Kind::F32, Kind::Bool },
+			{ { Op::JumpIfNot, 3, 5 }, { Op::VecGet, 2, 0, 1 }, { Op::MulF32, 2, 2, 2 }, { Op::VecSet, 0, 1, 2 }, { Op::Jump, 0 }, { Op::ReturnVoid } });
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("d0 = floats_in(r0);") != std::string::npos);
+}
+
 // `y[i] = y[i] + 1`, where y is a field, reads the field into two registers: one vector, and so one set of
 // places in the loop's locals, the second register's said to be the first's. Read apart, the C++ compiler
 // took them for two memories that might overlap, found that they did, and ran the loop one element at a time.
@@ -578,6 +589,7 @@ int main() {
 	a_method_nothing_overrides_is_called_by_name();
 	a_receiver_of_no_known_class_is_called_through_the_table();
 	an_int_in_a_vector_is_four_bytes();
+	float_arithmetic_keeps_packed_places_in_a_loop();
 	one_vector_read_twice_has_its_places_once();
 	return check::finish();
 }

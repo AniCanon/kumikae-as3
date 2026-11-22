@@ -32,6 +32,7 @@ class Lowerer {
 	Symbol *int_ = nullptr;
 	Symbol *uint_ = nullptr;
 	Symbol *int64_ = nullptr;
+	Symbol *float_ = nullptr;
 	Symbol *number_ = nullptr;
 	Symbol *math_ = nullptr;
 	Symbol *boolean_ = nullptr;

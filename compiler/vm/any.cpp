@@ -128,6 +128,10 @@ double to_number(Slot p_value) {
 	}
 }
 
+float to_float(Slot p_value) {
+	return tag(p_value) == AnyTag::Wide ? static_cast<float>(static_cast<Wide *>(pointer(p_value))->value) : static_cast<float>(to_number(p_value));
+}
+
 bool to_boolean(Slot p_value) {
 	switch (tag(p_value)) {
 		case AnyTag::Undefined:

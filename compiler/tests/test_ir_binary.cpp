@@ -76,6 +76,8 @@ static void test_round_trip_program_and_execution() {
 			public class Main extends Base {
 				public function Main() {
 					var nums:Vector.<int> = new <int>[10, 20, 30];
+					var singles:Vector.<float> = new <float>[16777217];
+					trace(singles[0] + float(1), singles[0] + 1);
 					var sum:int = 0;
 					var add:Function = function(v:int):void { sum += v; };
 					for each (var n:int in nums) {
@@ -104,7 +106,7 @@ static void test_round_trip_program_and_execution() {
 	CHECK_EQ(ir::print(decoded), ir::print(original));
 	CHECK_EQ(ir::fingerprint(decoded), ir::fingerprint(original));
 	CHECK_EQ(run_program(decoded), run_program(original));
-	CHECK_EQ(run_program(decoded), std::string("hi as3:2 60 boom\ndone\n"));
+	CHECK_EQ(run_program(decoded), std::string("16777216 16777217\nhi as3:2 60 boom\ndone\n"));
 }
 
 static void test_round_trip_godot_script_metadata() {
@@ -179,6 +181,16 @@ static void test_rejects_invalid_references() {
 		return ir::read_binary(bytes.data(), bytes.size(), &decoded).has_value();
 	};
 	ir::Module broken = original;
+	broken.functions.front().registers.push_back(ir::Kind::F32);
+	const uint32_t single = static_cast<uint32_t>(broken.functions.front().registers.size() - 1);
+	const uint32_t number = static_cast<uint32_t>(broken.numbers.size());
+	broken.numbers.push_back(16777217);
+	broken.functions.front().code.front() = { ir::Op::ConstF64, single, number, 0, 0 };
+	CHECK(invalid(broken));
+	broken = original;
+	broken.functions.front().code.front() = { ir::Op::AddF32, 0, 0, 0, 0 };
+	CHECK(invalid(broken));
+	broken = original;
 	broken.functions.front().code.front() = { ir::Op::Jump, ir::NONE, 0, 0, 0 };
 	CHECK(invalid(broken));
 	broken = original;

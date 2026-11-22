@@ -7,10 +7,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <new>
 
 namespace kas3 {
 namespace vm {
+
+static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559, "float vectors require IEEE binary32");
 
 namespace {
 size_t strings_alive = 0;

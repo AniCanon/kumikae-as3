@@ -44,6 +44,8 @@ std::string_view type_of(Kind p_kind) {
 			return "int32_t";
 		case Kind::U32:
 			return "uint32_t";
+		case Kind::F32:
+			return "float";
 		case Kind::F64:
 			return "double";
 		case Kind::Bool:
@@ -94,6 +96,7 @@ std::string_view slot_member(Kind p_kind) {
 			return "i";
 		case Kind::U32:
 			return "u";
+		case Kind::F32:
 		case Kind::F64:
 			return "d";
 		case Kind::Bool:

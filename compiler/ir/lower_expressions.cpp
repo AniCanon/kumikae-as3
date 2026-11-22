@@ -38,8 +38,8 @@ uint32_t Lowerer::expression(Expr *p_expression, Kind p_want) {
 	}
 	if (is_null(p_expression)) {
 		// null is whatever is asked for: no reference, 0, or false.
-		uint32_t out = default_value(p_want == Kind::Void ? Kind::Obj : p_want == Kind::F64 ? Kind::I32 : p_want, p_expression->offset);
-		return p_want == Kind::F64 ? convert(out, Kind::F64, p_expression->offset) : out;
+		uint32_t out = default_value(p_want == Kind::Void ? Kind::Obj : is_floating(p_want) ? Kind::I32 : p_want, p_expression->offset);
+		return is_floating(p_want) ? convert(out, p_want, p_expression->offset) : out;
 	}
 	uint32_t value = Expressions(*this).evaluate(p_expression, p_want);
 	if (gives_nothing(p_expression)) {
@@ -276,7 +276,7 @@ uint32_t Expressions::postfix(Expr *p_expression) {
 	uint32_t next = l_.reg(Kind::F64);
 	l_.emit(postfix->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
 	l_.store(place, l_.convert(next, place.kind, position), position);
-	return old;
+	return place.kind == Kind::F32 ? l_.convert(old, Kind::F32, position) : old;
 }
 
 uint32_t Expressions::conditional(Expr *p_expression, Kind p_want) {
@@ -402,7 +402,7 @@ uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
 		return out;
 	}
 	if (p_unary->op == TokenKind::Plus) {
-		return l_.expression(p_unary->operand, Kind::F64);
+		return l_.expression(p_unary->operand, result == Kind::F32 ? result : Kind::F64);
 	}
 	if (p_unary->operand->kind == NodeKind::NumberLit) {
 		// `-1` is one constant, not a 1 negated as the program runs. -0 stays a Number.
@@ -411,7 +411,7 @@ uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
 	}
 	uint32_t out = l_.reg(Kind::F64);
 	l_.emit(Op::NegF64, position, out, l_.expression(p_unary->operand, Kind::F64));
-	return out;
+	return result == Kind::F32 ? l_.convert(out, Kind::F32, position) : out;
 }
 
 // `++x` and `--x`: the value is the new one.

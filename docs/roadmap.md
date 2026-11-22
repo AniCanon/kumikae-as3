@@ -22,7 +22,7 @@ state of the project changes.
 - **Parser, name resolution and type checking** for ActionScript 3, checked against about 190,000 lines of
   open-source AS3.
 - **Godot's whole API as typed AS3:** 1,036 classes, with operators on `Vector2` and the other math types,
-  and Godot's 64-bit integers as an `Int64` type.
+  Godot's 64-bit integers as `Int64`, and opt-in binary32 arithmetic with `float` and `Vector.<float>`.
 - **Every error has a file, a line and a column.**
 
 ### The language at run time

@@ -43,6 +43,8 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::U32;
 	} else if (symbol == int64_) {
 		*r_kind = Kind::I64;
+	} else if (symbol == float_) {
+		*r_kind = Kind::F32;
 	} else if (symbol == number_) {
 		*r_kind = Kind::F64;
 	} else if (symbol == boolean_) {
@@ -330,6 +332,22 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 	if (from == p_to || p_to == Kind::Void) {
 		return p_reg;
 	}
+	if (p_to == Kind::F32 || from == Kind::F32) {
+		if (p_to == Kind::F32) {
+			const uint32_t out = reg(Kind::F32);
+			if (from == Kind::Any) {
+				emit(Op::FromAny, p_position, out, p_reg, NONE);
+			} else if (from == Kind::I64) {
+				emit(Op::I64ToF32, p_position, out, p_reg);
+			} else {
+				emit(Op::F64ToF32, p_position, out, convert(p_reg, Kind::F64, p_position, p_written));
+			}
+			return out;
+		}
+		const uint32_t wide = reg(Kind::F64);
+		emit(Op::F32ToF64, p_position, wide, p_reg);
+		return convert(wide, p_to, p_position, p_written);
+	}
 	if (p_to == Kind::Any) {
 		uint32_t out = reg(Kind::Any);
 		emit(Op::ToAny, p_position, out, p_reg);
@@ -520,6 +538,8 @@ bool Lowerer::kind_of_class(const Symbol *p_class, Kind *r_kind) {
 		*r_kind = Kind::U32;
 	} else if (p_class == int64_) {
 		*r_kind = Kind::I64;
+	} else if (p_class == float_) {
+		*r_kind = Kind::F32;
 	} else if (p_class == number_) {
 		*r_kind = Kind::F64;
 	} else if (p_class == boolean_) {
@@ -533,7 +553,7 @@ bool Lowerer::kind_of_class(const Symbol *p_class, Kind *r_kind) {
 }
 
 bool Lowerer::is_numeric(Kind p_kind) {
-	return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64 || p_kind == Kind::I64;
+	return p_kind == Kind::I32 || p_kind == Kind::U32 || is_floating(p_kind) || p_kind == Kind::I64;
 }
 
 bool Lowerer::is_integral(Kind p_kind) {

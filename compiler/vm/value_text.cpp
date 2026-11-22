@@ -65,6 +65,7 @@ bool element_text(Library &p_library, Kind p_kind, Slot p_element, std::string *
 		case Kind::I64:
 			*r_text += std::to_string(p_element.l);
 			return true;
+		case Kind::F32:
 		case Kind::F64:
 			*r_text += number_to_string(p_element.d);
 			return true;

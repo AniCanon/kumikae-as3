@@ -18,6 +18,7 @@ namespace {
 constexpr bool repeatable(Op p_op) {
 	switch (p_op) {
 		case Op::Stmt: case Op::ConstI32: case Op::ConstU32: case Op::ConstF64: case Op::ConstBool: case Op::ConstStr: case Op::ConstNull:
+		case Op::I64ToF32: case Op::F32ToF64: case Op::F64ToF32: case Op::AddF32: case Op::SubF32: case Op::MulF32: case Op::DivF32: case Op::ModF32:
 		case Op::Move: case Op::I32ToF64: case Op::U32ToF64: case Op::BoolToF64: case Op::StrToF64: case Op::F64ToI32: case Op::F64ToU32:
 		case Op::I32ToU32: case Op::U32ToI32: case Op::I32ToBool: case Op::U32ToBool: case Op::F64ToBool: case Op::StrToBool:
 		case Op::ObjToBool: case Op::I32ToStr: case Op::U32ToStr: case Op::F64ToStr: case Op::BoolToStr: case Op::StrToStr:
@@ -69,7 +70,7 @@ constexpr const char *does(Op p_op) {
 }
 
 bool plain_value(Kind p_kind) {
-	return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64 || p_kind == Kind::Bool || p_kind == Kind::Str || p_kind == Kind::I64;
+	return p_kind == Kind::I32 || p_kind == Kind::U32 || is_floating(p_kind) || p_kind == Kind::Bool || p_kind == Kind::Str || p_kind == Kind::I64;
 }
 
 // Whether the instruction uses the object the function runs on (register 0) as anything but the holder of

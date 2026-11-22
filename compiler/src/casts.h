@@ -28,7 +28,7 @@ inline ClassCall class_call(const Symbol *p_class) {
 		if (name == "Function" || name == "Class" || name == "Dictionary") {
 			return ClassCall::Cast;
 		}
-		const bool converts = name == "String" || name == "Number" || name == "int" || name == "uint" || name == "Boolean" || name == "Int64";
+		const bool converts = name == "String" || name == "float" || name == "Number" || name == "int" || name == "uint" || name == "Boolean" || name == "Int64";
 		return converts ? ClassCall::Conversion : ClassCall::Other;
 	}
 	if (!p_class->unit->is_declaration) {

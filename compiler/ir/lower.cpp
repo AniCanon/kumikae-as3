@@ -128,6 +128,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 	int_ = compilation_.builtin("int");
 	uint_ = compilation_.builtin("uint");
 	int64_ = compilation_.builtin("Int64");
+	float_ = compilation_.builtin("float");
 	number_ = compilation_.builtin("Number");
 	math_ = compilation_.builtin("Math");
 	boolean_ = compilation_.builtin("Boolean");

@@ -16,6 +16,8 @@ const char *kind_name(Kind p_kind) {
 			return "uint";
 		case Kind::I64:
 			return "Int64";
+		case Kind::F32:
+			return "float";
 		case Kind::F64:
 			return "Number";
 		case Kind::Bool:

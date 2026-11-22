@@ -538,6 +538,11 @@ int main() {
 	test_parameter_defaults();
 	test_argument_counts();
 	test_argument_types();
+	expect(program("var f:float; var a:Vector.<float>; var n:Vector.<Number>; n = /*!*/a; a = /*!*/n; f = /*!*/other;"),
+			{ UNRELATED("Vector.<float>", "Vector.<Number>"), UNRELATED("Vector.<Number>", "Vector.<float>"), UNRELATED("Other", "float") });
+	expect(program("trace(any is /*!*/float, any as /*!*/float);"),
+			{ "an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it",
+					"an untyped float is a Number; use 'is Number' to test it or 'float(value)' to round it" });
 	test_conversions_accepted();
 	test_conversions_rejected();
 	test_cast_advice();

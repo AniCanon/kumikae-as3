@@ -101,6 +101,19 @@ func _float32(probe: Node2D) -> void:
 	print("PROBE float32 empty=", label.tab_stops.is_empty())
 	probe.call("integerStops", label)
 	print("PROBE integer float32 bits=", label.tab_stops.to_byte_array() == PackedFloat32Array([-3, 16777217]).to_byte_array())
+	probe.call("floatStops", label, stops)
+	print("PROBE packed float bits=", label.tab_stops.to_byte_array() == PackedFloat32Array(stops).to_byte_array())
+	probe.call("floatStops", label, [NAN])
+	print("PROBE packed float NaN=", label.tab_stops.size() == 1 and is_nan(label.tab_stops[0]))
+	probe.call("floatStops", label, [])
+	print("PROBE packed float empty=", label.tab_stops.is_empty())
+	var rounded := float(PackedFloat32Array([1.0 + 3.0 * halfway])[0])
+	print("PROBE float from Godot number=", probe.call("floatEcho", 1.0 + 3.0 * halfway) == rounded)
+	print("PROBE float from Godot integer=", probe.call("floatEcho", 16777217) == 16777216.0)
+	print("PROBE float inspector default=", probe.get_script().get_property_default_value("singlePrecision") == 16777216.0
+			and probe.get("singlePrecision") == 16777216.0)
+	probe.set("singlePrecision", 1.0 + 3.0 * halfway)
+	print("PROBE float field from Godot=", probe.get("singlePrecision") == rounded)
 	label.free()
 
 

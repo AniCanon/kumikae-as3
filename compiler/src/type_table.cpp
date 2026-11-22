@@ -81,6 +81,9 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 }
 
 Symbol *Compilation::builtin(std::string_view p_name) const {
+	if (p_name == "float") {
+		return float_;
+	}
 	auto found = top_level_->definitions.find(p_name);
 	return found != top_level_->definitions.end() && found->second->unit->is_builtin ? found->second : nullptr;
 }

@@ -127,6 +127,7 @@ class Compilation {
 	Package *top_level_ = nullptr;
 	Symbol *object_ = nullptr;
 	Symbol *vector_ = nullptr;
+	Symbol *float_ = nullptr; // Offered only after ordinary AS3 lookup finds nothing.
 	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
 	std::unique_ptr<Tracking> tracking_; // Set by prepare(): what an incremental compilation keeps.

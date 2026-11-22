@@ -10,6 +10,7 @@ package {
 		private var log:Array = [];
 		private var heard:Array = [];
 		[Signal] public var struck:Signal;
+		[Export] public var singlePrecision:float = 16777217;
 
 		// A function value that gives one of Godot's values or objects, called every way there is, and
 		// `arguments` of a function whose parameters are such values.
@@ -669,6 +670,18 @@ package {
 		}
 		public function integerStops(target:Label):void {
 			target.tabStops = new <int>[-3, 16777217];
+		}
+
+		public function floatStops(target:Label, values:Array):void {
+			var stops:Vector.<float> = new Vector.<float>();
+			for (var i:int = 0; i < values.length; i++) {
+				stops.push(float(values[i]));
+			}
+			target.tabStops = stops;
+		}
+
+		public function floatEcho(value:float):float {
+			return value;
 		}
 
 		private function scaled(value:int, by:Number):Number {

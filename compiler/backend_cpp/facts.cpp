@@ -41,6 +41,14 @@ bool is_plain(Op p_op) {
 		case Op::F64ToBool:
 		case Op::StrToBool:
 		case Op::ObjToBool:
+		case Op::I64ToF32:
+		case Op::F64ToF32:
+		case Op::F32ToF64:
+		case Op::AddF32:
+		case Op::SubF32:
+		case Op::MulF32:
+		case Op::DivF32:
+		case Op::ModF32:
 		case Op::AddF64:
 		case Op::SubF64:
 		case Op::MulF64:

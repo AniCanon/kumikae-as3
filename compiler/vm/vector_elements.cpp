@@ -179,7 +179,7 @@ bool place_for(Library &p_library, const ir::Class &p_class, Slot p_value, Slot 
 
 bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_value) {
 	if (p_vector->narrow) {
-		numbers_of(p_vector)[p_index] = p_value.i; // The number itself: nothing is counted.
+		set_place(p_vector, p_index, p_value); // The number itself: nothing is counted.
 		return true;
 	}
 	const ir::Class &klass = p_library.class_of(p_vector);
@@ -195,7 +195,7 @@ bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot 
 bool put_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_owned) {
 	const ir::Class &klass = p_library.class_of(p_vector);
 	if (p_vector->narrow) {
-		numbers_of(p_vector)[p_index] = p_owned.i;
+		set_place(p_vector, p_index, p_owned);
 		return true;
 	}
 	if (klass.element_bare == ir::Bare::None) {

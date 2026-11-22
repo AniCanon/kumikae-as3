@@ -197,7 +197,7 @@ std::optional<uint32_t> Calls::class_function(Call *p_call, Symbol *p_type) {
 
 uint32_t Calls::conversion_of(const List<Expr *> &p_arguments, Kind p_conversion, uint32_t p_position) {
 	if (p_arguments.count == 0) {
-		if (p_conversion == Kind::Str || p_conversion == Kind::F64) {
+		if (p_conversion == Kind::Str || is_floating(p_conversion)) {
 			const uint32_t empty = l_.reg(p_conversion);
 			l_.emit(p_conversion == Kind::Str ? Op::ConstStr : Op::ConstF64, p_position, empty, p_conversion == Kind::Str ? l_.string("") : l_.number(0));
 			return empty;

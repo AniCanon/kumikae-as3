@@ -6,6 +6,10 @@ tree that `src/` gives.
 
 **Depends on:** `src/` only. It includes no Godot header and nothing from `vm/`.
 
+A float register has kind `F32`. Binary32 arithmetic and conversions have their own instructions.
+The kind and instructions follow the existing wire values, so earlier modules retain their encoding.
+Loading a module that uses float requires a runtime that recognizes the appended kind and instructions.
+
 ## The IR
 
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,

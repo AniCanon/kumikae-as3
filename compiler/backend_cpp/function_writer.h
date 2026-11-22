@@ -169,7 +169,7 @@ class FunctionWriter {
 	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
 	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
 	bool reads_in_place(uint32_t p_register) const;
-	bool narrow_vector(uint32_t p_vector) const;
+	ir::Kind vector_storage(uint32_t p_vector) const;
 	void find_twice();
 	bool fast_vector(const ir::Instruction &p_in);
 	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.

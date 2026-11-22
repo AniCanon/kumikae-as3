@@ -163,7 +163,7 @@ constexpr const LibraryMethod *library_method(std::string_view p_name, uint8_t p
 
 // Whether a vector of such elements is one of numbers.
 constexpr bool holds_numbers(Kind p_element) {
-	return p_element == Kind::I32 || p_element == Kind::U32 || p_element == Kind::F64 || p_element == Kind::I64;
+	return p_element == Kind::I32 || p_element == Kind::U32 || is_floating(p_element) || p_element == Kind::I64;
 }
 
 // indexOf or lastIndexOf as it is done where what is looked for is held untyped: a vector of numbers was

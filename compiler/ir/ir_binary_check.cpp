@@ -1,6 +1,7 @@
 #include "ir_binary_check.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace kas3::ir {
 
@@ -57,6 +58,24 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 	if (!operand_valid(p_module, p_fn, shape[0], p_in.a) || !operand_valid(p_module, p_fn, shape[1], p_in.b) ||
 			!operand_valid(p_module, p_fn, shape[2], p_in.c)) {
 		return false;
+	}
+	switch (p_in.op) {
+		case Op::ConstF64:
+			if (p_fn.registers[p_in.a] == Kind::F32) {
+				const double value = p_module.numbers[p_in.b];
+				return std::isnan(value) || static_cast<float>(value) == value;
+			}
+			break;
+		case Op::I64ToF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::I64;
+		case Op::F64ToF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::F64;
+		case Op::F32ToF64:
+			return p_fn.registers[p_in.a] == Kind::F64 && p_fn.registers[p_in.b] == Kind::F32;
+		case Op::AddF32: case Op::SubF32: case Op::MulF32: case Op::DivF32: case Op::ModF32:
+			return p_fn.registers[p_in.a] == Kind::F32 && p_fn.registers[p_in.b] == Kind::F32 && p_fn.registers[p_in.c] == Kind::F32;
+		default:
+			break;
 	}
 	if (p_in.op == Op::FromAny) {
 		return type_check_valid(p_module, p_fn.registers[p_in.a], p_in.c);
