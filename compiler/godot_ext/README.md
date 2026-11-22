@@ -27,6 +27,7 @@ nothing differently for the editor, so one library serves both.
 | Files | Job |
 |---|---|
 | `register.cpp`, `language.h` | The entry point, and the script language Godot sees |
+| `script_editor`, `script_highlighting.cpp`, `script_completion.cpp` | The Script editor's source saver, syntax highlighter and completion |
 | `program` | The project's scripts: found, read, checked and lowered. Also the reload, and the collector's step each frame |
 | `sources`, `watch.h`, `test_folders.h` | Where scripts are read from, when a file is read again, which folders hold tests, and extra `KAS3_TEST_SOURCES` directories loaded when `KAS3_TESTS` is set |
 | `script`, `instance` | A script resource, and one object's script instance |
@@ -46,6 +47,11 @@ nothing differently for the editor, so one library serves both.
 | `play_build`, `play_cache.h`, `toolchain.h` | [Building the program library on Play](#building-on-play) |
 
 ## How it works
+
+The desktop Script editor registers an ActionScript syntax highlighter based on the front-end lexer.
+Completion uses a separate incremental compilation with the active editor buffer overlaid on the project's
+saved sources. It reads files through Godot. Saving or a filesystem change invalidates the saved sources.
+The editor turns compiler candidates into Godot's insertions at the caret.
 
 - **One program for each project.** Every `.as` file under the project is compiled together when the first
   script loads. If any fails to compile, the errors are reported once and no script loads.

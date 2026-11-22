@@ -4,6 +4,7 @@
 #include "play_build.h"
 #include "program.h"
 #include "script.h"
+#include "script_editor.h"
 
 #include <godot_cpp/classes/editor_plugin_registration.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -37,6 +38,10 @@ static void initialize(ModuleInitializationLevel p_level) {
 		GDREGISTER_INTERNAL_CLASS(AS3IOSExport);
 		GDREGISTER_INTERNAL_CLASS(AS3ExportEditor);
 		EditorPlugins::add_by_type<AS3ExportEditor>();
+		GDREGISTER_INTERNAL_CLASS(AS3SyntaxHighlighter);
+		GDREGISTER_INTERNAL_CLASS(AS3ScriptSaver);
+		GDREGISTER_INTERNAL_CLASS(AS3ScriptEditor);
+		EditorPlugins::add_by_type<AS3ScriptEditor>();
 	}
 #endif
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -55,6 +60,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 static void terminate(ModuleInitializationLevel p_level) {
 #if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::remove_by_type<AS3ScriptEditor>();
 		EditorPlugins::remove_by_type<AS3ExportEditor>();
 	}
 #endif

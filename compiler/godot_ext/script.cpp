@@ -63,6 +63,11 @@ void AS3Script::refresh_all() {
 	}
 }
 
+static void report_plain_class(const String &p_path) {
+	UtilityFunctions::push_error(String("ActionScript: ") + p_path +
+			": its class does not extend a Godot class, so it can't be attached to anything.");
+}
+
 void AS3Script::set_file(const String &p_resource_path) {
 	file_ = p_resource_path.utf8().get_data();
 	source_ = FileAccess::get_file_as_string(p_resource_path);
@@ -79,10 +84,12 @@ void AS3Script::set_file(const String &p_resource_path) {
 		resolved_ = module != nullptr;
 	}
 	class_ = module ? Project::class_of_file(*module, file_) : kas3::ir::NONE;
-	// Only a class that extends a Godot class can be attached to an object.
-	if (class_ != kas3::ir::NONE && module->classes[class_].native_base.empty()) {
-		UtilityFunctions::push_error(String("ActionScript: ") + p_resource_path +
-				": its class does not extend a Godot class, so it can't be attached to anything.");
+	plain_ = class_ != kas3::ir::NONE && module->classes[class_].native_base.empty();
+	if (plain_) {
+		// In the editor, opening a helper file and attaching it are separate actions.
+		if (!Engine::get_singleton()->is_editor_hint()) {
+			report_plain_class(p_resource_path);
+		}
 		class_ = kas3::ir::NONE;
 	}
 	if (kas3::on_main_thread()) {
@@ -95,6 +102,10 @@ bool AS3Script::_can_instantiate() const {
 }
 
 void *AS3Script::_placeholder_instance_create(Object *p_for_object) const {
+	if (plain_) {
+		report_plain_class(String::utf8(file_.c_str()));
+		return nullptr;
+	}
 	void *placeholder = gdextension_interface::placeholder_script_instance_create(AS3Language::singleton->_owner, _owner, p_for_object->_owner);
 	placeholders_.insert(placeholder);
 	const_cast<AS3Script *>(this)->_update_exports();

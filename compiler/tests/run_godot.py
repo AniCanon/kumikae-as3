@@ -76,6 +76,13 @@ with tempfile.TemporaryDirectory() as fresh:
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", ".godot"))
     run = subprocess.run([godot, *FIRST_SCAN, "--path", copy], capture_output=True, text=True, timeout=300)
     check("the first editor scan exits cleanly", run.returncode == 0, "exit %d\n%s" % (run.returncode, (run.stdout + run.stderr)[-800:]))
+    if run.returncode == 0:
+        run = subprocess.run([godot, "--headless", "--editor", "--path", copy, "--quit-after", "600",
+                              "-s", "script_editor.gd"], capture_output=True, text=True, timeout=300)
+        check("the Script editor highlights, completes and saves ActionScript",
+              run.returncode == 0 and "EDITOR passed" in run.stdout, (run.stdout + run.stderr)[-3600:])
+        check("opening an ActionScript helper does not warn about attaching it",
+              "ActionScript: res://Plain.as:" not in run.stderr, run.stderr[-1800:])
 listed = os.path.join(project, ".godot", "extension_list.cfg")
 if not os.path.exists(listed):
     subprocess.run([godot, *FIRST_SCAN, "--path", project], capture_output=True, text=True, timeout=300)

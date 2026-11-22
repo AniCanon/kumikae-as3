@@ -70,7 +70,7 @@ package game {
 | **The AS3 language** | Classes, interfaces, closures, `Array`, `Vector.<T>`, `Dictionary`, `try`/`catch`, `RegExp`, `Date`, `JSON`, and AS3's runtime errors with stack traces. |
 | **Hot reload** | Save a script while the game runs and the game takes the new code and keeps its state. On desktop and in the iOS Simulator. [How it works](docs/hot-reload.md). |
 | **Native speed** | The same scripts compile to native code, level with or ahead of Godot C# on the ten macOS frame benchmarks. [The numbers and the techniques](docs/performance.md). |
-| **Editor support** | Errors as you type, completion, navigation and hover through a language server. A [Rider plugin](editors/jetbrains/README.md) adds run configurations, a test runner, settings and scene editors, and embedded iOS and Android device panels; a [VS Code client](editors/vscode/README.md) covers editing. |
+| **Editor support** | Syntax highlighting and completion in [Godot's Script editor](docs/godot.md#edit-scripts-in-godot). [Rider](editors/jetbrains/README.md) and [VS Code](editors/vscode/README.md) also use the language server for live errors, navigation and hover. Rider adds run configurations, scene editors, device panels and a test runner. |
 | **Claude Code** | A [standalone plugin](editors/claude/README.md) uses the compiler’s language server and builds, runs and tests a game on desktop, Web, iOS Simulator and Android emulator. |
 | **Tests in AS3** | A small [testing library](testing/README.md) with results shown in Rider. |
 

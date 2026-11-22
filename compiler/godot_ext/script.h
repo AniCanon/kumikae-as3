@@ -16,6 +16,7 @@ class AS3Script : public godot::ScriptExtension {
 	godot::String source_;
 	uint32_t class_ = 0xFFFFFFFFu; // The class the file declares, in the program's IR.
 	bool resolved_ = false; // Whether class_ was resolved against a loaded project module.
+	bool plain_ = false; // A helper that can be edited, but does not extend a Godot class.
 	// In the editor, the stand-ins Godot keeps on objects the script is attached to: they hold the exported
 	// fields' values, and no AS3 runs.
 	mutable std::unordered_set<void *> placeholders_;
