@@ -236,7 +236,8 @@ uint32_t Operators::type_test(Binary *p_binary) {
 	// A number, a Boolean or a String is asked of the value as it runs, whatever is on the left: an object
 	// or `null` is none, and gives false or null like any other value that is not one.
 	const bool plain = symbol && (symbol == l_.int_ || symbol == l_.uint_ || symbol == l_.number_ || symbol == l_.boolean_ || symbol == l_.string_);
-	if (!godot_target && (l_.untyped(left) || plain || (!Lowerer::is_null(left) && l_.natural(left) != Kind::Obj))) {
+	const bool legacy_vector = l_.is_vector(written) && written->kind != Type::FixedArray;
+	if (!godot_target && (l_.untyped(left) || plain || (!legacy_vector && !Lowerer::is_null(left) && l_.natural(left) != Kind::Obj))) {
 		if (const std::optional<uint32_t> tested = any_type_test(p_binary)) {
 			return *tested;
 		}
