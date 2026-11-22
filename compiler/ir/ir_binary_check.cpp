@@ -147,7 +147,7 @@ bool function_valid(const Module &p_module, const Function &p_fn) {
 		}
 	}
 	for (const Handler &h : p_fn.handlers) {
-		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || any_is_code(h.type);
+		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || (h.type >= ANY_IS_INT && h.type <= ANY_IS_BOOLEAN);
 		if (h.start > h.end || h.end > p_fn.code.size() || h.target >= p_fn.code.size() || h.reg >= p_fn.registers.size() ||
 				!valid_type) {
 			return false;

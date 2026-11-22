@@ -233,6 +233,10 @@ static void test_rejects_invalid_references() {
 	broken = original;
 	broken.classes.front().methods.push_back(ir::NONE);
 	CHECK(invalid(broken));
+	// Object has a sentinel for class values, but is not one of the primitive typed catch handlers.
+	broken = original;
+	broken.functions.front().handlers.push_back({ 0, 1, 0, 0, ir::ANY_IS_OBJECT, false });
+	CHECK(invalid(broken));
 	// Invalid handler type, local register, parameter class, virtual receiver, field class, global class.
 	broken = original;
 	broken.functions.front().handlers.push_back({ 0, 1, 0, 0, 0x123456u, false });
