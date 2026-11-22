@@ -686,6 +686,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::MakeFunction:
 			case Op::MakeMethod:
 			case Op::MakeInterfaceMethod:
+			case Op::CallTypedFunction:
 			case Op::CallFunction:
 			case Op::FunctionToCallable:
 			case Op::CallbackThis:

@@ -139,6 +139,7 @@ class Compilation {
 	size_t broken_files_ = 0;
 	std::deque<Type> types_;
 	std::unordered_map<const Symbol *, const Type *> instance_types_;
+	std::vector<const Type *> callback_types_;
 	std::unordered_map<const Type *, const Type *> vector_types_;
 	std::unordered_map<const Type *, const Type *> class_object_types_;
 	Type any_, void_, null_, unknown_;

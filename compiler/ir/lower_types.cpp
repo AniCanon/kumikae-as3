@@ -27,7 +27,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Obj;
 		return kind_of(p_type->element, &element) && element != Kind::Void;
 	}
-	if (p_type->kind == Type::ClassObject) {
+	if (p_type->kind == Type::Callback || p_type->kind == Type::ClassObject) {
 		*r_kind = Kind::Obj; // A class itself: a class value.
 		return true;
 	}

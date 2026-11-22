@@ -124,6 +124,19 @@ int32_t function_length(const ir::Module &p_module, Object *p_function) {
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
+bool typed_function_matches(const Function &p_target, Kind p_result, const Kind *p_arguments, size_t p_count) {
+	const size_t first = p_target.is_static ? 0 : 1;
+	if (p_target.result != p_result || p_target.rest || p_target.parameters != first + p_count || p_target.required != p_target.parameters) {
+		return false;
+	}
+	for (size_t i = 0; i < p_count; ++i) {
+		if (p_target.registers[first + i] != p_arguments[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 Object *function_in(Library &p_library, Kind p_kind, Slot p_value) {
 	Object *object = nullptr;
 	if (p_kind == Kind::Any) {

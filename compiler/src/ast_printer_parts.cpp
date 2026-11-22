@@ -83,6 +83,17 @@ void Printer::type_text(const TypeRef *p_type) {
 		case TypeRef::Named:
 			dotted(p_type->name);
 			break;
+		case TypeRef::Callback:
+			out_ += '(';
+			for (uint32_t i = 0; i < p_type->parameters.count; ++i) {
+				if (i) {
+					out_ += ", ";
+				}
+				type_text(p_type->parameters[i]);
+			}
+			out_ += ")=>";
+			type_text(p_type->argument);
+			break;
 		case TypeRef::Applied:
 			dotted(p_type->name);
 			out_ += ".<";

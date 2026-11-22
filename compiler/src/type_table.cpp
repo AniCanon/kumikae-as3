@@ -68,6 +68,26 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 	if (p_type->form == TypeRef::Void) {
 		return &void_;
 	}
+	if (p_type->form == TypeRef::Callback) {
+		std::vector<const Type *> parameters;
+		for (TypeRef *part : p_type->parameters) {
+			parameters.push_back(type_of(part));
+		}
+		const Type *result = type_of(p_type->argument);
+		for (const Type *known : callback_types_) {
+			if (known->element == result && known->parameters == parameters) {
+				return known;
+			}
+		}
+		types_.emplace_back();
+		Type *type = &types_.back();
+		type->kind = Type::Callback;
+		type->symbol = p_type->symbol;
+		type->element = result;
+		type->parameters = std::move(parameters);
+		callback_types_.push_back(type);
+		return type;
+	}
 	if (!p_type->symbol) {
 		return &unknown_;
 	}
@@ -113,6 +133,13 @@ std::string Compilation::type_name(const Type *p_type) const {
 			case Type::Vector:
 				prefix += "Vector.<";
 				suffix = ">" + suffix;
+				break;
+			case Type::Callback:
+				prefix += "(";
+				for (size_t i = 0; i < p_type->parameters.size(); ++i) {
+					prefix += (i ? ", " : "") + type_name(p_type->parameters[i]);
+				}
+				prefix += ")=>";
 				break;
 			case Type::ClassObject:
 				prefix += "Class.<";

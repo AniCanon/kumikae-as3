@@ -57,6 +57,20 @@ TypeRef *Parser::parse_type() {
 		current_.offset += 1;
 		current_.length -= 1;
 		current_.newline_before = false;
+	} else if (at(TokenKind::LParen)) {
+		Token open = advance();
+		type->form = TypeRef::Callback;
+		std::vector<TypeRef *> parameters;
+		if (!at(TokenKind::RParen)) {
+			do {
+				parameters.push_back(parse_type());
+			} while (accept(TokenKind::Comma));
+		}
+		expect_close(TokenKind::RParen, open);
+		expect(TokenKind::Assign, "'=>'");
+		expect(TokenKind::Greater, "'=>'");
+		type->parameters = to_list(parameters);
+		type->argument = parse_type();
 	} else if (at(TokenKind::KwVoid)) {
 		advance();
 		type->form = TypeRef::Void;

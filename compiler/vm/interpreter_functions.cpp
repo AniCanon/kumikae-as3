@@ -46,6 +46,9 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			}
 			break;
 		}
+		case Op::CallTypedFunction:
+			typed_call(p_function, p_in);
+			break;
 		case Op::ApplyFunction:
 			apply_value(p_function, p_in);
 			break;
@@ -178,6 +181,33 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 // The arguments function_arguments() made, once the callee has taken references of its own.
 void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
 	vm::let_go_arguments(library_, p_callee, p_values->data(), p_values->size());
+}
+
+void Interpreter::typed_call(const Function &p_function, const Instruction &p_in) {
+	const Slot *registers = stack_.data() + frames_.back().base;
+	Object *value = function_in(Kind::Obj, registers[p_in.b]);
+	if (!value) {
+		return;
+	}
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
+	const Function &callee = module_.functions[target];
+	const auto &list = p_function.argument_lists[p_in.c];
+	const Kind result = p_in.a == NONE ? Kind::Void : p_function.registers[p_in.a];
+	const size_t first = callee.is_static ? 0 : 1;
+	if (callee.result != result || callee.rest || callee.parameters != first + list.size() || callee.required != callee.parameters ||
+			!std::equal(list.begin(), list.end(), callee.registers.begin() + first,
+					[&](uint32_t p_register, Kind p_kind) { return p_function.registers[p_register] == p_kind; })) {
+		raise(module_.type_error_class, "the Function does not match the callback signature");
+		return;
+	}
+	SpareSlots values(spare_slots_);
+	if (first) {
+		values->push_back(own_field(value, ir::FUNCTION_FIRST));
+	}
+	for (uint32_t arg : list) {
+		values->push_back(registers[arg]);
+	}
+	push(target, values->data(), values->size(), p_in.a);
 }
 
 // f(a, b): the callee's parameters take the arguments as stores take untyped values. What it gives back is

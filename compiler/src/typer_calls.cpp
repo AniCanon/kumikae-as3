@@ -119,6 +119,16 @@ const Type *Typer::call(Call *p_call) {
 		return compilation_.type_of(function->return_type, element);
 	}
 	switch (type->kind) {
+		case Type::Callback:
+			if (type->parameters.size() != p_call->arguments.count) {
+				error(callee->offset, "callback takes " + counted(type->parameters.size(), "argument") +
+						" but received " + std::to_string(p_call->arguments.count));
+			} else {
+				for (size_t i = 0; i < type->parameters.size(); ++i) {
+					store(p_call->arguments[i], type->parameters[i]);
+				}
+			}
+			return type->element;
 		case Type::ClassObject:
 			if (type->element && type->element->kind == Type::Instance && type->element->symbol == compilation_.builtin("Date")) {
 				return string_; // Date(x) is the time now as text, as in Flash: no Date.

@@ -1,0 +1,18 @@
+package {
+	public class typed_callbacks {
+		private var total:int = 4;
+		private function add(x:int):int { return total += x; }
+		private function adder(start:int):(int)=>int {
+			return function(x:int):int { return start += x; };
+		}
+		private function invoke(f:(int)=>int, x:int):int { return f(x); }
+		public function typed_callbacks() {
+			var f:(int)=>int = adder(10);
+			trace(invoke(f, 2), f(3));
+			f = add;
+			trace(f(5), invoke(f, 1));
+			var erased:Function = f;
+			trace(erased(3));
+		}
+	}
+}

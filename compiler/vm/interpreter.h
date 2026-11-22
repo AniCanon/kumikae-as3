@@ -326,6 +326,7 @@ private:
 	Entries *loop_entries(Slot p_holder) const;
 	void property_loop(const ir::Function &p_function, const ir::Instruction &p_in);
 	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
+	void typed_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
 	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);

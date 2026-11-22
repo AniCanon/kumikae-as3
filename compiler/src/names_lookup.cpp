@@ -112,6 +112,25 @@ std::string Compilation::ambiguous_message(std::string_view p_name, const Found 
 }
 
 Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
+	if (p_type && p_type->form == TypeRef::Callback) {
+		auto component = [&](TypeRef *p_part, bool p_result) {
+			Symbol *symbol = resolve_type(p_from, p_part);
+			if (p_result && p_part->form == TypeRef::Void) {
+				return;
+			}
+			for (std::string_view name : { "int", "uint", "byte", "Int64", "float", "Number", "Boolean", "String" }) {
+				if (symbol && symbol == builtin(name)) {
+					return;
+				}
+			}
+			p_from.unit->diagnostics.error(p_part->offset, "a callback signature requires a scalar or String type; only the result can be void");
+		};
+		for (TypeRef *part : p_type->parameters) {
+			component(part, false);
+		}
+		component(p_type->argument, true);
+		return p_type->symbol = builtin("Function");
+	}
 	if (!p_type || p_type->form == TypeRef::Any || p_type->form == TypeRef::Void || p_type->name.count == 0) {
 		return nullptr;
 	}

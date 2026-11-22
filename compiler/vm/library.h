@@ -178,6 +178,7 @@ Object *make_method(Library &p_library, uint32_t p_method, Object *p_object);
 int32_t function_length(const ir::Module &p_module, Object *p_function);
 // The function value a register of the kind holds. Null, with AS3's TypeError raised, for anything else:
 // #1009 for nothing, #1006 for a value that is no function.
+bool typed_function_matches(const ir::Function &p_target, ir::Kind p_result, const ir::Kind *p_arguments, size_t p_count);
 Object *function_in(Library &p_library, ir::Kind p_kind, Slot p_value);
 // What such a call starts with, written to r_values (room for one more than p_count): what the function
 // takes first, if anything, then each argument with a reference of its own. How many were written, or
