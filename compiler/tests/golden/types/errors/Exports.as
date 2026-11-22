@@ -15,6 +15,7 @@ package {
 		[Export] public var items:Array;
 		[Export] public var texture:Texture2D;
 		[Export] public var target:Node;
+		[Export] public var sibling:Exports;
 
 		[Export(range="0,10")] public var hinted:int;
 		[Export] public static var shared:int;
@@ -24,7 +25,7 @@ package {
 		[Export] public var anything:*;
 		[Export] public var object:Object;
 		[Export] public var numbers:Vector.<int>;
-		[Export] public var mine:Exports;
+		[Export] public var mine:Plain;
 		[Export] public var heard:Signal;
 		[Export] [Signal] public var both:Signal;
 		[Export] public var callback:Function;
