@@ -168,7 +168,10 @@ std::optional<uint32_t> Reload::callback_target(Object *p_old) const {
 				return std::nullopt;
 			}
 			for (size_t i = 0; i < layout.fields.size(); ++i) {
-				if (layout.fields[i].name != old_layout.fields[i].name || layout.fields[i].kind != old_layout.fields[i].kind) {
+				const ir::Field &prior = old_layout.fields[i], &current = layout.fields[i];
+				if (prior.name != current.name || prior.kind != current.kind || prior.engine_type != current.engine_type ||
+						(prior.klass == ir::NONE) != (current.klass == ir::NONE) ||
+						(prior.klass != ir::NONE && from_.module_.classes[prior.klass].name != to_.module_.classes[current.klass].name)) {
 					return std::nullopt;
 				}
 			}

@@ -4,6 +4,7 @@
 #include "any.h"
 #include "builtins.h"
 #include "interpreter.h"
+#include "ir_binary.h"
 #include "reload.h"
 #include "table.h"
 #include "lower.h"
@@ -3038,6 +3039,38 @@ static void test_reload_callbacks() {
 	old.release_object(original);
 }
 
+static void test_reload_capture_type_change() {
+	const std::string head = "package { public class Counter { public var f:Function; ";
+	const std::string source = "public var oldType:[]int; public function Counter() { var values:";
+	const std::string body = "; f = function():uint { return values.length; }; } public function run():uint { return f(); } } }";
+	ir::Module written, before;
+	compile((head + source + "[]int = new [1] int" + body).c_str(), &written);
+	const auto packed = ir::write_binary(written);
+	CHECK(!ir::read_binary(packed.data(), packed.size(), &before));
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	auto migrate = [&](const std::string &p_type, bool p_compatible) {
+		ir::Module after;
+		compile((head + "public var earlier:[]String; " + source + p_type + body).c_str(), &after);
+		CHECK(class_named(before, "[]int") != class_named(after, "[]int"));
+		vm::Interpreter fresh(after, recorder);
+		vm::Reload reload(old, fresh);
+		vm::Object *moved = reload.object(original);
+		CHECK_EQ(reload.missing(), p_compatible ? std::string() : std::string("Function"));
+		if (p_compatible && moved) {
+			vm::Slot answer;
+			CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+			CHECK_EQ(answer.u, 1u);
+		}
+		fresh.release_object(moved);
+	};
+	migrate("[]int = new [2] int", true);
+	migrate("Vector.<int> = new Vector.<int>(2)", false);
+	old.release_object(original);
+}
+
 static void test_reload_callback_identity() {
 	const std::string head = "package { public class Counter { public var f:Function; public function Counter() { ";
 	const std::string tail = "} public function run():int { return f(); } } }";
@@ -4122,6 +4155,7 @@ int main() {
 	test_reload();
 	test_reload_vectors();
 	test_reload_callbacks();
+	test_reload_capture_type_change();
 	test_reload_callback_identity();
 	test_entries();
 	test_reload_tables();

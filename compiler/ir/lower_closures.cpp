@@ -67,11 +67,17 @@ void Functions::make_environment(FunctionDecl *p_decl) {
 	klass.fields.push_back({ "$outer", Kind::Obj, l_.chain_.empty() ? NONE : l_.chain_.front().klass });
 	if (keeps_this) {
 		l_.own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
-		klass.fields.push_back({ "$this", Kind::Obj });
+		klass.fields.push_back({ "$this", Kind::Obj, l_.fn().owner });
 	}
 	for (const Symbol *symbol : captured) {
 		l_.own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
-		klass.fields.push_back({ std::string(symbol->name), l_.kind_at(l_.locals_[symbol]) });
+		const uint32_t local = l_.locals_[symbol];
+		const Kind kind = l_.kind_at(local);
+		const bool declared = symbol->kind == SymbolKind::Local || (symbol->kind == SymbolKind::Parameter && !symbol->is_rest);
+		klass.fields.push_back({ symbol->name, kind, declared && kind == Kind::Obj ? l_.declared_class(symbol->type) : NONE });
+		if (is_engine(kind) && local < l_.fn().engine_types.size()) {
+			klass.fields.back().engine_type = l_.fn().engine_types[local];
+		}
 	}
 	l_.module_.classes.push_back(std::move(klass));
 	l_.own_layout_.klass = static_cast<uint32_t>(l_.module_.classes.size()) - 1;
