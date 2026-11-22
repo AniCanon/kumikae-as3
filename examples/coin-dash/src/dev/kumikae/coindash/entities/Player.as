@@ -18,6 +18,9 @@ package dev.kumikae.coindash.entities {
         private var blinking:Boolean = false;
         private var step:Number = 0;
         private var facing:int = 1;
+        private var poseIndex:int = 0;
+        private var drawnPose:int = -1;
+        private var poses:[][]Rect2 = new [4] []Rect2;
 
         public function resetAt(dock:Vector2):void {
             position = dock;
@@ -55,7 +58,10 @@ package dev.kumikae.coindash.entities {
                 facing = -1;
             }
             step += delta * (velocity.length() > 20 ? 16 : 3);
-            queueRedraw();
+            poseIndex = (facing > 0 ? 0 : 2) + (sin(step) > 0 ? 1 : 0);
+            if (dashing || poseIndex != drawnPose) {
+                queueRedraw();
+            }
         }
 
         private function setBlinking(next:Boolean):void {
@@ -65,8 +71,6 @@ package dev.kumikae.coindash.entities {
             blinking = next;
             modulate = blinking ? Palette.PLAYER_GRACE : Color.WHITE;
         }
-
-        private var poses:[][]Rect2 = new [4] []Rect2;
 
         private function pixel(direction:int, x:int, y:int, w:int, h:int):Rect2 {
             return new Rect2(direction > 0 ? x : -x - w, y, w, h);
@@ -92,18 +96,18 @@ package dev.kumikae.coindash.entities {
         }
 
         override public function _draw():void {
-            var lift:int = sin(step) > 0 ? 1 : 0;
+            // Dash trails depend on velocity. Redraw once more after a dash to clear the trail.
+            drawnPose = dashing ? -1 : poseIndex;
             drawRect(new Rect2(-12, 10, 24, 4), Palette.PLAYER_SHADOW);
             if (dashing && velocity.length() > 0) {
                 var tail:Vector2 = velocity.normalized() * -36;
                 drawLine(tail, Vector2.ZERO, Palette.PLAYER_SUIT, 7);
                 drawLine(tail * 0.75, Vector2.ZERO, Palette.PLAYER_LIGHT, 3);
             }
-            var index:int = (facing > 0 ? 0 : 2) + lift;
-            var pose:[]Rect2 = poses[index];
+            var pose:[]Rect2 = poses[poseIndex];
             if (pose == null) {
-                pose = makePose(facing, lift);
-                poses[index] = pose;
+                pose = makePose(facing, poseIndex % 2);
+                poses[poseIndex] = pose;
             }
             drawRect(pose[0], Palette.PLAYER_INK);
             drawRect(pose[1], Palette.PLAYER_INK);
