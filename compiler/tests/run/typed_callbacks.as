@@ -22,6 +22,9 @@ package {
 			say();
 			var through:Function = invoke;
 			try { through(describeIt, 2); } catch (mismatch:TypeError) { trace(mismatch.message); }
+			var round:(float,byte)=>float = function(n:float, b:byte):float { return n + float(b); };
+			var wrap:(float,byte)=>byte = function(n:float, b:byte):byte { return n + b; };
+			trace(round(16777217, 257), wrap(-2.75, 257));
 			var missing:()=>void = null;
 			try { missing(); } catch (empty:TypeError) { trace("null"); }
 		}

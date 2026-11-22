@@ -3031,6 +3031,47 @@ static void test_reload_callbacks() {
 	old.release_object(original);
 }
 
+static void test_reload_callback_identity() {
+	const std::string head = "package { public class Counter { public var f:Function; public function Counter() { ";
+	const std::string tail = "} public function run():int { return f(); } } }";
+	const std::string one = "f = function():int { return 1; }; ";
+	const std::string two = "f = function():int { return 2; }; ";
+	ir::Module before, after;
+	compile((head + one + two + tail).c_str(), &before);
+	compile((head + two + one + tail).c_str(), &after);
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	auto migrate = [&](const ir::Module &p_after, bool p_matches) {
+		vm::Interpreter fresh(p_after, recorder);
+		vm::Reload reload(old, fresh);
+		vm::Object *moved = reload.object(original);
+		CHECK_EQ(reload.missing(), p_matches ? std::string() : std::string("Function"));
+		if (moved && p_matches) {
+			vm::Slot answer;
+			CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+			CHECK_EQ(answer.i, 2);
+		}
+		fresh.release_object(moved);
+	};
+	migrate(after, true);
+	after = ir::Module();
+	compile((head + one + "f = function():int { return 3; }; " + tail).c_str(), &after);
+	migrate(after, false); // A new sibling at the old position does not prove identity.
+	for (auto &fn : before.functions) {
+		if (fn.name.find("/function") != std::string::npos) {
+			fn.code = { { ir::Op::Native } };
+		}
+	}
+	migrate(after, false); // Native stubs have no comparable bodies.
+	for (auto &fn : before.functions) {
+		fn.file = ir::NONE;
+	}
+	migrate(after, false); // A synthetic function may carry no source file.
+	old.release_object(original);
+}
+
 static void test_loop_markers() {
 	Compilation compilation;
 	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
@@ -4074,6 +4115,7 @@ int main() {
 	test_reload();
 	test_reload_vectors();
 	test_reload_callbacks();
+	test_reload_callback_identity();
 	test_entries();
 	test_reload_tables();
 	test_run_once_changes();

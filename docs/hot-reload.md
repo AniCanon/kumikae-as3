@@ -8,6 +8,13 @@ Simulator. An exported game doesn't watch its scripts.
 
 ![What happens when you save a script](diagrams/hot-reload.svg)
 
+A live `Function` or typed callback keeps its receiver and captured variables. Its target follows the
+method or function name if code moves within the module. Several anonymous functions in one scope
+can share a name. Reload can move one of those when its interpreted body uniquely identifies it in
+both builds. A changed capture layout or an ambiguous target can require restarting the scene.
+Giving the function expression a distinct name makes its target identifiable across body edits and
+when reloading from native code.
+
 ## What happens when you save
 
 The extension checks the project's `.as` files five times a second. When one changes:

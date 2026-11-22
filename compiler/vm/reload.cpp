@@ -144,8 +144,8 @@ std::optional<uint32_t> Reload::callback_target(Object *p_old) const {
 	}
 	const ir::Function &before = from_.module_.functions[old];
 	if (ambiguous_functions_.count(before.name)) {
-		// Sibling anonymous expressions share their printed name. Preserve a unique declaration at
-		// the same source position, or an unchanged body after another declaration moved it.
+		// Sibling anonymous expressions share their printed name. A source position alone can
+		// identify a different sibling after insertion. Require a matching body.
 		target = matching_closure(before);
 		if (target == ir::NONE) {
 			return std::nullopt;
@@ -180,28 +180,27 @@ std::optional<uint32_t> Reload::callback_target(Object *p_old) const {
 }
 
 uint32_t Reload::matching_closure(const ir::Function &p_before) const {
-	uint32_t by_position = ir::NONE;
-	uint32_t by_body = ir::NONE;
-	size_t positions = 0, bodies = 0;
+	if (p_before.file >= from_.module_.files.size() || p_before.code.empty() || p_before.code.front().op == ir::Op::Native) {
+		return ir::NONE;
+	}
 	const std::string body = ir::print(from_.module_, p_before);
+	const std::string &file = from_.module_.files[p_before.file];
+	uint32_t target = ir::NONE;
+	size_t matches = 0, old_matches = 0;
+	for (const ir::Function &prior : from_.module_.functions) {
+		if (prior.name == p_before.name && prior.file == p_before.file && ir::print(from_.module_, prior) == body) {
+			++old_matches;
+		}
+	}
 	for (uint32_t i = 0; i < to_.module_.functions.size(); ++i) {
 		const ir::Function &candidate = to_.module_.functions[i];
-		if (candidate.name != p_before.name || to_.module_.files[candidate.file] != from_.module_.files[p_before.file]) {
-			continue;
-		}
-		if (candidate.position == p_before.position) {
-			by_position = i;
-			++positions;
-		}
-		if (ir::print(to_.module_, candidate) == body) {
-			by_body = i;
-			++bodies;
+		if (candidate.name == p_before.name && candidate.file < to_.module_.files.size() &&
+				to_.module_.files[candidate.file] == file && ir::print(to_.module_, candidate) == body) {
+			++matches;
+			target = i;
 		}
 	}
-	if (bodies == 1) {
-		return by_body;
-	}
-	return positions == 1 ? by_position : ir::NONE;
+	return matches == 1 && old_matches == 1 ? target : ir::NONE;
 }
 
 Object *Reload::object(Object *p_old) {
