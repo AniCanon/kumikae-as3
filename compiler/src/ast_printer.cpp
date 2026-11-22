@@ -57,9 +57,10 @@ void Printer::node(const Node *p_node, int p_depth) {
 			break;
 		case NodeKind::VectorLit: {
 			const VectorLit *vector = static_cast<const VectorLit *>(p_node);
-			head("VectorLit", p_depth);
+			head(vector->fixed_array ? "FixedArray" : "VectorLit", p_depth);
 			at(p_node->offset);
 			node(vector->element_type, p_depth + 1);
+			node(vector->length, p_depth + 1);
 			children(vector->elements, p_depth + 1);
 		} break;
 		case NodeKind::FunctionExpr:

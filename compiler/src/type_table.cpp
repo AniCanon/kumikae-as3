@@ -34,16 +34,17 @@ const Type *Compilation::instance_type(Symbol *p_class) {
 	return type;
 }
 
-const Type *Compilation::vector_type(const Type *p_element) {
-	auto found = vector_types_.find(p_element);
-	if (found != vector_types_.end()) {
+const Type *Compilation::vector_type(const Type *p_element, bool p_fixed_array) {
+	auto &types = p_fixed_array ? fixed_array_types_ : vector_types_;
+	auto found = types.find(p_element);
+	if (found != types.end()) {
 		return found->second;
 	}
 	types_.emplace_back();
 	Type *type = &types_.back();
-	type->kind = Type::Vector;
+	type->kind = p_fixed_array ? Type::FixedArray : Type::Vector;
 	type->element = p_element;
-	vector_types_.emplace(p_element, type);
+	types.emplace(p_element, type);
 	return type;
 }
 
@@ -67,6 +68,9 @@ const Type *Compilation::type_of(const TypeRef *p_type, const Type *p_element) {
 	}
 	if (p_type->form == TypeRef::Void) {
 		return &void_;
+	}
+	if (p_type->form == TypeRef::FixedArray) {
+		return vector_type(type_of(p_type->argument, p_element), true);
 	}
 	if (p_type->form == TypeRef::Callback) {
 		std::vector<const Type *> parameters;
@@ -130,6 +134,9 @@ std::string Compilation::type_name(const Type *p_type) const {
 				return prefix + "?" + suffix;
 			case Type::Instance:
 				return prefix + std::string(p_type->symbol->name) + suffix;
+			case Type::FixedArray:
+				prefix += "[]";
+				break;
 			case Type::Vector:
 				prefix += "Vector.<";
 				suffix = ">" + suffix;

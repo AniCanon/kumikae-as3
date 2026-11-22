@@ -94,6 +94,10 @@ void Printer::type_text(const TypeRef *p_type) {
 			out_ += ")=>";
 			type_text(p_type->argument);
 			break;
+		case TypeRef::FixedArray:
+			out_ += "[]";
+			type_text(p_type->argument);
+			break;
 		case TypeRef::Applied:
 			dotted(p_type->name);
 			out_ += ".<";

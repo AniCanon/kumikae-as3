@@ -38,7 +38,7 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 		inner = module_.classes[*vector_class(p_type->element)].name;
 	}
 	Class klass;
-	klass.name = "Vector.<" + inner + ">";
+	klass.name = p_type->kind == Type::FixedArray ? "[]" + inner : "Vector.<" + inner + ">";
 	klass.element = element;
 	klass.element_check = check_for(p_type->element, element).value_or(NONE); // Before the class is added: it may add others.
 	if (element == Kind::Val && of && is_godot(of)) {
@@ -106,7 +106,19 @@ uint32_t Vectors::vector_literal(Expr *p_literal, const List<Expr *> &p_elements
 	}
 	// Made empty, then filled in order: each element is worked out after the ones before it are stored.
 	const uint32_t out = l_.reg(Kind::Obj);
-	l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ l_.default_value(Kind::U32, position), l_.default_value(Kind::Bool, position) }));
+	uint32_t length;
+	if (p_literal->type->kind == Type::FixedArray) {
+		Expr *written = static_cast<VectorLit *>(p_literal)->length;
+		if (written) {
+			length = l_.expression(written, Kind::U32);
+		} else {
+			length = l_.reg(Kind::U32);
+			l_.emit(Op::ConstU32, position, length, p_elements.count);
+		}
+	} else {
+		length = l_.default_value(Kind::U32, position);
+	}
+	l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ length, l_.default_value(Kind::Bool, position) }));
 	uint32_t at = 0;
 	for (Expr *element : p_elements) {
 		// A hole in an Array's, `[1,,2]`, is undefined.

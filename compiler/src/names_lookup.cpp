@@ -112,6 +112,13 @@ std::string Compilation::ambiguous_message(std::string_view p_name, const Found 
 }
 
 Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
+	if (p_type && p_type->form == TypeRef::FixedArray) {
+		resolve_type(p_from, p_type->argument);
+		if (p_type->argument->form == TypeRef::Void || p_type->argument->form == TypeRef::Callback) {
+			p_from.unit->diagnostics.error(p_type->argument->offset, "a fixed array element must be a storable value type");
+		}
+		return nullptr;
+	}
 	if (p_type && p_type->form == TypeRef::Callback) {
 		auto component = [&](TypeRef *p_part, bool p_result) {
 			Symbol *symbol = resolve_type(p_from, p_part);

@@ -21,7 +21,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Any;
 		return true;
 	}
-	if (p_type->kind == Type::Vector) {
+	if (p_type->typed_sequence()) {
 		// A vector is an object, if the interpreter can hold what is in it.
 		Kind element = Kind::Void;
 		*r_kind = Kind::Obj;

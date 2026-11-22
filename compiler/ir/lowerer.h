@@ -204,7 +204,7 @@ class Lowerer {
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
 	// Vectors: a Vector.<T>, or an Array (a vector of untyped elements with rules of its own). The class of
 	// a Vector.<T> is made the first time the type is met; nothing if its elements are of a kind not held.
-	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
+	bool is_vector(const Type *p_type) const { return p_type && (p_type->typed_sequence() || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// What an untyped value stored where p_type is declared is checked against (FromAny's third operand):
 	// nothing if the type can't be checked here.

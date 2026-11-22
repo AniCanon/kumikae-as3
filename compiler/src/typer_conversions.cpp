@@ -22,7 +22,7 @@ const Type *Typer::join(const Type *p_a, const Type *p_b) const {
 	}
 	auto nullable = [&](const Type *p_type) {
 		return (p_type->kind == Type::Instance && !numeric(p_type) && p_type != boolean_) ||
-				p_type->kind == Type::Vector || p_type->kind == Type::Callback || p_type->kind == Type::ClassObject;
+				p_type->typed_sequence() || p_type->kind == Type::Callback || p_type->kind == Type::ClassObject;
 	};
 	if (p_a->kind == Type::Null && nullable(p_b)) {
 		return p_b;
@@ -95,7 +95,7 @@ bool Typer::converts_to_engine(const Type *p_from, const Type *p_to) const {
 	}
 	std::string_view name = p_to->symbol->name;
 	if (name == "GodotArray") {
-		return p_from == array_ || p_from->kind == Type::Vector;
+		return p_from == array_ || p_from->typed_sequence();
 	}
 	if (name == "GodotDictionary") {
 		return p_from == object_ || p_from == dictionary_;
@@ -109,7 +109,7 @@ bool Typer::converts_to_engine(const Type *p_from, const Type *p_to) const {
 	if (p_from == array_) {
 		return true; // Its elements are checked when it is converted.
 	}
-	if (p_from->kind != Type::Vector) {
+	if (!p_from->typed_sequence()) {
 		return false;
 	}
 	std::string_view element = name.substr(head.size(), name.size() - head.size() - tail.size());
@@ -146,8 +146,8 @@ auto Typer::fits(const Type *p_from, const Type *p_to) const -> Typer::Fit {
 	if (p_to->kind == Type::ClassObject || p_to->kind == Type::Null) {
 		return Fit::Yes; // Not a type that can be written.
 	}
-	if (p_from->kind == Type::Vector || p_to->kind == Type::Vector) {
-		if (p_from->kind == Type::Vector && p_to->kind == Type::Vector) {
+	if (p_from->typed_sequence() || p_to->typed_sequence()) {
+		if (p_from->typed_sequence() && p_to->typed_sequence()) {
 			// Vectors of different element types are unrelated, even when the elements are related.
 			return Fit::No;
 		}
@@ -248,6 +248,10 @@ void Typer::written(Expr *p_target) {
 		symbol = static_cast<Name *>(p_target)->symbol;
 	} else if (p_target->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(p_target);
+		if (member->object && member->object->type && member->object->type->kind == Type::FixedArray && member->name == "length") {
+			error(member->name_offset, "'length' is read-only");
+			return;
+		}
 		symbol = member->resolved();
 		offset = member->name_offset;
 		own_object = member->object && member->object->kind == NodeKind::ThisExpr;

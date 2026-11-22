@@ -58,7 +58,7 @@ const Type *Typer::object_arithmetic(TokenKind p_op, const Type *p_left, const T
 	// by its valueOf() or its text: beside `+` a String or a Number, decided then; with `-`, `*`, `/`
 	// and `%` a Number.
 	const auto as3_object = [&](const Type *p_type) {
-		return !primitive(p_type) && (p_type->kind == Type::Vector ||
+		return !primitive(p_type) && (p_type->typed_sequence() ||
 				(p_type->kind == Type::Instance && p_type->symbol && p_type->symbol->unit && p_type->symbol->unit->source.path() != GODOT_DECLARATIONS_PATH));
 	};
 	if ((as3_object(p_left) || as3_object(p_right)) && (primitive(p_left) || as3_object(p_left)) && (primitive(p_right) || as3_object(p_right))) {

@@ -67,10 +67,12 @@ struct Type {
 		Unknown, // Could not be worked out; an error has been reported, or the rule is not built yet.
 		Instance, // An object of a class or interface.
 		Vector, // Vector.<element>
+		FixedArray, // []element
 		Callback, // A Function with a fixed signature.
 		ClassObject, // The class itself, as in `Math` or `Player`: `element` is the type of its instances.
 	};
 	Kind kind = Any;
+	bool typed_sequence() const { return kind == Vector || kind == FixedArray; }
 	Symbol *symbol = nullptr; // For Instance.
 	std::vector<const Type *> parameters; // For Callback; element is its return type.
 	const Type *element = nullptr; // For Vector and ClassObject.

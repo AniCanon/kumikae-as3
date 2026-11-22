@@ -56,6 +56,8 @@ struct ObjectLit : Expr {
 struct VectorLit : Expr { // `new <int>[1, 2]`
 	static const NodeKind KIND = NodeKind::VectorLit;
 	TypeRef *element_type = nullptr;
+	bool fixed_array = false;
+	Expr *length = nullptr; // A sized allocation; otherwise the elements supply the length.
 	List<Expr *> elements;
 };
 struct FunctionExpr : Expr {
