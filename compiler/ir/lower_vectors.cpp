@@ -185,6 +185,15 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	return place;
 }
 
+void Lowerer::store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value) {
+	const Type *declared = p_loop->declaration && p_loop->declaration->declarators.count == 1
+			? compilation_.type_of(p_loop->declaration->declarators[0].type)
+			: p_loop->target ? p_loop->target->type : nullptr;
+	const bool checked = kind_at(p_value) == Kind::Any && declared && p_target.kind != Kind::Any;
+	store(p_target, checked ? from_untyped(p_value, declared, p_target.kind, p_loop->offset)
+			: convert(p_value, p_target.kind, p_loop->offset), p_loop->offset);
+}
+
 // for each (x in vector) and for (i in vector): the elements, or their indices, first to last. The length
 // is read again each time round, as in Flash: an element added inside the loop is reached. An Array's
 // indices are Strings, as its keys are in AS3, and an element that is undefined is passed over: an Array
@@ -232,7 +241,7 @@ void Vectors::vector_loop(ForIn *p_loop) {
 			hole = l_.emit(Op::JumpIf, position, is_missing, 0);
 		}
 	}
-	l_.store(target, l_.convert(value, target.kind, position), position);
+	l_.store_iteration(target, p_loop, value);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();
@@ -263,13 +272,10 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		return;
 	}
 	Place target;
-	const Type *declared = nullptr;
 	if (p_loop->declaration && p_loop->declaration->declarators.count == 1) {
 		target = l_.place_of_symbol(p_loop->declaration->declarators[0].symbol, 0, p_loop->declaration->declarators[0].offset);
-		declared = p_loop->declaration->declarators[0].type ? l_.compilation_.type_of(p_loop->declaration->declarators[0].type) : nullptr;
 	} else if (p_loop->target) {
 		target = l_.place_of(p_loop->target);
-		declared = p_loop->target->type;
 	} else {
 		l_.refuse(position, "this loop variable");
 		return;
@@ -306,8 +312,7 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		l_.emit(Op::HostIndexGet, position, value, collection, key);
 	}
 	// An untyped element is stored as an assignment stores it: checked against what the variable is declared.
-	const bool checked = l_.kind_at(value) == Kind::Any && declared && target.kind != Kind::Any;
-	l_.store(target, checked ? l_.from_untyped(value, declared, target.kind, position) : l_.convert(value, target.kind, position), position);
+	l_.store_iteration(target, p_loop, value);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();

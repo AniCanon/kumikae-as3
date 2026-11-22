@@ -67,6 +67,9 @@ void Statements::leave_return(uint32_t p_position, uint32_t p_value) {
 // anything (NONE) for `*`, `Object` or no type.
 uint32_t Statements::catch_type(const CatchClause &p_clause) {
 	const Type *type = p_clause.type ? l_.compilation_.type_of(p_clause.type) : nullptr;
+	if (type && type->kind == Type::FixedArray) {
+		return l_.vector_class(type).value_or(NONE);
+	}
 	const Symbol *symbol = type && type->kind == Type::Instance ? type->symbol : nullptr;
 	if (!symbol || symbol == l_.object_) {
 		return NONE;

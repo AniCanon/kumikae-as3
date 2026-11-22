@@ -2766,9 +2766,12 @@ static void test_reload_kept_containers() {
 		running.release_object(bag);
 		if (moved) {
 			vm::Slot result;
-			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
-			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("7|true,false|0|1,two|1"));
-			fresh.discard(ir::Kind::Str, result);
+			const bool ok = fresh.call_method(moved, "tell", nullptr, 0, &result);
+			CHECK(ok);
+			if (ok && result.p) {
+				CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("7|true,false|0|1,two|1"));
+				fresh.discard(ir::Kind::Str, result);
+			}
 			fresh.release_object(moved);
 		}
 		CHECK_EQ(recorder.errors, std::string());

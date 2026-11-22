@@ -23,6 +23,16 @@ package {
             var dynamicRows:* = nested;
             try { dynamicRows[0] = ordinary; } catch (e:TypeError) { trace("element"); }
             trace(nested[0] === nums);
+            var erased:[]* = new []* { nums, ordinary };
+            try {
+                for each (var row:[]int in erased) { trace(row.length); }
+            } catch (e:TypeError) { trace("iteration"); }
+            try { throw ordinary; }
+            catch (e:[]int) { trace("wrong catch"); }
+            catch (e:*) { trace("vector catch"); }
+            try { throw nums; }
+            catch (e:[]uint) { trace("wrong element"); }
+            catch (e:[]int) { trace(e[1]); }
             for each (var invalid:* in [-1, 4294967296, 2.5, NaN]) {
                 try { var bad:[]int = new [invalid] int; } catch (e:RangeError) { trace("bad length"); }
             }

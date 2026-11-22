@@ -281,6 +281,7 @@ class Lowerer {
 	uint32_t load(const Place &p_place, uint32_t p_position);
 
 	void store(const Place &p_place, uint32_t p_value, uint32_t p_position);
+	void store_iteration(const Place &p_target, ForIn *p_loop, uint32_t p_value);
 	void store_engine(const Place &p_place, uint32_t p_value, uint32_t p_position);
 
 	// The class a `new`, `is`, `as` or conversion names.

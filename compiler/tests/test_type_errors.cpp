@@ -53,10 +53,10 @@ static void test_conversions_accepted() {
 static void test_fixed_arrays() {
 	expect(program("var a:[]Base = new [count] Base; var b:[]Sub = /*!*/a; var c:[]int = /*!*/ints;"
 				   "var d:Vector.<Base> = /*!*/a; a./*!*/length = 1; a./*!*/fixed = false; a./*!*/push(sub);"
-				   "var e:[]Base = new []Base { /*!*/other }; a[0] = /*!*/other;"),
+				   "var e:[]Base = new []Base { /*!*/other }; a[0] = /*!*/other; for each (var v:Vector.<int> in /*!*/new [][]int {}) {}"),
 			{ UNRELATED("[]Base", "[]Sub"), UNRELATED("Vector.<int>", "[]int"), UNRELATED("[]Base", "Vector.<Base>"),
 					"'length' is read-only", "'[]Base' has no member 'fixed'", "'[]Base' has no member 'push'",
-					UNRELATED("Other", "Base"), UNRELATED("Other", "Base") });
+					UNRELATED("Other", "Base"), UNRELATED("Other", "Base"), UNRELATED("[]int", "Vector.<int>") });
 }
 
 static void test_callback_signatures() {

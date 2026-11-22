@@ -358,7 +358,7 @@ void Dynamic::loop(ForIn *p_loop) {
 		l_.emit(Op::DynGet, position, element, holder, value);
 		value = element;
 	}
-	l_.store(target, l_.convert(value, target.kind, position), position);
+	l_.store_iteration(target, p_loop, value);
 	Statements(l_).open_loop();
 	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();
