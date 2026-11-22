@@ -12,7 +12,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace kas3 {
 
@@ -27,8 +26,6 @@ bool object_element(const vm::Object *p_object, godot::Variant *r_out, std::stri
 void forget_defaults();
 
 class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource, public vm::Clock {
-	std::unordered_set<void *> borrowed_; // Handles made by borrow().
-
 	// Godot's form of a name the interpreter passes on every call ("move_and_slide"), made once. The
 	// interpreter's names are its module's own text, which stays put while the program is loaded, so the
 	// place the text sits is the key; the text is kept beside it and checked, so that a different name at

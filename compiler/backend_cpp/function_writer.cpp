@@ -328,6 +328,8 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 	}
 
 	// What was known of a register is forgotten when it is written, and with it what was made from it.
+	const uint32_t moved_text = p_in.op == Op::Move && kind(p_in.a) == Kind::Str ? text_[p_in.b] : NONE;
+	const bool moved_exact = p_in.op == Op::Move && kind(p_in.a) == Kind::Str ? text_exact_[p_in.b] : false;
 	const char first = ir::op_shape(p_in.op)[0];
 	if ((first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op)) {
 		forget_whole(p_in.a);
@@ -338,6 +340,13 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 	remember_whole(p_in);
 	if (p_in.op == Op::ConstStr) {
 		text_[p_in.a] = p_in.b;
+		text_exact_[p_in.a] = true;
+	} else if (moved_text != NONE) {
+		text_[p_in.a] = moved_text;
+		text_exact_[p_in.a] = moved_exact;
+	} else if (p_in.op == Op::GetGlobal && facts_ && p_in.b < facts_->const_strings.size() && facts_->const_strings[p_in.b] != NONE) {
+		text_[p_in.a] = facts_->const_strings[p_in.b];
+		text_exact_[p_in.a] = false;
 	}
 }
 
@@ -470,6 +479,7 @@ std::string FunctionWriter::write() {
 	}
 	whole_.assign(function_.registers.size(), Whole());
 	text_.assign(function_.registers.size(), NONE);
+	text_exact_.assign(function_.registers.size(), false);
 	std::vector<std::string> copies(function_.code.size() + 1); // Before an instruction: a loop's copy with locals.
 	for (pc_ = 0; pc_ < function_.code.size(); pc_++) {
 		for (const Twice &loop : twice_) {
@@ -481,6 +491,7 @@ std::string FunctionWriter::write() {
 		if (landed[pc_]) {
 			whole_.assign(function_.registers.size(), Whole());
 			text_.assign(function_.registers.size(), NONE);
+			text_exact_.assign(function_.registers.size(), false);
 		}
 		instruction(function_.code[pc_]);
 		pieces.push_back(body_);

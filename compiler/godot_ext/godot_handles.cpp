@@ -100,7 +100,7 @@ void *GodotHost::borrow(Object *p_object) {
 	if (RefCounted *counted = Object::cast_to<RefCounted>(p_object)) {
 		counted->unreference();
 	}
-	borrowed_.insert(memory);
+	rt::head_of(memory)->shared = rt::HANDLE_BORROWED;
 	return memory;
 }
 
@@ -115,7 +115,7 @@ bool GodotHost::shares(void *p_object_handle) {
 	rt::HandleHead *head = rt::head_of(p_object_handle);
 	if (head->shared == rt::HANDLE_UNKNOWN) {
 		const ObjectID id = (ObjectID) * static_cast<const Variant *>(p_object_handle);
-		head->shared = !id.is_null() && !id.is_ref_counted() && !borrowed_.count(p_object_handle) ? rt::HANDLE_SHARED : rt::HANDLE_COPIED;
+		head->shared = !id.is_null() && !id.is_ref_counted() ? rt::HANDLE_SHARED : rt::HANDLE_COPIED;
 	}
 	return head->shared == rt::HANDLE_SHARED;
 }
@@ -158,9 +158,7 @@ void GodotHost::drop(void *p_value) {
 		if (head->shared == rt::HANDLE_SHARED && head->holders.fetch_sub(1, std::memory_order_acq_rel) > 1) {
 			return;
 		}
-		const auto borrowed = borrowed_.find(p_value);
-		if (borrowed != borrowed_.end()) {
-			borrowed_.erase(borrowed);
+		if (head->shared == rt::HANDLE_BORROWED) {
 			free_handle_memory(p_value);
 			return;
 		}
@@ -180,7 +178,7 @@ uint64_t GodotHost::node(void *p_value) {
 		return 0;
 	}
 	RefCounted *counted = Object::cast_to<RefCounted>(value->get_validated_object());
-	if (!counted || (borrowed_.count(p_value) && !joined_to_script(counted))) {
+	if (!counted || (rt::head_of(p_value)->shared == rt::HANDLE_BORROWED && !joined_to_script(counted))) {
 		return 0;
 	}
 	return counted->get_instance_id();

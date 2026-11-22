@@ -296,9 +296,11 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 }
 
 // A value as Godot's entry takes it bare, by its address: the register's own where it holds that very
-// type, a temporary where a number is widened or a Boolean is Godot's byte, the name the host built for a
-// String the program wrote. Nothing if the register does not hold what the parameter takes.
-std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard) {
+// type, a temporary where a number is widened or a Boolean is Godot's byte or a value with parts is copied
+// out of a handle, the name the host built for a String the program wrote. Nothing if the register does not
+// hold what the parameter takes.
+std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard,
+		std::string *r_inside) {
 	const Kind held = kind(p_register);
 	const std::string temporary = "a" + std::to_string(p_at);
 	if (p_type == "float" && (held == Kind::F64 || held == Kind::I32 || held == Kind::U32)) {
@@ -313,8 +315,14 @@ std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, st
 		line("const uint8_t " + temporary + " = " + reg(p_register) + ";");
 		return "&" + temporary;
 	}
-	if (has_parts(p_type) && parts(p_register) == p_type) {
-		return "&" + reg(p_register);
+	if (has_parts(p_type) && value_type(p_register) == p_type) {
+		if (!parts(p_register).empty()) {
+			return "&" + reg(p_register);
+		}
+		const std::string handle = (value_from_[p_register] != NONE ? own_field(value_from_[p_register]) : reg(p_register)) + ".handle";
+		*r_guard += " && " + handle;
+		*r_inside += "\tconst " + std::string(p_type) + " " + temporary + " = unbox<" + std::string(p_type) + ">(c, " + handle + ");\n";
+		return "&" + temporary;
 	}
 	// One of Godot's objects, where the parameter is of exactly the class the register is declared to hold:
 	// the object behind the handle, which is none for no handle and for an object Godot has freed, as the
@@ -325,6 +333,9 @@ std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, st
 	}
 	if (p_type == "StringName" && held == Kind::Str && text_[p_register] != NONE) {
 		const std::string name = "c->names[" + std::to_string(thunks_.name_index(text_[p_register])) + "]";
+		if (!text_exact_[p_register]) {
+			*r_guard += " && " + reg(p_register) + " == c->strings[" + std::to_string(text_[p_register]) + "]";
+		}
 		*r_guard += " && " + name;
 		return name;
 	}
@@ -373,7 +384,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const bool gives = result != "void";
 	// What comes back in a handle is made where a new handle keeps it, by the host (EngineApi::call_kept).
 	const bool kept = in_handle(result);
-	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 2 ||
+	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 4 ||
 			(out != NONE && (!gives || !(kept ? holds_handle(out, result) : holds(out, result)))) ||
 			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result) || kept))) {
 		return false;
@@ -386,9 +397,10 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	line("void *const bind = " + resolved + ".bind;");
 	line("void *const on = " + object_behind(receiver) + ";");
 	std::string guard = "bind && on";
+	std::string inside;
 	std::string addresses;
 	for (size_t i = 0; i < parameters.size(); i++) {
-		std::optional<std::string> address = i < given.size() ? bare_argument(given[i], parameters[i], i, &guard)
+		std::optional<std::string> address = i < given.size() ? bare_argument(given[i], parameters[i], i, &guard, &inside)
 															   : std::optional<std::string>("&" + resolved + ".defaults[" + std::to_string(i - given.size()) + "]");
 		if (!address) {
 			body_ = before;
@@ -397,6 +409,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		addresses += (i ? ", " : "") + *address;
 	}
 	line("if (KAS3_LIKELY(" + guard + (kept ? " && " + resolved + ".handle" : "") + ")) {");
+	body_ += inside;
 	if (!parameters.empty()) {
 		line("const void *const p[] = { " + addresses + " };");
 	}

@@ -461,7 +461,7 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	// all it takes.
 	const size_t given = p_in.op == ir::Op::HostCall ? p_thunk.argument_lists[p_in.c].size() - 1 : worked->parameters.size();
 	const size_t missing = worked->parameters.size() - std::min(worked->parameters.size(), given);
-	if (!bare || missing > 2 ||
+	if (!bare || missing > rt::MOST_DEFAULTS ||
 			(missing > 0 && !defaults_of(host.module.engine_names[p_in.b], worked->parameters.size(), given, r_resolved->defaults))) {
 		return false;
 	}

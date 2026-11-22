@@ -443,8 +443,9 @@ bool FunctionWriter::value_keyed(const Instruction &p_in) {
 		return false;
 	}
 	const std::string name = "c->names[" + std::to_string(thunks_.name_index(text_[p_in.c])) + "]";
+	const std::string match = text_exact_[p_in.c] ? std::string() : " && " + register_name(p_in.c) + " == c->strings[" + std::to_string(text_[p_in.c]) + "]";
 	line("{");
-	line("void *const made = c->engine && " + name + " ? c->engine->keyed(" + register_name(p_in.b) + ".handle, " + name + ", PartsOf<" + std::string(type) +
+	line("void *const made = c->engine && " + name + match + " ? c->engine->keyed(" + register_name(p_in.b) + ".handle, " + name + ", PartsOf<" + std::string(type) +
 			">::code) : nullptr;");
 	line("if (KAS3_LIKELY(made)) {");
 	put(untyped, std::string(zero_of(Kind::Any))); // What it held is let go of, as the element read into it would have.

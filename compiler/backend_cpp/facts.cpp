@@ -279,6 +279,59 @@ void look_at_classes(const ir::Module &p_module, Facts *r_facts) {
 	}
 }
 
+// Each static const String global that is only ever assigned one string literal across the whole module,
+// remembered by that literal's index so callers can cache a Godot StringName across classes.
+void find_const_strings(const ir::Module &p_module, Facts *r_facts) {
+	const size_t count = p_module.globals.size();
+	r_facts->const_strings.assign(count, NONE);
+	std::vector<bool> invalid(count, false);
+	for (const ir::Function &function : p_module.functions) {
+		std::vector<bool> landed(function.code.size() + 1, false);
+		for (const Instruction &in : function.code) {
+			const uint32_t target = jump_target(in);
+			if (target != NONE && target < landed.size()) {
+				landed[target] = true;
+			}
+		}
+		for (const ir::Handler &handler : function.handlers) {
+			if (handler.target < landed.size()) {
+				landed[handler.target] = true;
+			}
+		}
+		std::vector<uint32_t> str(function.registers.size(), NONE);
+		for (uint32_t pc = 0; pc < function.code.size(); pc++) {
+			const Instruction &in = function.code[pc];
+			if (landed[pc]) {
+				std::fill(str.begin(), str.end(), NONE);
+			}
+			if (in.op == Op::SetGlobal && in.a < count) {
+				const uint32_t value = in.b < str.size() ? str[in.b] : NONE;
+				if (!p_module.globals[in.a].is_const || p_module.globals[in.a].kind != Kind::Str || value == NONE ||
+						(r_facts->const_strings[in.a] != NONE && r_facts->const_strings[in.a] != value)) {
+					invalid[in.a] = true;
+				} else {
+					r_facts->const_strings[in.a] = value;
+				}
+			}
+			const char first = ir::op_shape(in.op)[0];
+			if ((first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op) && in.a < str.size()) {
+				if (in.op == Op::ConstStr) {
+					str[in.a] = in.b;
+				} else if (in.op == Op::Move && in.b < str.size()) {
+					str[in.a] = str[in.b];
+				} else {
+					str[in.a] = NONE;
+				}
+			}
+		}
+	}
+	for (size_t i = 0; i < count; i++) {
+		if (invalid[i]) {
+			r_facts->const_strings[i] = NONE;
+		}
+	}
+}
+
 } // namespace
 
 bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in) {
@@ -367,6 +420,7 @@ Facts find_facts(const ir::Module &p_module, bool p_keeps_stack) {
 	find_tables(p_module, &facts);
 	follow_calls(p_module, &facts);
 	look_at_classes(p_module, &facts);
+	find_const_strings(p_module, &facts);
 	return facts;
 }
 
