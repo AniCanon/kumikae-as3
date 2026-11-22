@@ -87,6 +87,23 @@ func _emits_said(from: int) -> void:
 		print("PROBE emits ", emits.rows[at][0], "=", emits.rows[at][1])
 
 
+func _float32(probe: Node2D) -> void:
+	var label := Label.new()
+	# Halfway values around 1 round to opposite even neighbors. Compare bytes to distinguish signed zeros.
+	var halfway := pow(2.0, -24)
+	var negative_zero := PackedByteArray([0, 0, 0, 128]).decode_float(0)
+	var stops := [0.0, negative_zero, 1.0 + halfway, 1.0 + 3.0 * halfway, pow(2.0, -149), INF, -INF]
+	probe.call("tabStops", label, stops)
+	print("PROBE float32 bits=", label.tab_stops.to_byte_array() == PackedFloat32Array(stops).to_byte_array())
+	probe.call("tabStops", label, [NAN])
+	print("PROBE float32 NaN=", label.tab_stops.size() == 1 and is_nan(label.tab_stops[0]))
+	probe.call("tabStops", label, [])
+	print("PROBE float32 empty=", label.tab_stops.is_empty())
+	probe.call("integerStops", label)
+	print("PROBE integer float32 bits=", label.tab_stops.to_byte_array() == PackedFloat32Array([-3, 16777217]).to_byte_array())
+	label.free()
+
+
 func _initialize() -> void:
 	var probe := Node2D.new()
 	probe.set_script(load("res://Probe.as"))
@@ -115,6 +132,7 @@ func _initialize() -> void:
 	waiting = probe
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
+	_float32(probe)
 	_enter()
 	_places()
 	_loops()

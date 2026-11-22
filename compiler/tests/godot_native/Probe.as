@@ -660,6 +660,17 @@ package {
 			return fail(depth - 1) + 1;
 		}
 
+		public function tabStops(target:Label, values:Array):void {
+			var stops:Vector.<Number> = new Vector.<Number>();
+			for (var i:int = 0; i < values.length; i++) {
+				stops.push(values[i]);
+			}
+			target.tabStops = stops;
+		}
+		public function integerStops(target:Label):void {
+			target.tabStops = new <int>[-3, 16777217];
+		}
+
 		private function scaled(value:int, by:Number):Number {
 			return value * by + 1;
 		}

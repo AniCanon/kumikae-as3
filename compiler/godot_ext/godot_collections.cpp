@@ -304,6 +304,20 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, c
 		ok = whole_numbers<PackedInt32Array>(p_kind, p_vector, INT32_MIN, INT32_MAX, "a 32-bit integer", &made, r_error);
 	} else if (p_type == "PackedInt64Array") {
 		ok = whole_numbers<PackedInt64Array>(p_kind, p_vector, INT64_MIN, INT64_MAX, "a 64-bit integer", &made, r_error);
+	} else if (p_type == "PackedFloat32Array" && p_kind == ir::Kind::F64 && !p_vector->narrow) {
+		PackedFloat32Array packed;
+		if (p_vector->length) {
+			if (packed.resize(p_vector->length) != OK) {
+				*r_error = "could not allocate a PackedFloat32Array";
+				return nullptr;
+			}
+			float *const elements = packed.ptrw();
+			const vm::Slot *const slots = vm::slots_of(p_vector);
+			for (uint32_t i = 0; i < p_vector->length; i++) {
+				elements[i] = static_cast<float>(slots[i].d);
+			}
+		}
+		made = packed;
 	} else if (p_type == "PackedFloat32Array") {
 		ok = values_of<PackedFloat32Array, double>(p_kind, p_vector, Variant::FLOAT, Variant::INT, "numbers", &made, r_error);
 	} else if (p_type == "PackedFloat64Array") {
