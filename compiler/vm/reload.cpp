@@ -20,7 +20,15 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 		classes_.emplace(fresh.classes[i].name, (uint32_t)i);
 	}
 	for (size_t i = 0; i < fresh.functions.size(); i++) {
-		functions_.emplace(fresh.functions[i].name, (uint32_t)i); // The first of a name: a getter before its setter.
+		if (!functions_.emplace(fresh.functions[i].name, static_cast<uint32_t>(i)).second) {
+			ambiguous_functions_.insert(fresh.functions[i].name);
+		}
+	}
+	std::unordered_set<std::string_view> prior_names;
+	for (const auto &prior : from_.module_.functions) {
+		if (!prior_names.insert(prior.name).second) {
+			ambiguous_functions_.insert(prior.name);
+		}
 	}
 	// The new program does not start over: what ran at the start of the old one has run.
 	to_.started_ = from_.started_;
@@ -126,6 +134,76 @@ Object *Reload::lost(uint32_t p_old_class) {
 	return nullptr;
 }
 
+// A Function holds a module-local index. Rebind by name and check that an instance method still has
+// its receiver, or that a closure still has every environment its new body expects.
+std::optional<uint32_t> Reload::callback_target(Object *p_old) const {
+	const uint32_t old = static_cast<uint32_t>(own_field(p_old, ir::FUNCTION_INDEX).i);
+	uint32_t target = function(old);
+	if (target == ir::NONE) {
+		return std::nullopt;
+	}
+	const ir::Function &before = from_.module_.functions[old];
+	if (ambiguous_functions_.count(before.name)) {
+		// Sibling anonymous expressions share their printed name. Preserve a unique declaration at
+		// the same source position, or an unchanged body after another declaration moved it.
+		target = matching_closure(before);
+		if (target == ir::NONE) {
+			return std::nullopt;
+		}
+	}
+	const ir::Function &after = to_.module_.functions[target];
+	if (before.is_static != after.is_static || (before.owner == ir::NONE) != (after.owner == ir::NONE)) {
+		return std::nullopt;
+	}
+	if (!after.is_static && after.owner == ir::NONE) {
+		Object *environment = static_cast<Object *>(own_field(p_old, ir::FUNCTION_FIRST).p);
+		uint32_t expected = after.parameter_classes.empty() ? ir::NONE : after.parameter_classes[0];
+		while (expected != ir::NONE) {
+			const ir::Class &layout = to_.module_.classes[expected];
+			if (!environment || from_.module_.classes[environment->klass].name != layout.name || layout.fields.empty()) {
+				return std::nullopt;
+			}
+			const ir::Class &old_layout = from_.module_.classes[environment->klass];
+			if (classes_.at(old_layout.name) != expected || old_layout.fields.size() != layout.fields.size()) {
+				return std::nullopt;
+			}
+			for (size_t i = 0; i < layout.fields.size(); ++i) {
+				if (layout.fields[i].name != old_layout.fields[i].name || layout.fields[i].kind != old_layout.fields[i].kind) {
+					return std::nullopt;
+				}
+			}
+			environment = static_cast<Object *>(own_field(environment, 0).p);
+			expected = layout.fields[0].klass;
+		}
+	}
+	return target;
+}
+
+uint32_t Reload::matching_closure(const ir::Function &p_before) const {
+	uint32_t by_position = ir::NONE;
+	uint32_t by_body = ir::NONE;
+	size_t positions = 0, bodies = 0;
+	const std::string body = ir::print(from_.module_, p_before);
+	for (uint32_t i = 0; i < to_.module_.functions.size(); ++i) {
+		const ir::Function &candidate = to_.module_.functions[i];
+		if (candidate.name != p_before.name || to_.module_.files[candidate.file] != from_.module_.files[p_before.file]) {
+			continue;
+		}
+		if (candidate.position == p_before.position) {
+			by_position = i;
+			++positions;
+		}
+		if (ir::print(to_.module_, candidate) == body) {
+			by_body = i;
+			++bodies;
+		}
+	}
+	if (bodies == 1) {
+		return by_body;
+	}
+	return positions == 1 ? by_position : ir::NONE;
+}
+
 Object *Reload::object(Object *p_old) {
 	if (!p_old) {
 		return nullptr;
@@ -168,6 +246,13 @@ Object *Reload::object(Object *p_old) {
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
+	std::optional<uint32_t> callback;
+	if (p_old->klass == from_.module_.function_class) {
+		callback = callback_target(p_old);
+		if (!callback) {
+			return lost(p_old->klass);
+		}
+	}
 	Object *fresh = new_object(named->second, to_.heap_.object_slots(named->second), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
@@ -176,6 +261,9 @@ Object *Reload::object(Object *p_old) {
 	moved_.emplace(p_old, fresh);
 	retain(fresh);
 	carry_fields(p_old, fresh);
+	if (callback) {
+		own_field(fresh, ir::FUNCTION_INDEX).i = static_cast<int32_t>(*callback);
+	}
 	carry_record(p_old, fresh);
 	return fresh;
 }

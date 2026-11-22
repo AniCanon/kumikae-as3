@@ -64,7 +64,7 @@ void Functions::make_environment(FunctionDecl *p_decl) {
 	std::sort(captured.begin(), captured.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->offset < p_b->offset; });
 	Class klass;
 	klass.name = l_.fn().name + "$environment";
-	klass.fields.push_back({ "$outer", Kind::Obj });
+	klass.fields.push_back({ "$outer", Kind::Obj, l_.chain_.empty() ? NONE : l_.chain_.front().klass });
 	if (keeps_this) {
 		l_.own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
 		klass.fields.push_back({ "$this", Kind::Obj });
@@ -231,6 +231,13 @@ void Functions::lower_pending_functions() {
 		FunctionDecl *decl = pending.decl;
 		l_.result_type_ = decl->return_type ? l_.compilation_.type_of(decl->return_type) : l_.compilation_.any_type();
 		Bodies(l_).parameters(decl);
+		if (!l_.chain_.empty()) {
+			auto &classes = l_.fn().parameter_classes;
+			if (classes.empty()) {
+				classes.resize(1);
+			}
+			classes[0] = l_.chain_.front().klass;
+		}
 		l_.fn().locals[0].name = "$environment";
 		l_.fn().result = decl->return_type ? l_.written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {

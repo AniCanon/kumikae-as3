@@ -3003,6 +3003,34 @@ static void test_reload() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A held callback follows its method or closure into the new module even when its index moves.
+static void test_reload_callbacks() {
+	const std::string head = "package { public class Counter { public var bound:()=>int; public var closure:()=>int; public var legacy:Function; ";
+	const std::string body = "public function Counter() { bound = step; closure = make(10); legacy = make(20); } "
+			"public function make(n:int):()=>int { return function():int { return ++n; }; } "
+			"public function run():int { return bound() + closure() + int(legacy()); } ";
+	ir::Module before, after;
+	compile((head + body + "public function step():int { return 1; } } }").c_str(), &before);
+	compile((head + "public function another():int { return 100; } " + body + "public function step():int { return 2; } } }").c_str(), &after);
+	Recorder recorder;
+	vm::Interpreter old(before, recorder);
+	CHECK(old.start());
+	vm::Object *original = old.construct(class_named(before, "Counter"), nullptr);
+	vm::Slot answer;
+	CHECK(old.call_method(original, "run", nullptr, 0, &answer));
+	CHECK_EQ(answer.i, 33);
+	vm::Interpreter fresh(after, recorder);
+	vm::Reload reload(old, fresh);
+	vm::Object *moved = reload.object(original);
+	CHECK(moved != nullptr);
+	if (moved) {
+		CHECK(fresh.call_method(moved, "run", nullptr, 0, &answer));
+		CHECK_EQ(answer.i, 36);
+		fresh.release_object(moved);
+	}
+	old.release_object(original);
+}
+
 static void test_loop_markers() {
 	Compilation compilation;
 	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
@@ -4045,6 +4073,7 @@ int main() {
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
+	test_reload_callbacks();
 	test_entries();
 	test_reload_tables();
 	test_run_once_changes();
