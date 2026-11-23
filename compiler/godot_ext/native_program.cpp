@@ -55,12 +55,14 @@ bool has_parts(int p_type) {
 	return false;
 }
 
+#if defined(KAS3_TEST_COUNTS)
 // How many times generated code asked for the object behind a handle (rt::Host::object_lookups).
 uint64_t looked_up = 0;
 uint64_t lookups() {
 	return looked_up;
 }
 
+#endif
 // How many of the objects found behind handles (object_behind) Godot has freed. It starts at one: a handle
 // nothing was found behind yet has seen none.
 std::atomic<uint64_t> gone{ 1 };
@@ -98,7 +100,9 @@ const GDExtensionInstanceBindingCallbacks WATCH = { &watched, &watched_freed, nu
 // then tells of its end, with nothing of a script's run between (Object::~Object): a freed object is
 // never read from a head whose count still matches.
 void *object_behind(void *p_handle) {
+#if defined(KAS3_TEST_COUNTS)
 	looked_up++;
+#endif
 	const Variant *held = static_cast<const Variant *>(p_handle);
 	if (!held || held->get_type() != Variant::OBJECT) {
 		return nullptr;
@@ -418,7 +422,9 @@ void NativeProgram::resolve(const rt::Program &p_program) {
 	rt::Host &host = *host_;
 	host.context.engine = api();
 	host.context.gone = &gone;
+#if defined(KAS3_TEST_COUNTS)
 	host.object_lookups = &lookups;
+#endif
 	names_.reserve(p_program.name_count);
 	for (uint32_t i = 0; i < p_program.name_count; i++) {
 		const rt::Text &text = p_program.strings[p_program.names[i]];
@@ -429,9 +435,14 @@ void NativeProgram::resolve(const rt::Program &p_program) {
 		const ir::Function &thunk = host.module.functions[host.thunk_function(p_program.uses[i])];
 		const ir::Instruction &in = thunk.code[0];
 		rt::Resolved &resolved = host.resolved[i];
-		if (!resolve_use(thunk, in, &resolved)) {
+		const bool ready = resolve_use(thunk, in, &resolved);
+#if defined(KAS3_TEST_COUNTS)
+		if (!ready) {
 			host.unresolved.push_back(i);
 		}
+#else
+		(void)ready;
+#endif
 	}
 }
 

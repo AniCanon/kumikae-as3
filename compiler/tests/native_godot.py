@@ -65,13 +65,14 @@ def retained_on_macos(program, reloads=8):
 
 
 class Runner:
-    def __init__(self, godot, extension, tests, kas3c, check):
+    def __init__(self, godot, extension, tests, kas3c, check, counted=False):
         self.godot = godot
         self.extension = extension  # A project that holds kas3.gdextension and the built library.
         self.tests = tests
         self.kas3c = kas3c
         self.check = check
         self.compiler = shutil.which("c++")
+        self.counted = counted
 
     def able(self, what):
         if self.kas3c and os.path.exists(self.kas3c) and self.compiler:
@@ -91,7 +92,8 @@ class Runner:
                 shutil.copy(os.path.join(sources, name), made)
         shutil.copy(os.path.join(self.extension, "kas3.gdextension"), made)
         os.makedirs(os.path.join(made, "bin"))
-        for library in glob.glob(os.path.join(self.extension, "bin", "libkas3_godot.*")):
+        binaries = os.path.join(self.extension, "bin", "test_counts" if self.counted else "")
+        for library in glob.glob(os.path.join(binaries, "libkas3_godot.*")):
             shutil.copy(library, os.path.join(made, "bin"))
         subprocess.run([self.godot, *FIRST_SCAN, "--path", made], capture_output=True, text=True, timeout=300)
         return made

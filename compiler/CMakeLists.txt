@@ -114,6 +114,12 @@ target_include_directories(kas3runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/runtim
 target_link_libraries(kas3runtime PUBLIC kas3vm)
 target_compile_options(kas3runtime PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# Tests link just this object ahead of the shipping archive to enable native counters.
+add_library(kas3_counted_host OBJECT runtime/host.cpp)
+target_link_libraries(kas3_counted_host PRIVATE kas3runtime)
+target_compile_options(kas3_counted_host PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+target_compile_definitions(kas3_counted_host PRIVATE KAS3_TEST_COUNTS)
+
 # The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
 file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
 add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
@@ -151,25 +157,31 @@ if(KAS3_GODOT_CPP)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/godot/runtime_names.py
             ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${runtime_names}
         DEPENDS godot/runtime_names.py godot/godot_names.txt)
-    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES} ${runtime_names})
+    set(export_sources godot_ext/program.cpp godot_ext/native_program.cpp)
+    foreach(source IN LISTS export_sources)
+        list(REMOVE_ITEM KAS3_GODOT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
+    endforeach()
+    add_library(kas3_godot_common OBJECT ${KAS3_GODOT_SOURCES} ${KAS3_GODOT_EXTRA_SOURCES} ${runtime_names})
     get_target_property(KAS3_GODOT_CPP_INCLUDES godot-cpp INTERFACE_INCLUDE_DIRECTORIES)
     if(KAS3_GODOT_CPP_INCLUDES)
-        target_include_directories(kas3_godot SYSTEM PRIVATE ${KAS3_GODOT_CPP_INCLUDES})
+        target_include_directories(kas3_godot_common SYSTEM PUBLIC ${KAS3_GODOT_CPP_INCLUDES})
     endif()
-    target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
+    target_include_directories(kas3_godot_common PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/godot_ext)
     if(NOT KAS3_RUNTIME_ONLY)
-        target_include_directories(kas3_godot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_include_directories(kas3_godot_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     endif()
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
-    target_compile_options(kas3_godot PRIVATE -fno-exceptions -Wall -Wextra -Werror)
+    target_compile_options(kas3_godot_common PUBLIC -fno-exceptions -Wall -Wextra -Werror)
     if(KAS3_RUNTIME_ONLY)
-        target_compile_definitions(kas3_godot PRIVATE KAS3_RUNTIME_ONLY=1)
-        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir_core)
+        target_compile_definitions(kas3_godot_common PUBLIC KAS3_RUNTIME_ONLY=1)
+        target_link_libraries(kas3_godot_common PUBLIC godot-cpp kas3runtime kas3vm kas3ir_core)
     elseif(KAS3_HAS_PLAY_BACKEND)
-        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir kas3backend_cpp)
+        target_link_libraries(kas3_godot_common PUBLIC godot-cpp kas3runtime kas3vm kas3ir kas3backend_cpp)
     else()
-        target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm kas3ir)
+        target_link_libraries(kas3_godot_common PUBLIC godot-cpp kas3runtime kas3vm kas3ir)
     endif()
+    add_library(kas3_godot SHARED ${export_sources})
+    target_link_libraries(kas3_godot PRIVATE kas3_godot_common)
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     # -DKAS3_GODOT_OUTPUT=<folder> puts it elsewhere: a build under the sanitizers must not take the place of
@@ -183,6 +195,13 @@ if(KAS3_GODOT_CPP)
     set_target_properties(kas3_godot PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
+    if(KAS3_HAS_PLAY_BACKEND)
+        add_library(kas3_godot_counts SHARED ${export_sources} $<TARGET_OBJECTS:kas3_counted_host>)
+        target_link_libraries(kas3_godot_counts PRIVATE kas3_godot_common)
+        target_compile_definitions(kas3_godot_counts PRIVATE KAS3_TEST_COUNTS)
+        set_target_properties(kas3_godot_counts PROPERTIES OUTPUT_NAME kas3_godot
+            LIBRARY_OUTPUT_DIRECTORY "${KAS3_GODOT_OUTPUT}/test_counts")
+    endif()
     if(EMSCRIPTEN)
         set(KAS3_WEB_EXPORTS -Wl,--export=kas3_godot_init)
         if(NOT KAS3_RUNTIME_ONLY)
@@ -200,6 +219,11 @@ if(KAS3_GODOT_CPP)
 endif()
 
 enable_testing()
+set(shipping_images $<TARGET_FILE:kas3runtime>)
+if(TARGET kas3_godot)
+    list(APPEND shipping_images $<TARGET_FILE:kas3_godot>)
+endif()
+add_test(NAME shipping_runtime COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_shipping_runtime.py ${shipping_images})
 # Link the internal host entry directly on Unix. Windows exports only the GDExtension entry.
 if(KAS3_HAS_PLAY_BACKEND AND UNIX)
     add_executable(godot_null_shape tests/godot_null_shape.cpp)
@@ -266,7 +290,7 @@ add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
     --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
     --include ${CMAKE_CURRENT_SOURCE_DIR}/ir
-    ${KAS3_STANDALONE_LINK_ARGS})
+    --lib $<TARGET_OBJECTS:kas3_counted_host> ${KAS3_STANDALONE_LINK_ARGS})
 add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)
 # Which corpus programs can run in Godot, and what stops the others.

@@ -866,6 +866,8 @@ def reload_test(label, elsewhere, native=False):
         environment = dict(os.environ)
         environment.pop("KAS3_SOURCE_DIR", None)
         environment["KAS3_REPORT_PREPARED"] = "1"
+        for library in glob.glob(os.path.join(copy, "bin", "test_counts", "libkas3_godot.*")):
+            shutil.copy2(library, os.path.join(copy, "bin"))
         if elsewhere:
             sources = os.path.join(edited, "sources")
             shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
@@ -999,7 +1001,7 @@ with tempfile.TemporaryDirectory() as edited:
 
 test_web_export.check_export(godot)
 
-native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
+native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check, counted=True)
 native.probe()
 native.workloads()
 native.frames()

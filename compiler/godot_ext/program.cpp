@@ -443,11 +443,13 @@ bool Project::reload_with_errors(std::string *r_errors) {
 	module.reset();
 	// The program just let go of was the only other one that held what the host worked out for it.
 	program->host_.release_unused();
+#if defined(KAS3_TEST_COUNTS)
 	if (std::getenv("KAS3_REPORT_PREPARED")) {
 		const auto [kept, used] = program->host_.own_places();
 		UtilityFunctions::print(String("ActionScript: ") + String::num_int64((int64_t)kept) + " calls keep a name of their own, " +
 				String::num_int64((int64_t)used) + " of them the running program's");
 	}
+#endif
 	AS3Script::refresh_all();
 	String message = String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.";
 	if (was_native) {

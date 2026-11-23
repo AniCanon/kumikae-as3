@@ -73,9 +73,11 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.class_tells = class_tells.data();
 	context.cache = &cache;
 	context.class_cached = class_cached.data();
+#if defined(KAS3_TEST_COUNTS)
 	if (std::getenv("KAS3_NATIVE_COUNTS")) {
 		thunk_counts.assign(module.functions.size() - program.function_count, 0);
 	}
+#endif
 	resolved.resize(program.use_count);
 	names.assign(program.name_count, nullptr);
 	context.resolved = resolved.data();
@@ -98,6 +100,7 @@ void Host::clear_globals() {
 	}
 }
 
+#if defined(KAS3_TEST_COUNTS)
 // What a thunk asks of the library, for the counts: the operation, and Godot's name where it asks Godot.
 static std::string asked_of(const ir::Module &p_module, const ir::Instruction &p_in) {
 	std::string text = ir::op_name(p_in.op);
@@ -131,11 +134,14 @@ void Host::say_counts() const {
 	}
 }
 
+#endif
 Host::~Host() {
 	limit.set(0); // Its thread reads the context.
+#if defined(KAS3_TEST_COUNTS)
 	if (!thunk_counts.empty()) {
 		say_counts();
 	}
+#endif
 	Host::clear_globals();
 	if (context.failing) {
 		interpreter->discard(Kind::Any, context.pending);
@@ -178,7 +184,9 @@ static_assert(RECORD_NOTHING == vm::Constructions::NOTHING && RECORD_ARGUMENTS =
 
 void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint32_t p_count) {
 	Host &host = *c->host;
+#if defined(KAS3_TEST_COUNTS)
 	host.told++;
+#endif
 	host.interpreter->constructing(p_function, p_arguments, p_count);
 	// A class of whose objects only the arguments are kept, as they come: from here on generated code
 	// keeps them itself. Asked once the class is known not to be one already.
@@ -190,7 +198,9 @@ void constructing(Context *c, uint32_t p_function, const Slot *p_arguments, uint
 }
 
 void *copy_handle(Context *c, void *p_handle) {
+#if defined(KAS3_TEST_COUNTS)
 	c->host->handle_copies++;
+#endif
 	return c->host->handles.copy(p_handle);
 }
 
@@ -236,9 +246,11 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 		return empty();
 	}
 	const uint32_t function = host.thunk_function(p_thunk);
+#if defined(KAS3_TEST_COUNTS)
 	if (KAS3_UNLIKELY(!host.thunk_counts.empty())) {
 		host.thunk_counts[p_thunk]++;
 	}
+#endif
 	if (p_thunk < host.program.thunk_count && asks_engine(host.program.thunks[p_thunk].op)) {
 		return engine_thunk(c, function, host.program.thunks[p_thunk], p_given, r_updated);
 	}
