@@ -1,0 +1,18 @@
+a false
+b true
+none false
+c
+d 9
+called
+[class String]
+[class Enemy]
+a
+1
+null
+2
+1
+1,2
+3
+null
+1034
+Error #1034: Type Coercion failed: cannot convert 1 to Enemy.
