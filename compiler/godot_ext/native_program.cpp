@@ -477,7 +477,7 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 		return false;
 	}
 	r_resolved->bind = const_cast<void *>(worked->bound);
-	if (kept || has_parts(worked->result)) {
+	if (kept) {
 		Variant *zero = make_handle(worked->zero);
 		singletons_.push_back(zero);
 		r_resolved->handle = zero;

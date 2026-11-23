@@ -144,6 +144,8 @@ class Runner:
                              "packed byte values", "packed byte empty", "byte from Godot integer", "byte from Godot number",
                              "byte inspector default", "byte field from Godot", "byte field rejects out of range"):
                     self.check("%s: %s" % (label, case), "PROBE %s=true" % case in said[label], text[-600:])
+                self.check("%s: a warmed receiver can be freed" % label,
+                           "PROBE freed after warmup=warmed/1009" in said[label], text[-1200:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
             self.check("native: the probe said something", len(said["interpreter"]) >= 8, "\n".join(said["interpreter"]))

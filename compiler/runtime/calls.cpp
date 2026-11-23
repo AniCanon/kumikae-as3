@@ -113,8 +113,8 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 	}
 }
 
-bool has_members(Context *, Slot p_any) {
-	const AnyTag tag = vm::any::tag(p_any);
+bool has_members(Context *c, Slot p_any) {
+	const AnyTag tag = vm::any::tag(vm::any::is_engine(p_any) ? vm::present_or_null(c->host->library(), p_any) : p_any);
 	return tag != AnyTag::Null && tag != AnyTag::Undefined;
 }
 

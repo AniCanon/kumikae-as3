@@ -629,7 +629,19 @@ void engine_handles_box_once() {
 	CHECK(text && text->find("own_engine_any(c, shared(c, r1).handle, true)") != std::string::npos);
 }
 
+void nullable_math_local_reuses_its_handle() {
+	using ir::Kind;
+	ir::Module module = module_of({ Kind::Val, Kind::Val }, { ir::Instruction{ ir::Op::Move, 1, 0 } });
+	module.functions[0].parameters = 1;
+	module.functions[0].required = 1;
+	module.functions[0].engine_types = { "Vector2", "Vector2" };
+	const auto made = backend_cpp::generate(module);
+	const auto *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("copy_parts<Vector2>(c, r1, r0)") != std::string::npos);
+}
+
 int main() {
+	nullable_math_local_reuses_its_handle();
 	engine_handles_box_once();
 	checked_uint_conversion_keeps_its_error_path();
 	a_typed_callback_uses_the_typed_entry();

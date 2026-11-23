@@ -137,6 +137,10 @@ void FunctionWriter::put(uint32_t p_register, const std::string &p_owned) {
 }
 
 void FunctionWriter::share(uint32_t p_register, const std::string &p_borrowed) {
+	if (kind(p_register) == Kind::Val && parts(p_register).empty() && has_parts(value_type(p_register))) {
+		line("copy_parts<" + std::string(value_type(p_register)) + ">(c, " + reg(p_register) + ", " + p_borrowed + ");");
+		return;
+	}
 	if (ir::is_held(kind(p_register)) && !lent_[p_register]) {
 		line("store(c, " + reg(p_register) + ", " + p_borrowed + ");");
 	} else {

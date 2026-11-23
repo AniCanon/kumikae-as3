@@ -89,7 +89,8 @@ struct EngineHandles {
 	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
 	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view) { return MISSING_MEMBER; }
 	// Validates a receiver for a site hit. A host without stable shape identities declines.
-	virtual bool plain(void *, std::string_view) { return false; }
+	virtual const void *guard_class(std::string_view) { return nullptr; }
+	virtual bool plain(void *, const void *) { return false; }
 	virtual NamedShape named_shape(void *, uintptr_t) { return {}; }
 	// A prepared operation on the receiver named_shape just validated.
 	virtual std::optional<bool> run_named(const NamedShape &p_shape, const Prepared &p_bind, const Argument *p_operands, size_t p_count,

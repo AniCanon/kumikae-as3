@@ -91,6 +91,7 @@ private:
 	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
 	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
 	std::vector<std::vector<EngineStep>> prepared_;
+	std::vector<const void *> guard_classes_;
 	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can number.
 	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
 		return heap_.operator_named(p_name, p_spelling);
@@ -249,7 +250,7 @@ private:
 	std::string date_text(const Object *p_date, ir::DateText p_which) const { return vm::date_text(library_, p_date, p_which); }
 	void json_call(const ir::Function &p_function, const ir::Instruction &p_in); // vm/json_methods.cpp
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
-	void any_null_check(Slot p_value);
+	bool any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length) { vm::raise_range(library_, p_index, p_length); }
 	bool resize_vector(Vector *p_vector, uint32_t p_length) { return vm::resize_vector(library_, p_vector, p_length); }

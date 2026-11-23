@@ -392,9 +392,10 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const size_t missing = parameters.size() - std::min(parameters.size(), given.size());
 	const bool gives = result != "void";
 	// What comes back in a handle is made where a new handle keeps it, by the host (EngineApi::call_kept).
-	const bool kept = in_handle(result) || (out != NONE && has_parts(result) && holds_handle(out, result) && parts(out).empty());
+	const bool kept = in_handle(result);
+	const bool math_handle = out != NONE && has_parts(result) && holds_handle(out, result);
 	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 4 ||
-			(out != NONE && (!gives || !(kept ? holds_handle(out, result) : holds(out, result)))) ||
+			(out != NONE && (!gives || !(kept || math_handle ? holds_handle(out, result) : holds(out, result)))) ||
 			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result) || kept))) {
 		return false;
 	}
@@ -436,6 +437,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + std::string(kept ? "release(c, v); " : "") + fail() + " }");
 	if (kept) {
 		line(out != NONE ? "put(c, " + reg(out) + ", v);" : "release(c, v);");
+	} else if (math_handle) {
+		line("store_parts(c, " + reg(out) + ", v);");
 	} else if (out != NONE) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}

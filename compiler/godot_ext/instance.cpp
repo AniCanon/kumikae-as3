@@ -15,6 +15,7 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <array>
 #include <atomic>
 #include <deque>
 #include <memory>
@@ -34,18 +35,49 @@ static std::unordered_set<ScriptInstance *> &instances() {
 	return all;
 }
 // The same, by the Godot object each is attached to.
-static std::unordered_map<uint64_t, ScriptInstance *> &instances_on() {
-	static std::unordered_map<uint64_t, ScriptInstance *> all;
-	return all;
+class InstanceOwners {
+	struct Entry {
+		uint64_t id = 0;
+		ScriptInstance *instance = nullptr;
+	};
+	std::array<Entry, 64> recent_{};
+	std::unordered_map<uint64_t, ScriptInstance *> all_;
+public:
+	ScriptInstance *get(uint64_t p_id) {
+		Entry &entry = recent_[p_id % recent_.size()];
+		if (entry.id != p_id) {
+			const auto at = all_.find(p_id);
+			entry = { p_id, at == all_.end() ? nullptr : at->second };
+		}
+		return entry.instance;
+	}
+	void add(ScriptInstance *p_instance) {
+		const uint64_t id = p_instance->owner_id;
+		all_[id] = p_instance;
+		recent_[id % recent_.size()] = { id, p_instance };
+	}
+	void remove(ScriptInstance *p_instance) {
+		const uint64_t id = p_instance->owner_id;
+		const auto at = all_.find(id);
+		if (at != all_.end() && at->second == p_instance) {
+			all_.erase(at);
+			recent_[id % recent_.size()] = { id, nullptr };
+		}
+	}
+};
+
+static InstanceOwners &instances_on() {
+	static InstanceOwners owners;
+	return owners;
 }
 
 vm::Object *kas3::script_object(const Object *p_owner) {
-	return script_object_by_id(p_owner->get_instance_id());
+	return p_owner ? script_object_by_id(p_owner->get_instance_id()) : nullptr;
 }
 
 vm::Object *kas3::script_object_by_id(uint64_t p_id) {
-	auto found = instances_on().find(p_id);
-	return found == instances_on().end() ? nullptr : found->second->object;
+	const auto *instance = instances_on().get(p_id);
+	return instance ? instance->object : nullptr;
 }
 
 std::vector<std::pair<vm::Object *, Object *>> kas3::instances_outside(const Node *p_scene) {
@@ -370,10 +402,7 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 
 static void free_instance(ScriptInstance *instance) {
 	instances().erase(instance);
-	auto on = instances_on().find(instance->owner_id);
-	if (on != instances_on().end() && on->second == instance) {
-		instances_on().erase(on);
-	}
+	instances_on().remove(instance);
 	if (instance->counted) {
 		kas3::counted_freed(instance);
 	} else {
@@ -480,7 +509,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	instance->counted = counted;
 	instances().insert(instance);
-	instances_on()[instance->owner_id] = instance;
+	instances_on().add(instance);
 	if (counted) {
 		if (made_here && vm::release(object)) {
 			// Its constructor left no other reference: the instance keeps it (counted.cpp).

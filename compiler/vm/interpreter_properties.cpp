@@ -368,10 +368,8 @@ void Interpreter::property_op(const Function &p_function, const Instruction &p_i
 	const Slot key = to_any(p_function.registers[key_reg], stack_[base + key_reg]);
 	const Slot value = setting ? share(Kind::Any, stack_[base + p_in.c]) : any::undefined();
 	PropertyKey found;
-	const bool missing = !held_object(holder) && (any::tag(holder) == AnyTag::Null || any::tag(holder) == AnyTag::Undefined);
-	if (missing) {
-		any_null_check(holder); // Before the key's text: a missing object is the error, as in Flash.
-	} else if (property_key(holder, key, &found)) {
+	// Check the holder before converting the key, including an engine object freed since it was stored.
+	if (any_null_check(holder) && property_key(holder, key, &found)) {
 		Slot out;
 		bool answer = false;
 		switch (p_in.op) {

@@ -177,8 +177,10 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				flag(in.b != 0);
 				break;
 			case Op::ConstStr:
-				retain(strings_[in.b]);
-				assign(Kind::Str, r[in.a], strings_[in.b]);
+				if (r[in.a].p != strings_[in.b]) {
+					retain(strings_[in.b]);
+					assign(Kind::Str, r[in.a], strings_[in.b]);
+				}
 				break;
 			case Op::ConstNull:
 				drop(function.registers[in.a], r[in.a]);
@@ -644,7 +646,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
 			case Op::HostPlain:
-				flag(function.registers[in.b] == Kind::Ref && r[in.b].p && host_.handles.plain(r[in.b].p, module_.strings[in.c]));
+				flag(function.registers[in.b] == Kind::Ref && r[in.b].p && in.c < guard_classes_.size() && host_.handles.plain(r[in.b].p, guard_classes_[in.c]));
 				break;
 			case Op::IsClass:
 				flag(is_class(static_cast<Object *>(r[in.b].p), in.c));

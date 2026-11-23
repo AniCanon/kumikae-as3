@@ -334,9 +334,7 @@ void Interpreter::property_call(const Function &p_function, const Instruction &p
 		given->push_back(share(Kind::Any, stack_[base + list[i]]));
 	}
 	PropertyKey found;
-	if (!held_object(holder) && (any::tag(holder) == AnyTag::Null || any::tag(holder) == AnyTag::Undefined)) {
-		any_null_check(holder);
-	} else if (property_key(holder, key, &found)) {
+	if (any_null_check(holder) && property_key(holder, key, &found)) {
 		call_named(holder, found, *given, p_in.a);
 	}
 	drop_any(holder);

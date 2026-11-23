@@ -264,19 +264,42 @@ inline Val boxed(const Context *c, const T &p_value) {
 }
 // Each math handle is owned by its slot. A copy of that slot gets a separate handle.
 template <typename T>
-inline bool replace_parts(const Context *c, void *p_handle, const T &p_value) {
+inline char *parts_storage(const Context *c, void *p_handle) {
 	if (!c->engine || !p_handle) {
-		return false;
+		return nullptr;
 	}
 	const size_t type = static_cast<size_t>(PartsOf<T>::code);
 	const uint8_t at = c->engine->value_at[type];
 	int32_t held;
 	std::memcpy(&held, p_handle, sizeof(held));
-	if (!at || held != c->engine->value_type[type]) {
-		return false;
+	return at && held == c->engine->value_type[type] ? static_cast<char *>(p_handle) + at : nullptr;
+}
+template <typename T>
+inline bool replace_parts(const Context *c, void *p_handle, const T &p_value) {
+	if (char *to = parts_storage<T>(c, p_handle)) {
+		std::memcpy(to, &p_value, sizeof(T));
+		return true;
 	}
-	std::memcpy(static_cast<char *>(p_handle) + at, &p_value, sizeof(T));
-	return true;
+	return false;
+}
+template <typename T>
+inline void store_parts(Context *c, Val &r_place, const T &p_value) {
+	if (!replace_parts(c, r_place.handle, p_value)) {
+		put(c, r_place, boxed(c, p_value));
+	}
+}
+template <typename T>
+inline void copy_parts(Context *c, Val &r_place, Val p_from) {
+	if (r_place.handle == p_from.handle) {
+		return;
+	}
+	char *to = parts_storage<T>(c, r_place.handle);
+	const char *from = to ? parts_storage<T>(c, p_from.handle) : nullptr;
+	if (from) {
+		std::memcpy(to, from, sizeof(T));
+	} else {
+		store(c, r_place, p_from);
+	}
 }
 template <typename T>
 inline void store_parts_any(Context *c, Slot &r_place, const T &p_value) {

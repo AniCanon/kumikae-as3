@@ -162,7 +162,8 @@ public:
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	static vm::NamedShape shape_of(void *p_receiver, uintptr_t p_delegated = 0);
 	static bool plain_named(void *p_handle, const void *p_class);
-	bool plain(void *p_handle, std::string_view p_class) override { return plain_named(p_handle, name(p_class)._native_ptr()); }
+	const void *guard_class(std::string_view p_class) override { return name(p_class)._native_ptr(); }
+	bool plain(void *p_handle, const void *p_class) override { return plain_named(p_handle, p_class); }
 	vm::NamedShape named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }
 	std::optional<bool> run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
