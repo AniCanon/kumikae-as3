@@ -388,6 +388,73 @@ LocalProof check_uses(Block *p_body, Expr *p_initial, const Type *p_type, bool p
 	return { safe, std::move(bindings), safe ? std::move(p_consumers.results) : Facts{} };
 }
 
+struct Local {
+	Symbol *symbol;
+	Expr *initial;
+	const Type *type;
+	bool fresh;
+	bool numeric;
+};
+
+std::vector<LocalProof> fixed_point(Block *p_body, Package *p_godot, const std::vector<Local> &p_locals,
+		const Uses &p_uses, Facts &r_assumptions, const Consumers &p_consumers) {
+	// Start with every candidate. Withdraw unsupported assumptions together so that two
+	// independently initialized operands can prove each other, irrespective of visit order.
+	for (;;) {
+		Facts supported;
+		std::vector<LocalProof> proofs;
+		for (const Local &local : p_locals) {
+			Consumers consumers = p_consumers;
+			auto proof = check_uses(p_body, local.initial, local.type, local.fresh, p_godot, p_uses.at(local.symbol), consumers, local.numeric);
+			if (proof.storage) {
+				for (Name *name : p_uses.at(local.symbol)) {
+					supported.emplace(name, local.type);
+				}
+			}
+			for (const Binding &binding : proof.bindings) {
+				supported.emplace(binding.access->object, local.type);
+				supported.emplace(binding.access, binding.result);
+			}
+			proofs.push_back(std::move(proof));
+		}
+		const auto before = r_assumptions.size();
+		for (auto it = r_assumptions.begin(); it != r_assumptions.end();) {
+			it = supported.count(it->first) ? std::next(it) : r_assumptions.erase(it);
+		}
+		if (before == r_assumptions.size()) {
+			return proofs;
+		}
+	}
+}
+
+void apply_storage(const Local &p_local, const LocalProof &p_proof, const std::vector<Name *> &p_uses, const Consumers &p_consumers) {
+	// An escaped engine object can acquire a script, but its local still holds the
+	// original Ref. Only proven member uses below acquire a static binding.
+	if (p_proof.storage || (p_local.fresh && !p_proof.bindings.empty() &&
+			std::none_of(p_uses.begin(), p_uses.end(), [&](Name *p_name) {
+				Node *use = parent(p_consumers.parents, p_name);
+				return use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name;
+			}))) {
+		p_local.symbol->storage = p_local.type;
+		if (!p_proof.storage) {
+			for (Name *name : p_uses) {
+				Node *use = parent(p_consumers.parents, name);
+				if (use && use->kind == NodeKind::Call && p_consumers.argument(static_cast<Call *>(use), name, p_local.type)) {
+					name->type = p_local.type;
+				}
+			}
+		}
+	}
+	if (p_proof.storage) {
+		for (Name *name : p_uses) {
+			name->type = p_local.type;
+		}
+		for (const auto &[expr, result] : p_proof.results) {
+			expr->type = result;
+		}
+	}
+}
+
 } // namespace
 
 void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_initial) {
@@ -396,12 +463,6 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 	index_uses(p_body, p_initial, parents, uses);
 	const Type *returns = current_ ? compilation_.type_of(current_->return_type) : nullptr;
 	const auto engine_root = godot_ ? find_in(godot_->definitions, "GodotObject") : nullptr;
-	struct Local {
-		Symbol *symbol;
-		Expr *initial;
-		const Type *type;
-		bool fresh;
-	};
 	std::vector<Local> locals;
 	Facts assumptions;
 	for (const auto &[symbol, initial] : p_initial) {
@@ -420,7 +481,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 				}
 			}
 		}
-		locals.push_back({ symbol, initial, type, engine });
+		locals.push_back({ symbol, initial, type, engine, numeric(type) });
 		for (Name *name : uses[symbol]) {
 			assumptions.emplace(name, type);
 			Node *use = parent(parents, name);
@@ -434,69 +495,18 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 		}
 	}
 
-	// Start with every candidate. Withdraw unsupported assumptions together so that two
-	// independently initialized operands can prove each other, irrespective of visit order.
-	for (;;) {
-		Facts supported;
-		std::vector<LocalProof> proofs;
-		for (const Local &local : locals) {
-			Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
-			auto proof = check_uses(p_body, local.initial, local.type, local.fresh, godot_, uses[local.symbol], consumers, numeric(local.type));
-			if (proof.storage) {
-				for (Name *name : uses[local.symbol]) {
-					supported.emplace(name, local.type);
-				}
-			}
-			for (const Binding &binding : proof.bindings) {
-				supported.emplace(binding.access->object, local.type);
-				supported.emplace(binding.access, binding.result);
-			}
-			proofs.push_back(std::move(proof));
+	Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
+	const auto proofs = fixed_point(p_body, godot_, locals, uses, assumptions, consumers);
+	for (size_t i = 0; i < locals.size(); i++) {
+		const Local &local = locals[i];
+		const auto &proof = proofs[i];
+		apply_storage(local, proof, uses[local.symbol], consumers);
+		for (const Binding &binding : proof.bindings) {
+			binding.access->object->type = local.type;
+			binding.access->member = binding.member;
+			binding.access->type = symbol_type(binding.member, nullptr);
+			binding.operation->type = binding.result;
 		}
-		const auto before = assumptions.size();
-		for (auto it = assumptions.begin(); it != assumptions.end();) {
-			it = supported.count(it->first) ? std::next(it) : assumptions.erase(it);
-		}
-		if (before != assumptions.size()) {
-			continue;
-		}
-		for (size_t i = 0; i < locals.size(); i++) {
-			const Local &local = locals[i];
-			const auto &proof = proofs[i];
-			// An escaped engine object can acquire a script, but its local still holds the
-			// original Ref. Only proven member uses below acquire a static binding.
-			if (proof.storage || (local.fresh && !proof.bindings.empty() &&
-					std::none_of(uses[local.symbol].begin(), uses[local.symbol].end(), [&](Name *p_name) {
-						Node *use = parent(parents, p_name);
-						return use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name;
-					}))) {
-				local.symbol->storage = local.type;
-				if (!proof.storage) {
-					Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
-					for (Name *name : uses[local.symbol]) {
-						Node *use = parent(parents, name);
-						if (use && use->kind == NodeKind::Call && consumers.argument(static_cast<Call *>(use), name, local.type)) {
-							name->type = local.type;
-						}
-					}
-				}
-			}
-			if (proof.storage) {
-				for (Name *name : uses[local.symbol]) {
-					name->type = local.type;
-				}
-				for (const auto &[expr, result] : proof.results) {
-					expr->type = result;
-				}
-			}
-			for (const Binding &binding : proof.bindings) {
-				binding.access->object->type = local.type;
-				binding.access->member = binding.member;
-				binding.access->type = symbol_type(binding.member, nullptr);
-				binding.operation->type = binding.result;
-			}
-		}
-		return;
 	}
 }
 

@@ -27,7 +27,7 @@ CONTROLS = {
                         ["godot/Configure.ir"]),
     "escape-prefix": (USES, "safe = bindings.size() == p_uses.size();",
                       "safe = bindings.size() == p_uses.size(); if (!safe) return {};", ["godot/Configure.ir"]),
-    "narrow-storage": (USES, "local.symbol->storage = local.type;", "local.symbol->storage = local.initial->type;",
+    "narrow-storage": (USES, "p_local.symbol->storage = p_local.type;", "p_local.symbol->storage = p_local.initial->type;",
                        ["LocalArithmetic.out", "LocalOperands.out"]),
     "conflicting-write": (STORAGE, "stored_type(assign->value) != it->second.value->type",
                           "false", ["dynamic_local_tags.out"]),
