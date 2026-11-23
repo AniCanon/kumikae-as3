@@ -212,7 +212,7 @@ A value of type A fits where B is expected when one of these holds:
 - B is one of Godot's collections and A is the AS3 collection that converts to it. See
   [Using AS3 in Godot](godot.md#collections).
 
-A class doesn't fit `Function`, as in Flash: `names.map(String)` is an error. Pass a function that converts,
+A class doesn't fit `Function`: `names.map(String)` is an error. Pass a function that converts,
 such as `function(item:*, index:int, list:Array):String { return String(item); }`.
 
 When B is a subclass of A, the error asks for a cast:

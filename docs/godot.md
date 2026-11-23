@@ -335,8 +335,6 @@ package game {
   `var later:()=>void = node.queueFree;`.
 - **A method that takes any number of arguments isn't a value:** `callDeferred`, `emitSignal`, `print`. Call
   it from a function of your own.
-- **Arguments aren't converted to Godot's collections** in a call through the value. Pass a `GodotArray`
-  where the method declares one.
 
 ### Declare a signal
 
