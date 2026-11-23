@@ -1954,6 +1954,8 @@ static void test_engine_calls() {
 		"function f():Boolean { return \"length\" in \"text\"; }",
 		"function f(v:Vector2):void { for (var k:* in v) { trace(k); } }",
 		"function f():void { var g:Function = function():void { trace(this.name); }; }",
+		// One of Godot's methods that takes any number of arguments has no function of the program to be.
+		"function f():void { var g:Function = callDeferred; }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);
