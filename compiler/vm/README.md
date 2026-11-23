@@ -24,7 +24,8 @@ is no engine, and the tests use a recorder.
 
 Each instruction that asks something of the engine is prepared once, when the program loads:
 `EngineHandles::prepare()` is called for every such instruction, and `run()` carries out what it kept. A
-host that keeps nothing gets the request by name instead.
+host can decline before invoking the operation if the supplied operands do not match. Only a decline
+or an absent binding sends the request by name. A failure after invocation raises an AS3 error.
 
 ## Files
 

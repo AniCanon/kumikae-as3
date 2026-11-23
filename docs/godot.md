@@ -266,7 +266,10 @@ package game {
 - **A name that isn't there is an AS3 error:** ReferenceError #1069 when you read it, ReferenceError #1056
   when you write it, and TypeError #1006 when you call it.
 - **A node that carries one of your scripts has the script's public members first,** and then Godot's.
-  Your own script object held untyped reaches its Godot object's members the same way.
+  Your own script object held untyped reaches its Godot object's members the same way. You can use
+  `in` or `hasOwnProperty` to test for a public script member. Using `delete` on a declared member
+  returns `false`. If a public getter returns a function, calling that name runs the getter once and
+  invokes the function it returns.
 - **A method you read without calling it is a function.** It's the same function a typed read gives. See
   [Godot's methods as values](#godots-methods-as-values).
 - **Arguments go to Godot as they're held,** and Godot checks them: an `int` as an integer, a `Number` as a
