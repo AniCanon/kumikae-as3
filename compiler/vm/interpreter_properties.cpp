@@ -1,6 +1,7 @@
 // Properties reached by name as the program runs: of an Object or a Dictionary, of an Array beyond its
 // indices, and of a sealed object (its public fields and methods). What holds the property is always an
 // untyped value here, with a reference of its own while the property is worked on.
+#include "engine_named.h"
 #include "interpreter_internal.h"
 
 #include "table.h"
@@ -210,8 +211,9 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		return false;
 	}
 	if (any::is_engine(p_holder)) {
-		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
-		return false;
+		if (const std::optional<bool> done = EngineNamed(*this).set(p_holder, p_key, p_value)) {
+			return *done; // One of Godot's values or objects: its property by the AS3 name.
+		}
 	}
 	return cannot("1056", "Cannot create property ");
 }
@@ -247,6 +249,11 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 	}
 	if (named_method(klass, p_key.text, "get ")) {
 		return cannot("1074", "Illegal write to read-only property ");
+	}
+	if (!klass.native_base.empty()) {
+		if (const std::optional<bool> done = EngineNamed(*this).set(p_holder, p_key, p_value)) {
+			return *done; // A property of the Godot object the script object is attached to.
+		}
 	}
 	if (klass.built_in) {
 		raise_unsupported("adding a property to " + holder_name(p_holder));

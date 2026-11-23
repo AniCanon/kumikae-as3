@@ -522,6 +522,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			case ir::Kind::Ref:
 				r_result->p = box();
 				break;
+			case ir::Kind::Any:
+				*r_result = vm::any::string(vm::new_string(p_text));
+				break;
 			default:
 				break;
 		}
@@ -615,6 +618,15 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 				std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
+	// The members a value of the engine's has by an AS3 name: a few of a node's.
+	[[nodiscard]] vm::NamedMember named(void *, std::string_view p_name) override {
+		vm::NamedMember found;
+		found.what = p_name == "queueFree" || p_name == "addChild" ? vm::NamedMember::What::Method
+				: p_name == "name" || p_name == "position" || p_name == "readOnly" ? vm::NamedMember::What::Property : vm::NamedMember::What::Missing;
+		found.godot = p_name == "queueFree" ? "queue_free" : p_name == "addChild" ? "add_child" : p_name == "readOnly" ? "read_only" : p_name == "name" ? "name" : "position";
+		found.written = p_name != "readOnly";
+		return found;
+	}
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *) override {
 		void *made = box();
 		log += "bind #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + " -> #" + std::to_string((intptr_t)made) + "\n";
@@ -688,7 +700,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			*r_error = "the engine refused to set " + std::string(p_property);
 			return false;
 		}
-		if (p_property == "name" && p_value.slot.p) {
+		if (p_property == "name" && p_value.kind == ir::Kind::Any) {
+			name = vm::any::text(p_value.slot).value_or(name);
+		} else if (p_property == "name" && p_value.slot.p) {
 			name = std::string(static_cast<vm::Str *>(p_value.slot.p)->view());
 		}
 		return true;
@@ -759,6 +773,11 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	// The script objects the engine's objects carry, by their handles.
 	std::unordered_map<void *, vm::Object *> scripts;
 	[[nodiscard]] vm::Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) override {
+		if (p_class == ir::NONE) {
+			// Whatever its class: asked for each name an untyped value reaches, and not written down.
+			const auto carried = scripts.find(p_handle);
+			return carried == scripts.end() ? nullptr : carried->second;
+		}
 		log += "script #" + std::to_string((intptr_t)p_handle) + " as " + (module ? module->classes[p_class].name : std::to_string(p_class)) +
 				(p_taken ? ", taken\n" : "\n");
 		const auto found = scripts.find(p_handle);
@@ -1180,6 +1199,84 @@ static void test_engine_class_values() {
 		CHECK(vm::any::tag(result) == vm::AnyTag::Null);
 		interpreter.release_object(object);
 		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// One of Godot's objects held untyped: its members by their AS3 names, as the engine's table of names has
+// them, and AS3's errors for a name that is not there.
+static void test_engine_members_by_name() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Loose extends Node {\n"
+						 "  public var own:int = 7;\n"
+						 "  public function reads(o:*):String { return o.name + \"/\" + o[\"name\"]; }\n"
+						 "  public function writes(o:*, v:*):void { o.position = v; o[\"name\"] = \"new\"; }\n"
+						 "  public function calls(o:Object):void { o.queueFree(); o.addChild(o, true); }\n"
+						 "  public function bad(o:*):String { var said:Array = [];\n"
+						 "    try { o.missing; } catch (e:ReferenceError) { said.push(e.errorID); }\n"
+						 "    try { o.missing = 1; } catch (e:ReferenceError) { said.push(e.errorID); }\n"
+						 "    try { o.missing(); } catch (e:TypeError) { said.push(e.errorID); }\n"
+						 "    try { o.readOnly = 1; } catch (e:ReferenceError) { said.push(e.errorID); }\n"
+						 "    try { o.queueFree = 1; } catch (e:ReferenceError) { said.push(e.errorID); }\n"
+						 "    try { o.name(); } catch (e:TypeError) { said.push(e.errorID); }\n"
+						 "    return said.join(\",\"); }\n"
+						 "  public function has(o:*):String { return (\"name\" in o) + \" \" + (\"missing\" in o) + \" \" + o.hasOwnProperty(\"queueFree\") + \" \" + o.toString(); }\n"
+						 "  public function self():String { var me:* = this; me.queueFree(); me.position = 5; return me.own + \" \" + me.name + \" \" + (\"name\" in me); }\n"
+						 "  public function method(o:*):Boolean { var f:Function = o.queueFree; f(); renamed.add(f); return f == o.queueFree; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Loose.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		engine.aligned = true;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Loose"), engine.box()); // #16
+		void *node = engine.box(); // #32
+		vm::Slot given[2] = { vm::any::godot_object(node), vm::any::integer(3) };
+		vm::Slot result;
+		const auto text = [&](const char *p_method, size_t p_count) {
+			engine.log.clear();
+			engine.errors.clear();
+			result.bits = 0;
+			const bool ran = interpreter.call_method(object, p_method, given, p_count, &result);
+			std::string said = ran && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string("failed: ") + engine.errors;
+			if (ran && result.p) {
+				vm::free_string(static_cast<vm::Str *>(result.p));
+			}
+			return said;
+		};
+		// A property read and written by Godot's name for it.
+		CHECK_EQ(text("reads", 1), std::string("Player/Player"));
+		CHECK_EQ(engine.log, std::string("get #32.name\nget #32.name\n"));
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "writes", given, 2, nullptr));
+		CHECK_EQ(engine.log, std::string("set #32.position = 3\nset #32.name = new\n"));
+		// A method called with the arguments as they are held.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "calls", given, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("call #32.queue_free()\ncall #32.add_child(#32, true)\n"));
+		// A name that is not there, in AS3's numbers: read, write, call; and a write Godot's property does not take.
+		CHECK_EQ(text("bad", 1), std::string("1069,1056,1006,1074,1037,1006"));
+		CHECK_EQ(text("has", 1), std::string("true false true <#32>"));
+		// A script object attached to one of Godot's objects reaches that object's members after its own.
+		CHECK_EQ(text("self", 0), std::string("7 new true"));
+		CHECK_EQ(engine.log, std::string("call #16.queue_free()\nset #16.position = 5\nget #16.name\n"));
+		// A method read and not called is the function a typed read of it gives.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "method", given, 1, &result));
+		CHECK(result.b);
+		CHECK(engine.log.find("call #32.queue_free()\n") != std::string::npos && engine.log.find("bind #32.queue_free -> ") != std::string::npos);
+		interpreter.release_object(object);
+		engine.drop(node);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -4333,6 +4430,7 @@ int main() {
 	test_engine_calls();
 	test_engine_method_values();
 	test_engine_class_values();
+	test_engine_members_by_name();
 	test_engine_prepared();
 	test_vector_of_values();
 	test_engine_operators();

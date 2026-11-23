@@ -413,6 +413,14 @@ output = compare("kinds.gd", [
 check("kinds.gd: a cast that fails is AS3's coercion error", "Error #1034: Type Coercion failed: cannot convert 5 to Node2D." in output and
       "at Kinds/cast()" in output, output[-1500:])
 
+# Godot's values and objects held untyped, used by name, as GDScript's untyped variables are.
+output = compare("by_name.gd", [
+    "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
+    "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
+    "a freed object",
+])
+check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
+
 # Every default the name table records must be one Godot can read back.
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
                       os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)

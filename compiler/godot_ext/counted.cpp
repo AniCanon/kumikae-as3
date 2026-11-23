@@ -90,12 +90,13 @@ bool GodotHost::keep(vm::Object *p_object) {
 }
 
 vm::Object *arriving_script(const Variant &p_value, uint32_t p_class) {
-	if (p_value.get_type() != Variant::OBJECT || p_class >= Project::get().module().classes.size()) {
+	if (p_value.get_type() != Variant::OBJECT || (p_class != ir::NONE && p_class >= Project::get().module().classes.size())) {
 		return nullptr;
 	}
 	const Object *owner = p_value.get_validated_object();
 	vm::Object *object = owner ? script_object(owner) : nullptr;
-	return object && vm::is_class(Project::get().module(), object, p_class) ? object : nullptr;
+	// With no class asked for: the script object it carries, whatever its class.
+	return object && (p_class == ir::NONE || vm::is_class(Project::get().module(), object, p_class)) ? object : nullptr;
 }
 
 vm::Object *taken_script(vm::Object *p_object) {

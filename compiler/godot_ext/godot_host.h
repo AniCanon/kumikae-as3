@@ -136,6 +136,7 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] vm::NamedMember named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
 	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future
