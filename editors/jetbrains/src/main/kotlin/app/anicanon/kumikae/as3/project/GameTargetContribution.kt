@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.project
 
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
@@ -48,7 +50,8 @@ class GameTargetContribution : CustomLoadingExtensionPointBean<Predicate<Virtual
         }
         val context = SimpleDataContext.builder().add(CommonDataKeys.PROJECT, project)
         if (game != null) context.add(CommonDataKeys.VIRTUAL_FILE, game)
-        ActionUtil.invokeAction(action, context.build(), "KumikaeGameTarget", null, null)
+        val event = AnActionEvent.createEvent(action, context.build(), null, "KumikaeGameTarget", ActionUiKind.NONE, null)
+        ActionUtil.performAction(action, event)
     }
 
     companion object {

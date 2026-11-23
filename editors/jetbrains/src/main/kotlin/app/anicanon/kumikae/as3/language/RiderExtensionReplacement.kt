@@ -4,9 +4,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.extensions.ExtensionPoint
 import com.intellij.openapi.extensions.LoadingOrder
 
-// Removal by instance is deprecated, and the only undeprecated removals go by class or through the
-// platform's internal adapter type. By class would also remove unrelated extensions of the same class
-// (see RiderExtensionReplacementTest), so the instance form stays, in both supported builds.
+// The class overload removes a matching registration, which can be a different instance of the same
+// class. Both the replacement and rollback must remove the exact instance (RiderExtensionReplacementTest).
 @Suppress("DEPRECATION")
 internal fun <T : Any> replaceRiderExtension(
     point: ExtensionPoint<T>,

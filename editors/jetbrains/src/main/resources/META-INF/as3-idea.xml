@@ -1,3 +1,0 @@
-<idea-plugin>
-    <depends optional="true" config-file="as3-idea-lsp4ij.xml">com.redhat.devtools.lsp4ij</depends>
-</idea-plugin>

@@ -143,6 +143,9 @@ The probe proves layout and wiring. It doesn't prove behavior against a real Sim
 
 ### Both IDEs, with and without LSP4IJ
 
+To check which AS3 adapter the plugin descriptor registers, set `KUMIKAE_LSP_DESCRIPTOR_PROBE=1`
+for the four sandbox tasks below. Each sandbox checks whether the AS3 parameter-help handler is present.
+
 After you change a language client, run all four combinations, one after another:
 
 ```sh
@@ -161,6 +164,17 @@ After you change a language client, run all four combinations, one after another
 | `runRiderWithoutLsp4ij` | Rider's own client | `build/reports/ui-runRiderWithoutLsp4ij` |
 
 Save a run's reports before the next run overwrites them.
+
+Run `KUMIKAE_RIDER_STARTUP_PROBE=1 ./gradlew --offline runIde -PuiProbe` to check Rider’s startup
+adapters and close and reopen a sandbox project with the Problems window visible.
+
+To check Rider itself, run `./gradlew --offline runRiderReopenDisabled`. A standalone test plugin
+verifies that Kumikae is absent from the loaded plugins. It opens a plain text project twice, restores
+the visible split Problems window, checks panel disposal after each close, and counts project weak
+references after full garbage collection. Run `./gradlew --offline runRiderReopenEnabled` for the
+same check with Kumikae loaded. Each task uses its own sandbox and writes its observations under
+`build/reports/<task name>/`. A surviving panel or retained project fails the task.
+The upstream Rider report is [RIDER-145607](https://youtrack.jetbrains.com/issue/RIDER-145607).
 
 ### Opt-in probes
 
