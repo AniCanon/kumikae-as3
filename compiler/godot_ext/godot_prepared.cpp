@@ -255,6 +255,12 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 		}
 		return true;
 	}
+	if (kind == ir::Kind::Any && type >= Variant::VECTOR2 && type <= Variant::COLOR) {
+		Variant *made = make_handle(p_worked.zero);
+		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, inside(*made, type));
+		*r_result = vm::any::godot_value(made);
+		return true;
+	}
 	if (!into_handle(p_result, type)) {
 		return std::nullopt;
 	}
@@ -383,17 +389,17 @@ std::optional<bool> GodotHost::run_builtin(const Worked &p_worked, const vm::Arg
 }
 
 std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Object *p_checked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-		std::string *r_error) {
-	GDExtensionObjectPtr object = nullptr;
+		std::string *r_error, void *p_validated) {
+	GDExtensionObjectPtr object = p_validated;
 	const size_t first = p_worked.is_static ? 0 : 1;
-	if (!p_worked.is_static && !object_of(p_operands[0], &object)) {
+	if (!p_validated && !p_worked.is_static && !object_of(p_operands[0], &object)) {
 		return std::nullopt;
 	}
 	if (!p_worked.is_static && !object) {
 		*r_error = FREED;
 		return false;
 	}
-	if (p_worked.by_name) {
+	if (p_worked.by_name && !p_validated) {
 		const Object *owner = internal::get_object_instance_binding(object);
 		if ((!p_checked || script_object(owner) != p_checked) && owner->get_script().get_type() != Variant::NIL) {
 			return std::nullopt; // Only the script whose members the VM checked can be bypassed.
@@ -715,6 +721,15 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 		used += worked->own_place && worked->program == program_ ? 1 : 0;
 	}
 	return { kept, used };
+}
+
+std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
+	const Worked &worked = static_cast<const Worked &>(p_bind);
+	if (p_shape.owner && worked.bound && p_count <= MOST) {
+		return run_bound(worked, p_shape.instance, p_operands, p_count, p_result, r_value, r_error, p_shape.owner);
+	}
+	return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);
 }
 
 std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,

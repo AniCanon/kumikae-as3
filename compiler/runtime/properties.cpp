@@ -3,6 +3,7 @@
 // (vm/table.h), and one element added at a vector's end. Each is the library's rule for that one case
 // (vm/interpreter_properties.cpp, vm/interpreter_vectors.cpp); every other case is left to it.
 #include "fast.h"
+#include "direct.h"
 
 #include "native_host.h"
 #include "table.h"
@@ -18,6 +19,21 @@ Object *holder_of_any(Context *, Slot p_any) {
 
 Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
+}
+
+bool named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, Slot *r_result) {
+	Host &host = *c->host;
+	const uint32_t carries = host.interpreter->carries();
+	const bool done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result);
+	settle_direct(c, carries);
+	if (c->listener_failed) {
+		call_failed(c);
+	}
+	if (c->failing) {
+		release(c, *r_result);
+		*r_result = empty();
+	}
+	return done;
 }
 
 Slot *property(const Context *c, Object *p_holder, const Str *p_key) {

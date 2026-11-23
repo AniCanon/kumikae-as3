@@ -4,6 +4,8 @@
 // checker finds a member of a typed value: nothing is worked out backward from the AS3 name. What is found
 // is kept by class and name, so that a name is looked for once.
 #include "godot_calls.h"
+#include "program.h"
+#include "handles.h"
 
 #if !defined(KAS3_RUNTIME_ONLY)
 #include "builtins.h"
@@ -19,6 +21,32 @@
 using namespace godot;
 
 namespace kas3 {
+
+vm::NamedShape GodotHost::named_shape(void *p_receiver) {
+#if defined(KAS3_RUNTIME_ONLY)
+	(void)p_receiver;
+	return {};
+#else
+	const Variant &value = *static_cast<const Variant *>(p_receiver);
+	const Variant::Type type = value.get_type();
+	if (type != Variant::OBJECT) {
+		// Calls on other value types may mutate their copy of the receiver.
+		return type >= Variant::VECTOR2 && type <= Variant::COLOR ? vm::NamedShape{ static_cast<uintptr_t>(type) + 1 } : vm::NamedShape{};
+	}
+	void *raw = live_handle_object(p_receiver);
+	Object *owner = raw ? internal::get_object_instance_binding(raw) : nullptr;
+	if (!owner) {
+		return {};
+	}
+	StringName klass;
+	if (!gdextension_interface::object_get_class_name(owner->_owner, gdextension_interface::library, klass._native_ptr())) {
+		return {};
+	}
+	const Variant script = owner->get_script();
+	const uint64_t id = script.get_type() == Variant::OBJECT ? gdextension_interface::variant_get_object_instance_id(script._native_ptr()) : 0;
+	return { class_identity(klass), id, id ? script_object(owner) : nullptr, owner->_owner };
+#endif
+}
 
 #if defined(KAS3_RUNTIME_ONLY)
 

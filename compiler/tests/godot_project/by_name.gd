@@ -102,6 +102,15 @@ func _physics_process(_delta: float) -> bool:
 	show("same site on alternating classes and scripts", [
 		ask("foreignVisible", [control]), ask("foreignVisible", [scripted]), ask("foreignVisible", [foreign]),
 		ask("foreignVisible", [control]), foreign.reads, foreign.writes], [false, false, false, false, 2, 2])
+	var replaced := Node2D.new()
+	var before = ask("foreignVisible", [replaced])
+	replaced.set_script(Intercept)
+	var after = ask("foreignVisible", [replaced])
+	var counts := [replaced.get("reads"), replaced.get("writes")]
+	replaced.set_script(null)
+	show("replacement on the same receiver", [before, after, counts, ask("foreignVisible", [replaced])],
+			[false, false, [1, 1], false])
+	replaced.free()
 	control.free()
 	foreign.free()
 	reference.free()

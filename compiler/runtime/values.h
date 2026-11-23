@@ -3,6 +3,7 @@
 #pragma once
 
 #include "any.h"
+#include "named_site.h"
 #include "runtime.h"
 
 #include <atomic>

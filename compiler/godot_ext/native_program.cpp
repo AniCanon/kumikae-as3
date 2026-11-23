@@ -329,6 +329,11 @@ bool defaults_of(const ir::EngineName &p_entry, size_t p_parameters, size_t p_gi
 
 } // namespace
 
+void *live_handle_object(void *p_handle) {
+	const rt::HandleHead *head = rt::head_of(p_handle);
+	return head->seen == gone.load(std::memory_order_relaxed) ? head->object : object_behind(p_handle);
+}
+
 static const rt::Program *linked_program = nullptr;
 
 #if defined(IOS_ENABLED)

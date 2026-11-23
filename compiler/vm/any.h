@@ -147,7 +147,10 @@ void *pointer(Slot p_value); // For String, Object, Value, Godot, Wide; null for
 // The counted thing the value holds, if it holds one (a String, a script object or a Wide).
 Counted *counted(Slot p_value);
 // Whether it holds a handle on an engine value or object.
-bool is_engine(Slot p_value);
+inline bool is_engine(Slot p_value) {
+	const AnyTag kind = tag(p_value);
+	return kind == AnyTag::Value || kind == AnyTag::Godot;
+}
 
 // ECMAScript's conversions, where they need nothing outside the value. A script object or a Godot value
 // is not a number (NaN), and is true.

@@ -238,7 +238,7 @@ void FunctionWriter::raw_thunk(const Instruction &p_in) {
 
 void FunctionWriter::dispatch(const Instruction &p_in) {
 	const bool written = counted(p_in) || whole_conversion(p_in) || whole_comparison(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
-			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
+			fast_text(p_in) || fast_named(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
 	}

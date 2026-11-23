@@ -8,6 +8,7 @@
 #pragma once
 
 #include "engine_types.h"
+#include "named_site.h"
 
 #include <optional>
 #include <string>
@@ -85,6 +86,13 @@ struct EngineHandles {
 	// What an engine value has under an AS3 name: asked where the value is held untyped, so that the
 	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
 	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view) { return MISSING_MEMBER; }
+	// Validates a receiver for a site hit. A host without stable shape identities declines.
+	virtual NamedShape named_shape(void *) { return {}; }
+	// A prepared operation on the receiver named_shape just validated.
+	virtual std::optional<bool> run_named(const NamedShape &p_shape, const Prepared &p_bind, const Argument *p_operands, size_t p_count,
+			const Wanted &p_result, Slot *r_value, std::string *r_error) {
+		return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);
+	}
 	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
 	[[nodiscard]] virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	// An element, by a number or another key: `vector[0]`.

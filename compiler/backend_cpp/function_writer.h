@@ -309,6 +309,7 @@ class FunctionWriter {
 	bool fast_place(const ir::Instruction &p_in);
 	std::string vector_for(uint32_t p_vector, uint32_t p_element) const;
 	bool fast_text(const ir::Instruction &p_in);
+	bool fast_named(const ir::Instruction &p_in);
 	bool fast_untyped(const ir::Instruction &p_in);
 	bool fast_call(const ir::Instruction &p_in);
 	std::string arguments(const ir::Function &p_callee, const std::vector<uint32_t> &p_list);

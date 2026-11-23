@@ -104,10 +104,6 @@ Counted *counted(Slot p_value) {
 	const AnyTag kind = tag(p_value);
 	return kind == AnyTag::String || kind == AnyTag::Object || kind == AnyTag::Wide ? static_cast<Counted *>(pointer(p_value)) : nullptr;
 }
-bool is_engine(Slot p_value) {
-	const AnyTag kind = tag(p_value);
-	return kind == AnyTag::Value || kind == AnyTag::Godot;
-}
 
 double to_number(Slot p_value) {
 	switch (tag(p_value)) {

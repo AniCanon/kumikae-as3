@@ -120,7 +120,7 @@ private:
 	std::optional<bool> run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
 	std::optional<bool> run_bound(const Worked &p_worked, const vm::Object *p_checked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-			std::string *r_error);
+			std::string *r_error, void *p_validated = nullptr);
 	std::optional<bool> run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
 	std::optional<bool> run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
@@ -159,6 +159,9 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	vm::NamedShape named_shape(void *p_receiver) override;
+	std::optional<bool> run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
 	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;

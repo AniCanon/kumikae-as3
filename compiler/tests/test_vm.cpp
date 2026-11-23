@@ -1246,8 +1246,14 @@ static void test_engine_members_by_name() {
 		struct Engine : FakeEngine {
 			vm::Prepared binding;
 			vm::NamedMember member{ vm::NamedMember::What::Method, "queue_free", true, false, &binding };
+			int lookups = 0;
+			vm::NamedShape named_shape(void *p_handle) override {
+				vm::Object *script = script_of(p_handle, ir::NONE, false);
+				return {1, script ? 2u : 0u, script, p_handle};
+			}
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
+				lookups++;
 				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name);
 			}
 			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *, const vm::Object *) override {
@@ -1280,6 +1286,10 @@ static void test_engine_members_by_name() {
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "writes", given, 2, nullptr));
 		CHECK_EQ(engine.log, std::string("set #32.position = 3\nset #32.name = new\n"));
+		// The two warmed read sites reuse their bindings for this receiver class.
+		const int looked = engine.lookups;
+		CHECK_EQ(text("reads", 1), std::string("new/new"));
+		CHECK_EQ(engine.lookups, looked);
 		// A method called with the arguments as they are held.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "calls", given, 1, nullptr));
