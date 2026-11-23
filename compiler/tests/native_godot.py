@@ -123,7 +123,7 @@ class Runner:
         with tempfile.TemporaryDirectory() as where:
             # With the scripts places.gd and emits.gd hold to GDScript under the interpreter: here each is held to
             # itself as native code.
-            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd", "Loops.as", "Callables.as", "Kinds.as", "ByName.as")]
+            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd", "Loops.as", "Callables.as", "Kinds.as", "ByName.as", "by_name.gd")]
             project = self.project(where, sources, sorted(os.listdir(sources)) + shared)
             scripts = sorted(name for name in os.listdir(project) if name.endswith(".as"))
             program = self.library("the probe", project, scripts, where)
@@ -148,6 +148,10 @@ class Runner:
                            "PROBE freed after warmup=warmed/1009" in said[label], text[-1200:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
+            status, text = self.run(project, "by_name.gd", program)
+            expected = "VALUE parameter alias respects position overrides=[[3, true], 5, 1]|[[3, true], 5, 1]"
+            self.check("native: a foreign getter can change its result type", status == 0 and USED in text and expected in text
+                       and "SCRIPT ERROR" not in text, text[-1200:])
             self.check("native: the probe said something", len(said["interpreter"]) >= 8, "\n".join(said["interpreter"]))
             for ours, theirs in zip(said["native"], said["interpreter"]):
                 self.check("native: as the interpreter says it", ours == theirs, "native       %s\ninterpreter  %s" % (ours, theirs))

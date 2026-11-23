@@ -4,6 +4,27 @@
 namespace kas3 {
 namespace vm {
 
+// A statement is about to run: once in a while the clock is looked at, and the debugger's hook, if there is
+// one, sees it and may stop the program.
+void Interpreter::at_statement() {
+	if (countdown_ == 0) {
+		look_at_clock();
+	}
+	if (!hook_) {
+		return;
+	}
+	frames_.back().pc--; // The hook sees the statement about to run.
+	const bool carry_on = hook_(*this, hook_data_);
+	frames_.back().pc++;
+	if (time_limit_) {
+		entered_ = host_.clock.elapsed(); // A debugger's stop is not the program's time.
+	}
+	if (!carry_on) {
+		stopped_ = true;
+		halted_ = true;
+	}
+}
+
 // A run that has gone on too long ends with Flash's error, which nothing catches.
 void Interpreter::look_at_clock() {
 	countdown_ = STATEMENTS_PER_LOOK;

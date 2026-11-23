@@ -20,6 +20,24 @@ class Intercept extends Node2D:
 			return true
 		return false
 
+class Positions extends Node2D:
+	var reads := 0
+	var writes := 0
+
+	func _get(property: StringName):
+		if property == &"position":
+			reads += 1
+			if reads == 5:
+				return "wrong type"
+			return Vector2(reads, 4)
+		return null
+
+	func _set(property: StringName, _value) -> bool:
+		if property == &"position":
+			writes += 1
+			return true
+		return false
+
 var node: Node2D
 var child: Node2D
 var scripted: Node2D
@@ -113,6 +131,9 @@ func _physics_process(_delta: float) -> bool:
 	replaced.set_script(Intercept)
 	show("proven receiver keeps foreign accessors", [ask("provenVisible", [replaced]), replaced.get("reads"), replaced.get("writes")],
 			[false, 1, 1])
+	var positions := Positions.new()
+	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes], [[3, true], 5, 1])
+	positions.free()
 	replaced.free()
 	control.free()
 	foreign.free()

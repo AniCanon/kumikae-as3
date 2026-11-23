@@ -76,6 +76,11 @@ inline Slot integer(int32_t p_value) {
 // A pointer is held as it is, with no new reference: the caller decides who owns it.
 Slot string(Str *p_string);
 Slot object(Object *p_object);
+// A borrowed handle can come from a host stack with weaker alignment than the heap.
+inline bool can_borrow(const void *p_handle) {
+	const auto address = reinterpret_cast<uintptr_t>(p_handle);
+	return address && !(address & (POINTER_ALIGNMENT - 1)) && static_cast<uint64_t>(address) < INT_FLAG;
+}
 Slot godot_value(void *p_handle); // One of Godot's values (a Vector2).
 Slot godot_object(void *p_handle); // One of Godot's objects (a node).
 Slot wide(Wide *p_wide);

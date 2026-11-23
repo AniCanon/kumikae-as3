@@ -21,11 +21,12 @@ Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
 }
 
-bool named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, Slot *r_result) {
+vm::NamedResult named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, Slot *r_result) {
 	Host &host = *c->host;
 	const uint32_t carries = host.interpreter->carries();
 	vm::NamedCall call;
-	bool done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_ref ? vm::any::godot_object(p_holder.p) : p_holder, p_key->view(), p_args, p_count, r_result, &call);
+	const vm::Wanted wanted{ static_cast<ir::Op>(p_op) == ir::Op::DynSet ? ir::Kind::Void : ir::Kind::Any, p_type ? p_type : "", p_reuse };
+	bool done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_ref ? vm::any::godot_object(p_holder.p) : p_holder, p_key->view(), p_args, p_count, r_result, &call, wanted);
 	if (call.receiver) {
 		retain(c, call.receiver);
 		done = call_resolved(c, call.function, call.receiver, p_args, p_count, r_result);
@@ -35,11 +36,14 @@ bool named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, S
 	if (c->listener_failed) {
 		call_failed(c);
 	}
+	const bool reused = p_reuse && vm::any::tag(*r_result) == AnyTag::Value && vm::any::pointer(*r_result) == p_reuse;
 	if (c->failing) {
-		release(c, *r_result);
+		if (!reused) {
+			release(c, *r_result);
+		}
 		*r_result = empty();
 	}
-	return done;
+	return reused ? vm::NamedResult::Reused : done ? vm::NamedResult::Done : vm::NamedResult::Declined;
 }
 
 Slot *property(const Context *c, Object *p_holder, const Str *p_key) {

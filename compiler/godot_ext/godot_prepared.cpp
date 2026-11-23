@@ -256,7 +256,7 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 		return true;
 	}
 	if (kind == ir::Kind::Any && type >= Variant::VECTOR2 && type <= Variant::COLOR) {
-		Variant *made = result_handle(p_result, p_worked);
+		Variant *made = p_result.type.empty() || value_name(type) == p_result.type ? result_handle(p_result, p_worked) : make_handle(p_worked.zero);
 		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, inside(*made, type));
 		*r_result = vm::any::godot_value(made);
 		return true;
@@ -573,6 +573,16 @@ std::unique_ptr<Worked> method_of(std::string_view p_owner, const std::vector<st
 	return worked->builtin ? std::move(worked) : nullptr;
 }
 
+static bool read_number(const vm::Prepared &p_prepared, void *p_value, double *r_number) {
+	const auto &worked = static_cast<const Worked &>(p_prepared);
+	auto &value = *static_cast<Variant *>(p_value);
+	if (value.get_type() != worked.receiver) {
+		return false;
+	}
+	worked.getter(inside(value, worked.receiver), r_number);
+	return true;
+}
+
 // A property of one of Godot's classes, by its accessor's method bind; or a part of one of its values.
 std::unique_ptr<Worked> member_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, bool p_set, ir::Kind p_receiver) {
 	auto worked = std::make_unique<Worked>();
@@ -606,6 +616,9 @@ std::unique_ptr<Worked> member_of(std::string_view p_owner, const std::vector<st
 	worked->zero = zero_of(worked->result);
 	worked->getter = gdextension_interface::variant_get_ptr_getter((GDExtensionVariantType)*owner, member._native_ptr());
 	worked->setter = gdextension_interface::variant_get_ptr_setter((GDExtensionVariantType)*owner, member._native_ptr());
+	if (!p_set && worked->result == Variant::FLOAT) {
+		worked->read_number = read_number;
+	}
 	return worked->result >= 0 && (p_set ? worked->setter != nullptr : worked->getter != nullptr) ? std::move(worked) : nullptr;
 }
 
@@ -721,40 +734,6 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 		used += worked->own_place && worked->program == program_ ? 1 : 0;
 	}
 	return { kept, used };
-}
-
-std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
-		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
-	const Worked &worked = static_cast<const Worked &>(p_bind);
-	if (p_shape.delegate || (p_shape.script && !p_shape.instance)) {
-		auto *receiver = static_cast<Variant *>(p_operands[0].slot.p);
-		bool valid = false;
-		if (worked.what == What::Getter) {
-			const Variant value = receiver->get_named(worked.dynamic_name, valid);
-			if (valid) {
-				return take(p_result, value, worked.name, r_value, r_error);
-			}
-			*r_error = "Godot has no '" + worked.name + "' on this value";
-		} else if (worked.what == What::Setter) {
-			const vm::Slot given = p_operands[1].slot;
-			if (vm::any::tag(given) == vm::AnyTag::Value) {
-				receiver->set_named(worked.dynamic_name, *static_cast<const Variant *>(vm::any::pointer(given)), valid);
-			} else {
-				receiver->set_named(worked.dynamic_name, to_variant(ir::Kind::Any, given), valid);
-			}
-			if (valid) {
-				return true;
-			}
-			*r_error = "Godot could not set '" + worked.name + "' on this value";
-		} else {
-			return std::nullopt;
-		}
-		return false;
-	}
-	if (p_shape.owner && worked.bound && p_count <= MOST) {
-		return run_bound(worked, p_shape.instance, p_operands, p_count, p_result, r_value, r_error, p_shape.owner);
-	}
-	return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);
 }
 
 std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,

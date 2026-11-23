@@ -1,5 +1,6 @@
 #include "named_sites.h"
 
+#include "adjacent_uses.h"
 #include "any.h"
 #include "fields.h"
 
@@ -13,12 +14,33 @@ using ir::Op;
 
 static std::atomic<uint64_t> next_generation{ 1 };
 
-NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.size()), generation_(next_generation.fetch_add(1, std::memory_order_relaxed)) {
+NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.size()), vector_targets_(p_module.functions.size()), borrowed_sets_(p_module.functions.size()), generation_(next_generation.fetch_add(1, std::memory_order_relaxed)) {
 	for (size_t f = 0; f < p_module.functions.size(); f++) {
 		const auto &fn = p_module.functions[f];
 		std::vector<uint32_t> names;
+		std::optional<ir::AdjacentUses> uses;
 		for (size_t pc = 0; pc < fn.code.size(); pc++) {
 			const auto &in = fn.code[pc];
+			if (pc + 1 < fn.code.size() && (in.op == Op::VecGet || in.op == Op::ToAny)) {
+				const auto &next = fn.code[pc + 1];
+				const bool moves = next.op == Op::Move && in.op == Op::VecGet && in.a == next.b;
+				const bool sets = next.op == Op::DynSet && in.op == Op::ToAny && in.a == next.c && fn.registers[in.b] == Kind::Val &&
+						 in.b < fn.engine_types.size() && ir::bare_named(fn.engine_types[in.b]) != ir::Bare::None;
+				if (moves || sets) {
+					if (!uses) {
+						uses.emplace(fn);
+					}
+					if (uses->only_consumer(in.a, pc + 1)) {
+						if (moves) {
+							vector_targets_[f].resize(pc + 1, NONE);
+							vector_targets_[f][pc] = next.a;
+						} else {
+							borrowed_sets_[f].resize(pc + 1);
+							borrowed_sets_[f][pc] = true;
+						}
+					}
+				}
+			}
 			if (in.op == Op::ConstStr && in.a < fn.registers.size() && in.b < p_module.strings.size()) {
 				if (names.empty()) {
 					names.resize(fn.registers.size(), NONE);
@@ -32,14 +54,20 @@ NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.
 				if (key < names.size() && fn.registers[key] == Kind::Str && names[key] != NONE) {
 					places_[f].resize(pc + 1);
 					places_[f][pc] = { names[key], static_cast<uint32_t>(sites_.size()) };
-					sites_.emplace_back();
+					auto &site = sites_.emplace_back();
+					if (in.op == Op::DynGet) {
+						if (!uses) {
+							uses.emplace(fn);
+						}
+						site.math = ir::math_consumer(fn, pc, *uses);
+					}
 				}
 			}
 		}
 	}
 }
 
-NamedSite *NamedSites::at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings) {
+InterpreterSite *NamedSites::at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings) {
 	const auto &places = places_[p_function];
 	if (p_pc >= places.size()) {
 		return nullptr;
@@ -92,13 +120,14 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 }
 
 std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error, void *p_reuse) {
+		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error, const Wanted &wanted) {
 	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
 	void *handle = any::pointer(p_holder);
 	if (p_site.generation != generation_) {
 		p_site.used = 0;
+		p_site.overflow = nullptr;
 		p_site.delegated = NONE;
 		p_site.generation = generation_;
 	}
@@ -121,10 +150,18 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		}
 		entry = &(p_site.entries[p_site.used++] = resolve(p_engine, p_module, shape, handle, p_name));
 	} else if (!entry) {
-		auto &members = shared_[{ shape.type, shape.instance ? shape.instance->klass : NONE }];
-		auto at = members.find(p_name);
-		if (at == members.end()) {
-			at = members.emplace(std::string(p_name), resolve(p_engine, p_module, shape, handle, p_name)).first;
+		if (!p_site.overflow) {
+			auto found = shared_.find(p_name);
+			if (found == shared_.end()) {
+				found = shared_.try_emplace(std::string(p_name)).first;
+			}
+			p_site.overflow = &found->second;
+		}
+		auto &entries = p_site.overflow->entries;
+		const NamedOverflow::Shape key{ shape.type, shape.instance ? shape.instance->klass : NONE };
+		auto [at, added] = entries.try_emplace(key);
+		if (added) {
+			at->second = resolve(p_engine, p_module, shape, handle, p_name);
 		}
 		entry = &at->second;
 	}
@@ -151,7 +188,6 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		}
 		operands[i + 1] = { Kind::Any, p_arguments[i] };
 	}
-	const Wanted wanted{ write ? Kind::Void : Kind::Any, {}, p_reuse };
 	const Prepared *bind = write ? member->setter : member->invoke;
 	if (bind) {
 		if (auto done = p_engine.run_named(shape, *bind, operands, p_count + 1, wanted, r_result, r_error)) {

@@ -75,8 +75,8 @@ enum class Kind : uint8_t;
 	X(element_added, void *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
 	X(holder_of_any, Object *, (Context *c, Slot p_any), (c, p_any)) \
 	X(key_of_any, Str *, (Context *c, Slot p_any), (c, p_any)) \
-	X(named_access, bool, (Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, Slot *r_result), \
-			(c, p_site, p_op, p_ref, p_holder, p_key, p_args, p_count, r_result)) \
+	X(named_access, vm::NamedResult, (Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, Slot *r_result), \
+			(c, p_site, p_op, p_ref, p_holder, p_key, p_args, p_count, p_type, p_reuse, r_result)) \
 	X(property, Slot *, (const Context *c, Object *p_holder, const Str *p_key), (c, p_holder, p_key)) \
 	X(set_property, bool, (Context *c, Object *p_holder, Str *p_key, Slot p_value), (c, p_holder, p_key, p_value)) \
 	X(text_of_int, Str *, (Context *c, int32_t p_value), (c, p_value)) \

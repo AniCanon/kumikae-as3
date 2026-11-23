@@ -20,6 +20,8 @@ namespace vm {
 // method's entry, a constant's value): its own, kept by the host for as long as the host lives.
 struct Prepared {
 	virtual ~Prepared() {}
+	// A scalar field of an engine value. This reads the value alone and cannot run script code.
+	bool (*read_number)(const Prepared &, void *, double *) = nullptr;
 };
 
 // What an engine value has under an AS3 name, found as a program runs (`untyped.name`): whether the name is

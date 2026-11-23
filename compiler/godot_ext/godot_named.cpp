@@ -10,8 +10,9 @@
 #if !defined(KAS3_RUNTIME_ONLY)
 #include "builtins.h"
 #include "godot_names.h"
-#include "worked.h"
 #endif
+#include "worked.h"
+#include "any.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 
@@ -190,7 +191,7 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 					return nullptr;
 				}
 				p_binding->by_name = true;
-					p_binding->dynamic_name = name(p_binding->name);
+				p_binding->dynamic_name = name(p_binding->name);
 				named_bindings_.push_back(std::move(p_binding));
 				return named_bindings_.back().get();
 			};
@@ -216,5 +217,39 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 }
 
 #endif
+
+std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
+	const Worked &worked = static_cast<const Worked &>(p_bind);
+	if (p_shape.delegate || (p_shape.script && !p_shape.instance)) {
+		auto *receiver = static_cast<Variant *>(p_operands[0].slot.p);
+		bool valid = false;
+		if (worked.what == Worked::What::Getter) {
+			const Variant value = receiver->get_named(worked.dynamic_name, valid);
+			if (valid) {
+				return take(p_result, value, worked.name, r_value, r_error);
+			}
+			*r_error = "Godot has no '" + worked.name + "' on this value";
+		} else if (worked.what == Worked::What::Setter) {
+			const vm::Slot given = p_operands[1].slot;
+			if (vm::any::tag(given) == vm::AnyTag::Value) {
+				receiver->set_named(worked.dynamic_name, *static_cast<const Variant *>(vm::any::pointer(given)), valid);
+			} else {
+				receiver->set_named(worked.dynamic_name, to_variant(ir::Kind::Any, given), valid);
+			}
+			if (valid) {
+				return true;
+			}
+			*r_error = "Godot could not set '" + worked.name + "' on this value";
+		} else {
+			return std::nullopt;
+		}
+		return false;
+	}
+	if (p_shape.owner && worked.bound && p_count <= MOST_OPERANDS) {
+		return run_bound(worked, p_shape.instance, p_operands, p_count, p_result, r_value, r_error, p_shape.owner);
+	}
+	return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);
+}
 
 } // namespace kas3

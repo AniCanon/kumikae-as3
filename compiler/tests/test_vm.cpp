@@ -1280,9 +1280,10 @@ static void test_engine_members_by_name() {
 				return FakeEngine::get(holder, name, wanted, out, error);
 			}
 			int lookups = 0;
+			uintptr_t receiver_type = 1;
 			vm::NamedShape named_shape(void *p_handle, uintptr_t) override {
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
-				return { 1, script ? 2u : 0u, script, p_handle };
+				return { receiver_type, script ? 2u : 0u, script, p_handle };
 			}
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
@@ -1364,6 +1365,21 @@ static void test_engine_members_by_name() {
 			}
 			CHECK_EQ(engine.lookups, before + 1);
 		}
+		// Overflow entries belong to the generation. A second site shares them by name.
+		vm::NamedSite by_shape[2];
+		const int before_shapes = engine.lookups;
+		for (auto &site : by_shape) {
+			for (int round = 0; round < 2; round++) {
+				for (engine.receiver_type = 1; engine.receiver_type <= 8; engine.receiver_type++) {
+					vm::Slot value{};
+					CHECK(interpreter.access_named(site, ir::Op::DynGet, given[0], "name", nullptr, 0, &value, &method));
+					interpreter.discard(ir::Kind::Any, value);
+				}
+			}
+			CHECK_EQ(site.used, 4u);
+		}
+		CHECK_EQ(engine.lookups - before_shapes, 12);
+		engine.receiver_type = 1;
 		engine.return_math = true;
 		CHECK(interpreter.call_method(object, "repeated", given, 1, nullptr));
 		CHECK_EQ(engine.reuses, 7);

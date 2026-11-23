@@ -418,7 +418,7 @@ output = compare("by_name.gd", [
     "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
     "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
     "exact untyped arguments", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
-    "proven receiver keeps foreign accessors", "freed after warming the site", "a freed object",
+    "proven receiver keeps foreign accessors", "parameter alias respects position overrides", "freed after warming the site", "a freed object",
 ])
 check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
 

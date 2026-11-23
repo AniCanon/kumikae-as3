@@ -1,6 +1,8 @@
 // A literal AS3 member name has its own cache. Computed names keep their ordinary lookup.
 #include "function_writer.h"
 
+#include "names.h"
+
 namespace kas3::backend_cpp {
 
 bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
@@ -34,11 +36,29 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	}
 	mark();
 	line("Slot w = empty();");
-	const std::string guard = reference ? "" : "kas3::vm::any::is_engine(" + reg(holder) + ") && ";
+	ir::MathConsumer math;
+	if (p_in.op == Op::DynGet && kept_.empty() && twice_.empty()) {
+		if (!adjacent_) {
+			adjacent_.emplace(function_);
+		}
+		math = ir::math_consumer(function_, pc_, *adjacent_);
+		if (math.skip && (!owns(math.target) || math.target < function_.parameters || !parts(math.target).empty() ||
+				math.target >= function_.engine_types.size() || !has_parts(function_.engine_types[math.target]))) {
+			math = {};
+		}
+	}
+	const std::string reuse = math.skip ? "\"" + function_.engine_types[math.target] + "\", " + reg(math.target) + ".handle" : "nullptr, nullptr";
+	const std::string guard = reference ? "" : "!kas3::vm::any::is_engine(" + reg(holder) + ") ? kas3::vm::NamedResult::Declined : ";
 	const std::string receiver = reference ? "true, slot(" + reg(holder) + ")" : "false, " + reg(holder);
-	line("if (" + guard + "named_access(c, &site, " + std::to_string(static_cast<unsigned>(p_in.op)) +
-			", " + receiver + ", " + reg(key) + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", &w)) {");
+	line("const auto handled = " + guard + "named_access(c, &site, " + std::to_string(static_cast<unsigned>(p_in.op)) +
+			", " + receiver + ", " + reg(key) + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", " + reuse + ", &w);");
+	line("if (handled != kas3::vm::NamedResult::Declined) {");
 	check();
+	if (math.skip) {
+		const uint32_t after = pc_ + math.skip + 1;
+		targets_[after] = true;
+		line("if (handled == kas3::vm::NamedResult::Reused) goto L" + std::to_string(after) + ";");
+	}
 	if (!write && p_in.a != ir::NONE) {
 		put(p_in.a, "w");
 	} else {

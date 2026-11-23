@@ -95,6 +95,24 @@ package {
 			return seen;
 		}
 
+		private function sumPositions(source:Node2D, count:int):Number {
+			var target:* = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < count; i++) {
+				var point:Vector2 = target.position;
+				sum += point.x;
+			}
+			return sum;
+		}
+		public function aliasPositions(source:Node2D):Array {
+			var target:* = source;
+			target.position = new Vector2(8, 9);
+			var total:Number = sumPositions(source, 2);
+			var failed:Boolean = false;
+			try { sumPositions(source, 3); } catch (e:Error) { failed = true; }
+			return [total, failed];
+		}
+
 		public function freeAfterRead(o:*):String {
 			var first:String = "";
 			for (var i:int = 0; i < 2; i++) {

@@ -21,7 +21,7 @@ namespace rt {
 // coming to disagree about what a value's bits mean (vm/any.h). A change that only adds an entry at the end
 // of a table counts too: an older library is handed a table it reads the same, but a newer one would call
 // what an older host does not have.
-inline constexpr uint64_t RUNTIME_LAYOUT = 0x4b41533300000010ull;
+inline constexpr uint64_t RUNTIME_LAYOUT = 0x4b41533300000011ull;
 
 // A size that moves without the number above moving does not build: set the number, then the size. (A
 // change that keeps every size is not caught here: the list above is what decides.)
@@ -29,7 +29,7 @@ static_assert(sizeof(void *) != 8 ||
 				(sizeof(Program) == 248 && sizeof(ClassInfo) == 144 && sizeof(FieldInfo) == 24 && sizeof(FunctionInfo) == 72 &&
 						sizeof(GlobalInfo) == 24 && sizeof(ThunkInfo) == 72 && sizeof(NamedMethod) == 16 && sizeof(Text) == 16 &&
 						sizeof(KnownClasses) == 60 && sizeof(Context) == 256 && sizeof(Api) == 744 && sizeof(EngineApi) == 144 &&
-						sizeof(HandleHead) == 32 && sizeof(Resolved) == 64 && sizeof(Object) == 32 && sizeof(Vector) == 64 && sizeof(Str) == 8 && sizeof(Slot) == 8 &&
+						sizeof(vm::NamedSite) == 184 && sizeof(HandleHead) == 32 && sizeof(Resolved) == 64 && sizeof(Object) == 32 && sizeof(Vector) == 64 && sizeof(Str) == 8 && sizeof(Slot) == 8 &&
 						sizeof(StackFrame) == 16 && sizeof(ObjectCache) == 400),
 		"what a program library and its host share has changed size: add one to RUNTIME_LAYOUT, then set the size here");
 

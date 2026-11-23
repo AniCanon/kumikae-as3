@@ -9,6 +9,7 @@
 //     through its handlers, or by `failed`, which puts its line into the trace.
 #pragma once
 
+#include "adjacent_uses.h"
 #include "facts.h"
 #include "ir.h"
 #include "thunks.h"
@@ -309,6 +310,7 @@ class FunctionWriter {
 	bool fast_place(const ir::Instruction &p_in);
 	std::string vector_for(uint32_t p_vector, uint32_t p_element) const;
 	bool fast_text(const ir::Instruction &p_in);
+	std::optional<ir::AdjacentUses> adjacent_;
 	bool fast_named(const ir::Instruction &p_in);
 	bool fast_untyped(const ir::Instruction &p_in);
 	bool fast_call(const ir::Instruction &p_in);
