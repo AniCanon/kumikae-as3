@@ -265,6 +265,15 @@ Object *Reload::object(Object *p_old) {
 			return lost(p_old->klass);
 		}
 	}
+	if (callback && !own_field(p_old, ir::FUNCTION_FIRST).p && to_.module_.functions[*callback].is_static) {
+		// A function bound to nothing is one object for a whole program (`f == Math.max`): the new program's.
+		Object *lone = to_.make_function(*callback, nullptr);
+		if (lone) {
+			moved_.emplace(p_old, lone);
+			retain(lone);
+		}
+		return lone;
+	}
 	Object *fresh = new_object(named->second, to_.heap_.object_slots(named->second), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;

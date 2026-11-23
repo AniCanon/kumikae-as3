@@ -2309,6 +2309,32 @@ static void test_reload_in_place() {
 	edited.end();
 }
 
+// The values of this change across a reload: a function of the library held as a value, a method of the
+// library read from a value, and one of Godot's classes held as a class value, each still what it was.
+static void test_reload_values() {
+	const auto source = [](const char *p_said) {
+		return std::string("package { import godot.*; public class Game {\n"
+						   "  public var best:Function = Math.max;\n"
+						   "  public var push:Function;\n"
+						   "  public var list:Array = [1];\n"
+						   "  public var kind:Class = Node2D;\n"
+						   "  public var said:String = \"\";\n"
+						   "  public function make():void { push = list.push; }\n"
+						   "  public function pick():void { push(7); said = \"") + p_said + "\" + best(1, 5, 3) + \" \" + list + \" \" + kind + \" \" + (kind == Node2D) + \" \" + (best == Math.max); }\n"
+						   "} }\n";
+	};
+	Edited edited;
+	edited.godot = true;
+	edited.start(source("old "));
+	edited.call("make");
+	edited.call("pick");
+	CHECK_EQ(edited.text("said"), std::string("old 5 1,7 [class Node2D] true true"));
+	edited.edit(source("new "));
+	edited.call("pick");
+	CHECK_EQ(edited.text("said"), std::string("new 5 1,7,7 [class Node2D] true true"));
+	edited.end();
+}
+
 // First values that are NaN and text, a default left out, a field added, and a move made twice.
 static void test_reload_in_place_values() {
 	const std::string source =
@@ -4417,6 +4443,7 @@ int main() {
 	test_reload_constants("com.example.config", "com.example.config.Game"); // A class in a package: its fields are named with it.
 	test_reload_in_place();
 	test_reload_in_place_values();
+	test_reload_values();
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
 	test_reload_from_native();

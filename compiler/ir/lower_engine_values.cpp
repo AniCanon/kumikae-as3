@@ -224,7 +224,6 @@ void EngineValues::lower(const PendingFunction &p_pending) {
 	if (bound) {
 		l_.fn().registers.push_back(Kind::Obj);
 		l_.fn().locals.push_back({ "$bound", 0 });
-		l_.fn().parameter_classes.push_back(*l_.vector_class(l_.compilation_.instance_type(l_.array_)));
 	}
 	uint32_t least = decl->parameters.count;
 	for (uint32_t i = 0; i < decl->parameters.count; i++) {
