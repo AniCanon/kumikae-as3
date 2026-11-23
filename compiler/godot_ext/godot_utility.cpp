@@ -102,25 +102,7 @@ struct GodotHost::Utility {
 };
 
 GodotHost::GodotHost() = default;
-GodotHost::~GodotHost() {
-#if !defined(KAS3_RUNTIME_ONLY)
-	if (std::getenv("KAS3_NATIVE_COUNTS")) {
-		const auto misses = [](const Members &members) {
-			return std::count_if(members.begin(), members.end(), [](const auto &entry) {
-				return entry.second.what == vm::NamedMember::What::Missing;
-			});
-		};
-		size_t total = 0;
-		for (const auto &entry : class_members_) {
-			total += misses(entry.second);
-		}
-		for (const auto &members : value_members_) {
-			total += misses(members);
-		}
-		std::fprintf(stderr, "kas3: cached missing members=%zu\n", total);
-	}
-#endif
-}
+GodotHost::~GodotHost() = default;
 
 const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::string *r_error) {
 	auto found = utilities_.find(p_signature);

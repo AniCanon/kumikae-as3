@@ -15,6 +15,7 @@
 #include "any.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/script.hpp>
 
 #include <string>
 #include <unordered_map>
@@ -22,6 +23,18 @@
 using namespace godot;
 
 namespace kas3 {
+
+void GodotHost::new_program() {
+	program_++;
+#if !defined(KAS3_RUNTIME_ONLY)
+	for (auto &entry : class_members_) {
+		entry.second.misses.clear();
+	}
+	for (auto &members : value_members_) {
+		members.misses.clear();
+	}
+#endif
+}
 
 #if !defined(KAS3_RUNTIME_ONLY)
 uintptr_t GodotHost::handle_class(void *p_receiver, void *p_raw) {
@@ -93,10 +106,55 @@ std::optional<vm::NamedShape> GodotHost::shape_of(void *p_receiver, uintptr_t p_
 #endif
 }
 
+const vm::NamedMember &GodotHost::script_binding(std::string_view p_name, bool p_method) {
+	auto at = script_members_.find(p_name);
+	if (at == script_members_.end()) {
+		at = script_members_.try_emplace(std::string(p_name)).first;
+	}
+	auto &member = at->second[p_method];
+	if (!member.invoke) {
+		auto binding = std::make_unique<Worked>();
+		binding->what = p_method ? Worked::What::Bound : Worked::What::Getter;
+		binding->name = at->first;
+		binding->dynamic_name = StringName(to_godot(p_name));
+		member = { p_method ? vm::NamedMember::What::Method : vm::NamedMember::What::Property,
+			at->first, true, !p_method, binding.get(), nullptr, true };
+		named_bindings_.push_back(std::move(binding));
+	}
+	return member;
+}
+
+// Only names declared by the attached script supplement the engine's AS3 declaration table.
+const vm::NamedMember &GodotHost::script_member(void *p_receiver, std::string_view p_name) {
+	const Variant &value = *static_cast<const Variant *>(p_receiver);
+	Object *object = value.get_type() == Variant::OBJECT ? value.get_validated_object() : nullptr;
+	if (!object || script_object_by_id(object->get_instance_id())) {
+		return vm::MISSING_MEMBER;
+	}
+	Ref<Script> script = object->get_script();
+	if (script.is_null()) {
+		return vm::MISSING_MEMBER;
+	}
+	const StringName key(to_godot(p_name));
+	if (script->has_script_method(key)) {
+		return script_binding(p_name, true);
+	}
+	for (; script.is_valid(); script = script->get_base_script()) {
+		const auto properties = script->get_script_property_list();
+		for (int i = 0; i < properties.size(); i++) {
+			const Dictionary property = properties[i];
+			if (StringName(property["name"]) == key) {
+				return script_binding(p_name, false);
+			}
+		}
+	}
+	return vm::MISSING_MEMBER;
+}
+
 #if defined(KAS3_RUNTIME_ONLY)
 
 // A build that carries no table of Godot's names can't say: the script is told so.
-const vm::NamedMember &GodotHost::named(void *, std::string_view) {
+const vm::NamedMember &GodotHost::named(void *, std::string_view, vm::NameSource) {
 	static constexpr vm::NamedMember unknown{ vm::NamedMember::What::Unknown, {} };
 	return unknown;
 }
@@ -151,7 +209,7 @@ vm::NamedMember described(const std::vector<std::string_view> &words) {
 
 } // namespace
 
-const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_name) {
+const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_name, vm::NameSource p_source) {
 	const Variant &receiver = *static_cast<const Variant *>(p_receiver);
 	const Variant::Type type = receiver.get_type();
 	StringName klass;
@@ -165,14 +223,19 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 		}
 	}
 	Members &members = object ? class_members_[klass] : value_members_[type];
-	if (const auto known = members.find(p_name); known != members.end()) {
+	if (const auto known = members.known.find(p_name); known != members.known.end()) {
 		return known->second;
 	}
+	return *members.misses.lookup(p_name, p_source, [&] { return resolve_member(members, klass, type, p_name); });
+}
+
+const vm::NamedMember *GodotHost::resolve_member(Members &p_members, StringName p_class, Variant::Type p_type, std::string_view p_name) {
+	const bool object = p_type == Variant::OBJECT;
 	if (!object) {
-		klass = StringName(Variant::get_type_name(type));
+		p_class = StringName(Variant::get_type_name(p_type));
 	}
-	while (klass != StringName()) {
-		const std::string godot = String(klass).utf8().get_data();
+	while (p_class != StringName()) {
+		const std::string godot = String(p_class).utf8().get_data();
 		const auto as3 = renamed().find(godot);
 		const auto id = godot_entry((as3 == renamed().end() ? godot : as3->second) + "." + std::string(p_name));
 		if (id) {
@@ -189,7 +252,7 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 				return named_bindings_.back().get();
 			};
 			if (found.what == vm::NamedMember::What::Method) {
-				found.invoke = keep_binding(method_of(godot, words, type, false, std::nullopt));
+				found.invoke = keep_binding(method_of(godot, words, p_type, false, std::nullopt));
 			} else if (found.what == vm::NamedMember::What::Property) {
 				const ir::Kind kind = object ? ir::Kind::Ref : ir::Kind::Val;
 				if (found.read) {
@@ -201,16 +264,54 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 			}
 			if (found.what != vm::NamedMember::What::Missing) {
 				// The same constant table the IR uses owns both names, across program reloads.
-				return members.emplace(entry.key.substr(entry.key.find('.') + 1), found).first->second;
+				return &p_members.known.emplace(entry.key.substr(entry.key.find('.') + 1), found).first->second;
 			}
 		}
-		klass = object ? ClassDBSingleton::get_singleton()->get_parent_class(klass) : StringName();
+		p_class = object ? ClassDBSingleton::get_singleton()->get_parent_class(p_class) : StringName();
 	}
-	// A computed key belongs to the caller. Only names from the engine declaration table are retained.
-	return vm::MISSING_MEMBER;
+	return &vm::MISSING_MEMBER;
 }
 
 #endif
+
+std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
+	const auto &binding = static_cast<const Worked &>(p_bind);
+	Variant value;
+	if (binding.what == Worked::What::Getter) {
+		GDExtensionBool valid = false;
+		gdextension_interface::variant_get_named(static_cast<const Variant *>(p_operands[0].slot.p)->_native_ptr(),
+				binding.dynamic_name._native_ptr(), value._native_ptr(), &valid);
+		if (!valid) {
+			return std::nullopt;
+		}
+	} else {
+		GDExtensionCallError error{};
+		if (p_count == 1) {
+			gdextension_interface::object_call_script_method(p_shape.owner, binding.dynamic_name._native_ptr(), nullptr, 0, value._native_ptr(), &error);
+		} else {
+			Arguments args(p_operands + 1, p_count - 1);
+			gdextension_interface::object_call_script_method(p_shape.owner, binding.dynamic_name._native_ptr(),
+					reinterpret_cast<const GDExtensionConstVariantPtr *>(args.pointers()), p_count - 1, value._native_ptr(), &error);
+		}
+		if (error.error == GDEXTENSION_CALL_ERROR_INVALID_METHOD) {
+			return std::nullopt;
+		}
+		if (error.error != GDEXTENSION_CALL_OK) {
+			*r_error = describe(error, binding.name);
+			return false;
+		}
+	}
+	if (p_result.kind == ir::Kind::Any && !p_result.reuse && r_value) {
+		if (auto result = untyped_from_variant(value)) {
+			*r_value = *result;
+			return true;
+		}
+		*r_error = std::string(vm::OUT_OF_MEMORY);
+		return false;
+	}
+	return take(p_result, value, binding.name, r_value, r_error);
+}
 
 std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {

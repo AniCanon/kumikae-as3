@@ -621,7 +621,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		return made;
 	}
 	// The members a value of the engine's has by an AS3 name: a few of a node's.
-	[[nodiscard]] const vm::NamedMember &named(void *, std::string_view p_name) override {
+	[[nodiscard]] const vm::NamedMember &named(void *, std::string_view p_name, vm::NameSource) override {
 		using What = vm::NamedMember::What;
 		static constexpr vm::NamedMember methods[] = { { What::Method, "queue_free" }, { What::Method, "add_child" } };
 		static constexpr vm::NamedMember properties[] = { { What::Property, "name" }, { What::Property, "position" }, { What::Property, "read_only", true, false } };
@@ -1304,9 +1304,9 @@ static void test_engine_members_by_name() {
 				return vm::NamedShape{ receiver_type, script ? 2u : 0u, script, p_handle };
 			}
 			bool fail_after_call = false;
-			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
+			const vm::NamedMember &named(void *p_handle, std::string_view p_name, vm::NameSource p_source) override {
 				lookups++;
-				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name);
+				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name, p_source);
 			}
 			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *, const vm::Object *) override {
 				log += "prepared call\n";

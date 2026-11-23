@@ -19,10 +19,11 @@ struct NamedOverflow {
 	struct Shape {
 		uintptr_t type;
 		std::optional<uint32_t> klass;
-		bool operator==(const Shape &p_other) const { return type == p_other.type && klass == p_other.klass; }
+		uint64_t script;
+		bool operator==(const Shape &p_other) const { return type == p_other.type && klass == p_other.klass && script == p_other.script; }
 	};
 	struct Hash {
-		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (std::hash<std::optional<uint32_t>>{}(p_shape.klass) << 1); }
+		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (std::hash<std::optional<uint32_t>>{}(p_shape.klass) << 1) ^ std::hash<uint64_t>{}(p_shape.script); }
 	};
 	std::unordered_map<Shape, NamedSite::Entry, Hash> entries;
 };

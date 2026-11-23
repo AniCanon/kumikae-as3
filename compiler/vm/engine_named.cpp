@@ -41,9 +41,17 @@ void *EngineNamed::handle_of(Slot p_holder) const {
 	return any::is_engine(p_holder) ? any::pointer(p_holder) : engine_object_in(vm_.module_, p_holder);
 }
 
-const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
+NamedMember EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
 	void *handle = p_key.object ? nullptr : handle_of(p_holder);
-	return handle ? vm_.host_.handles.named(handle, p_key.name()) : MISSING_MEMBER;
+	if (!handle) {
+		return MISSING_MEMBER;
+	}
+	NamedMember found = vm_.host_.handles.named(handle, p_key.name());
+	if (found.what == NamedMember::What::Missing && !checked_) {
+		found = vm_.host_.handles.script_member(handle, p_key.name());
+
+	}
+	return found;
 }
 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
@@ -104,7 +112,7 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	wanted.kind = Kind::Any;
 	std::string error;
 	const Argument operand = receiver(p_holder, handle);
-	const auto done = prepared(vm_.host_.handles, checked_, found.invoke, &operand, 1, wanted, r_value, &error);
+	const auto done = prepared(vm_.host_.handles, checked_, found.script_only ? nullptr : found.invoke, &operand, 1, wanted, r_value, &error);
 	if (!(done ? *done : vm_.host_.handles.get(handle, found.godot, wanted, r_value, &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
@@ -191,7 +199,7 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 	const size_t frame = vm_.frames_.size() - 1;
 	bool ok = ready == count;
 	if (ok) {
-		const auto done = prepared(vm_.host_.handles, checked_, found.invoke, arguments, count, wanted, &result, &error);
+		const auto done = prepared(vm_.host_.handles, checked_, found.script_only ? nullptr : found.invoke, arguments, count, wanted, &result, &error);
 		ok = done ? *done : vm_.host_.handles.call(handle, found.godot, arguments + 1, count - 1, wanted, &result, &error);
 	}
 	for (size_t i = 1; i < ready; i++) {

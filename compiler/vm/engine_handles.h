@@ -28,6 +28,8 @@ struct Prepared {
 // a property (a signal and a part of a value too) or a method of the value's class or of one it extends,
 // and Godot's name for it, which the host keeps for as long as it lives. Unknown: a host that has no table
 // of Godot's names can't say.
+enum class NameSource { Computed, Literal };
+
 struct NamedMember {
 	enum class What : uint8_t { Missing, Unknown, Property, Method };
 	What what = What::Missing;
@@ -36,6 +38,7 @@ struct NamedMember {
 	bool written = true; // A property with a setter.
 	const Prepared *invoke = nullptr; // The method or getter, with the receiver as the first operand.
 	const Prepared *setter = nullptr;
+	bool script_only = false;
 };
 
 inline constexpr NamedMember MISSING_MEMBER{};
@@ -89,9 +92,14 @@ struct EngineHandles {
 	[[nodiscard]] virtual bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) = 0;
 	// What an engine value has under an AS3 name: asked where the value is held untyped, so that the
 	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
-	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view) { return MISSING_MEMBER; }
+	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view, NameSource = NameSource::Computed) { return MISSING_MEMBER; }
+	// A site holds the declaration miss for a literal. A foreign script can still supply the name.
+	virtual const NamedMember &script_member(void *, std::string_view) { return MISSING_MEMBER; }
 	// Validates a receiver for a site hit. A host without stable shape identities declines.
 	virtual std::optional<NamedShape> named_shape(void *, uintptr_t) { return {}; }
+	// The actual script handles the request even if it has changed since the site warmed.
+	virtual std::optional<bool> run_script(const NamedShape &, const Prepared &, const Argument *, size_t,
+			const Wanted &, Slot *, std::string *) { return std::nullopt; }
 	// A prepared operation on the receiver named_shape just validated.
 	virtual std::optional<bool> run_named(const NamedShape &p_shape, const Prepared &p_bind, const Argument *p_operands, size_t p_count,
 			const Wanted &p_result, Slot *r_value, std::string *r_error) {

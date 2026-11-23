@@ -100,7 +100,10 @@ static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_mod
 			}
 		}
 	}
-	entry.engine = &p_engine.named(p_handle, p_name);
+	entry.engine = &p_engine.named(p_handle, p_name, NameSource::Literal);
+	if (entry.engine->what == NamedMember::What::Missing && p_shape.script && !p_shape.instance) {
+		entry.engine = &p_engine.script_member(p_handle, p_name);
+	}
 	return entry;
 }
 
@@ -134,10 +137,13 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 		}
 	}
 	if (!entry && p_site.used < p_site.entries.size()) {
-		if (shape.script && !shape.instance) {
+		auto &next = p_site.entries[p_site.used];
+		next = resolve(p_engine, p_module, shape, handle, p_name);
+		if (shape.script && !shape.instance && next.engine && !next.engine->godot.empty()) {
 			p_site.delegated = p_site.used;
 		}
-		entry = &(p_site.entries[p_site.used++] = resolve(p_engine, p_module, shape, handle, p_name));
+		entry = &next;
+		p_site.used++;
 	} else if (!entry) {
 		if (!p_site.overflow) {
 			auto found = shared_.find(p_name);
@@ -147,7 +153,7 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 			p_site.overflow = &found->second;
 		}
 		auto &entries = p_site.overflow->entries;
-		const NamedOverflow::Shape key{ shape.type, klass };
+		const NamedOverflow::Shape key{ shape.type, klass, shape.script };
 		auto [at, added] = entries.try_emplace(key);
 		if (added) {
 			at->second = resolve(p_engine, p_module, shape, handle, p_name);
@@ -186,8 +192,9 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 	}
 	const NamedMember *member = entry.engine;
 	const bool call = p_op == Op::DynCall, write = p_op == Op::DynSet;
-	if (!member || member->what != (call ? NamedMember::What::Method : NamedMember::What::Property) || member->godot.empty() ||
-			member->godot.front() == '@' || (!call && !(write ? member->written : member->read)) || (write && any::tag(p_holder) == AnyTag::Value)) {
+	const std::string_view name = member ? member->godot : std::string_view{};
+	if (!member || member->what != (call ? NamedMember::What::Method : NamedMember::What::Property) || name.empty() ||
+			name.front() == '@' || (!call && !(write ? member->written : member->read)) || (write && any::tag(p_holder) == AnyTag::Value)) {
 		return std::nullopt;
 	}
 	Argument operands[5];
@@ -200,16 +207,22 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		operands[i + 1] = { Kind::Any, p_arguments[i] };
 	}
 	const Prepared *bind = write ? member->setter : member->invoke;
+	if (member->script_only) {
+		if (!bind || write) {
+			return std::nullopt;
+		}
+		return p_engine.run_script(shape, *bind, operands, p_count + 1, wanted, r_result, r_error);
+	}
 	if (bind) {
 		if (auto done = p_engine.run_named(shape, *bind, operands, p_count + 1, wanted, r_result, r_error)) {
 			return done;
 		}
 	}
 	if (write) {
-		return p_engine.set(handle, member->godot, operands[1], r_error);
+		return p_engine.set(handle, name, operands[1], r_error);
 	}
-	return call ? p_engine.call(handle, member->godot, operands + 1, p_count, wanted, r_result, r_error)
-				: p_engine.get(handle, member->godot, wanted, r_result, r_error);
+	return call ? p_engine.call(handle, name, operands + 1, p_count, wanted, r_result, r_error)
+				: p_engine.get(handle, name, wanted, r_result, r_error);
 }
 
 } // namespace kas3::vm

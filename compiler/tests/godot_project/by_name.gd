@@ -7,6 +7,9 @@ class Intercept extends Node2D:
 	var writes := 0
 	var stored := true
 
+	func script_score() -> int:
+		return 41
+
 	func _get(property: StringName):
 		if property == &"visible":
 			reads += 1
@@ -111,6 +114,8 @@ func _physics_process(_delta: float) -> bool:
 	show("a signal reached by name", ask("listens", [fresh()]), [true, 1, 0])
 	show("exact untyped arguments", ask("exactArguments", [fresh()]), [false, Vector2(6, 8), 0.5, 100.0])
 	var foreign := Intercept.new()
+	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
+		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
 	var reference := Intercept.new()
 	reference.set("visible", false)
 	var expected = [reference.get("visible"), reference.reads, reference.writes]

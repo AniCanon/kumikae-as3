@@ -3,6 +3,7 @@
 #pragma once
 
 #include "host.h"
+#include "literal_misses.h"
 
 #include <godot_cpp/variant/variant.hpp>
 
@@ -11,6 +12,7 @@
 #include <array>
 #include <cstring>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -62,7 +64,11 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	struct SameClass {
 		bool operator()(const godot::StringName &a, const godot::StringName &b) const { return class_identity(a) == class_identity(b); }
 	};
-	using Members = std::unordered_map<std::string_view, vm::NamedMember>;
+	struct Members {
+		std::unordered_map<std::string_view, vm::NamedMember> known;
+		LiteralMisses misses;
+	};
+	const vm::NamedMember *resolve_member(Members &p_members, godot::StringName p_class, godot::Variant::Type p_type, std::string_view p_name);
 	std::unordered_map<godot::StringName, Members, ClassHash, SameClass> class_members_;
 	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;
 #endif
@@ -101,7 +107,7 @@ public:
 	// An engine instruction worked out once (worked.h): public for the helpers of godot_prepared.cpp.
 	struct Worked;
 	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
-	void new_program() { program_++; }
+	void new_program();
 	// The programs made before the last are gone: what was worked out for a call at its own place and
 	// is not the last program's is let go of.
 	void release_unused();
@@ -112,6 +118,8 @@ private:
 	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
 	std::vector<std::unique_ptr<Worked>> named_bindings_;
+	std::map<std::string, std::array<vm::NamedMember, 2>, std::less<>> script_members_;
+	const vm::NamedMember &script_binding(std::string_view p_name, bool p_method);
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
 	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.
 	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
@@ -158,11 +166,14 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	const vm::NamedMember &script_member(void *p_receiver, std::string_view p_name) override;
 	static std::optional<vm::NamedShape> shape_of(void *p_receiver, uintptr_t p_delegated = 0);
 	std::optional<vm::NamedShape> named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }
+	std::optional<bool> run_script(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
 	std::optional<bool> run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
-	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
+	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name, vm::NameSource p_source) override; // godot_named.cpp
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
 	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future

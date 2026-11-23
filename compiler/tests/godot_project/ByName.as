@@ -94,6 +94,9 @@ package {
 			}
 			return found;
 		}
+		public function foreignDeclarations(o:*, property:String, method:String):Array {
+			return [o.stored, o.script_score(), o[property], o[method]()];
+		}
 		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
 		public function aliasVisible(source:Node2D):Boolean {
 			var alias:* = source;
