@@ -24,7 +24,7 @@ def benchmark(arguments, native):
     if "--against" in arguments:
         builds.append(Path(arguments[arguments.index("--against") + 1]).resolve())
     runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 7
-    cases = ["script"] if "--script-only" in arguments else ["script", "node", "value", "refused"]
+    cases = ["script"] if "--script-only" in arguments else ["script", "inherited", "node", "value", "refused"]
     with tempfile.TemporaryDirectory() as folder:
         commands = []
         for i, build in enumerate(builds):

@@ -6,6 +6,7 @@
 // held untyped) is left to the requests by name (godot_host.cpp), which say what is wrong.
 #include "godot_calls.h"
 #include "handles.h"
+#include "program.h"
 #include "worked.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -347,7 +348,7 @@ std::optional<bool> GodotHost::run_builtin(const Worked &p_worked, const vm::Arg
 	return take(p_result, result, p_worked.name, r_result, r_error);
 }
 
-std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Object *p_checked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	GDExtensionObjectPtr object = nullptr;
 	const size_t first = p_worked.is_static ? 0 : 1;
@@ -358,8 +359,11 @@ std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Argum
 		*r_error = FREED;
 		return false;
 	}
-	if (p_worked.by_name && internal::get_object_instance_binding(object)->get_script().get_type() != Variant::NIL) {
-		return std::nullopt; // A script can intercept even an inherited name, differently on each instance.
+	if (p_worked.by_name) {
+		const Object *owner = internal::get_object_instance_binding(object);
+		if ((!p_checked || script_object(owner) != p_checked) && owner->get_script().get_type() != Variant::NIL) {
+			return std::nullopt; // Only the script whose members the VM checked can be bypassed.
+		}
 	}
 	if (p_worked.bare && !(p_worked.result == NO_VALUE && p_result.kind == ir::Kind::Any)) {
 		if (const std::optional<bool> done = run_bare(p_worked, object, p_operands + first, p_count - first, p_result, r_result)) {
@@ -680,7 +684,7 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 }
 
 std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-		std::string *r_error) {
+		std::string *r_error, const vm::Object *p_checked) {
 	const Worked &worked = static_cast<const Worked &>(p_prepared);
 	if (p_count > MOST) {
 		return std::nullopt;
@@ -693,7 +697,7 @@ std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Arg
 		case What::Bound:
 		case What::Getter:
 		case What::Setter:
-			return run_bound(worked, p_operands, p_count, p_result, r_result, r_error);
+			return run_bound(worked, p_checked, p_operands, p_count, p_result, r_result, r_error);
 		case What::FieldGet:
 		case What::FieldSet:
 			return run_field(worked, p_operands, p_result, r_result, r_error);

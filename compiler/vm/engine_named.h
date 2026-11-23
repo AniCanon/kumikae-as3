@@ -24,6 +24,7 @@ inline Object *property_object(EngineHandles &p_handles, Slot p_holder) {
 
 class EngineNamed {
 	Interpreter &vm_;
+	const Object *checked_;
 
 	// The handle the value reaches Godot by: its own, or the Godot object a script object is attached to.
 	void *handle_of(Slot p_holder) const;
@@ -32,8 +33,8 @@ class EngineNamed {
 	bool unknown(const PropertyKey &p_key);
 
 public:
-	explicit EngineNamed(Interpreter &p_vm) :
-			vm_(p_vm) {}
+	explicit EngineNamed(Interpreter &p_vm, const Object *p_checked = nullptr) :
+			vm_(p_vm), checked_(p_checked) {}
 
 	// `new c(a)` where c is one of Godot's classes (its engine name): what `new` of the class named asks of
 	// the engine, a new object of the class or a new value of the value type, with the arguments as they

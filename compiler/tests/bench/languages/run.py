@@ -336,7 +336,7 @@ def main():
                 for which, program in builds:
                     run = step("C# by-name access", [program, "--headless", "--", "untyped-cs", "cs"], where)
                     rows = re.findall(r"^NAMED (\w+) (\d+)$", run.stdout, re.M)
-                    if [case for case, _ in rows] != ["script", "node"]:
+                    if [case for case, _ in rows] != ["script", "inherited", "node"]:
                         sys.exit(run.stdout + run.stderr)
                     for case, micros in rows:
                         samples.setdefault((which, case), []).append(int(micros) / 1000)

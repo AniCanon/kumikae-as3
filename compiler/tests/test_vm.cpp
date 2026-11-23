@@ -1250,7 +1250,7 @@ static void test_engine_members_by_name() {
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
 				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name);
 			}
-			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *) override {
+			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *, const vm::Object *) override {
 				log += "prepared call\n";
 				return false;
 			}
@@ -1504,7 +1504,7 @@ struct PreparingEngine : FakeEngine {
 		return worked.back().get();
 	}
 	[[nodiscard]] std::optional<bool> run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
-			std::string *) override {
+			std::string *, const vm::Object *) override {
 		if (refuse_to_run) {
 			return std::nullopt;
 		}

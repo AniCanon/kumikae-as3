@@ -126,7 +126,7 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	}
 	if (!klass.native_base.empty()) {
 		// A script object attached to one of Godot's objects: what Godot's object has, after its own.
-		if (const std::optional<bool> done = EngineNamed(*this).get(p_holder, p_key, r_value)) {
+		if (const std::optional<bool> done = EngineNamed(*this, p_object).get(p_holder, p_key, r_value)) {
 			return *done;
 		}
 	}

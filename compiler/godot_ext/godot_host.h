@@ -108,7 +108,7 @@ private:
 	std::optional<bool> run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
 	std::optional<bool> run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
-	std::optional<bool> run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+	std::optional<bool> run_bound(const Worked &p_worked, const vm::Object *p_checked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
 	std::optional<bool> run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
 	std::optional<bool> run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
@@ -127,7 +127,7 @@ public:
 	// The engine instructions, worked out once and run (godot_prepared.cpp).
 	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in) override;
 	[[nodiscard]] std::optional<bool> run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-			std::string *r_error) override;
+			std::string *r_error, const vm::Object *p_checked) override;
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;

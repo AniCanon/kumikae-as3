@@ -252,7 +252,7 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 		return cannot("1074", "Illegal write to read-only property ");
 	}
 	if (!klass.native_base.empty()) {
-		if (const std::optional<bool> done = EngineNamed(*this).set(p_holder, p_key, p_value)) {
+		if (const std::optional<bool> done = EngineNamed(*this, p_object).set(p_holder, p_key, p_value)) {
 			return *done; // A property of the Godot object the script object is attached to.
 		}
 	}

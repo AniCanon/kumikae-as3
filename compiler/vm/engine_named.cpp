@@ -11,9 +11,9 @@ Argument receiver(Slot p_holder, void *p_handle) {
 	return argument;
 }
 
-std::optional<bool> prepared(EngineHandles &p_host, const Prepared *p_prepared, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
+std::optional<bool> prepared(EngineHandles &p_host, const Object *p_checked, const Prepared *p_prepared, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
 		Slot *r_value, std::string *r_error) {
-	return p_prepared ? p_host.run(*p_prepared, p_arguments, p_count, p_wanted, r_value, r_error) : std::nullopt;
+	return p_prepared ? p_host.run(*p_prepared, p_arguments, p_count, p_wanted, r_value, r_error, p_checked) : std::nullopt;
 }
 
 } // namespace
@@ -104,7 +104,7 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	wanted.kind = Kind::Any;
 	std::string error;
 	const Argument operand = receiver(p_holder, handle);
-	const auto done = prepared(vm_.host_.handles, found.invoke, &operand, 1, wanted, r_value, &error);
+	const auto done = prepared(vm_.host_.handles, checked_, found.invoke, &operand, 1, wanted, r_value, &error);
 	if (!(done ? *done : vm_.host_.handles.get(handle, found.godot, wanted, r_value, &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
@@ -141,7 +141,7 @@ std::optional<bool> EngineNamed::set(Slot p_holder, const PropertyKey &p_key, Sl
 	std::string error;
 	void *handle = handle_of(p_holder);
 	const Argument operands[] = { receiver(p_holder, handle), { Kind::Any, p_value } };
-	const auto done = prepared(vm_.host_.handles, found.setter, operands, 2, Wanted{}, nullptr, &error);
+	const auto done = prepared(vm_.host_.handles, checked_, found.setter, operands, 2, Wanted{}, nullptr, &error);
 	if (!(done ? *done : vm_.host_.handles.set(handle, found.godot, operands[1], &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
@@ -191,7 +191,7 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 	const size_t frame = vm_.frames_.size() - 1;
 	bool ok = ready == count;
 	if (ok) {
-		const auto done = prepared(vm_.host_.handles, found.invoke, arguments, count, wanted, &result, &error);
+		const auto done = prepared(vm_.host_.handles, checked_, found.invoke, arguments, count, wanted, &result, &error);
 		ok = done ? *done : vm_.host_.handles.call(handle, found.godot, arguments + 1, count - 1, wanted, &result, &error);
 	}
 	for (size_t i = 1; i < ready; i++) {

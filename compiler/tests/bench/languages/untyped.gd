@@ -11,21 +11,21 @@ static func measure(tree: SceneTree) -> void:
 	tree.root.add_child(node)
 	var cs := Node2D.new()
 	var args := OS.get_cmdline_user_args()
-	var cases := ["script", "node", "value", "refused"]
+	var cases := ["script", "inherited", "node", "value", "refused"]
 	if "script-only" in args:
 		cases = ["script"]
 	if "cs" in args:
 		cs.set_script(load("res://CmpCs.cs"))
 		tree.root.add_child(cs)
-		cases = ["script", "node"]
+		cases = ["script", "inherited", "node"]
 	for which in cases:
 		for rounds in [1000, 20000]:
 			var begin := Time.get_ticks_usec()
 			var result
 			if "cs" in args:
-				result = cs.call("NamedLoop", script if which == "script" else node, which == "script", rounds)
-			elif which == "node":
-				result = script.call("nodeLoop", node, rounds)
+				result = cs.call("NamedLoop", node if which == "node" else script, which == "script", rounds)
+			elif which == "node" or which == "inherited":
+				result = script.call("nodeLoop", node if which == "node" else script, rounds)
 			else:
 				result = script.call(which + "Loop", rounds)
 			var elapsed := Time.get_ticks_usec() - begin

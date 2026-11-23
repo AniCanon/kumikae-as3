@@ -281,7 +281,7 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 			return;
 		}
 	}
-	if (!own && (any::is_engine(p_holder) || (klass && !klass->native_base.empty())) && EngineNamed(*this).call(p_holder, p_key, p_given, p_out)) {
+	if (!own && (any::is_engine(p_holder) || (klass && !klass->native_base.empty())) && EngineNamed(*this, object).call(p_holder, p_key, p_given, p_out)) {
 		return;
 	}
 	Object *function = held_object(value);
