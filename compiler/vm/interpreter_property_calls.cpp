@@ -147,7 +147,7 @@ bool Interpreter::set_enumerable(Slot p_holder, const std::vector<Slot> &p_given
 		return true; // A Date, a RegExp, a Vector: dynamic in AS3, with no property here to hide.
 	}
 	if (!klass || !(klass->table || klass->array)) {
-		return refuse_write("1056", "Cannot create property ", asked.text, p_holder);
+		return refuse_write("1056", "Cannot create property ", asked.name(), p_holder);
 	}
 	Entries *entries = loop_entries(p_holder);
 	if (const std::optional<uint32_t> at = entry_of(entries, asked)) {
@@ -251,7 +251,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 // holder.name(arguments): the property's value called, as a function. A sealed object's method is called
 // on it; a name it lacks is #1069; a property that is not a function, AS3's TypeError #1006.
 void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
-	Object *object = property_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.name(), p_given, p_out))) {
 		return; // A class's static method, or RegExp's or Date's, done or raised.

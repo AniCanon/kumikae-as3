@@ -17,6 +17,11 @@
 namespace kas3 {
 namespace vm {
 
+// Both forms of an attached script use the same lookup for public members.
+inline Object *property_object(EngineHandles &p_handles, Slot p_holder) {
+	return any::tag(p_holder) == AnyTag::Godot ? p_handles.script_of(any::pointer(p_holder), ir::NONE, false) : held_object(p_holder);
+}
+
 class EngineNamed {
 	Interpreter &vm_;
 

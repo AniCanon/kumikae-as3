@@ -45,10 +45,6 @@ void *EngineNamed::handle_of(Slot p_holder) const {
 	return any::is_engine(p_holder) ? any::pointer(p_holder) : engine_object_in(vm_.module_, p_holder);
 }
 
-Object *Interpreter::property_object(Slot p_holder) const {
-	return any::tag(p_holder) == AnyTag::Godot ? host_.handles.script_of(any::pointer(p_holder), NONE, false) : held_object(p_holder);
-}
-
 const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
 	void *handle = p_key.object ? nullptr : handle_of(p_holder);
 	return handle ? vm_.host_.handles.named(handle, p_key.name()) : MISSING_MEMBER;

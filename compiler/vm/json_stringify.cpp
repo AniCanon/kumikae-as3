@@ -251,7 +251,7 @@ bool Json::member_value(Object *p_object, const std::string &p_name, Slot *r_val
 	*r_value = any::undefined();
 	const ir::Class &klass = vm_.module_.classes[p_object->klass];
 	Interpreter::PropertyKey key;
-	key.text = p_name;
+	key.owned_text = p_name;
 	if (klass.table) {
 		if (const std::optional<uint32_t> at = vm_.entry_of(entries_of(p_object), key)) {
 			*r_value = vm_.share(Kind::Any, entries_of(p_object)->value_at(*at));

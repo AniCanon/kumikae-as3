@@ -35,7 +35,7 @@ bool listed(const std::array<std::string_view, Count> &p_names, std::string_view
 // does not have is AS3's ReferenceError #1069; one the interpreter can't reach yet says so.
 bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
 	*r_value = any::undefined();
-	Object *object = property_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	if (klass && klass->table) {
 		if (const std::optional<uint32_t> at = entry_of(entries_of(object), p_key)) {
@@ -195,7 +195,7 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 
 // key in holder (p_prototype: what its prototype has counts), or holder.hasOwnProperty(key).
 bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has) {
-	Object *object = property_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const AnyTag tag = any::tag(p_holder);
 	if (!klass && (tag == AnyTag::Null || tag == AnyTag::Undefined)) {

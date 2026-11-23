@@ -111,7 +111,7 @@ void Interpreter::arguments_array(const Instruction &p_in) {
 	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
 	Entries *properties = callee ? properties_of(made) : nullptr;
 	PropertyKey key;
-	key.text = "callee";
+	key.owned_text = "callee";
 	if (!properties || !set_entry(properties, key, any::object(callee))) {
 		release_object(callee);
 		release_object(made);

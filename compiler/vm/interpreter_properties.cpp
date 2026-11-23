@@ -80,7 +80,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 	const Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const AnyTag tag = any::tag(p_key);
-	r_key->text.clear();
+	r_key->owned_text.clear();
 	r_key->borrowed = {};
 	r_key->index.reset();
 	r_key->object = nullptr;
@@ -91,7 +91,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 			r_key->index = index_text(static_cast<const Str *>(any::pointer(p_key))->view());
 		}
 		if (r_key->index) {
-			r_key->text = std::to_string(*r_key->index);
+			r_key->owned_text = std::to_string(*r_key->index);
 			return true;
 		}
 	}
@@ -107,7 +107,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 		r_key->borrowed = static_cast<const Str *>(any::pointer(p_key))->view();
 		return true;
 	}
-	return any_text(p_key, &r_key->text);
+	return any_text(p_key, &r_key->owned_text);
 }
 
 std::optional<uint32_t> Interpreter::entry_of(const Entries *p_entries, const PropertyKey &p_key) const {
@@ -161,14 +161,14 @@ bool Interpreter::set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p
 // undefined. Out of the loop's way: the elements' own path stays short.
 void Interpreter::array_number_get(Vector *p_array, double p_number, Slot &r_out) {
 	PropertyKey key;
-	key.text = number_to_string(p_number);
+	key.owned_text = number_to_string(p_number);
 	const std::optional<uint32_t> found = entry_of(p_array->properties, key);
 	put(Kind::Any, r_out, found ? share(Kind::Any, p_array->properties->value_at(*found)) : any::undefined());
 }
 
 void Interpreter::array_number_set(Vector *p_array, double p_number, Slot p_value) {
 	PropertyKey key;
-	key.text = number_to_string(p_number);
+	key.owned_text = number_to_string(p_number);
 	set_entry(properties_of(p_array), key, p_value);
 }
 
@@ -194,7 +194,7 @@ bool Interpreter::refuse_write(const char *p_number, const char *p_words, std::s
 // holder[key] = value. A sealed object takes a value into a public field, coerced as a store into it is; a
 // name it lacks is AS3's ReferenceError #1056, and one of its methods #1037.
 bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value) {
-	Object *object = property_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), p_holder); };
 	if (klass && klass->table) {

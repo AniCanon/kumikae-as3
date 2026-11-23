@@ -114,7 +114,7 @@ Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_t
 	}
 	const auto property = [&](const std::string &p_name, Slot p_value) {
 		PropertyKey key;
-		key.text = p_name;
+		key.owned_text = p_name;
 		const bool set = set_entry(properties_of(array), key, p_value);
 		drop_any(p_value);
 		return set;
