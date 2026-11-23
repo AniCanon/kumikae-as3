@@ -15,12 +15,18 @@ struct NamedShape {
 	void *owner = nullptr; // The validated engine object, borrowed for this access.
 };
 
+struct NamedCall {
+	Object *receiver = nullptr;
+	uint32_t function = UINT32_MAX;
+};
+
 struct NamedSite {
 	struct Entry {
 		uintptr_t type = 0;
 		uint64_t script = 0;
 		uint32_t klass = UINT32_MAX;
 		uint32_t field = UINT32_MAX;
+		uint32_t method = UINT32_MAX;
 		const NamedMember *engine = nullptr;
 	};
 	std::array<Entry, 4> entries{};

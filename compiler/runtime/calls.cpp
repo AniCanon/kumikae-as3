@@ -209,7 +209,13 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 	if (!p_function || p_function->klass != program.known.function) {
 		return false;
 	}
-	const FunctionInfo &callee = program.functions[static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX))];
+	const uint32_t target = static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX));
+	Object *receiver = program.functions[target].is_static ? nullptr : field<Object *>(p_function, ir::FUNCTION_FIRST);
+	return call_resolved(c, target, receiver, p_arguments, p_count, r_result);
+}
+
+bool call_resolved(Context *c, uint32_t p_target, Object *p_receiver, const Slot *p_arguments, uint32_t p_count, Slot *r_result) {
+	const FunctionInfo &callee = c->program->functions[p_target];
 	const uint32_t first = callee.is_static ? 0 : 1;
 	if (callee.rest || callee.parameters > MOST_PARAMETERS || p_count + first > callee.parameters || p_count + first < callee.required) {
 		return false;
@@ -219,7 +225,7 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 		values[i] = empty();
 	}
 	if (first) {
-		values[0].p = field<Object *>(p_function, ir::FUNCTION_FIRST);
+		values[0].p = p_receiver;
 	}
 	for (uint32_t i = 0; i < p_count; i++) {
 		const uint32_t at = first + i;

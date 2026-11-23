@@ -21,10 +21,16 @@ Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
 }
 
-bool named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, Slot *r_result) {
+bool named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, bool p_ref, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, Slot *r_result) {
 	Host &host = *c->host;
 	const uint32_t carries = host.interpreter->carries();
-	const bool done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result);
+	vm::NamedCall call;
+	bool done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_ref ? vm::any::godot_object(p_holder.p) : p_holder, p_key->view(), p_args, p_count, r_result, &call);
+	if (call.receiver) {
+		retain(c, call.receiver);
+		done = call_resolved(c, call.function, call.receiver, p_args, p_count, r_result);
+		release(c, call.receiver);
+	}
 	settle_direct(c, carries);
 	if (c->listener_failed) {
 		call_failed(c);

@@ -13,7 +13,8 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	const uint32_t holder = write ? p_in.a : p_in.b;
 	const auto *list = p_in.op == Op::DynCall ? &function_.argument_lists[p_in.c] : nullptr;
 	const uint32_t key = list ? (*list)[0] : write ? p_in.b : p_in.c;
-	if (kind(holder) != Kind::Any || kind(key) != Kind::Str || text_[key] == ir::NONE || !text_exact_[key] || (list && list->size() > 5)) {
+	const bool reference = kind(holder) == Kind::Ref;
+	if ((!reference && kind(holder) != Kind::Any) || kind(key) != Kind::Str || text_[key] == ir::NONE || !text_exact_[key] || (list && list->size() > 5)) {
 		return false;
 	}
 	std::string given = write ? reg(p_in.c) : "";
@@ -28,8 +29,10 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	}
 	mark();
 	line("Slot w = empty();");
-	line("if (kas3::vm::any::is_engine(" + reg(holder) + ") && named_access(c, &site, " + std::to_string(static_cast<unsigned>(p_in.op)) +
-			", " + reg(holder) + ", " + reg(key) + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", &w)) {");
+	const std::string guard = reference ? "" : "kas3::vm::any::is_engine(" + reg(holder) + ") && ";
+	const std::string receiver = reference ? "true, slot(" + reg(holder) + ")" : "false, " + reg(holder);
+	line("if (" + guard + "named_access(c, &site, " + std::to_string(static_cast<unsigned>(p_in.op)) +
+			", " + receiver + ", " + reg(key) + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", &w)) {");
 	check();
 	if (!write && p_in.a != ir::NONE) {
 		put(p_in.a, "w");

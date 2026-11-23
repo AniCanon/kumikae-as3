@@ -34,17 +34,32 @@ vm::NamedShape GodotHost::named_shape(void *p_receiver) {
 		return type >= Variant::VECTOR2 && type <= Variant::COLOR ? vm::NamedShape{ static_cast<uintptr_t>(type) + 1 } : vm::NamedShape{};
 	}
 	void *raw = live_handle_object(p_receiver);
-	Object *owner = raw ? internal::get_object_instance_binding(raw) : nullptr;
-	if (!owner) {
+	if (!raw) {
 		return {};
 	}
-	StringName klass;
-	if (!gdextension_interface::object_get_class_name(owner->_owner, gdextension_interface::library, klass._native_ptr())) {
+	auto &type_id = rt::head_of(p_receiver)->godot_class;
+	if (!type_id) {
+		StringName klass;
+		if (!gdextension_interface::object_get_class_name(raw, gdextension_interface::library, klass._native_ptr())) {
+			return {};
+		}
+		type_id = class_identity(klass);
+	}
+	const uint64_t owner_id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
+	if (vm::Object *instance = script_object_by_id(owner_id)) {
+		return { static_cast<uintptr_t>(type_id), uint64_t(instance->klass) + 1, instance, raw };
+	}
+	static const auto get_script = [] {
+		const auto entry = godot_entry("GodotObject.getScript");
+		return entry ? method_bind("Object", "get_script", godot_words(godot_entry_at(*entry).value)[2]) : nullptr;
+	}();
+	if (!get_script) {
 		return {};
 	}
-	const Variant script = owner->get_script();
+	Variant script;
+	gdextension_interface::object_method_bind_ptrcall(get_script, raw, nullptr, script._native_ptr());
 	const uint64_t id = script.get_type() == Variant::OBJECT ? gdextension_interface::variant_get_object_instance_id(script._native_ptr()) : 0;
-	return { class_identity(klass), id, id ? script_object(owner) : nullptr, owner->_owner };
+	return { static_cast<uintptr_t>(type_id), id, nullptr, raw };
 #endif
 }
 

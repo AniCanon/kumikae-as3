@@ -59,7 +59,11 @@ static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_mod
 		}
 		for (const auto &[name, slot] : klass.named_methods) {
 			const std::string_view full = name;
-			if (full == p_name || (full.size() == p_name.size() + 4 && full.substr(4) == p_name &&
+			if (full == p_name) {
+				entry.method = klass.methods[slot];
+				return entry;
+			}
+			if ((full.size() == p_name.size() + 4 && full.substr(4) == p_name &&
 					(full.substr(0, 4) == "get " || full.substr(0, 4) == "set "))) {
 				return entry; // A method or accessor needs the full AS3 call convention.
 			}
@@ -88,7 +92,7 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 }
 
 std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, std::string *r_error) {
+		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error) {
 	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
@@ -117,6 +121,10 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 	if (entry->field != NONE) {
 		return scalar_field(p_module.classes[shape.instance->klass], shape.instance, entry->field, p_op, p_arguments, r_result) ?
 				std::optional<bool>(true) : std::nullopt;
+	}
+	if (entry->method != NONE && p_op == Op::DynCall) {
+		*r_call = { shape.instance, entry->method };
+		return std::nullopt;
 	}
 	const NamedMember *member = entry->engine;
 	const bool call = p_op == Op::DynCall, write = p_op == Op::DynSet;

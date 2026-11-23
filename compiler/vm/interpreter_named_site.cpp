@@ -2,9 +2,9 @@
 
 namespace kas3::vm {
 
-bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value) {
+bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, NamedCall *r_call) {
 	std::string error;
-	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, &error);
+	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error);
 	if (done && !*done && !failing_) {
 		raise_engine(library_, error);
 	}
@@ -17,7 +17,8 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	const Frame &frame = frames_.back();
 	const size_t base = frame.base;
 	const Slot *registers = stack_.data() + base;
-	if (p_function.registers[holder] != ir::Kind::Any || !any::is_engine(registers[holder])) {
+	const bool reference = p_function.registers[holder] == ir::Kind::Ref;
+	if (!reference && (p_function.registers[holder] != ir::Kind::Any || !any::is_engine(registers[holder]))) {
 		return false;
 	}
 	const auto *list = p_in.op == ir::Op::DynCall ? &p_function.argument_lists[p_in.c] : nullptr;
@@ -40,8 +41,20 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 		}
 	}
 	Slot result = any::undefined();
-	if (!access_named(*site, p_in.op, registers[holder], text->view(), args, count, &result)) {
-		return false;
+	NamedCall call;
+	if (!access_named(*site, p_in.op, reference ? any::godot_object(registers[holder].p) : registers[holder], text->view(), args, count, &result, &call)) {
+		if (!call.receiver || count || module_.functions[call.function].parameters != 1 || module_.functions[call.function].rest) {
+			return false;
+		}
+		Slot first{};
+		first.p = call.receiver;
+		retain(call.receiver);
+		if (p_in.a != ir::NONE) {
+			put(ir::Kind::Any, stack_[base + p_in.a], any::undefined());
+		}
+		push(call.function, &first, 1, p_in.a);
+		release_object(call.receiver);
+		return true;
 	}
 	if (!write && p_in.a != ir::NONE && !failing_) {
 		put(ir::Kind::Any, stack_[base + p_in.a], result);

@@ -34,19 +34,18 @@ static std::unordered_set<ScriptInstance *> &instances() {
 	return all;
 }
 // The same, by the Godot object each is attached to.
-static std::unordered_map<const Object *, ScriptInstance *> &instances_on() {
-	static std::unordered_map<const Object *, ScriptInstance *> all;
+static std::unordered_map<uint64_t, ScriptInstance *> &instances_on() {
+	static std::unordered_map<uint64_t, ScriptInstance *> all;
 	return all;
 }
 
 vm::Object *kas3::script_object(const Object *p_owner) {
-	auto found = instances_on().find(p_owner);
-	// An instance freed on another thread stays here until the main thread frees it, and another object may
-	// have been made where its object was.
-	if (found == instances_on().end() || found->second->owner_id != ObjectID(p_owner->get_instance_id())) {
-		return nullptr;
-	}
-	return found->second->object;
+	return script_object_by_id(p_owner->get_instance_id());
+}
+
+vm::Object *kas3::script_object_by_id(uint64_t p_id) {
+	auto found = instances_on().find(p_id);
+	return found == instances_on().end() ? nullptr : found->second->object;
 }
 
 std::vector<std::pair<vm::Object *, Object *>> kas3::instances_outside(const Node *p_scene) {
@@ -371,7 +370,7 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 
 static void free_instance(ScriptInstance *instance) {
 	instances().erase(instance);
-	auto on = instances_on().find(instance->owner);
+	auto on = instances_on().find(instance->owner_id);
 	if (on != instances_on().end() && on->second == instance) {
 		instances_on().erase(on);
 	}
@@ -481,7 +480,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	instance->counted = counted;
 	instances().insert(instance);
-	instances_on()[p_owner] = instance;
+	instances_on()[instance->owner_id] = instance;
 	if (counted) {
 		if (made_here && vm::release(object)) {
 			// Its constructor left no other reference: the instance keeps it (counted.cpp).

@@ -131,6 +131,7 @@ void restart_scene(const Restart &p_restart);
 // The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
 // reference to it, unless its Godot object is reference-counted (counted.cpp).
 vm::Object *script_object(const godot::Object *p_owner);
+vm::Object *script_object_by_id(uint64_t p_id);
 // What arrives where an object of the program's class p_class is declared and Godot gives p_value: the
 // script object of the Godot object p_value holds, if that object carries a script whose class is p_class
 // or extends it. Null for anything else: not an object, one freed, one with no script of the program's or

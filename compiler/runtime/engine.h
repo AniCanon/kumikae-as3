@@ -37,7 +37,7 @@ struct HandleHead {
 	// none of them has been freed, so this one is still there. 0: not found yet.
 	uint64_t seen;
 	void *object;
-	uint64_t unused_too; // The handle after it is sixteen bytes on, as an untyped value's tag needs.
+	uint64_t godot_class; // Interned identity of the object's engine class, independent of its attached script.
 };
 inline constexpr uint8_t HANDLE_UNKNOWN = 0;
 inline constexpr uint8_t HANDLE_SHARED = 1;

@@ -18,7 +18,7 @@ public:
 	explicit NamedSites(const ir::Module &p_module);
 	NamedSite *at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings);
 	std::optional<bool> access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, ir::Op p_op, Slot p_holder,
-			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::string *r_error);
+			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error);
 };
 
 } // namespace kas3::vm

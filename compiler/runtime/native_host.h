@@ -212,6 +212,7 @@ struct Host final : vm::NativeCode {
 // After a call the host made of the library or of the engine with none of the interpreter's code running
 // (Interpreter::direct_began()): an error the interpreter was left with, its own or one carried back from
 // a script the engine ran meanwhile (carries() moved on from p_carries), is the context's from here.
+bool call_resolved(Context *c, uint32_t p_target, Object *p_receiver, const Slot *p_arguments, uint32_t p_count, Slot *r_result);
 void settle_direct(Context *c, uint32_t p_carries);
 // An instruction that asks the engine, carried out for generated code on the values it hands over, with no
 // frame of the interpreter's (runtime/engine_thunk.cpp): what thunk() does for those.
