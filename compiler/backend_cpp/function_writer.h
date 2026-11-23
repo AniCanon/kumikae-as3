@@ -15,6 +15,7 @@
 #include "thunks.h"
 
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -206,6 +207,7 @@ class FunctionWriter {
 		uint32_t moved = 0; // The instruction that writes the counter.
 	};
 	std::vector<Counted> counted_;
+	std::set<uint32_t> loop_binds_; // Immutable method binds read by a counted loop in this function.
 	// How such a loop is written in the copy being written.
 	struct Counts {
 		const Counted *loop = nullptr;

@@ -404,7 +404,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const uint32_t use = thunks_.use_index(thunks_.use(function_, p_in).thunk);
 	const std::string resolved = "c->resolved[" + std::to_string(use) + "]";
 	line("{");
-	line("void *const bind = " + resolved + ".bind;");
+	const bool repeated = std::any_of(counted_.begin(), counted_.end(), [&](const Counted &p_loop) { return p_loop.from <= pc_ && pc_ <= p_loop.to; });
+	line("void *const bind = " + (repeated ? "bind" + std::to_string(use) : resolved + ".bind") + ";");
 	line("void *const on = " + object_behind(receiver) + ";");
 	std::string guard = "bind && on";
 	std::string inside;
@@ -417,6 +418,9 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 			return false;
 		}
 		addresses += (i ? ", " : "") + *address;
+	}
+	if (repeated) {
+		loop_binds_.insert(use);
 	}
 	line("if (KAS3_LIKELY(" + guard + (kept ? " && " + resolved + ".handle" : "") + ")) {");
 	body_ += inside;

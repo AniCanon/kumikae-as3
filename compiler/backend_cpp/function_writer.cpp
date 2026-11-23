@@ -357,6 +357,10 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 std::string FunctionWriter::prologue() const {
 	std::string out;
 	const auto add = [&](const std::string &p_text) { out += "\t" + p_text + "\n"; };
+	for (const uint32_t use : loop_binds_) {
+		const std::string index = std::to_string(use);
+		add("void *const bind" + index + " = c->resolved ? c->resolved[" + index + "].bind : nullptr;");
+	}
 	std::string unused = "(void)c;";
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
 		if (i >= function_.parameters) {

@@ -185,6 +185,10 @@ of the expected math type. A bare setter with one exact math argument passes tha
 to the validated method bind. A foreign setter still calls Godot's named setter. The gate measures
 GDScript reads and mixed writes separately so both paths stay visible.
 
+The host resolves method binds when it loads the program. Native code reads a counted loop's
+bind once on function entry. Each iteration still checks the receiver's lifetime, calls the
+getter, and checks for a listener error. An unresolved bind still takes the ordinary thunk.
+
 The fresh Timer loop reads `waitTime` through the same host getter as an explicitly typed Timer.
 In a one-second interpreted sample, 155 samples end in the VM loop, 112 in its engine request and
 113 in bound dispatch. In native mode, 233 end in the generated function. For a GDScript-only
