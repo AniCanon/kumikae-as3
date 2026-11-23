@@ -21,7 +21,7 @@ package {
 		public function selfCall(n:int):int { return scriptCall(this, n); }
 
 		public function scriptRead(target:*, n:int):int {
-			var sum:int = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += int(target.score);
 			return sum;
 		}
@@ -29,22 +29,22 @@ package {
 			for (var i:int = 0; i < n; i++) target.score = i;
 		}
 		public function scriptCall(target:*, n:int):int {
-			var sum:int = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += int(target.current());
 			return sum;
 		}
 		public function valueRead(target:*, n:int):Number {
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += Number(target.x);
 			return sum;
 		}
 		public function valueCall(target:*, n:int):Number {
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += Number(target.length());
 			return sum;
 		}
 		public function nodeRead(target:*, n:int):Number {
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
@@ -64,7 +64,7 @@ package {
 		}
 		public function aliasRead(source:Node2D, n:int):Number {
 			var target = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
@@ -86,7 +86,7 @@ package {
 		}
 		public function aliasTypedRead(source:Node2D, n:int):Number {
 			var target:Node2D = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
@@ -109,7 +109,7 @@ package {
 		public function provenRead(source:Node2D, n:int):Number {
 			var target:* = new Node2D();
 			target.position = new Vector2(3, 4);
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
@@ -135,7 +135,7 @@ package {
 		public function typedRead(source:Node2D, n:int):Number {
 			var target:Node2D = new Node2D();
 			target.position = new Vector2(3, 4);
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
@@ -164,21 +164,21 @@ package {
 
 		public function timerRead(source:Node2D, n:int):Number {
 			var timer:* = new Timer();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
 			timer.free();
 			return sum;
 		}
 		public function timerTypedRead(source:Node2D, n:int):Number {
 			var timer:Timer = new Timer();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
 			timer.free();
 			return sum;
 		}
 		public function numberRead(source:Node2D, n:int):Number {
 			var alias:* = this.numberField;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias;
 			}
@@ -187,7 +187,7 @@ package {
 
 		public function numberTypedRead(source:Node2D, n:int):Number {
 			var alias:Number = this.numberField;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias;
 			}
@@ -196,7 +196,7 @@ package {
 
 		public function booleanRead(source:Node2D, n:int):Number {
 			var alias:* = flag();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				if (alias) sum += 3;
 			}
@@ -205,7 +205,7 @@ package {
 
 		public function booleanTypedRead(source:Node2D, n:int):Number {
 			var alias:Boolean = flag();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				if (alias) sum += 3;
 			}
@@ -214,7 +214,7 @@ package {
 
 		public function stringRead(source:Node2D, n:int):Number {
 			var alias:* = "abc";
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += lengthOf(alias);
 			}
@@ -223,7 +223,7 @@ package {
 
 		public function stringTypedRead(source:Node2D, n:int):Number {
 			var alias:String = "abc";
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += lengthOf(alias);
 			}
@@ -232,7 +232,7 @@ package {
 
 		public function as3ClassRead(source:Node2D, n:int):Number {
 			var alias:* = new MatrixScore();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.value;
 			}
@@ -241,7 +241,7 @@ package {
 
 		public function as3ClassTypedRead(source:Node2D, n:int):Number {
 			var alias:MatrixScore = new MatrixScore();
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.value;
 			}
@@ -250,7 +250,7 @@ package {
 
 		public function vectorRead(source:Vector2, n:int):Number {
 			var alias:* = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.x;
 			}
@@ -259,7 +259,7 @@ package {
 
 		public function vectorTypedRead(source:Vector2, n:int):Number {
 			var alias:Vector2 = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.x;
 			}
@@ -268,7 +268,7 @@ package {
 
 		public function colorRead(source:Color, n:int):Number {
 			var alias:* = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.g;
 			}
@@ -277,7 +277,7 @@ package {
 
 		public function colorTypedRead(source:Color, n:int):Number {
 			var alias:Color = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				sum += alias.g;
 			}
@@ -286,7 +286,7 @@ package {
 
 		public function mixedRead(source:Node2D, n:int):Number {
 			var target = source;
-			var sum:Number = 0;
+			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
 				target = targets[i & 7];
 				var point:Vector2 = target.position;

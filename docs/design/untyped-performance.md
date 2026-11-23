@@ -63,7 +63,7 @@ The front end checks your source with its declared types, then follows each loca
 It considers an initializer or a standalone first assignment in a statement block. Reads must
 follow that write in the same straight-line region, which can include nested blocks. A write
 inside an `if`, loop or `try` block proves only the part of that block after the write.
-Every later assignment must have the same checked type. Closure capture and indirect writes
+Every later simple assignment must have the same checked type. Closure capture and indirect writes
 such as `for each` keep the local dynamic.
 
 The proof recognizes literals, construction, typed parameters and locals, fields, getters and
@@ -71,7 +71,10 @@ typed call results. A local can flow to a matching declaration, assignment, retu
 call parameter. A Boolean or ordinary number can control a branch. Numbers, signed and unsigned
 32-bit integers support numeric arithmetic and comparisons with another known ordinary number.
 A Boolean can feed a Boolean conjunction or disjunction. An int can also go directly to the
-built-in `trace`. The checker keeps the result types it proves for enclosing arithmetic.
+built-in `trace`. The checker tests candidate operands together and removes unsupported
+types until every remaining use agrees. Both operands can come from untyped locals or their
+fields. A numeric compound assignment uses Number storage so an integer initializer can grow
+past the 32-bit limit.
 
 A public field, getter or method can bind when its result feeds one of these uses. A discarded
 method call can also bind. Writes and method arguments require an exact value. A script class

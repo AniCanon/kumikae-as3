@@ -113,7 +113,7 @@ bool validate_use(Node *p_node, Candidates &r_candidates) {
 		case NodeKind::Assign: {
 			const auto *assign = static_cast<Assign *>(p_node);
 			auto it = r_candidates.find(local_name(assign->target));
-			if (it != r_candidates.end() && (assign->op != TokenKind::Assign || stored_type(assign->value) != it->second.value->type)) {
+			if (it != r_candidates.end() && assign->op == TokenKind::Assign && stored_type(assign->value) != it->second.value->type) {
 				r_candidates.erase(it);
 			}
 		} break;

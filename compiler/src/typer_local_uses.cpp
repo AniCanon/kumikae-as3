@@ -72,13 +72,24 @@ bool exact_argument(Expr *p_expr, const Type *p_type, const Parents &p_parents, 
 }
 
 // Types tentatively proved for enclosing expressions are published only if every use succeeds.
+using Facts = std::unordered_map<Expr *, const Type *>;
+
 struct Consumers {
 	Compilation &compilation;
 	const Parents &parents;
 	const Type *returns;
 	const Type *number;
 	const Type *boolean;
-	std::unordered_map<Expr *, const Type *> results;
+	const Facts &assumptions;
+	Facts results;
+
+	const Type *operand(Expr *p_expr) const {
+		if (p_expr->kind == NodeKind::Binary && static_cast<Binary *>(p_expr)->op == TokenKind::KwAs) {
+			return nullptr; // A failed numeric cast still holds null.
+		}
+		const auto at = assumptions.find(p_expr);
+		return at == assumptions.end() ? p_expr->type : at->second;
+	}
 
 	bool ordinary_number(const Type *p_type) const {
 		return p_type == number || (p_type && p_type->symbol &&
@@ -105,7 +116,7 @@ struct Consumers {
 	}
 
 	const Type *binary_result(Binary *p_binary, Expr *p_expr, const Type *p_type) const {
-		const Type *other = (p_binary->left == p_expr ? p_binary->right : p_binary->left)->type;
+		const Type *other = operand(p_binary->left == p_expr ? p_binary->right : p_binary->left);
 		if (p_type == boolean && other == boolean && (p_binary->op == TokenKind::AmpAmp || p_binary->op == TokenKind::PipePipe)) {
 			return boolean;
 		}
@@ -130,7 +141,7 @@ struct Consumers {
 		}
 		switch (use->kind) {
 			case NodeKind::Return:
-				return returns == p_type;
+				return returns == p_type || (ordinary_number(returns) && ordinary_number(p_type));
 			case NodeKind::Call:
 				return argument(static_cast<Call *>(use), p_expr, p_type);
 			case NodeKind::If: case NodeKind::While: case NodeKind::DoWhile:
@@ -156,7 +167,7 @@ struct Consumers {
 				if (assign->op == TokenKind::Assign) {
 					return assign->target->type == p_type;
 				}
-				return ordinary_number(p_type) && ordinary_number(assign->target->type) &&
+				return ordinary_number(p_type) && ordinary_number(operand(assign->target)) &&
 						(assign->op == TokenKind::PlusAssign || assign->op == TokenKind::MinusAssign ||
 						assign->op == TokenKind::StarAssign || assign->op == TokenKind::SlashAssign || assign->op == TokenKind::PercentAssign);
 			}
@@ -283,7 +294,7 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 		} else if (node->kind == NodeKind::Name) {
 			const auto *name = static_cast<Name *>(node);
 			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
-					(p_consumers.ordinary_number(name->type) || name->type == p_consumers.boolean ||
+					(p_consumers.ordinary_number(p_consumers.operand(static_cast<Name *>(node))) || name->type == p_consumers.boolean ||
 					(name->type && name->type->symbol && name->type->symbol->package == p_godot && name->type->symbol->name == "Vector2"))) {
 				return true;
 			}
@@ -314,7 +325,16 @@ void retain_detached(const Parents &p_parents, Expr *p_initial, uint32_t p_effec
 bool direct_use(Consumers &p_consumers, Name *p_name, const Type *p_type) {
 	Node *use = parent(p_consumers.parents, p_name);
 	if (use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name) {
-		return discarded(p_consumers.parents, static_cast<Assign *>(use));
+		auto *assign = static_cast<Assign *>(use);
+		if (!discarded(p_consumers.parents, assign)) {
+			return false;
+		}
+		if (assign->op == TokenKind::Assign) {
+			return true;
+		}
+		const Type *right = p_consumers.operand(assign->value);
+		return p_type == p_consumers.number && p_consumers.ordinary_number(right) &&
+				p_consumers.receives(assign->value, right);
 	}
 	if (use && use->kind == NodeKind::Call && p_type->symbol == p_consumers.compilation.builtin("int")) {
 		Expr *callee = static_cast<Call *>(use)->callee;
@@ -325,6 +345,48 @@ bool direct_use(Consumers &p_consumers, Name *p_name, const Type *p_type) {
 	return p_consumers.receives(p_name, p_type);
 }
 
+struct LocalProof {
+	bool storage = false;
+	std::vector<Binding> bindings;
+	Facts results;
+};
+
+LocalProof check_uses(Block *p_body, Expr *p_initial, const Type *p_type, bool p_fresh, Package *p_godot,
+		const std::vector<Name *> &p_uses, Consumers &p_consumers, bool p_numeric) {
+	Symbol *klass = p_type->symbol;
+	const bool math = klass && klass->package == p_godot && klass->unit && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color");
+	const bool pure_class = klass && klass->unit && !klass->unit->is_declaration && !(klass->modifiers & Modifiers::Dynamic);
+	const bool can_bind = p_fresh || math || pure_class || p_numeric || p_type == p_consumers.boolean || klass == p_consumers.compilation.builtin("String");
+
+	std::vector<Binding> bindings;
+	bool safe = true, assigned = false;
+	uint32_t escape = p_body->end;
+	for (Name *name : p_uses) {
+		Node *use = parent(p_consumers.parents, name);
+		if (!p_fresh && direct_use(p_consumers, name, p_type)) {
+			assigned |= use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == name;
+			continue;
+		}
+		auto bind = can_bind ? member_use(p_consumers.compilation, p_type, name, p_consumers.parents, p_body, p_consumers, p_fresh || pure_class) : std::nullopt;
+		if (!bind) {
+			safe = false;
+			if (p_fresh) {
+				escape = std::min(escape, name->offset);
+				continue;
+			}
+			break;
+		}
+		bindings.push_back(*bind);
+	}
+	if (p_fresh) {
+		retain_detached(p_consumers.parents, p_initial, first_effect(p_body, p_initial, bindings, p_godot, p_consumers), escape, bindings);
+		safe = bindings.size() == p_uses.size();
+	} else if (!safe || (!bindings.empty() && (assigned || (pure_class && p_initial->kind != NodeKind::New && !(klass->modifiers & Modifiers::Final))))) {
+		return {};
+	}
+	return { safe, std::move(bindings), safe ? std::move(p_consumers.results) : Facts{} };
+}
+
 } // namespace
 
 void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_initial) {
@@ -333,62 +395,90 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 	index_uses(p_body, p_initial, parents, uses);
 	const Type *returns = current_ ? compilation_.type_of(current_->return_type) : nullptr;
 	const auto engine_root = godot_ ? find_in(godot_->definitions, "GodotObject") : nullptr;
-	for (const auto &[local, initial] : p_initial) {
+	struct Local {
+		Symbol *symbol;
+		Expr *initial;
+		const Type *type;
+		bool fresh;
+	};
+	std::vector<Local> locals;
+	Facts assumptions;
+	for (const auto &[symbol, initial] : p_initial) {
 		const Type *type = initial->type;
 		Symbol *klass = type->symbol;
-		const bool engine_object = klass && engine_root && derives_from(klass, engine_root);
-		const bool fresh = engine_object && klass->unit->is_declaration && initial->kind == NodeKind::New && !static_cast<New *>(initial)->arguments.count;
-		if (engine_object && !fresh) {
+		const bool engine = klass && engine_root && derives_from(klass, engine_root);
+		if (engine && (!klass->unit->is_declaration || initial->kind != NodeKind::New || static_cast<New *>(initial)->arguments.count)) {
 			continue;
 		}
-		const bool math = klass && klass->package == godot_ && klass->unit && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color");
-		const bool pure_class = klass && klass->unit && !klass->unit->is_declaration && !(klass->modifiers & Modifiers::Dynamic);
-		const bool can_bind = fresh || math || pure_class || type == string_ || numeric(type) || type == boolean_;
-		Consumers consumers{ compilation_, parents, returns, number_, boolean_, {} };
-		std::vector<Binding> bindings;
-		bool safe = true, assigned = false;
-		uint32_t escape = p_body->end;
-		for (Name *name : uses[local]) {
+		for (Name *name : uses[symbol]) {
 			Node *use = parent(parents, name);
-			if (!fresh && direct_use(consumers, name, type)) {
-				assigned |= use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == name;
-				continue;
-			}
-			auto bind = can_bind ? member_use(compilation_, type, name, parents, p_body, consumers, fresh || pure_class) : std::nullopt;
-			if (!bind) {
-				safe = false;
-				if (fresh) {
-					escape = std::min(escape, name->offset);
-					continue;
+			if (use && use->kind == NodeKind::Assign) {
+				auto *assign = static_cast<Assign *>(use);
+				if (assign->target == name && assign->op != TokenKind::Assign && (type == int_ || type == uint_)) {
+					type = number_; // Compound arithmetic produces a Number, including on overflow.
 				}
-				break;
 			}
-			bindings.push_back(*bind);
 		}
-		if (fresh) {
-			retain_detached(parents, initial, first_effect(p_body, initial, bindings, godot_, consumers), escape, bindings);
-			safe = bindings.size() == uses[local].size();
-			if (bindings.empty() && !safe) {
-				continue;
+		locals.push_back({ symbol, initial, type, engine });
+		for (Name *name : uses[symbol]) {
+			assumptions.emplace(name, type);
+			Node *use = parent(parents, name);
+			if (klass && use && use->kind == NodeKind::Member) {
+				auto *access = static_cast<Member *>(use);
+				auto *member = compilation_.find_member(klass, access->name, false, nullptr, nullptr);
+				if (member && (member->kind == SymbolKind::Field || member->getter)) {
+					assumptions.emplace(access, compilation_.type_of(member->getter ? member->getter->return_type : member->type));
+				}
 			}
-		} else if (!safe || (!bindings.empty() && (assigned || (pure_class && initial->kind != NodeKind::New && !(klass->modifiers & Modifiers::Final))))) {
+		}
+	}
+
+	// Start with every candidate. Withdraw unsupported assumptions together so that two
+	// independently initialized operands can prove each other, irrespective of visit order.
+	for (;;) {
+		Facts supported;
+		std::vector<LocalProof> proofs;
+		for (const Local &local : locals) {
+			Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
+			auto proof = check_uses(p_body, local.initial, local.type, local.fresh, godot_, uses[local.symbol], consumers, numeric(local.type));
+			if (proof.storage) {
+				for (Name *name : uses[local.symbol]) {
+					supported.emplace(name, local.type);
+				}
+			}
+			for (const Binding &binding : proof.bindings) {
+				supported.emplace(binding.access->object, local.type);
+				supported.emplace(binding.access, binding.result);
+			}
+			proofs.push_back(std::move(proof));
+		}
+		const auto before = assumptions.size();
+		for (auto it = assumptions.begin(); it != assumptions.end();) {
+			it = supported.count(it->first) ? std::next(it) : assumptions.erase(it);
+		}
+		if (before != assumptions.size()) {
 			continue;
 		}
-		if (safe) {
-			local->storage = type;
-			for (Name *name : uses[local]) {
-				name->type = type;
+		for (size_t i = 0; i < locals.size(); i++) {
+			const Local &local = locals[i];
+			const auto &proof = proofs[i];
+			if (proof.storage) {
+				local.symbol->storage = local.type;
+				for (Name *name : uses[local.symbol]) {
+					name->type = local.type;
+				}
+				for (const auto &[expr, result] : proof.results) {
+					expr->type = result;
+				}
 			}
-			for (const auto &[expr, result] : consumers.results) {
-				expr->type = result;
+			for (const Binding &binding : proof.bindings) {
+				binding.access->object->type = local.type;
+				binding.access->member = binding.member;
+				binding.access->type = symbol_type(binding.member, nullptr);
+				binding.operation->type = binding.result;
 			}
 		}
-		for (const Binding &binding : bindings) {
-			binding.access->object->type = type;
-			binding.access->member = binding.member;
-			binding.access->type = symbol_type(binding.member, nullptr);
-			binding.operation->type = binding.result;
-		}
+		return;
 	}
 }
 
