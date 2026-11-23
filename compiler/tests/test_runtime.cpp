@@ -34,6 +34,12 @@ static void test_integers() {
 	CHECK_EQ(to_int32(-1e10), -1410065408);
 	CHECK_EQ(to_int32(1e300), 0);
 	CHECK_EQ(to_int32(-1.5), -1);
+	CHECK_EQ(to_int32(std::nextafter(2147483648.0, 0.0)), INT32_MAX);
+	CHECK_EQ(to_int32(std::nextafter(-2147483648.0, -INFINITY)), INT32_MIN);
+	CHECK_EQ(to_int32(2147483648.75), INT32_MIN);
+	CHECK_EQ(to_uint32(std::nextafter(4294967296.0, 0.0)), UINT32_MAX);
+	CHECK_EQ(to_uint32(4294967296.75), 0u);
+	CHECK_EQ(to_uint32(-0.75), 0u);
 	CHECK_EQ(to_uint32(-1.0), 4294967295u);
 	CHECK_EQ(to_uint32(-1.5), 4294967295u);
 	CHECK_EQ(to_uint32(4294967296.0 + 5), 5u);

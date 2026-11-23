@@ -95,7 +95,7 @@ package {
 			return found;
 		}
 		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
-		public function provenVisible(source:Node2D):Boolean {
+		public function aliasVisible(source:Node2D):Boolean {
 			var alias:* = source;
 			alias.visible = false;
 			var seen:Boolean = alias.visible;
@@ -131,6 +131,14 @@ package {
 			return first;
 		}
 
+		private function component(source:Vector2):Number { var point:* = source; return point.x; }
+		private function channel(source:Color):Number { var color:* = source; return color.g; }
+		public function nullParts():Array {
+			var errors:Array = [];
+			try { errors.push(component(null)); } catch (pointError:Error) { errors.push(pointError.errorID); }
+			try { errors.push(channel(null)); } catch (colorError:Error) { errors.push(colorError.errorID); }
+			return errors;
+		}
 		// A freed object is null.
 		public function freed(o:*):String {
 			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }

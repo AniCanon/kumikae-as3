@@ -15,6 +15,11 @@ func _initialize() -> void:
 	WorkerThreadPool.wait_for_task_completion(task)
 	show("toString from a worker is refused: Godot's own text", [seen.size(), str(seen[0]).begins_with("<RefCounted#")], [1, true])
 
+	show("main thread warms a by-name site", on_main.call("namedRead", on_main), 1)
+	task = WorkerThreadPool.add_task(func(): on_main.call("namedRead", on_main))
+	WorkerThreadPool.wait_for_task_completion(task)
+	show("worker cannot enter a warm by-name site", on_main.get("calls"), 1)
+
 	var before: int = on_main.call("madeCount")
 	var attached := []
 	task = WorkerThreadPool.add_task(func():

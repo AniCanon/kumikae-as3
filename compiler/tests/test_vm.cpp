@@ -2,6 +2,7 @@
 #include "check.h"
 
 #include "any.h"
+#include "ast_walk.h"
 #include "builtins.h"
 #include "interpreter.h"
 #include "ir_binary.h"
@@ -9,6 +10,7 @@
 #include "table.h"
 #include "lower.h"
 #include "names.h"
+#include "numeric_dispatch.h"
 
 #include <algorithm>
 #include <map>
@@ -1209,12 +1211,24 @@ static void test_engine_class_values() {
 // them, and AS3's errors for a name that is not there.
 static void test_inferred_local_storage() {
 	Compilation compilation;
-	compilation.add("Storage.as", "package { public class Storage { public function check(input:int):void {"
+	Unit *unit = compilation.add("Storage.as", "package { public class Storage { public function check(input:int):void {"
 			"var exact:* = input; exact = input; var later:*; later = input; var mixed:* = input; mixed = null;"
 			"var item:* = input; for each (var item:* in [input, null]) trace(item);"
 			"trace(early); var early:* = input; var captured:* = input;"
 			"var change:Function = function():void { captured = undefined; }; trace(exact, mixed, early, captured); } } }");
 	compilation.check();
+	size_t captures = 0;
+	walk(unit->tree, [&](Node *node) {
+		if (node->kind == NodeKind::VarDecl) {
+			for (const auto &decl : static_cast<VarDecl *>(node)->declarators) {
+				if (decl.name == "captured") {
+					CHECK(decl.symbol && !decl.symbol->storage);
+					captures++;
+				}
+			}
+		}
+	});
+	CHECK_EQ(captures, size_t(1));
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	size_t count = 0;
@@ -1570,12 +1584,22 @@ static void test_engine_statics() {
 struct PreparingEngine : FakeEngine {
 	struct Worked : vm::Prepared {
 		std::string what;
+		bool accept_number = true;
 	};
 	std::vector<std::unique_ptr<Worked>> worked;
 	int prepared = 0;
 	bool refuse_to_run = false; // Leave every one to the requests by name.
 	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &, const ir::Instruction &p_in) override {
 		prepared++;
+		if (p_in.op == ir::Op::HostGet && p_module.engine_names[p_in.c].key == "Vector2.x") {
+			auto &field = worked.emplace_back(std::make_unique<Worked>());
+			field->what = "Vector2.x";
+			field->read_number = [](const vm::Prepared &binding, void *, double *result) {
+				*result = 37.5;
+				return static_cast<const Worked &>(binding).accept_number;
+			};
+			return field.get();
+		}
 		if (p_in.op != ir::Op::HostOperate) {
 			return nullptr;
 		}
@@ -1608,6 +1632,7 @@ struct PreparingEngine : FakeEngine {
 
 static void test_engine_prepared() {
 	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
+						 "  public function part(by:Vector2):Number { return by.x; }\n"
 						 "  public function step(by:Vector2, n:int):Boolean { var v:Vector2 = position + by * n; return v == by; }\n"
 						 "  public function grow(by:Vector2, n:int):Vector2 { var v:Vector2 = by; for (var i:int = 0; i < n; i++) { v = v + by; } return v; }\n"
 						 "} }\n";
@@ -1664,6 +1689,17 @@ static void test_engine_prepared() {
 		CHECK_EQ(engine.assigned, 3); // Into the zero the variable starts at, then each time round.
 		CHECK_EQ(engine.boxes, 3); // The owner, the argument, and the result.
 		engine.drop(result.p);
+		engine.in_place = false;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "part", arguments, 1, &result));
+		CHECK_EQ(result.d, 37.5);
+		CHECK(engine.log.empty());
+		for (auto &field : engine.worked) {
+			field->accept_number = false;
+		}
+		CHECK(interpreter.call_method(object, "part", arguments, 1, &result));
+		CHECK_EQ(result.d, 1.0);
+		CHECK_EQ(engine.log, std::string("run Vector2.x (#2)\n"));
 		engine.drop(arguments[0].p);
 		interpreter.release_object(object);
 	}
@@ -3501,6 +3537,94 @@ static void test_reload_callback_identity() {
 	old.release_object(original);
 }
 
+// Both fused tails must honor the operands of each instruction. A nonmatching tail stays untouched.
+static void test_numeric_tails() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module;
+	module.numbers = { 0.75 };
+	ir::Function fn;
+	fn.registers = { Kind::I32, Kind::F64, Kind::F64, Kind::Bool, Kind::Bool, Kind::I32 };
+	vm::Slot values[6]{};
+	values[0].i = 4;
+	values[2].d = 5;
+	fn.code = { { Op::I32ToF64, 1, 0 }, { Op::LtF64, 3, 1, 2 }, { Op::JumpIfNot, 4, 7 } };
+	uint32_t pc = 0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 7u); // The branch reads r4 even though the comparison wrote r3.
+	CHECK(values[3].b);
+	CHECK_EQ(values[1].d, 4.0);
+	values[4].b = true;
+	pc = 0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 3u);
+	fn.code = { { Op::ConstF64, 1, 0 }, { Op::AddF64, 2, 2, 1 }, { Op::F64ToI32, 0, 2 }, { Op::Move, 5, 0 }, { Op::Jump, 9 } };
+	pc = 0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 9u);
+	CHECK_EQ(values[1].d, 0.75);
+	CHECK_EQ(values[2].d, 5.75);
+	CHECK_EQ(values[0].i, 5);
+	CHECK_EQ(values[5].i, 5);
+	fn.code.pop_back();
+	pc = 0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 0u);
+	CHECK_EQ(values[2].d, 5.75);
+}
+
+static void test_vector_move_targets() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module;
+	auto &fn = module.functions.emplace_back();
+	fn.registers = { Kind::Obj, Kind::I32, Kind::Any, Kind::Any };
+	fn.code = { { Op::VecGet, 2, 0, 1 }, { Op::Move, 3, 2 }, { Op::Return, 3 } };
+	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), 3u);
+	fn.code.push_back({ Op::Jump, 1 });
+	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
+	fn.code.back() = { Op::Return, 2 };
+	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
+}
+
+// Exercise repeated and changed literals in the same register.
+// The statement hook observes the loop even after scalar dispatch kept the current frame.
+static void test_literal_dispatch() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module;
+	compile("package { public class Main { public function word():String { return \"first\"; } } }", &module, "Main.as");
+	auto &fn = *std::find_if(module.functions.begin(), module.functions.end(), [](const ir::Function &f) { return f.name == "Main/word"; });
+	const uint32_t first = module.strings.size();
+	module.strings.insert(module.strings.end(), { "repeat", "other" });
+	fn.registers = { Kind::Obj, Kind::Str, Kind::Bool };
+	fn.code = { { Op::ConstStr, 1, first }, { Op::ConstStr, 1, first }, { Op::ConstBool, 2, 1 }, { Op::Stmt, 32 },
+		{ Op::ConstStr, 1, first + 1 }, { Op::Return, 1 } };
+	Recorder host;
+	const size_t before = vm::live_strings();
+	{
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		auto *object = interpreter.construct(class_named(module, "Main"), nullptr);
+		int visits = 0;
+		interpreter.set_statement_hook([](vm::Interpreter &, void *count) {
+			++*static_cast<int *>(count);
+			return true;
+		}, &visits);
+		vm::Slot result{};
+		CHECK(interpreter.call_method(object, "word", nullptr, 0, &result));
+		if (result.p) {
+			CHECK_EQ(static_cast<vm::Str *>(result.p)->view(), std::string_view("other"));
+			vm::release(static_cast<vm::Str *>(result.p));
+		} else {
+			CHECK(result.p != nullptr);
+		}
+		CHECK_EQ(visits, 1);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_strings(), before);
+}
+
 static void test_loop_markers() {
 	Compilation compilation;
 	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
@@ -4568,6 +4692,9 @@ int main() {
 	test_reload_in_place_early();
 	test_reload_engine_class();
 	test_failed_static_initializer();
+	test_numeric_tails();
+	test_vector_move_targets();
+	test_literal_dispatch();
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_method_values();

@@ -171,6 +171,8 @@ class Runner:
             status, text = self.run(project, "by_name.gd", program)
             self.check("native: computed keys leave no missing names cached",
                        "VALUE computed misses=0|0" in text and "kas3: cached missing members=0" in text, text[-1200:])
+            self.check("native: nullable math member reads raise the null-reference error",
+                       "VALUE null math receivers=[1009, 1009]|[1009, 1009]" in text, text[-1600:])
             expected = "VALUE parameter alias respects position overrides=[[3, true], 5, 1]|[[3, true], 5, 1]"
             self.check("native: a foreign getter can change its result type", status == 0 and USED in text and expected in text
                        and "SCRIPT ERROR" not in text, text[-1200:])

@@ -10,6 +10,8 @@ package {
 			made++;
 			partner = new Counted();
 		}
+		public var calls:int;
+		public function namedRead(source:*):int { calls++; return source.calls; }
 		public function partnerID():Int64 { return partner.getInstanceID(); }
 		public function madeCount():int { return made; }
 		public function toString():String { return "threaded"; }

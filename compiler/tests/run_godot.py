@@ -332,7 +332,7 @@ check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not
 output = compare("threads.gd", [
     "toString on the main thread", "toString from a worker is refused: Godot's own text",
     "attached on a worker is refused: no script, no constructor run", "lists asked for on workers and on the main thread at once",
-    "scripts loaded on workers at once",
+    "main thread warms a by-name site", "worker cannot enter a warm by-name site", "scripts loaded on workers at once",
     "freed on a worker: nothing of AS3's freed there",
     "freed on a worker: freed on the main thread",
 ])
@@ -418,7 +418,7 @@ output = compare("by_name.gd", [
     "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
     "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
     "exact untyped arguments", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
-    "proven receiver keeps foreign accessors", "parameter alias respects position overrides", "freed after warming the site", "a freed object",
+    "computed misses", "null math receivers", "parameter alias keeps foreign accessors", "parameter alias respects position overrides", "freed after warming the site", "a freed object",
 ])
 check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
 
