@@ -98,6 +98,11 @@ func _physics_process(_delta: float) -> bool:
 	var expected = [reference.get("visible"), reference.reads, reference.writes]
 	var seen = ask("foreignVisible", [foreign])
 	show("foreign script accessors", [seen, foreign.reads, foreign.writes], expected)
+	var control := Control.new()
+	show("same site on alternating classes and scripts", [
+		ask("foreignVisible", [control]), ask("foreignVisible", [scripted]), ask("foreignVisible", [foreign]),
+		ask("foreignVisible", [control]), foreign.reads, foreign.writes], [false, false, false, false, 2, 2])
+	control.free()
 	foreign.free()
 	reference.free()
 	var gone := Node2D.new()
