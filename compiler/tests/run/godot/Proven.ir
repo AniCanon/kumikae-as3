@@ -66,28 +66,27 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @5 SetField r0 .3 r4
   @6 ReturnVoid
 function Proven/inferred(r0:Object):Number
-  godot r2:Vector2 r3:Node2D r5:Node2D r8:Vector2 r9:Node2D r13:Vector2
+  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r11:Vector2
   @1 HostNew r3 [Node2D] ()
-  @2 ToAny r4 r3
-  @3 Move r1 r4
-  @5 FromAny r5 r1 11
-  @6 ConstI64 r6 3
-  @7 ConstF64 r7 4
-  @8 HostNew r8 [Vector2] (r6, r7)
-  @9 HostSet r5 [Node2D.position] r8
-  @11 FromAny r9 r1 11
-  @12 ConstF64 r10 0.25
-  @13 HostCall _ [Node2D.rotate] (r9, r10)
-  @15 ConstStr r11 "position"
-  @16 DynGet r12 r1 r11
-  @17 FromAny r13 r12 13
-  @18 Move r2 r13
-  @20 ConstStr r14 "free"
-  @21 DynCall r15 r1 (r14)
-  @23 HostGet r16 r2 [Vector2.x]
-  @24 Return r16
-  @25 ConstF64 r17 nan
-  @26 Return r17
+  @2 Move r1 r3
+  @4 ConstI64 r4 3
+  @5 ConstF64 r5 4
+  @6 HostNew r6 [Vector2] (r4, r5)
+  @7 HostSet r1 [Node2D.position] r6
+  @9 ConstF64 r7 0.25
+  @10 HostCall _ [Node2D.rotate] (r1, r7)
+  @12 ToAny r8 r1
+  @13 ConstStr r9 "position"
+  @14 DynGet r10 r8 r9
+  @15 FromAny r11 r10 13
+  @16 Move r2 r11
+  @18 ToAny r12 r1
+  @19 ConstStr r13 "free"
+  @20 DynCall r14 r12 (r13)
+  @22 HostGet r15 r2 [Vector2.x]
+  @23 Return r15
+  @24 ConstF64 r16 nan
+  @25 Return r16
 function Proven/declared(r0:Object):Number
   godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
   @1 HostNew r3 [Node2D] ()
@@ -160,18 +159,18 @@ function Proven/timerDeclared(r0:Object, r1:int, r2:Object):Number
   @31 ConstF64 r19 nan
   @32 Return r19
 function Proven/beforeEscape(r0:Object, r1:Object):Number
-  godot r5:Timer r7:Timer
+  godot r2:Timer r5:Timer
   @0 ConstF64 r3 nan
   @1 ConstF64 r4 nan
   @3 HostNew r5 [Timer] ()
-  @4 ToAny r6 r5
-  @5 Move r2 r6
-  @7 FromAny r7 r2 17
-  @8 HostGet r8 r7 [Timer.waitTime]
-  @9 Move r3 r8
-  @11 CallFunction r9 r1 (r2)
+  @4 Move r2 r5
+  @6 HostGet r6 r2 [Timer.waitTime]
+  @7 Move r3 r6
+  @9 ToAny r7 r2
+  @10 CallFunction r8 r1 (r7)
+  @12 ToAny r9 r2
   @13 ConstStr r10 "waitTime"
-  @14 DynGet r11 r2 r10
+  @14 DynGet r11 r9 r10
   @15 FromAny r12 r11 -1
   @16 Move r4 r12
   @18 AddF64 r13 r3 r4

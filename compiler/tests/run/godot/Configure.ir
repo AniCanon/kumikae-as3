@@ -61,30 +61,25 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @5 SetField r0 .3 r4
   @6 ReturnVoid
 function Configure/attach(r0:Object):void
-  godot r3:Timer r5:Timer r7:Timer r9:Timer r11:Timer
+  godot r1:Timer r3:Timer
   @0 ConstF64 r2 nan
   @2 HostNew r3 [Timer] ()
-  @3 ToAny r4 r3
-  @4 Move r1 r4
-  @6 FromAny r5 r1 11
-  @7 ConstF64 r6 2.5
-  @8 HostSet r5 [Timer.waitTime] r6
-  @10 FromAny r7 r1 11
-  @11 ConstBool r8 1
-  @12 HostSet r7 [Timer.oneShot] r8
-  @14 FromAny r9 r1 11
-  @15 ConstBool r10 1
-  @16 HostSet r9 [Timer.autostart] r10
-  @18 FromAny r11 r1 11
-  @19 HostGet r12 r11 [Timer.waitTime]
-  @20 Move r2 r12
-  @22 GetField r13 r0 .0
-  @23 FromAny r14 r1 -1
-  @24 HostCall _ [Node.addChild] (r13, r14)
-  @26 ConstStr r15 "waitTime"
-  @27 ToAny r16 r2
-  @28 DynSet r1 r15 r16
-  @29 ReturnVoid
+  @3 Move r1 r3
+  @5 ConstF64 r4 2.5
+  @6 HostSet r1 [Timer.waitTime] r4
+  @8 ConstBool r5 1
+  @9 HostSet r1 [Timer.oneShot] r5
+  @11 ConstBool r6 1
+  @12 HostSet r1 [Timer.autostart] r6
+  @14 HostGet r7 r1 [Timer.waitTime]
+  @15 Move r2 r7
+  @17 GetField r8 r0 .0
+  @18 HostCall _ [Node.addChild] (r8, r1)
+  @20 ToAny r9 r1
+  @21 ConstStr r10 "waitTime"
+  @22 ToAny r11 r2
+  @23 DynSet r9 r10 r11
+  @24 ReturnVoid
 function Configure(r0:Object):void
   @0 ReturnVoid
 function ReferenceError(r0:Object, r1:String, r2:int):void

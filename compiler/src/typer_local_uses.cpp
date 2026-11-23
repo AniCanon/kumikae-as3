@@ -463,8 +463,16 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 		for (size_t i = 0; i < locals.size(); i++) {
 			const Local &local = locals[i];
 			const auto &proof = proofs[i];
-			if (proof.storage) {
+			// An escaped engine object can acquire a script, but its local still holds the
+			// original Ref. Only proven member uses below acquire a static binding.
+			if (proof.storage || (local.fresh && !proof.bindings.empty() &&
+					std::none_of(uses[local.symbol].begin(), uses[local.symbol].end(), [&](Name *p_name) {
+						Node *use = parent(parents, p_name);
+						return use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name;
+					}))) {
 				local.symbol->storage = local.type;
+			}
+			if (proof.storage) {
 				for (Name *name : uses[local.symbol]) {
 					name->type = local.type;
 				}
