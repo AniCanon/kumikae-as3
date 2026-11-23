@@ -59,16 +59,16 @@ std::optional<bool> Interpreter::static_get(Object *p_object, const PropertyKey 
 	if (!code) {
 		return raised ? std::optional<bool>(false) : std::nullopt;
 	}
-	if (const std::optional<uint32_t> field = static_member(*code, '.', "", p_key.text)) {
+	if (const std::optional<uint32_t> field = static_member(*code, '.', "", p_key.name())) {
 		*r_value = to_any(module_.globals[*field].kind, native_ ? *native_->global(*field) : globals_[*field]);
 		return true;
 	}
-	if (const std::optional<uint32_t> method = static_member(*code, '/', "", p_key.text)) {
+	if (const std::optional<uint32_t> method = static_member(*code, '/', "", p_key.name())) {
 		Object *made = make_function(*method, nullptr);
 		*r_value = made ? any::object(made) : any::undefined();
 		return made != nullptr;
 	}
-	if (const std::optional<uint32_t> getter = static_member(*code, '/', "get ", p_key.text)) {
+	if (const std::optional<uint32_t> getter = static_member(*code, '/', "get ", p_key.name())) {
 		Object *function = make_function(*getter, nullptr);
 		const std::optional<Slot> given = function ? call_function_within(function, nullptr, 0) : std::nullopt;
 		release_object(function);
@@ -77,9 +77,9 @@ std::optional<bool> Interpreter::static_get(Object *p_object, const PropertyKey 
 		}
 		return given.has_value();
 	}
-	if (static_member(*code, '/', "set ", p_key.text)) {
+	if (static_member(*code, '/', "set ", p_key.name())) {
 		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
+				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(p_holder) + ".");
 		return false;
 	}
 	return std::nullopt;
@@ -91,10 +91,10 @@ std::optional<bool> Interpreter::static_set(Object *p_object, const PropertyKey 
 	if (!code) {
 		return raised ? std::optional<bool>(false) : std::nullopt;
 	}
-	if (const std::optional<uint32_t> field = static_member(*code, '.', "", p_key.text)) {
+	if (const std::optional<uint32_t> field = static_member(*code, '.', "", p_key.name())) {
 		const ir::Global &declared = module_.globals[*field];
 		if (declared.is_const) {
-			return refuse_write("1074", "Illegal write to read-only property ", p_key.text, p_holder);
+			return refuse_write("1074", "Illegal write to read-only property ", p_key.name(), p_holder);
 		}
 		if (ir::is_engine(declared.kind)) {
 			raise_unsupported("writing a field of one of Godot's types by its name");
@@ -107,10 +107,10 @@ std::optional<bool> Interpreter::static_set(Object *p_object, const PropertyKey 
 		put(declared.kind, native_ ? *native_->global(*field) : globals_[*field], stored);
 		return true;
 	}
-	if (static_member(*code, '/', "", p_key.text)) {
-		return refuse_write("1037", "Cannot assign to a method ", p_key.text, p_holder);
+	if (static_member(*code, '/', "", p_key.name())) {
+		return refuse_write("1037", "Cannot assign to a method ", p_key.name(), p_holder);
 	}
-	if (const std::optional<uint32_t> setter = static_member(*code, '/', "set ", p_key.text)) {
+	if (const std::optional<uint32_t> setter = static_member(*code, '/', "set ", p_key.name())) {
 		Object *function = make_function(*setter, nullptr);
 		const Slot value = share(Kind::Any, p_value); // Not the stack's: the call may move it.
 		const std::optional<Slot> given = function ? call_function_within(function, &value, 1) : std::nullopt;
@@ -121,18 +121,18 @@ std::optional<bool> Interpreter::static_set(Object *p_object, const PropertyKey 
 		}
 		return given.has_value();
 	}
-	if (static_member(*code, '/', "get ", p_key.text)) {
-		return refuse_write("1074", "Illegal write to read-only property ", p_key.text, p_holder);
+	if (static_member(*code, '/', "get ", p_key.name())) {
+		return refuse_write("1074", "Illegal write to read-only property ", p_key.name(), p_holder);
 	}
-	return refuse_write("1056", "Cannot create property ", p_key.text, p_holder);
+	return refuse_write("1056", "Cannot create property ", p_key.name(), p_holder);
 }
 
 // Whether the class a class value names has a public static member of that name.
 bool Interpreter::static_has(const Object *p_object, const PropertyKey &p_key) {
 	bool raised = false;
 	const std::optional<uint32_t> code = statics_of(p_object, &raised);
-	return code && (static_member(*code, '.', "", p_key.text) || static_member(*code, '/', "", p_key.text) ||
-			static_member(*code, '/', "get ", p_key.text) || static_member(*code, '/', "set ", p_key.text));
+	return code && (static_member(*code, '.', "", p_key.name()) || static_member(*code, '/', "", p_key.name()) ||
+			static_member(*code, '/', "get ", p_key.name()) || static_member(*code, '/', "set ", p_key.name()));
 }
 
 // c.name(arguments) where it is a static method: called. False for anything else, which the caller goes on with.
@@ -142,7 +142,7 @@ bool Interpreter::static_call(Object *p_object, const PropertyKey &p_key, const 
 	if (raised) {
 		return true;
 	}
-	const std::optional<uint32_t> method = code ? static_member(*code, '/', "", p_key.text) : std::nullopt;
+	const std::optional<uint32_t> method = code ? static_member(*code, '/', "", p_key.name()) : std::nullopt;
 	if (method) {
 		call_with(*method, nullptr, p_given, p_out);
 	}

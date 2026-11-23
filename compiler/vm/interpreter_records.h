@@ -68,6 +68,8 @@ struct PropertyKey {
 	std::optional<uint32_t> index;
 	Object *object = nullptr; // Held by the key it came from.
 	std::string text;
+	std::string_view borrowed; // The string slot is held until this property operation returns.
+	std::string_view name() const { return borrowed.data() ? borrowed : std::string_view(text); }
 };
 
 struct Prepared; // vm/engine_handles.h

@@ -27,8 +27,8 @@ void *EngineNamed::handle_of(Slot p_holder) const {
 }
 
 bool EngineNamed::own_member(const ir::Class &p_class, const PropertyKey &p_key) const {
-	return p_class.field(p_key.text, true) || vm_.named_method(p_class, p_key.text) || vm_.named_method(p_class, p_key.text, "get ") ||
-			vm_.named_method(p_class, p_key.text, "set ");
+	return p_class.field(p_key.name(), true) || vm_.named_method(p_class, p_key.name()) || vm_.named_method(p_class, p_key.name(), "get ") ||
+			vm_.named_method(p_class, p_key.name(), "set ");
 }
 
 Object *EngineNamed::script_with(Slot p_holder, const PropertyKey &p_key) const {
@@ -36,9 +36,9 @@ Object *EngineNamed::script_with(Slot p_holder, const PropertyKey &p_key) const 
 	return script && own_member(vm_.module_.classes[script->klass], p_key) ? script : nullptr;
 }
 
-NamedMember EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
+const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
 	void *handle = p_key.object ? nullptr : handle_of(p_holder);
-	return handle ? vm_.host_.handles.named(handle, p_key.text) : NamedMember();
+	return handle ? vm_.host_.handles.named(handle, p_key.name()) : MISSING_MEMBER;
 }
 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
@@ -46,11 +46,11 @@ NamedMember EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
 bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value) {
 	const ir::Module &module = vm_.module_;
 	if (module.library_function == NONE || module.array_class == NONE) {
-		vm_.raise_unsupported("reading '" + p_key.text + "' of one of Godot's values by its name");
+		vm_.raise_unsupported("reading '" + std::string(p_key.name()) + "' of one of Godot's values by its name");
 		return false;
 	}
 	Vector *bound = vm_.fresh_vector(module.array_class, 3);
-	Str *name = bound ? vm_.text(p_key.text) : nullptr;
+	Str *name = bound ? vm_.text(p_key.name()) : nullptr;
 	Str *godot = name ? vm_.text(std::string(p_godot)) : nullptr;
 	if (!godot) {
 		if (name) {
@@ -72,7 +72,7 @@ bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::st
 }
 
 bool EngineNamed::unknown(const PropertyKey &p_key) {
-	vm_.raise(vm_.module_.error_class, "'" + p_key.text + "' of one of Godot's values can't be reached by its name here: this build of the extension "
+	vm_.raise(vm_.module_.error_class, "'" + std::string(p_key.name()) + "' of one of Godot's values can't be reached by its name here: this build of the extension "
 										"carries no table of Godot's names. Store the value in a variable of its type.");
 	return false;
 }
@@ -81,7 +81,7 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	if (Object *script = script_with(p_holder, p_key)) {
 		return vm_.get_property(any::object(script), p_key, r_value);
 	}
-	const NamedMember found = member(p_holder, p_key);
+	const NamedMember &found = member(p_holder, p_key);
 	void *handle = handle_of(p_holder);
 	switch (found.what) {
 		case NamedMember::What::Missing:
@@ -95,7 +95,7 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	}
 	if (!found.read) {
 		vm_.raise(vm_.module_.reference_error_class != NONE ? vm_.module_.reference_error_class : vm_.module_.error_class,
-				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + vm_.holder_name(p_holder) + ".");
+				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + vm_.holder_name(p_holder) + ".");
 		return false;
 	}
 	Wanted wanted;
@@ -112,24 +112,24 @@ std::optional<bool> EngineNamed::set(Slot p_holder, const PropertyKey &p_key, Sl
 	if (Object *script = script_with(p_holder, p_key)) {
 		return vm_.set_property(any::object(script), p_key, p_value);
 	}
-	const NamedMember found = member(p_holder, p_key);
+	const NamedMember &found = member(p_holder, p_key);
 	switch (found.what) {
 		case NamedMember::What::Missing:
 			return std::nullopt;
 		case NamedMember::What::Unknown:
 			return unknown(p_key);
 		case NamedMember::What::Method:
-			return vm_.refuse_write("1037", "Cannot assign to a method ", p_key.text, p_holder);
+			return vm_.refuse_write("1037", "Cannot assign to a method ", p_key.name(), p_holder);
 		case NamedMember::What::Property:
 			break;
 	}
 	if (!found.written) {
-		return vm_.refuse_write("1074", "Illegal write to read-only property ", p_key.text, p_holder);
+		return vm_.refuse_write("1074", "Illegal write to read-only property ", p_key.name(), p_holder);
 	}
 	if (any::tag(p_holder) == AnyTag::Value) {
 		// One of Godot's values is a copy wherever it is held: a part written here would be written to a
 		// copy and lost. Said, never done.
-		vm_.raise(vm_.module_.error_class, "'" + p_key.text + "' of one of Godot's values held untyped can't be written: the value is a copy. Store the value "
+		vm_.raise(vm_.module_.error_class, "'" + std::string(p_key.name()) + "' of one of Godot's values held untyped can't be written: the value is a copy. Store the value "
 											"in a variable of its type and write to that.");
 		return false;
 	}
@@ -154,7 +154,7 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 	if (object && own_member(vm_.module_.classes[object->klass], p_key)) {
 		return std::nullopt; // The script object's own member: the program's to call.
 	}
-	const NamedMember found = member(p_holder, p_key);
+	const NamedMember &found = member(p_holder, p_key);
 	if (found.what == NamedMember::What::Missing) {
 		return std::nullopt;
 	}
@@ -162,7 +162,7 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 		return unknown(p_key);
 	}
 	if (found.what == NamedMember::What::Property) {
-		vm_.raise(vm_.module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
+		vm_.raise(vm_.module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
 		return false;
 	}
 	// Each argument as it is held; a function goes as Godot's Callable, as it does where the method is named.

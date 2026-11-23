@@ -8,10 +8,12 @@
 
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace kas3 {
 
@@ -45,6 +47,15 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+#if !defined(KAS3_RUNTIME_ONLY)
+	struct ClassHash {
+		size_t operator()(const godot::StringName &p_class) const { return p_class.hash(); }
+	};
+	using Members = std::unordered_map<std::string_view, vm::NamedMember>;
+	std::unordered_set<std::string> missing_names_; // A computed key can outlive neither its slot nor its program.
+	std::unordered_map<godot::StringName, Members, ClassHash> class_members_;
+	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;
+#endif
 	// Only a successful ClassDB lookup is cached. Script fields depend on the instance.
 	struct {
 		std::string_view as3; // Points into the generated static table.
@@ -136,7 +147,7 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] vm::NamedMember named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
+	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
 	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future

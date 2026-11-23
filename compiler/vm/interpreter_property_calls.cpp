@@ -185,7 +185,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 		}
 		drop(p_kind, p_value);
 	};
-	const std::string &name = p_key.text;
+	const std::string_view name = p_key.name();
 	if (name == "hasOwnProperty" || name == "propertyIsEnumerable") {
 		PropertyKey asked;
 		bool has = false;
@@ -258,18 +258,18 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 			return; // One of Godot's methods by its AS3 name, called or raised.
 		}
 	}
-	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.text, p_given, p_out))) {
+	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.name(), p_given, p_out))) {
 		return; // A class's static method, or RegExp's or Date's, done or raised.
 	}
 	if (klass && klass->element == Kind::Void && !klass->table) {
-		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.text)) {
+		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.name())) {
 			call_with(klass->methods[*slot], object, p_given, p_out);
 			return;
 		}
 	}
 	Slot value = any::undefined();
 	bool own = false;
-	if (klass && (klass->table || klass->array || (klass->element == Kind::Void && klass->field(p_key.text, true)))) {
+	if (klass && (klass->table || klass->array || (klass->element == Kind::Void && klass->field(p_key.name(), true)))) {
 		if (!has_property(p_holder, p_key, false, &own)) {
 			return;
 		}
@@ -281,11 +281,11 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 	if (function && function->klass == module_.function_class) {
 		const uint32_t target = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
 		call_with(target, static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p), p_given, p_out);
-	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
+	} else if (!own && (library_call(p_holder, p_key.name(), p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
 		// The library's method, or Object's own, on a value with no property of that name.
 	} else if (own || (klass && klass->table) || any::is_engine(p_holder)) {
 		// One of Godot's values has no such method: what calling a name that is not there is in AVM2.
-		raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
+		raise(module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
 	} else {
 		// A method of its prototype (an Array's push) can't be called by name yet; reading anything else
 		// raises for what is not there (#1069), and what is read is no function.
@@ -294,10 +294,10 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 		if (!has_property(p_holder, p_key, true, &inherited)) {
 			// Raised.
 		} else if (inherited) {
-			raise_unsupported("calling '" + p_key.text + "' on a value of type '" + holder_name(p_holder) + "' by its name");
+			raise_unsupported("calling '" + std::string(p_key.name()) + "' on a value of type '" + holder_name(p_holder) + "' by its name");
 		} else if (get_property(p_holder, p_key, &read)) {
 			drop_any(read);
-			raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
+			raise(module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
 		}
 	}
 	drop_any(value);

@@ -24,7 +24,7 @@ class EngineNamed {
 	void *handle_of(Slot p_holder) const;
 	// The script object the Godot object an untyped value holds carries, if it has a member of that name.
 	Object *script_with(Slot p_holder, const PropertyKey &p_key) const;
-	NamedMember member(Slot p_holder, const PropertyKey &p_key) const;
+	const NamedMember &member(Slot p_holder, const PropertyKey &p_key) const;
 	bool method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value);
 	bool unknown(const PropertyKey &p_key);
 

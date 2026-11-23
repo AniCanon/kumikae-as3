@@ -22,22 +22,14 @@ namespace kas3 {
 #if defined(KAS3_RUNTIME_ONLY)
 
 // A build that carries no table of Godot's names can't say: the script is told so.
-vm::NamedMember GodotHost::named(void *, std::string_view) {
-	vm::NamedMember unknown;
-	unknown.what = vm::NamedMember::What::Unknown;
+const vm::NamedMember &GodotHost::named(void *, std::string_view) {
+	static constexpr vm::NamedMember unknown{ vm::NamedMember::What::Unknown, {} };
 	return unknown;
 }
 
 #else
 
 namespace {
-
-struct Found {
-	vm::NamedMember::What what = vm::NamedMember::What::Missing;
-	std::string godot;
-	bool read = true;
-	bool written = true;
-};
 
 // AS3's name for each of Godot's classes whose name AS3 already uses (GodotObject for Object), by Godot's
 // name: read once from the table, where a class's entry is its AS3 name and Godot's.
@@ -63,10 +55,10 @@ const std::unordered_map<std::string, std::string> &renamed() {
 }
 
 // What the table says of a member, as a script may use it by name.
-Found described(std::string_view p_value) {
+vm::NamedMember described(std::string_view p_value) {
 	const std::vector<std::string_view> words = godot_words(p_value);
-	Found found;
-	found.godot = std::string(words[0]);
+	vm::NamedMember found;
+	found.godot = words[0];
 	if (words.size() == 1 && !words[0].empty() && words[0][0] == '@') {
 		// The AS3 way of listening to a signal: one property, and the rest are methods.
 		found.what = words[0] == "@numListeners" ? vm::NamedMember::What::Property : vm::NamedMember::What::Method;
@@ -86,31 +78,41 @@ Found described(std::string_view p_value) {
 
 } // namespace
 
-vm::NamedMember GodotHost::named(void *p_receiver, std::string_view p_name) {
-	static std::unordered_map<std::string, Found> kept;
+const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_name) {
 	const Variant &receiver = *static_cast<const Variant *>(p_receiver);
-	Object *object = receiver.get_type() == Variant::OBJECT ? receiver.get_validated_object() : nullptr;
-	StringName klass = object ? StringName(object->get_class()) : StringName(Variant::get_type_name(receiver.get_type()));
-	const std::string own = std::string(String(klass).utf8().get_data()) + "." + std::string(p_name);
-	auto known = kept.find(own);
-	for (; known == kept.end(); klass = object ? ClassDBSingleton::get_singleton()->get_parent_class(klass) : StringName()) {
-		if (klass == StringName()) {
-			known = kept.emplace(own, Found()).first; // No class of its has the name.
-			break;
-		}
-		const std::string godot = String(klass).utf8().get_data();
-		const auto as3 = renamed().find(godot);
-		const std::optional<std::string_view> value = godot_value((as3 == renamed().end() ? godot : as3->second) + "." + std::string(p_name));
-		if (const Found found = value ? described(*value) : Found(); found.what != vm::NamedMember::What::Missing) {
-			known = kept.emplace(own, found).first;
+	const Variant::Type type = receiver.get_type();
+	StringName klass;
+	const bool object = type == Variant::OBJECT;
+	if (object) {
+		// This is the interned class identity godot-cpp uses for instance binding (core/object.cpp).
+		const auto id = gdextension_interface::variant_get_object_instance_id(receiver._native_ptr());
+		const auto owner = gdextension_interface::object_get_instance_from_id(id);
+		if (!owner || !gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
+			return vm::MISSING_MEMBER;
 		}
 	}
-	vm::NamedMember member;
-	member.what = known->second.what;
-	member.godot = known->second.godot;
-	member.read = known->second.read;
-	member.written = known->second.written;
-	return member;
+	Members &members = object ? class_members_[klass] : value_members_[type];
+	if (const auto known = members.find(p_name); known != members.end()) {
+		return known->second;
+	}
+	if (!object) {
+		klass = StringName(Variant::get_type_name(type));
+	}
+	while (klass != StringName()) {
+		const std::string godot = String(klass).utf8().get_data();
+		const auto as3 = renamed().find(godot);
+		const auto id = godot_entry((as3 == renamed().end() ? godot : as3->second) + "." + std::string(p_name));
+		if (id) {
+			const GodotEntry entry = godot_entry_at(*id);
+			const vm::NamedMember found = described(entry.value);
+			if (found.what != vm::NamedMember::What::Missing) {
+				// The same constant table the IR uses owns both names, across program reloads.
+				return members.emplace(entry.key.substr(entry.key.find('.') + 1), found).first->second;
+			}
+		}
+		klass = object ? ClassDBSingleton::get_singleton()->get_parent_class(klass) : StringName();
+	}
+	return members.emplace(*missing_names_.emplace(p_name).first, vm::MISSING_MEMBER).first->second;
 }
 
 #endif

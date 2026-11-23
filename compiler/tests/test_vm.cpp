@@ -619,13 +619,14 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		return made;
 	}
 	// The members a value of the engine's has by an AS3 name: a few of a node's.
-	[[nodiscard]] vm::NamedMember named(void *, std::string_view p_name) override {
-		vm::NamedMember found;
-		found.what = p_name == "queueFree" || p_name == "addChild" ? vm::NamedMember::What::Method
-				: p_name == "name" || p_name == "position" || p_name == "readOnly" ? vm::NamedMember::What::Property : vm::NamedMember::What::Missing;
-		found.godot = p_name == "queueFree" ? "queue_free" : p_name == "addChild" ? "add_child" : p_name == "readOnly" ? "read_only" : p_name == "name" ? "name" : "position";
-		found.written = p_name != "readOnly";
-		return found;
+	[[nodiscard]] const vm::NamedMember &named(void *, std::string_view p_name) override {
+		using What = vm::NamedMember::What;
+		static constexpr vm::NamedMember methods[] = { { What::Method, "queue_free" }, { What::Method, "add_child" } };
+		static constexpr vm::NamedMember properties[] = { { What::Property, "name" }, { What::Property, "position" }, { What::Property, "read_only", true, false } };
+		if (p_name == "queueFree" || p_name == "addChild") {
+			return methods[p_name == "addChild"];
+		}
+		return p_name == "name" ? properties[0] : p_name == "position" ? properties[1] : p_name == "readOnly" ? properties[2] : vm::MISSING_MEMBER;
 	}
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *) override {
 		void *made = box();

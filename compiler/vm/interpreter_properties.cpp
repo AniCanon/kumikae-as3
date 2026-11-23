@@ -70,7 +70,7 @@ void Interpreter::raise_unsupported(const std::string &p_what) {
 
 void Interpreter::raise_not_found(const PropertyKey &p_key, Slot p_holder) {
 	raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-			"Error #1069: Property " + p_key.text + " not found on " + holder_name(p_holder) + " and there is no default value.");
+			"Error #1069: Property " + std::string(p_key.name()) + " not found on " + holder_name(p_holder) + " and there is no default value.");
 }
 
 // The key as the holder keeps it: an element's index for an Array or a Vector, an object itself for a
@@ -81,6 +81,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const AnyTag tag = any::tag(p_key);
 	r_key->text.clear();
+	r_key->borrowed = {};
 	r_key->index.reset();
 	r_key->object = nullptr;
 	if (klass && klass->element != Kind::Void) {
@@ -103,7 +104,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 		return false;
 	}
 	if (tag == AnyTag::String) {
-		r_key->text = static_cast<const Str *>(any::pointer(p_key))->view();
+		r_key->borrowed = static_cast<const Str *>(any::pointer(p_key))->view();
 		return true;
 	}
 	return any_text(p_key, &r_key->text);
@@ -114,7 +115,7 @@ std::optional<uint32_t> Interpreter::entry_of(const Entries *p_entries, const Pr
 		return std::nullopt;
 	}
 	if (!p_key.object) {
-		return p_entries->find_text(p_key.text);
+		return p_entries->find_text(p_key.name());
 	}
 	if (const std::optional<uint32_t> found = p_entries->find_object(p_key.object)) {
 		return found;
@@ -146,7 +147,7 @@ bool Interpreter::set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p
 		retain(p_key.object);
 		key = any::object(p_key.object);
 	} else {
-		Str *made = text(p_key.text);
+		Str *made = text(p_key.name());
 		if (!made) {
 			return false;
 		}
@@ -195,7 +196,7 @@ bool Interpreter::refuse_write(const char *p_number, const char *p_words, std::s
 bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value) {
 	Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
+	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), p_holder); };
 	if (klass && klass->table) {
 		return set_entry(entries_of(object), p_key, p_value);
 	}
@@ -221,14 +222,14 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 // holder[key] = value on a sealed object: one of RegExp's or Date's properties, a public field, or a setter.
 bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder) {
 	const ir::Class &klass = module_.classes[p_object->klass];
-	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
+	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), p_holder); };
 	if (const std::optional<bool> done = static_set(p_object, p_key, p_holder, p_value)) {
 		return *done;
 	}
-	if (const std::optional<bool> done = library_set(p_object, p_key.text, p_value)) {
+	if (const std::optional<bool> done = library_set(p_object, p_key.name(), p_value)) {
 		return *done;
 	}
-	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
+	if (const std::optional<uint32_t> field = klass.field(p_key.name(), true)) {
 		const ir::Field &declared = klass.fields[*field];
 		if (ir::is_engine(declared.kind)) {
 			raise_unsupported("writing a field of one of Godot's types by its name");
@@ -241,13 +242,13 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 		put(declared.kind, vm::field(klass, p_object, *field), stored);
 		return true;
 	}
-	if (named_method(klass, p_key.text)) {
+	if (named_method(klass, p_key.name())) {
 		return cannot("1037", "Cannot assign to a method ");
 	}
-	if (const std::optional<uint32_t> setter = named_method(klass, p_key.text, "set ")) {
+	if (const std::optional<uint32_t> setter = named_method(klass, p_key.name(), "set ")) {
 		return call_setter(p_object, klass.methods[*setter], p_value);
 	}
-	if (named_method(klass, p_key.text, "get ")) {
+	if (named_method(klass, p_key.name(), "get ")) {
 		return cannot("1074", "Illegal write to read-only property ");
 	}
 	if (!klass.native_base.empty()) {
@@ -281,16 +282,16 @@ bool Interpreter::call_setter(Object *p_object, uint32_t p_function, Slot p_valu
 // An element of an Array or a Vector held untyped, its length, or another property of an Array.
 bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p_value) {
 	const ir::Class &klass = module_.classes[p_vector->klass];
-	if (!p_key.index && p_key.text != "length") {
+	if (!p_key.index && p_key.name() != "length") {
 		if (klass.array) {
 			return set_entry(properties_of(p_vector), p_key, p_value);
 		}
-		if (p_key.text == "fixed" && !klass.fixed_array()) {
+		if (p_key.name() == "fixed" && !klass.fixed_array()) {
 			p_vector->fixed = any::to_boolean(p_value);
 			return true;
 		}
 		// A Vector takes no property of its own, as a sealed object takes none.
-		return refuse_write("1056", "Cannot create property ", p_key.text, any::object(p_vector));
+		return refuse_write("1056", "Cannot create property ", p_key.name(), any::object(p_vector));
 	}
 	Slot value;
 	if (!from_any(p_value, p_key.index ? klass.element : Kind::F64, p_key.index ? klass.element_check : NONE, &value)) {
@@ -338,11 +339,11 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 			}
 			return true;
 		}
-		*r_done = klass->array && !p_key.index && p_key.text != "length";
+		*r_done = klass->array && !p_key.index && p_key.name() != "length";
 		entries = klass->array ? vector->properties : nullptr;
 	} else if (klass && !klass->table) {
-		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text) && !named_method(*klass, p_key.text, "get ") &&
-				!named_method(*klass, p_key.text, "set ");
+		*r_done = !klass->field(p_key.name(), true) && !named_method(*klass, p_key.name()) && !named_method(*klass, p_key.name(), "get ") &&
+				!named_method(*klass, p_key.name(), "set ");
 	} else if (!klass && (any::tag(p_holder) == AnyTag::Null || any::tag(p_holder) == AnyTag::Undefined)) {
 		any_null_check(p_holder);
 		return false;

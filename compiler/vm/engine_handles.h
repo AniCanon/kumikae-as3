@@ -32,6 +32,8 @@ struct NamedMember {
 	bool written = true; // A property with a setter.
 };
 
+inline constexpr NamedMember MISSING_MEMBER{};
+
 struct EngineHandles {
 	virtual ~EngineHandles() {}
 	// Asked once for each engine instruction when a program is loaded, before any of it runs: what the host
@@ -79,7 +81,7 @@ struct EngineHandles {
 	[[nodiscard]] virtual bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) = 0;
 	// What an engine value has under an AS3 name: asked where the value is held untyped, so that the
 	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
-	[[nodiscard]] virtual NamedMember named(void *, std::string_view) { return NamedMember(); }
+	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view) { return MISSING_MEMBER; }
 	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
 	[[nodiscard]] virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	// An element, by a number or another key: `vector[0]`.

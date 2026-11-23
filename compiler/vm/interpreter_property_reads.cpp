@@ -42,8 +42,8 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 			*r_value = share(Kind::Any, entries_of(object)->value_at(*at));
 			return true;
 		}
-		if (listed(OBJECT_METHODS, p_key.text)) {
-			return method_value(p_holder, p_key.text, r_value);
+		if (listed(OBJECT_METHODS, p_key.name())) {
+			return method_value(p_holder, p_key.name(), r_value);
 		}
 		return true; // Nothing there: undefined.
 	}
@@ -66,7 +66,7 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 		raise_range(*p_key.index, p_vector->length);
 		return false;
 	}
-	if (p_key.text == "length") {
+	if (p_key.name() == "length") {
 		Slot length;
 		set_uint32(length, p_vector->length);
 		*r_value = to_any(Kind::U32, length);
@@ -76,15 +76,15 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 		*r_value = share(Kind::Any, p_vector->properties->value_at(*at));
 		return true;
 	}
-	if (p_key.text == "fixed" && !klass.array && !klass.fixed_array()) {
+	if (p_key.name() == "fixed" && !klass.array && !klass.fixed_array()) {
 		Slot fixed;
 		fixed.bits = 0;
 		fixed.b = p_vector->fixed;
 		*r_value = to_any(Kind::Bool, fixed);
 		return true;
 	}
-	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
-		return method_value(p_holder, p_key.text, r_value);
+	if (library_name(p_holder, p_key.name()) || listed(OBJECT_METHODS, p_key.name())) {
+		return method_value(p_holder, p_key.name(), r_value);
 	}
 	if (klass.array) {
 		return true; // Nothing there: undefined.
@@ -100,28 +100,28 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	if (const std::optional<bool> done = static_get(p_object, p_key, p_holder, r_value)) {
 		return *done;
 	}
-	if (const std::optional<bool> done = library_get(p_object, p_key.text, r_value)) {
+	if (const std::optional<bool> done = library_get(p_object, p_key.name(), r_value)) {
 		return *done;
 	}
-	if (p_object->klass == module_.function_class && p_key.text == "length") {
+	if (p_object->klass == module_.function_class && p_key.name() == "length") {
 		*r_value = any::integer(function_length(p_object));
 		return true;
 	}
-	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
+	if (const std::optional<uint32_t> field = klass.field(p_key.name(), true)) {
 		*r_value = to_any(klass.fields[*field].kind, vm::field(klass, p_object, *field));
 		return true;
 	}
-	if (const std::optional<uint32_t> slot = named_method(klass, p_key.text)) {
+	if (const std::optional<uint32_t> slot = named_method(klass, p_key.name())) {
 		Object *made = make_function(klass.methods[*slot], p_object);
 		*r_value = made ? any::object(made) : any::undefined();
 		return made != nullptr;
 	}
-	if (const std::optional<uint32_t> getter = named_method(klass, p_key.text, "get ")) {
+	if (const std::optional<uint32_t> getter = named_method(klass, p_key.name(), "get ")) {
 		return call_getter(p_object, klass.methods[*getter], r_value);
 	}
-	if (named_method(klass, p_key.text, "set ")) {
+	if (named_method(klass, p_key.name(), "set ")) {
 		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
+				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(p_holder) + ".");
 		return false;
 	}
 	if (!klass.native_base.empty()) {
@@ -130,15 +130,15 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 			return *done;
 		}
 	}
-	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
-		return method_value(p_holder, p_key.text, r_value);
+	if (library_name(p_holder, p_key.name()) || listed(OBJECT_METHODS, p_key.name())) {
+		return method_value(p_holder, p_key.name(), r_value);
 	}
 	const bool library_error = klass.built_in && module_.error_class != NONE && is_class(p_object, module_.error_class);
 	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class || p_object->klass == module_.function_class || library_error) {
 		return true; // Dynamic in AS3, and nothing can be added to one here: undefined.
 	}
 	if (klass.built_in && p_object->klass != module_.class_class) {
-		raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
+		raise_unsupported("reading '" + std::string(p_key.name()) + "' of " + holder_name(p_holder) + " by its name");
 		return false;
 	}
 	raise_not_found(p_key, p_holder);
@@ -175,19 +175,19 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 		if (const std::optional<bool> done = EngineNamed(*this).get(p_holder, p_key, r_value)) {
 			return *done;
 		}
-		if (listed(OBJECT_METHODS, p_key.text)) {
-			return method_value(p_holder, p_key.text, r_value);
+		if (listed(OBJECT_METHODS, p_key.name())) {
+			return method_value(p_holder, p_key.name(), r_value);
 		}
 		raise_not_found(p_key, p_holder);
 		return false;
 	}
-	if (tag == AnyTag::String && p_key.text == "length") {
+	if (tag == AnyTag::String && p_key.name() == "length") {
 		*r_value = any::integer(utf16_length(static_cast<const Str *>(any::pointer(p_holder))->view()));
 		return true;
 	}
 	const bool number = tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide;
-	if (listed(OBJECT_METHODS, p_key.text) || library_name(p_holder, p_key.text) || (number && listed(NUMBER_METHODS, p_key.text))) {
-		return method_value(p_holder, p_key.text, r_value);
+	if (listed(OBJECT_METHODS, p_key.name()) || library_name(p_holder, p_key.name()) || (number && listed(NUMBER_METHODS, p_key.name()))) {
+		return method_value(p_holder, p_key.name(), r_value);
 	}
 	raise_not_found(p_key, p_holder);
 	return false;
@@ -202,7 +202,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		any_null_check(p_holder);
 		return false;
 	}
-	bool has = (p_prototype && listed(OBJECT_METHODS, p_key.text)) || static_has(object, p_key);
+	bool has = (p_prototype && listed(OBJECT_METHODS, p_key.name())) || static_has(object, p_key);
 	if ((!klass && any::is_engine(p_holder)) || (klass && !klass->native_base.empty())) {
 		has = has || EngineNamed(*this).has(p_holder, p_key); // What Godot's value or object has by that name.
 	}
@@ -212,17 +212,17 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		const Vector *vector = static_cast<const Vector *>(object);
 		const bool element = p_key.index && *p_key.index < vector->length &&
 				(!klass->array || !any::is_hole(slots_of(vector)[*p_key.index]));
-		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed" && !klass->fixed_array()) ||
-				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
+		has = has || element || p_key.name() == "length" || (!klass->array && p_key.name() == "fixed" && !klass->fixed_array()) ||
+				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.name()));
 	} else if (klass) {
 		// A getter or a setter is a property of the object as a field is (avmplus looks through the traits).
-		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || named_method(*klass, p_key.text, "get ") ||
-				named_method(*klass, p_key.text, "set ") || library_has(object, p_key.text) ||
-				(p_prototype && library_name(p_holder, p_key.text));
+		has = has || klass->field(p_key.name(), true) || named_method(*klass, p_key.name()) || named_method(*klass, p_key.name(), "get ") ||
+				named_method(*klass, p_key.name(), "set ") || library_has(object, p_key.name()) ||
+				(p_prototype && library_name(p_holder, p_key.name()));
 	} else if (tag == AnyTag::String) {
-		has = has || p_key.text == "length" || (p_prototype && library_name(p_holder, p_key.text));
+		has = has || p_key.name() == "length" || (p_prototype && library_name(p_holder, p_key.name()));
 	} else if (tag != AnyTag::Boolean) {
-		has = has || (p_prototype && listed(NUMBER_METHODS, p_key.text));
+		has = has || (p_prototype && listed(NUMBER_METHODS, p_key.name()));
 	}
 	*r_has = has;
 	return true;

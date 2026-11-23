@@ -362,7 +362,7 @@ private:
 	// The function the object's class runs for an interface method; NONE, with the error raised, if the
 	// object is missing or its class has none.
 	uint32_t interface_function(const Object *p_object, uint32_t p_method);
-	Str *text(const std::string &p_text);
+	Str *text(std::string_view p_text);
 
 public:
 	Interpreter(const ir::Module &p_module, Host p_host);
