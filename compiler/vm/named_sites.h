@@ -16,6 +16,7 @@ struct InterpreterSite : NamedSite {
 
 // A literal name is interned once on overflow. Subsequent dispatch uses just the class identities.
 struct NamedOverflow {
+	static constexpr size_t CAPACITY = 64;
 	struct Shape {
 		uintptr_t type;
 		std::optional<uint32_t> klass;

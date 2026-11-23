@@ -1299,13 +1299,14 @@ static void test_engine_members_by_name() {
 			int computed_walks = 0;
 			int lookups = 0;
 			uintptr_t receiver_type = 1;
+			uint64_t foreign_script = 0;
 			std::optional<vm::NamedShape> named_shape(void *p_handle, uintptr_t) override {
 				CHECK(p_handle != nullptr);
 				if (!p_handle) {
 					return {};
 				}
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
-				return vm::NamedShape{ receiver_type, script ? 2u : 0u, script, p_handle };
+				return vm::NamedShape{ receiver_type, script ? 2u : foreign_script, script, p_handle };
 			}
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name, vm::NameSource p_source) override {
@@ -1414,6 +1415,12 @@ static void test_engine_members_by_name() {
 		}
 		CHECK_EQ(engine.lookups - before_shapes, 12);
 		engine.receiver_type = 1;
+		vm::NamedSite churn;
+		for (engine.foreign_script = 1; engine.foreign_script <= 1000; ++engine.foreign_script) {
+			CHECK(!interpreter.access_named(churn, ir::Op::DynGet, given[0], "undeclared", nullptr, 0, &result, &method));
+		}
+		CHECK(churn.overflow && churn.overflow->entries.size() <= vm::NamedOverflow::CAPACITY);
+		engine.foreign_script = 0;
 		engine.return_math = true;
 		CHECK(interpreter.call_method(object, "repeated", given, 1, nullptr));
 		CHECK_EQ(engine.reuses, 7);

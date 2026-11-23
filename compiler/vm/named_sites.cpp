@@ -157,6 +157,9 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 		const NamedOverflow::Shape key{ p_shape.type, klass, p_shape.script };
 		auto at = entries.find(key);
 		if (at == entries.end()) {
+			if (entries.size() == NamedOverflow::CAPACITY) {
+				entries.clear();
+			}
 			at = entries.emplace(key, resolve(p_engine, p_module, p_shape, p_handle, p_name)).first;
 		}
 		entry = &at->second;
