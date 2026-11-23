@@ -134,7 +134,8 @@ trace(next(2), next(3)); // 12 15
 ```
 
 A callback can hold a function expression, a script method bound to its receiver, a package function,
-another callback with the same signature, or `null`. Bindings require an exact match, including the
+one of [Godot's methods](godot.md#godots-methods-as-values), another callback with the same signature, or
+`null`. Bindings require an exact match, including the
 result. Calls check the number and types of arguments and perform the same scalar conversions as
 a named call. Write `()=>void` for a callback that takes no arguments and returns nothing.
 

@@ -64,6 +64,9 @@ The editor turns compiler candidates into Godot's insertions at the caret.
   instruction needs: an operator's evaluator for its operand types, a method bind, a property's accessors,
   a constant's value. Nothing is looked up by name while the program runs. An instruction that meets
   values of other types than expected falls back to a request by name.
+- **One of Godot's methods as a function is Godot's own Callable** of the object and the method
+  (`GodotHost::bind_method`), never a callable of the extension's. `godot_signals.cpp` notes each one a
+  script adds as a listener, so that `numListeners` and `removeAll()` count it.
 - **In the interpreter, a Godot value is boxed** in a handle (a `godot::Variant` the interpreter holds).
   A handle on an object that isn't reference counted, such as a node, is shared by everyone who copies it.
 - **Calls can nest.** The engine calls a script, which calls the engine, which can call a script again,

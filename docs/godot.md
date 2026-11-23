@@ -114,6 +114,9 @@ Other things to know:
   what it expects: `var x:Number = lerp(a, b, 0.5);`.
 - **`Input.singleton` is the singleton object itself,** for where you need to pass it.
 - **A method is a function wherever Godot takes a callable:** `children.filter(isEnemy)`.
+- **One of Godot's own methods is a function too:** `timer.timeout.add(queueFree)`,
+  `tween.tweenCallback(node.queueFree)`, `var hide:Function = sprite.hide`. See
+  [Godot's methods as values](#godots-methods-as-values).
 - **Enums are `int`.**
 - **Methods that take raw pointers aren't available.** There are 60 of them.
 
@@ -251,13 +254,53 @@ A signal is a property of type `Signal`. You add and remove listeners on it.
 | `signal.emit(...)` | Emits the signal |
 
 - **A listener is a method or a function expression.** A method's listener is removed when its object is
-  freed.
+  freed. The method can be one of Godot's own: `timer.timeout.add(queueFree)`.
 - **A listener's parameters are checked when the signal fires.** An argument that doesn't fit is an AS3
   error that says so.
 - **On a singleton's signal, `removeAll()` and `numListeners` cover only the calling object's listeners.**
   A signal such as `Input.joyConnectionChanged` is shared by the whole game.
 - **`node[name].add(listener)` reaches a signal by its AS3 name** when you only know the name at run time.
 - **Godot's `connect` isn't declared.** Use `add`.
+
+### Godot's methods as values
+
+A method of a Godot object is a value, like a method of your own class. Read it without calling it:
+
+```actionscript
+package game {
+    import godot.*;
+
+    public class Bullet extends Area2D {
+        [Export] public var timer:Timer;
+
+        override public function _ready():void {
+            timer.timeout.add(queueFree);
+            var tween:Tween = createTween();
+            tween.tweenCallback(hide);
+            var stop:Function = timer.stop;
+            stop();
+        }
+    }
+}
+```
+
+- **Godot gets its own `Callable`** of that object and that method, where it takes a function. No AS3 code
+  runs when the signal fires.
+- **In AS3 the value is a `Function`.** A call through it counts and converts its arguments as a call of one
+  of your functions does: one argument too many is ArgumentError #1063, and a value of the wrong type is
+  TypeError #1034. An argument you leave out takes Godot's default.
+- **The same method of the same object is the same function.** `node.hide == node.hide` is true, so
+  `signal.remove(node.hide)` removes what `signal.add(node.hide)` added.
+- **It doesn't keep a node alive.** After the node is freed, calling it is TypeError #1009, and Godot drops
+  the listener.
+- **A static method and a global function are values too:** `Vector2.fromAngle`, `Input.isActionPressed`,
+  `lerpf`.
+- **It fits a [typed callback](language.md#typed-callbacks)** when the signature is the same:
+  `var later:()=>void = node.queueFree;`.
+- **A method that takes any number of arguments isn't a value:** `callDeferred`, `emitSignal`, `print`. Call
+  it from a function of your own.
+- **Arguments aren't converted to Godot's collections** in a call through the value. Pass a `GodotArray`
+  where the method declares one.
 
 ### Declare a signal
 
@@ -413,8 +456,6 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
-- A method of Godot's isn't a value: `timer.timeout.add(queueFree)` is refused. Pass a method of your own
-  that calls it.
 - A Godot class isn't a class value: `var kind:Class = Node2D` is refused. `is`, `as` and `new` take the
   class by name.
 - A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
