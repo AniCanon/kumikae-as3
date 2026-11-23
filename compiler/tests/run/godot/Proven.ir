@@ -1,0 +1,83 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class Proven on Godot's Node
+  .0 $owner:GodotObject
+  #0 Proven/inferred
+  #1 Proven/declared
+  new Proven
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function Proven/inferred(r0:Object):Number
+  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
+  @1 HostNew r3 [Node2D] ()
+  @2 Move r1 r3
+  @4 ConstI64 r4 3
+  @5 ConstF64 r5 4
+  @6 HostNew r6 [Vector2] (r4, r5)
+  @7 HostSet r1 [Node2D.position] r6
+  @9 ConstF64 r7 0.25
+  @10 HostCall _ [Node2D.rotate] (r1, r7)
+  @12 HostGet r8 r1 [Node2D.position]
+  @13 Move r2 r8
+  @15 HostCall _ [GodotObject.free] (r1)
+  @17 HostGet r9 r2 [Vector2.x]
+  @18 Return r9
+  @19 ConstF64 r10 nan
+  @20 Return r10
+function Proven/declared(r0:Object):Number
+  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
+  @1 HostNew r3 [Node2D] ()
+  @2 Move r1 r3
+  @4 ConstI64 r4 3
+  @5 ConstF64 r5 4
+  @6 HostNew r6 [Vector2] (r4, r5)
+  @7 HostSet r1 [Node2D.position] r6
+  @9 ConstF64 r7 0.25
+  @10 HostCall _ [Node2D.rotate] (r1, r7)
+  @12 HostGet r8 r1 [Node2D.position]
+  @13 Move r2 r8
+  @15 HostCall _ [GodotObject.free] (r1)
+  @17 HostGet r9 r2 [Vector2.x]
+  @18 Return r9
+  @19 ConstF64 r10 nan
+  @20 Return r10
+function Proven(r0:Object):void
+  @0 ReturnVoid

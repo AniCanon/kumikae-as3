@@ -126,9 +126,11 @@ void Typer::infer_storage(Block *p_body) {
 		}
 		return true;
 	});
+	std::unordered_map<Symbol *, Expr *> initial;
 	for (const auto &[symbol, decl] : candidates) {
-		symbol->storage = decl.value->type;
+		initial.emplace(symbol, decl.value);
 	}
+	prove_local_uses(p_body, initial);
 }
 
 } // namespace kas3

@@ -11,7 +11,7 @@ all read its result.
 **Depends on:** nothing else in this repository. It includes no header from `ir/`, `vm/`, `godot_ext/` or
 `lsp/`, and no Godot header. Godot's API arrives as AS3 declarations, like any source file.
 
-The checker keeps a separate storage type for a function-local variable when a dominating write and every other write agree. Your source type still governs member lookup and diagnostics. Captures, loop targets and reads before initialization keep dynamic storage.
+The checker can give a local declared as `*` a concrete type after checking the source. It checks the first write, later assignments and each use before recording that type. A fresh, detached Node2D used only for its local transform can bind its members directly. A node received from a caller can already carry a script. Captures, reads before initialization and operations that observe dynamic behavior keep the declared type.
 
 ## Files
 

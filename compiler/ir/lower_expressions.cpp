@@ -20,9 +20,6 @@ bool Lowerer::gives_nothing(const Expr *p_expression) {
 }
 
 void Lowerer::effect(Expr *p_expression) {
-	if (p_expression && (p_expression->kind == NodeKind::Call || p_expression->kind == NodeKind::Assign) && Dynamic(*this).guarded(p_expression)) {
-		return;
-	}
 	if (p_expression && gives_nothing(p_expression)) {
 		Expressions(*this).evaluate(p_expression, Kind::Void);
 	} else {
@@ -108,8 +105,7 @@ uint32_t Expressions::name_value(Expr *p_expression) {
 		return Functions(l_).function_value(p_expression); // A method or a function as a value, not called.
 	}
 	l_.natural(p_expression);
-	const uint32_t value = l_.load(l_.place_of(name), position);
-	return name->symbol && name->symbol->storage ? l_.convert(value, Kind::Any, position) : value;
+	return l_.load(l_.place_of(name), position);
 }
 
 uint32_t Expressions::member_value(Expr *p_expression) {
@@ -541,8 +537,7 @@ uint32_t Expressions::assign(Assign *p_assign) {
 		}
 	}
 	l_.store(place, value, position);
-	const auto *local = p_assign->target->kind == NodeKind::Name ? static_cast<Name *>(p_assign->target)->symbol : nullptr;
-	return local && local->storage ? l_.convert(value, Kind::Any, position) : value;
+	return value;
 }
 
 } // namespace ir

@@ -89,13 +89,6 @@ bool Dynamic::by_name(const Expr *p_holder) const {
 
 // The value that holds the property, as an untyped or an object register.
 uint32_t Dynamic::holder(Expr *p_holder, Expr *p_later, uint32_t p_position) {
-	const auto *symbol = p_holder->kind == NodeKind::Name ? static_cast<Name *>(p_holder)->symbol : nullptr;
-	if (symbol && symbol->storage) {
-		const auto local = l_.locals_.find(symbol);
-		if (local != l_.locals_.end() && l_.kind_at(local->second) == Kind::Ref) {
-			return l_.settled(local->second, p_later, p_position);
-		}
-	}
 	uint32_t value = p_holder->kind == NodeKind::ThisExpr && !l_.fn().is_static && !l_.received_env_ ? 0 : l_.expression(p_holder, Kind::Void);
 	if (l_.kind_at(value) != Kind::Obj && l_.kind_at(value) != Kind::Any) {
 		value = l_.convert(value, Kind::Any, p_position);

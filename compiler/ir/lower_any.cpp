@@ -191,18 +191,6 @@ uint32_t Lowerer::empty_untyped(const Type *p_type, uint32_t p_position) {
 }
 
 uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
-	if (p_expression && p_expression->kind == NodeKind::Member && p_kind != Kind::Any && p_kind != Kind::Void) {
-		if (const auto direct = Dynamic(*this).guarded(p_expression, p_type)) {
-			return *direct;
-		}
-	}
-	if (p_expression && p_expression->kind == NodeKind::Name) {
-		const Symbol *symbol = static_cast<Name *>(p_expression)->symbol;
-		auto local = locals_.find(symbol);
-		if (local != locals_.end() && symbol->storage && symbol->storage == p_type && kind_at(local->second) == p_kind) {
-			return local->second;
-		}
-	}
 	// A plain value is asked for in its own kind: a call of Godot's that gives any value then gives that one.
 	const bool checked = starts_null_type(p_kind, p_type) || is_engine(p_kind) || p_kind == Kind::Obj;
 	if (!checked || !untyped(p_expression)) {

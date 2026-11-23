@@ -30,7 +30,6 @@ public:
 	bool by_name(const Expr *p_holder) const;
 	// `o.a` or `o[k]` as a place, if it is one reached by name.
 	std::optional<Place> place(Expr *p_target, Expr *p_later);
-	std::optional<uint32_t> guarded(Expr *p_expr, const Type *p_want = nullptr);
 	uint32_t literal(ObjectLit *p_literal);
 	// `new Object()` and `new Dictionary(weakKeys)`. Nothing if the class is neither.
 	std::optional<uint32_t> made(New *p_new, const Symbol *p_class);
