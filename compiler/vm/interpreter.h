@@ -91,7 +91,6 @@ private:
 	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
 	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
 	std::vector<std::vector<EngineStep>> prepared_;
-	std::vector<const void *> guard_classes_;
 	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can number.
 	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
 		return heap_.operator_named(p_name, p_spelling);
@@ -451,7 +450,7 @@ public:
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
 	// For a host whose native code is the program (native_code.h says what each is for).
-	bool access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, NamedCall *r_call, const Wanted &p_wanted = { ir::Kind::Any, {} });
+	bool access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted = { ir::Kind::Any, {} });
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
 	// p_timed: the host keeps the call's time itself, and knows it began (native code's, for the engine).

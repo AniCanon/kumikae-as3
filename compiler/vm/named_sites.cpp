@@ -78,9 +78,12 @@ InterpreterSite *NamedSites::at(uint32_t p_function, uint32_t p_pc, const Str *p
 }
 
 static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle, std::string_view p_name) {
-	NamedSite::Entry entry{ p_shape.type, p_shape.script, p_shape.instance ? p_shape.instance->klass : NONE };
+	NamedSite::Entry entry{};
+	entry.type = p_shape.type;
+	entry.script = p_shape.script;
 	if (p_shape.instance) {
-		const auto &klass = p_module.classes[p_shape.instance->klass];
+		entry.klass = p_shape.instance->klass;
+		const auto &klass = p_module.classes[*entry.klass];
 		if (auto index = klass.field(p_name, true)) {
 			entry.field = *index;
 			return entry;
@@ -119,27 +122,13 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 	return false;
 }
 
-std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error, const Wanted &wanted) {
-	if (!any::is_engine(p_holder) || p_count > 4) {
-		return std::nullopt;
-	}
-	void *handle = any::pointer(p_holder);
-	if (p_site.generation != generation_) {
-		p_site.used = 0;
-		p_site.overflow = nullptr;
-		p_site.delegated = NONE;
-		p_site.generation = generation_;
-	}
-	const auto *delegated = p_site.delegated == NONE ? nullptr : &p_site.entries[p_site.delegated];
-	const NamedShape shape = p_engine.named_shape(handle, delegated ? delegated->type : 0);
-	if (!shape.type) {
-		return std::nullopt;
-	}
+const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &shape, void *handle,
+		std::string_view p_name, const NamedSite::Entry *delegated) {
+	const std::optional<uint32_t> klass = shape.instance ? std::optional<uint32_t>(shape.instance->klass) : std::nullopt;
 	const NamedSite::Entry *entry = shape.delegate ? delegated : nullptr;
 	for (size_t i = 0; !entry && i < p_site.used; i++) {
 		const auto &candidate = p_site.entries[i];
-		if (shape.type == candidate.type && shape.script == candidate.script && candidate.klass == (shape.instance ? shape.instance->klass : NONE)) {
+		if (shape.type == candidate.type && shape.script == candidate.script && candidate.klass == klass) {
 			entry = &candidate;
 			break;
 		}
@@ -158,22 +147,44 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 			p_site.overflow = &found->second;
 		}
 		auto &entries = p_site.overflow->entries;
-		const NamedOverflow::Shape key{ shape.type, shape.instance ? shape.instance->klass : NONE };
+		const NamedOverflow::Shape key{ shape.type, klass };
 		auto [at, added] = entries.try_emplace(key);
 		if (added) {
 			at->second = resolve(p_engine, p_module, shape, handle, p_name);
 		}
 		entry = &at->second;
 	}
-	if (entry->field != NONE) {
-		return scalar_field(p_module.classes[shape.instance->klass], shape.instance, entry->field, p_op, p_arguments, r_result) ?
-				std::optional<bool>(true) : std::nullopt;
-	}
-	if (entry->method != NONE && p_op == Op::DynCall) {
-		*r_call = { shape.instance, entry->method };
+	return *entry;
+}
+
+std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
+		const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, const Wanted &wanted) {
+	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
-	const NamedMember *member = entry->engine;
+	void *handle = any::pointer(p_holder);
+	if (p_site.generation != generation_) {
+		p_site.used = 0;
+		p_site.overflow = nullptr;
+		p_site.delegated.reset();
+		p_site.generation = generation_;
+	}
+	const auto *delegated = p_site.delegated ? &p_site.entries[*p_site.delegated] : nullptr;
+	const auto checked = p_engine.named_shape(handle, delegated ? delegated->type : 0);
+	if (!checked) {
+		return std::nullopt;
+	}
+	const NamedShape &shape = *checked;
+	const auto &entry = binding(p_site, p_engine, p_module, shape, handle, p_name, delegated);
+	if (entry.field) {
+		return scalar_field(p_module.classes[shape.instance->klass], shape.instance, *entry.field, p_op, p_arguments, r_result) ?
+				std::optional<bool>(true) : std::nullopt;
+	}
+	if (entry.method && p_op == Op::DynCall) {
+		*r_call = NamedCall{ shape.instance, *entry.method };
+		return std::nullopt;
+	}
+	const NamedMember *member = entry.engine;
 	const bool call = p_op == Op::DynCall, write = p_op == Op::DynSet;
 	if (!member || member->what != (call ? NamedMember::What::Method : NamedMember::What::Property) || member->godot.empty() ||
 			member->godot.front() == '@' || (!call && !(write ? member->written : member->read)) || (write && any::tag(p_holder) == AnyTag::Value)) {

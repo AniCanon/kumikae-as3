@@ -50,17 +50,23 @@ static std::optional<uint64_t> attached_script(void *p_raw) {
 }
 #endif
 
-vm::NamedShape GodotHost::shape_of(void *p_receiver, uintptr_t p_delegated) {
+std::optional<vm::NamedShape> GodotHost::shape_of(void *p_receiver, uintptr_t p_delegated) {
 #if defined(KAS3_RUNTIME_ONLY)
 	(void)p_receiver;
 	(void)p_delegated;
 	return {};
 #else
+	if (!p_receiver) {
+		return std::nullopt;
+	}
 	const Variant &value = *static_cast<const Variant *>(p_receiver);
 	const Variant::Type type = value.get_type();
 	if (type != Variant::OBJECT) {
 		// Calls on other value types may mutate their copy of the receiver.
-		return type >= Variant::VECTOR2 && type <= Variant::COLOR ? vm::NamedShape{ static_cast<uintptr_t>(type) + 1 } : vm::NamedShape{};
+		if (type >= Variant::VECTOR2 && type <= Variant::COLOR) {
+			return vm::NamedShape{ static_cast<uintptr_t>(type) + 1 };
+		}
+		return std::nullopt;
 	}
 	void *raw = live_handle_object(p_receiver);
 	if (!raw) {
@@ -72,31 +78,18 @@ vm::NamedShape GodotHost::shape_of(void *p_receiver, uintptr_t p_delegated) {
 	}
 	const uint64_t owner_id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
 	if (vm::Object *instance = script_object_by_id(owner_id)) {
-		return { static_cast<uintptr_t>(type_id), uint64_t(instance->klass) + 1, instance, raw };
+		return vm::NamedShape{ type_id, uint64_t(instance->klass) + 1, instance, raw };
 	}
 	// This binding goes through Godot's named dispatch, so a different foreign script or a
 	// detached script on the same engine class needs no separate query for the Script resource.
 	if (p_delegated == type_id) {
-		return { static_cast<uintptr_t>(type_id), 0, nullptr, raw, true };
+		return vm::NamedShape{ type_id, 0, nullptr, raw, true };
 	}
 	const auto id = attached_script(raw);
-	return id ? vm::NamedShape{ type_id, *id, nullptr, raw } : vm::NamedShape{};
-#endif
-}
-
-bool GodotHost::plain_named(void *p_handle, const void *p_class) {
-#if defined(KAS3_RUNTIME_ONLY)
-	(void)p_handle;
-	(void)p_class;
-	return false;
-#else
-	if (!p_handle || !p_class) {
-		return false;
+	if (!id) {
+		return std::nullopt;
 	}
-	uintptr_t expected;
-	std::memcpy(&expected, p_class, sizeof(expected));
-	void *raw = live_handle_object(p_handle);
-	return raw && expected == handle_class(p_handle, raw) && attached_script(raw) == 0;
+	return vm::NamedShape{ type_id, *id, nullptr, raw };
 #endif
 }
 

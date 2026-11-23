@@ -660,9 +660,6 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::CallInterface:
 				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
-			case Op::HostPlain:
-				flag(function.registers[in.b] == Kind::Ref && r[in.b].p && in.c < guard_classes_.size() && host_.handles.plain(r[in.b].p, guard_classes_[in.c]));
-				break;
 			case Op::IsClass:
 				flag(is_class(static_cast<Object *>(r[in.b].p), in.c));
 				break;

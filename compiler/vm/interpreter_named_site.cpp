@@ -2,7 +2,7 @@
 
 namespace kas3::vm {
 
-bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, NamedCall *r_call, const Wanted &p_wanted) {
+bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted) {
 	std::string error;
 	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error, p_wanted);
 	if (done && !*done && !failing_) {
@@ -17,8 +17,7 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	const Frame &frame = frames_.back();
 	const size_t base = frame.base;
 	const Slot *registers = stack_.data() + base;
-	const bool reference = p_function.registers[holder] == ir::Kind::Ref;
-	if (!reference && (p_function.registers[holder] != ir::Kind::Any || !any::is_engine(registers[holder]))) {
+	if (p_function.registers[holder] != ir::Kind::Any || !any::is_engine(registers[holder])) {
 		return false;
 	}
 	const auto *list = p_in.op == ir::Op::DynCall ? &p_function.argument_lists[p_in.c] : nullptr;
@@ -41,33 +40,33 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 		}
 	}
 	Slot result = any::undefined();
-	NamedCall call;
+	std::optional<NamedCall> call;
 	Wanted wanted{ write ? ir::Kind::Void : ir::Kind::Any, {} };
-	if (site->math.skip) {
+	if (site->math) {
 		const uint32_t type = p_function.code[frame.pc].c;
 		wanted.type = type == ir::NONE ? std::string_view{} : std::string_view(module_.engine_names[type].name);
-		wanted.reuse = registers[site->math.target].p;
+		wanted.reuse = registers[site->math->target].p;
 	} else if (p_in.op == ir::Op::DynGet && any::tag(registers[p_in.a]) == AnyTag::Value) {
 		wanted.reuse = any::pointer(registers[p_in.a]);
 	}
-	if (!access_named(*site, p_in.op, reference ? any::godot_object(registers[holder].p) : registers[holder], text->view(), args, count, &result, &call, wanted)) {
-		if (!call.receiver || count || module_.functions[call.function].parameters != 1 || module_.functions[call.function].rest) {
+	if (!access_named(*site, p_in.op, registers[holder], text->view(), args, count, &result, &call, wanted)) {
+		if (!call || count || module_.functions[call->function].parameters != 1 || module_.functions[call->function].rest) {
 			return false;
 		}
 		Slot first{};
-		first.p = call.receiver;
-		retain(call.receiver);
+		first.p = call->receiver;
+		retain(call->receiver);
 		if (p_in.a != ir::NONE) {
 			put(ir::Kind::Any, stack_[base + p_in.a], any::undefined());
 		}
-		push(call.function, &first, 1, p_in.a);
-		release_object(call.receiver);
+		push(call->function, &first, 1, p_in.a);
+		release_object(call->receiver);
 		return true;
 	}
 	if (!write && p_in.a != ir::NONE && !failing_) {
-		if (site->math.skip && wanted.reuse && any::tag(result) == AnyTag::Value && any::pointer(result) == wanted.reuse) {
-			frames_.back().pc += site->math.skip;
-		} else if (site->math.skip || !wanted.reuse || result.bits != stack_[base + p_in.a].bits) {
+		if (site->math && wanted.reuse && any::tag(result) == AnyTag::Value && any::pointer(result) == wanted.reuse) {
+			frames_.back().pc += site->math->skip;
+		} else if (site->math || !wanted.reuse || result.bits != stack_[base + p_in.a].bits) {
 			put(ir::Kind::Any, stack_[base + p_in.a], result);
 		}
 	} else if (!wanted.reuse || any::tag(result) != AnyTag::Value || any::pointer(result) != wanted.reuse) {

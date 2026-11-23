@@ -1281,9 +1281,13 @@ static void test_engine_members_by_name() {
 			}
 			int lookups = 0;
 			uintptr_t receiver_type = 1;
-			vm::NamedShape named_shape(void *p_handle, uintptr_t) override {
+			std::optional<vm::NamedShape> named_shape(void *p_handle, uintptr_t) override {
+				CHECK(p_handle != nullptr);
+				if (!p_handle) {
+					return {};
+				}
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
-				return { receiver_type, script ? 2u : 0u, script, p_handle };
+				return vm::NamedShape{ receiver_type, script ? 2u : 0u, script, p_handle };
 			}
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
@@ -1354,7 +1358,8 @@ static void test_engine_members_by_name() {
 		engine.scripts.erase(node);
 		// A generated site can outlive its interpreter. A new program resolves its own binding.
 		vm::NamedSite native_site;
-		vm::NamedCall method;
+		std::optional<vm::NamedCall> method;
+		CHECK(!interpreter.access_named(native_site, ir::Op::DynGet, vm::any::godot_object(nullptr), "name", nullptr, 0, &result, &method));
 		for (int generation = 0; generation < 2; generation++) {
 			vm::Interpreter fresh(module, engine);
 			const int before = engine.lookups;

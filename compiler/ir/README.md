@@ -16,7 +16,7 @@ A byte register has kind `U8`. The VM slot uses its unsigned integer member. Con
 keeps the low eight bits of an unsigned integer, and arithmetic widens it before operating.
 The byte kind and its integer conversions also use appended wire values.
 
-A proven local uses the same registers, bound members and instructions as a local declared with its type. A local whose script or use is unknown keeps dynamic dispatch. The interpreter and native backend also accept the `HostPlain` instruction in existing packed modules.
+A proven local uses the same registers, bound members and instructions as a local declared with its type. A local whose script or use is unknown keeps dynamic dispatch.
 
 ## The IR
 

@@ -11,18 +11,18 @@
 namespace kas3::vm {
 
 struct InterpreterSite : NamedSite {
-	ir::MathConsumer math;
+	std::optional<ir::MathConsumer> math;
 };
 
 // A literal name is interned once on overflow. Subsequent dispatch uses just the class identities.
 struct NamedOverflow {
 	struct Shape {
 		uintptr_t type;
-		uint32_t klass;
+		std::optional<uint32_t> klass;
 		bool operator==(const Shape &p_other) const { return type == p_other.type && klass == p_other.klass; }
 	};
 	struct Hash {
-		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (size_t(p_shape.klass) << 1); }
+		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (std::hash<std::optional<uint32_t>>{}(p_shape.klass) << 1); }
 	};
 	std::unordered_map<Shape, NamedSite::Entry, Hash> entries;
 };
@@ -40,6 +40,8 @@ class NamedSites {
 	// share its class metadata. Only AS3 field and method slots depend on a script class.
 	std::map<std::string, NamedOverflow, std::less<>> shared_;
 	uint64_t generation_;
+	const NamedSite::Entry &binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &shape, void *handle,
+		std::string_view p_name, const NamedSite::Entry *delegated);
 public:
 	explicit NamedSites(const ir::Module &p_module);
 	uint32_t vector_target(uint32_t p_function, uint32_t p_pc) const {
@@ -52,7 +54,7 @@ public:
 	}
 	InterpreterSite *at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings);
 	std::optional<bool> access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, ir::Op p_op, Slot p_holder,
-			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error, const Wanted &p_wanted);
+			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, const Wanted &p_wanted);
 };
 
 } // namespace kas3::vm

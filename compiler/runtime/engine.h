@@ -77,7 +77,6 @@ struct EngineApi {
 	// host built for it, Context::names), where that is a value with parts of the type asked for: in a new
 	// handle, the caller's. Null for anything else (no Dictionary, no such key, a value of another type).
 	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
-	bool (*plain)(void *p_handle, const void *p_class);
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a

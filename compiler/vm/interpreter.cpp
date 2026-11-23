@@ -41,12 +41,6 @@ void Interpreter::prepare_engine() {
 		const Function &function = module_.functions[f];
 		for (size_t i = 0; i < function.code.size(); i++) {
 			const Instruction &in = function.code[i];
-			if (in.op == Op::HostPlain && in.c < module_.strings.size()) {
-				guard_classes_.resize(module_.strings.size());
-				if (!guard_classes_[in.c]) {
-					guard_classes_[in.c] = host_.handles.guard_class(module_.strings[in.c]);
-				}
-			}
 			const char *shape = ir::op_shape(in.op);
 			if (std::strchr(shape, 'E') == nullptr) {
 				continue;

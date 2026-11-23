@@ -274,7 +274,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &GodotHost::plain_named };
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed };
 		find_values(&made);
 		return made;
 	}();

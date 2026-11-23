@@ -52,11 +52,11 @@ public:
 };
 
 struct MathConsumer {
-	uint32_t target = NONE;
+	uint32_t target;
 	uint32_t skip = 0;
 };
 
-inline MathConsumer math_consumer(const Function &p_function, size_t p_pc, const AdjacentUses &p_uses) {
+inline std::optional<MathConsumer> math_consumer(const Function &p_function, size_t p_pc, const AdjacentUses &p_uses) {
 	const auto &code = p_function.code;
 	const uint32_t source = code[p_pc].a;
 	if (!p_function.handlers.empty() || code[p_pc].op != Op::DynGet || !p_uses.only_consumer(source, p_pc + 1)) {
@@ -74,7 +74,10 @@ inline MathConsumer math_consumer(const Function &p_function, size_t p_pc, const
 			result.skip++;
 		}
 	}
-	return result.target < p_function.parameters ? MathConsumer{} : result;
+	if (result.target < p_function.parameters) {
+		return std::nullopt;
+	}
+	return result;
 }
 
 } // namespace kas3::ir
