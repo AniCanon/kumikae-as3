@@ -29,9 +29,12 @@ def check_export(godot):
             'include_filter="*.as"\nexclude_filter="Excluded.as"\n[preset.0.options]\n'
             'variant/extensions_support=true\nvariant/thread_support=false\n')
         dest = Path(folder) / "game.zip"
-        done = subprocess.run([godot, "--headless", "--path", str(project), "--export-pack", "Web", str(dest)],
-                              capture_output=True, text=True, check=True)
-        assert "ERROR:" not in done.stderr, done.stderr
+        driver = Path(__file__).with_name("web_export_scan.gd")
+        done = subprocess.run([godot, "--headless", "--path", str(project), "--script", str(driver),
+                               "--export-pack", "Web", str(dest)],
+                              capture_output=True, text=True, check=True, timeout=120)
+        assert "ERROR:" not in done.stderr and "A Thread object is being destroyed" not in done.stderr, done.stderr
+        assert "Web export documentation ready" in done.stdout, done.stdout
         with zipfile.ZipFile(dest) as archive:
             module = archive.read(".kas3/program.kas3")
             assert "Excluded.as" not in archive.namelist()
