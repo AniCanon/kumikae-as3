@@ -9,6 +9,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 
 #include <array>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
@@ -48,12 +49,22 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
 #if !defined(KAS3_RUNTIME_ONLY)
+	// Godot 4 stores the interned name pointer in its opaque StringName. Keep the name alive as the key.
+	static uintptr_t class_identity(const godot::StringName &p_class) {
+		uintptr_t identity;
+		static_assert(sizeof(p_class) == sizeof(identity));
+		std::memcpy(&identity, p_class._native_ptr(), sizeof(identity));
+		return identity;
+	}
 	struct ClassHash {
-		size_t operator()(const godot::StringName &p_class) const { return p_class.hash(); }
+		size_t operator()(const godot::StringName &p_class) const { return std::hash<uintptr_t>{}(class_identity(p_class)); }
+	};
+	struct SameClass {
+		bool operator()(const godot::StringName &a, const godot::StringName &b) const { return class_identity(a) == class_identity(b); }
 	};
 	using Members = std::unordered_map<std::string_view, vm::NamedMember>;
 	std::unordered_set<std::string> missing_names_; // A computed key can outlive neither its slot nor its program.
-	std::unordered_map<godot::StringName, Members, ClassHash> class_members_;
+	std::unordered_map<godot::StringName, Members, ClassHash, SameClass> class_members_;
 	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;
 #endif
 	// Only a successful ClassDB lookup is cached. Script fields depend on the instance.

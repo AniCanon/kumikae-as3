@@ -78,6 +78,15 @@ package {
 			o.visible = !o.visible;
 			return [has, heard, o.visibilityChanged.numListeners];
 		}
+		public function exactArguments(o:*):Array {
+			var b:* = false;
+			var v:* = new Vector2(6, 8);
+			var n:* = 0.5;
+			o.setProcess(b);
+			o.translate(v);
+			o.rotate(n);
+			return [o.isProcessing(), o.position, o.rotation, v.dot(v)];
+		}
 		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
 
 		// A freed object is null.

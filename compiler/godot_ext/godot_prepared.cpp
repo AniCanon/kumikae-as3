@@ -5,6 +5,7 @@
 // is made, as one runs. One that meets values of other types than it was worked out for (a null, a value
 // held untyped) is left to the requests by name (godot_host.cpp), which say what is wrong.
 #include "godot_calls.h"
+#include "any.h"
 #include "handles.h"
 #include "program.h"
 #include "worked.h"
@@ -100,11 +101,34 @@ union Scalar {
 	GDExtensionBool boolean;
 };
 
+// The same exact types untyped_to_variant() would hand to Godot, without making a Variant.
+const void *bare_any(vm::Slot p_value, int p_type, Scalar *r_scalar) {
+	const vm::AnyTag tag = vm::any::tag(p_value);
+	if (tag == vm::AnyTag::Boolean && p_type == Variant::BOOL) {
+		r_scalar->boolean = vm::any::to_bool_payload(p_value);
+	} else if (tag == vm::AnyTag::Number && p_type == Variant::FLOAT) {
+		r_scalar->number = vm::any::to_number_payload(p_value);
+	} else if (tag == vm::AnyTag::Int && p_type == Variant::INT) {
+		r_scalar->integer = vm::any::to_int_payload(p_value);
+	} else if (tag == vm::AnyTag::Wide && p_type == Variant::INT) {
+		r_scalar->integer = static_cast<const vm::Wide *>(vm::any::pointer(p_value))->value;
+	} else if (tag == vm::AnyTag::Value) {
+		auto *held = static_cast<Variant *>(vm::any::pointer(p_value));
+		return held->get_type() == p_type ? inside(*held, p_type) : nullptr;
+	} else {
+		return nullptr;
+	}
+	return r_scalar;
+}
+
 // Where an operand's bare value of a type is: in `r_scalar` for a number or a Boolean, inside the handle
 // for one of Godot's values. Null if the operand does not hold that type (a null, a whole number where a
 // Number is not taken as one): the instruction then goes by name.
 const void *bare(const vm::Argument &p_operand, int p_type, Scalar *r_scalar) {
 	const ir::Kind kind = p_operand.kind;
+	if (kind == ir::Kind::Any) {
+		return bare_any(p_operand.slot, p_type, r_scalar);
+	}
 	switch (p_type) {
 		case Variant::FLOAT: {
 			const bool real = kind == ir::Kind::F64 || kind == ir::Kind::F32;
@@ -206,11 +230,19 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 	Scalar out;
 	out.integer = 0;
 	if (type == NO_VALUE) {
+		if (kind == ir::Kind::Any && r_result) {
+			*r_result = vm::any::null(); // A void method by name returns Godot's nil.
+		}
 		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, nullptr);
 		return true;
 	}
 	if (!r_result) {
 		return std::nullopt;
+	}
+	if (kind == ir::Kind::Any && (type == Variant::BOOL || type == Variant::FLOAT)) {
+		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, &out);
+		*r_result = type == Variant::BOOL ? vm::any::boolean(out.boolean != 0) : vm::any::number(out.number);
+		return true;
 	}
 	if ((type == Variant::BOOL && kind == ir::Kind::Bool) || (type == Variant::FLOAT && kind == ir::Kind::F64) || (type == Variant::INT && kind == ir::Kind::I64)) {
 		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, &out);
@@ -316,6 +348,8 @@ std::optional<bool> GodotHost::run_builtin(const Worked &p_worked, const vm::Arg
 			Variant &value = values.next();
 			argument(p_worked, i - first, given, &value);
 			pointers[i - first] = inside(value, type);
+		} else if ((pointers[i - first] = bare(given, type, &scalars[i]))) {
+			continue;
 		} else if (given.kind == ir::Kind::Any) {
 			Variant &value = values.next();
 			value = to_variant(given.kind, given.slot);
@@ -323,7 +357,7 @@ std::optional<bool> GodotHost::run_builtin(const Worked &p_worked, const vm::Arg
 				return std::nullopt; // Let Godot apply its conversions and report a bad argument.
 			}
 			pointers[i - first] = inside(value, type);
-		} else if (!(pointers[i - first] = bare(given, type, &scalars[i]))) {
+		} else {
 			return std::nullopt;
 		}
 	}
@@ -365,7 +399,7 @@ std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Objec
 			return std::nullopt; // Only the script whose members the VM checked can be bypassed.
 		}
 	}
-	if (p_worked.bare && !(p_worked.result == NO_VALUE && p_result.kind == ir::Kind::Any)) {
+	if (p_worked.bare) {
 		if (const std::optional<bool> done = run_bare(p_worked, object, p_operands + first, p_count - first, p_result, r_result)) {
 			return *done;
 		}

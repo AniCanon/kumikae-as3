@@ -91,6 +91,7 @@ func _physics_process(_delta: float) -> bool:
 	o = fresh()
 	show("a method read by name", ask("method", [o]), [false, true, true, "function"])
 	show("a signal reached by name", ask("listens", [fresh()]), [true, 1, 0])
+	show("exact untyped arguments", ask("exactArguments", [fresh()]), [false, Vector2(6, 8), 0.5, 100.0])
 	var foreign := Intercept.new()
 	var reference := Intercept.new()
 	reference.set("visible", false)
