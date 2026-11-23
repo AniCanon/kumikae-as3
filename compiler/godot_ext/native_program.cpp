@@ -197,7 +197,7 @@ uint32_t kept_at(int p_type) {
 
 // A signal emitted by generated code (rt::EngineApi::emit): each value made into Godot's own where Godot
 // reads it, on the stack, as the request by name makes it (to_variant), and the emit the host worked out.
-bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
+bool emit_bare(rt::Context *c, void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
 	if (p_count >= MOST_OPERANDS) {
 		return false;
 	}
@@ -237,7 +237,13 @@ bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const voi
 			}
 		}
 	}
-	return emit_signal(*static_cast<const GodotHost::Worked *>(p_emitter), static_cast<const Variant *>(p_signal), pointers, p_count);
+	std::string error;
+	const auto ran = emit_signal(*static_cast<const GodotHost::Worked *>(p_emitter), static_cast<const Variant *>(p_signal), pointers, p_count, &error);
+	if (ran && !*ran) {
+		auto library = c->host->library();
+		vm::raise_engine(library, error);
+	}
+	return ran.has_value();
 }
 
 // Godot's own entry for a call on bare values is handed over as it is: generated code calls it with nothing

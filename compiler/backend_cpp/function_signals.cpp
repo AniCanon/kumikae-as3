@@ -197,9 +197,9 @@ bool FunctionWriter::engine_emit(const Instruction &p_in) {
 		line("const void *const p[] = { " + values + " };");
 	}
 	mark();
-	line("if (KAS3_LIKELY(emitter && c->engine->emit(emitter, " + signal + ".handle, " + (list.size() > 1 ? "k, p, " : "nullptr, nullptr, ") + count + "))) {");
+	line("if (KAS3_LIKELY(emitter && c->engine->emit(c, emitter, " + signal + ".handle, " + (list.size() > 1 ? "k, p, " : "nullptr, nullptr, ") + count + "))) {");
 	// The listeners ran meanwhile, and one of the program's may have raised.
-	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + fail() + " }");
+	line("if (KAS3_UNLIKELY(c->failing || (c->listener_failed && call_failed(c)))) { " + fail() + " }");
 	line("} else {");
 	if (lent != NONE) {
 		// The library reads the handle while the listeners run: it is given one of its own.

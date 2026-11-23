@@ -62,7 +62,7 @@ struct EngineApi {
 	// for the place (Resolved::bind), `p_signal` the handle on the signal, and each value is given as its
 	// code in `p_held` says (GIVEN_WHOLE and the rest). False, with nothing done, where the handle holds no
 	// signal or the signal's object is gone: the instruction's thunk then says what that is.
-	bool (*emit)(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
+	bool (*emit)(Context *, void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
 	// For each value with parts: where a handle on one keeps it, in bytes from the handle's start (0 for a
 	// type a handle keeps elsewhere, and for every type where the host could not make sure), and the number
 	// a handle on one starts with. Found by the host as it starts, from what Godot itself says of a handle
