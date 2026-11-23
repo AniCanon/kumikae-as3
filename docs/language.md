@@ -85,8 +85,6 @@ The compiler reports each of these as an error with its own message.
 - **Weak keys:** `new Dictionary(true)`.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.** Reading a name that one of
   these doesn't have gives `undefined`, as in Flash.
-- **`is` and `as` with `Int64`.** Store the value in an `Int64` variable instead: it's converted, and
-  checked, as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
   class that extends `RegExp` or `Dictionary`.
 
@@ -172,7 +170,8 @@ A mismatch raises `TypeError`.
 - **`Int64`.** A 64-bit integer type, because Godot's integers have 64 bits. Arithmetic on it wraps at 64
   bits, `/` gives a `Number`, and a comparison with a `Number` is exact. An `Int64` converts to `int`,
   `uint` or `Number` where one is expected, and raises a `RangeError` if the value doesn't fit. Writing
-  `int(x)` truncates instead, as in Flash.
+  `int(x)` truncates instead, as in Flash. `value is Int64` is true for a whole number an `Int64` holds,
+  `value as Int64` gives it or `null`, and `catch (e:Int64)` catches one.
 - **`[Export]` and `[Signal]`.** Metadata tags on fields of a class that extends a Godot class. See
   [Using AS3 in Godot](godot.md#export-a-field-to-the-inspector).
 - **Operators on Godot's value types.** `position + velocity * delta` works on `Vector2` and the other
