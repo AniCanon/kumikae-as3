@@ -67,19 +67,25 @@ Every later assignment must have the same checked type. Closure capture and indi
 such as `for each` keep the local dynamic.
 
 The proof recognizes literals, construction, typed parameters and locals, fields, getters and
-typed call results. You can return the local or copy it to a declaration of the same type.
-A public member can bind when its result goes into an exactly typed declaration or return, or
-when you discard a method result. Writes and method arguments need an exact value. Member access
-on an AS3 class needs a known concrete construction or a final class. Writes to the parts
-of an untyped Godot math value stay dynamic. The IR fixtures compare Numbers, Booleans, strings,
-AS3 objects, Vector2, Color and a newly constructed Godot resource with explicit declarations.
+typed call results. A local can flow to a matching declaration, assignment, return or fixed
+call parameter. A Boolean or ordinary number can control a branch. Numbers, signed and unsigned
+32-bit integers support numeric arithmetic and comparisons with another known ordinary number.
+A Boolean can feed a Boolean conjunction or disjunction. An int can also go directly to the
+built-in `trace`. The checker keeps the result types it proves for enclosing arithmetic.
 
-A freshly constructed engine object can bind a public member while it is known to be detached.
-For example, `var g:* = new Gradient(); return g.getPointCount();` can bind in a function returning
-`int`. The proof treats an unfamiliar engine operation as capable of publishing the receiver
-or attaching a script. It accepts that operation as the last, non-repeating access. A local
-sequence or loop of Node2D transforms can stay detached across accesses. Calling a callback
-between construction and access or publishing the object prevents the proof.
+A public field, getter or method can bind when its result feeds one of these uses. A discarded
+method call can also bind. Writes and method arguments require an exact value. A script class
+must be non-dynamic and either final or constructed at the first write. Writing a component of
+an untyped Godot math value still raises the copy error.
+
+A zero-argument construction of a built-in engine class establishes a fresh receiver. The proof
+tracks its uses up to a call that can run user code, an escape, or an engine operation that may
+publish the receiver. The operation itself can bind before its effects take place. Reading ordinary numeric and Boolean
+properties and performing detached Node2D transforms can continue within this region. A loop
+includes effects on its back edge. Later calls outside the loop cannot alter an earlier read.
+For example, a fresh Timer can read `waitTime` in a loop, free itself, and then call a callback.
+When you pass the Timer to the callback first, subsequent by-name accesses check its current
+script. Earlier accesses can bind even when the local needs dynamic storage after the callback.
 
 A parameter declared as `Node2D` can already carry a foreign script. Its untyped alias must
 dispatch through that script even for a built-in property. The parameter-alias fixture overrides
@@ -101,8 +107,11 @@ Each site has room for four receiver shapes. A shape identifies the Godot class 
 and the script class. An entry holds resolution metadata. It takes its receiver and arguments
 from the current operation. Additional shapes use the shared lookup table. An interpreter owns
 its side table separately from the immutable module, so warming a site cannot change the module
-fingerprint. The host retains names resolved in its declaration table. A computed miss returns a
-shared missing-member description without retaining the key. Generated C++ keeps a cache at each site and checks its program generation before
+fingerprint. The host retains resolved engine declarations. It remembers a declaration miss for a literal
+on the receiver class or value type. A computed key can reuse that answer. Starting a program
+clears the literal misses. A foreign script can declare a property or method absent from the
+engine table. The host looks up those declarations on the attached script and its base scripts.
+A warmed site dispatches the read or call through Godot with an interned name. Generated C++ keeps a cache at each site and checks its program generation before
 using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
 refused before it enters AS3, and a worker free is queued for the main thread. The instance
 lookup, host bindings and interpreter overflow table follow the same thread contract. A native

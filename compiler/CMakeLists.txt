@@ -200,7 +200,8 @@ if(KAS3_GODOT_CPP)
 endif()
 
 enable_testing()
-if(KAS3_HAS_PLAY_BACKEND)
+# Link the internal host entry directly on Unix. Windows exports only the GDExtension entry.
+if(KAS3_HAS_PLAY_BACKEND AND UNIX)
     add_executable(godot_null_shape tests/godot_null_shape.cpp)
     target_include_directories(godot_null_shape PRIVATE godot_ext vm ir)
     target_include_directories(godot_null_shape SYSTEM PRIVATE ${KAS3_GODOT_CPP_INCLUDES})

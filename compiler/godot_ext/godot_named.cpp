@@ -124,6 +124,28 @@ const vm::NamedMember &GodotHost::script_binding(std::string_view p_name, bool p
 	return member;
 }
 
+// Godot may receive this literal after a script is detached. A raw engine spelling must
+// never expose a native member that the AS3 declaration table spells differently.
+bool GodotHost::delegates_script(void *p_receiver, std::string_view p_name) {
+	Object *object = static_cast<const Variant *>(p_receiver)->get_validated_object();
+	if (!object) {
+		return false;
+	}
+	const StringName klass = object->get_class();
+	const StringName key(to_godot(p_name));
+	auto *db = ClassDBSingleton::get_singleton();
+	if (db->class_has_method(klass, key) || db->class_has_signal(klass, key) || db->class_has_integer_constant(klass, key)) {
+		return false;
+	}
+	const auto properties = db->class_get_property_list(klass);
+	for (int i = 0; i < properties.size(); i++) {
+		if (StringName(Dictionary(properties[i])["name"]) == key) {
+			return false;
+		}
+	}
+	return true;
+}
+
 // Only names declared by the attached script supplement the engine's AS3 declaration table.
 const vm::NamedMember &GodotHost::script_member(void *p_receiver, std::string_view p_name) {
 	const Variant &value = *static_cast<const Variant *>(p_receiver);
@@ -279,10 +301,18 @@ std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const v
 	const auto &binding = static_cast<const Worked &>(p_bind);
 	Variant value;
 	if (binding.what == Worked::What::Getter) {
+		// An undeclared name can also be answered by _get. Check its declaration before invoking
+		// that hook on a replacement script, so a decline has no observable side effects.
+		static const StringName custom_get("_get");
+		if (p_shape.delegate && gdextension_interface::object_has_script_method(p_shape.owner, custom_get._native_ptr()) &&
+				script_member(p_operands[0].slot.p, binding.name).what != vm::NamedMember::What::Property) {
+			return std::nullopt;
+		}
 		GDExtensionBool valid = false;
 		gdextension_interface::variant_get_named(static_cast<const Variant *>(p_operands[0].slot.p)->_native_ptr(),
 				binding.dynamic_name._native_ptr(), value._native_ptr(), &valid);
-		if (!valid) {
+		if (!valid || (value.get_type() == Variant::CALLABLE &&
+				gdextension_interface::object_has_script_method(p_shape.owner, binding.dynamic_name._native_ptr()))) {
 			return std::nullopt;
 		}
 	} else {

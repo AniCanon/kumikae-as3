@@ -125,21 +125,22 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 	return false;
 }
 
-const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &shape, void *handle,
-		std::string_view p_name, const NamedSite::Entry *delegated) {
-	const std::optional<uint32_t> klass = shape.instance ? std::optional<uint32_t>(shape.instance->klass) : std::nullopt;
-	const NamedSite::Entry *entry = shape.delegate ? delegated : nullptr;
+const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
+		std::string_view p_name, const NamedSite::Entry *p_delegated) {
+	const std::optional<uint32_t> klass = p_shape.instance ? std::optional<uint32_t>(p_shape.instance->klass) : std::nullopt;
+	const NamedSite::Entry *entry = p_shape.delegate ? p_delegated : nullptr;
 	for (size_t i = 0; !entry && i < p_site.used; i++) {
 		const auto &candidate = p_site.entries[i];
-		if (shape.type == candidate.type && shape.script == candidate.script && candidate.klass == klass) {
+		if (p_shape.type == candidate.type && p_shape.script == candidate.script && candidate.klass == klass) {
 			entry = &candidate;
 			break;
 		}
 	}
 	if (!entry && p_site.used < p_site.entries.size()) {
 		auto &next = p_site.entries[p_site.used];
-		next = resolve(p_engine, p_module, shape, handle, p_name);
-		if (shape.script && !shape.instance && next.engine && !next.engine->godot.empty()) {
+		next = resolve(p_engine, p_module, p_shape, p_handle, p_name);
+		if (p_shape.script && !p_shape.instance && next.engine && !next.engine->godot.empty() &&
+				(!next.engine->script_only || p_engine.delegates_script(p_handle, p_name))) {
 			p_site.delegated = p_site.used;
 		}
 		entry = &next;
@@ -153,10 +154,10 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 			p_site.overflow = &found->second;
 		}
 		auto &entries = p_site.overflow->entries;
-		const NamedOverflow::Shape key{ shape.type, klass, shape.script };
+		const NamedOverflow::Shape key{ p_shape.type, klass, p_shape.script };
 		auto [at, added] = entries.try_emplace(key);
 		if (added) {
-			at->second = resolve(p_engine, p_module, shape, handle, p_name);
+			at->second = resolve(p_engine, p_module, p_shape, p_handle, p_name);
 		}
 		entry = &at->second;
 	}

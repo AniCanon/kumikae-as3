@@ -23,6 +23,21 @@ class Intercept extends Node2D:
 			return true
 		return false
 
+class VirtualOnly extends Node2D:
+	var reads := 0
+
+	func _get(property: StringName):
+		if property == &"stored":
+			reads += 1
+			return "virtual"
+		return null
+
+class InterceptTimer extends Timer:
+	func _get(property: StringName):
+		if property == &"wait_time":
+			return 7.5
+		return null
+
 class Positions extends Node2D:
 	var reads := 0
 	var writes := 0
@@ -113,9 +128,21 @@ func _physics_process(_delta: float) -> bool:
 	show("a method read by name", ask("method", [o]), [false, true, true, "function"])
 	show("a signal reached by name", ask("listens", [fresh()]), [true, 1, 0])
 	show("exact untyped arguments", ask("exactArguments", [fresh()]), [false, Vector2(6, 8), 0.5, 100.0])
+	var timer := Timer.new()
+	var initial = timer.get("wait_time")
+	timer.set_script(InterceptTimer)
+	show("fresh timer after attaching a script", ask("attachedTimer", [InterceptTimer]), initial + timer.get("wait_time"))
+	timer.free()
 	var foreign := Intercept.new()
 	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
 		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
+	var changing := Node2D.new()
+	changing.set_script(Intercept)
+	var declared = ask("readStored", [changing])
+	changing.set_script(VirtualOnly)
+	var removed = ask("readStored", [changing])
+	show("foreign declaration after replacement", [declared, removed, changing.get("reads")], [true, 1069, 0])
+	changing.free()
 	var reference := Intercept.new()
 	reference.set("visible", false)
 	var expected = [reference.get("visible"), reference.reads, reference.writes]

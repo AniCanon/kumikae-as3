@@ -12,8 +12,6 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
-#include <cstdio>
-#include <cstdlib>
 #include <optional>
 #include <vector>
 

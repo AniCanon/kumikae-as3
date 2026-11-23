@@ -213,22 +213,22 @@ std::optional<Binding> member_use(Compilation &p_compilation, const Type *p_type
 
 using Uses = std::unordered_map<Symbol *, std::vector<Name *>>;
 
-void index_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_initial, Parents &parents, Uses &uses) {
-	walk(p_body, [&](Node *node) {
-		if (node->kind == NodeKind::FunctionDecl) {
+void index_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_initial, Parents &r_parents, Uses &r_uses) {
+	walk(p_body, [&](Node *p_node) {
+		if (p_node->kind == NodeKind::FunctionDecl) {
 			return false;
 		}
-		walk(node, [&](Node *child) {
-			if (child != node) {
-				parents.emplace(child, node);
+		walk(p_node, [&](Node *p_child) {
+			if (p_child != p_node) {
+				r_parents.emplace(p_child, p_node);
 				return false;
 			}
 			return true;
 		});
-		if (node->kind == NodeKind::Name) {
-			auto *name = static_cast<Name *>(node);
+		if (p_node->kind == NodeKind::Name) {
+			auto *name = static_cast<Name *>(p_node);
 			if (p_initial.count(name->symbol)) {
-				uses[name->symbol].push_back(name);
+				r_uses[name->symbol].push_back(name);
 			}
 		}
 		return true;
@@ -253,14 +253,15 @@ uint32_t last_iteration(const Parents &p_parents, Expr *p_initial, Expr *p_acces
 // The first operation that can expose the receiver or execute user code ends its proof.
 // An operation can itself bind before it publishes the receiver. Later statements cannot
 // affect an earlier access unless control can return to it through a loop.
-uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding> &p_bindings, Package *p_godot) {
+uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding> &p_bindings, Package *p_godot, const Consumers &p_consumers) {
 	uint32_t first = p_body->end;
 	std::unordered_set<Node *> known{ p_initial, static_cast<New *>(p_initial)->callee };
 	for (const Binding &binding : p_bindings) {
 		known.insert(binding.access->object);
 		known.insert(binding.access);
 		known.insert(binding.operation);
-		const bool read = binding.operation == binding.access && binding.member->kind == SymbolKind::Property;
+		const bool read = binding.operation == binding.access && binding.member->kind == SymbolKind::Property &&
+				(p_consumers.ordinary_number(binding.result) || binding.result == p_consumers.boolean);
 		if (!read && !isolated_transform(*binding.member)) {
 			first = std::min(first, binding.operation->end);
 		}
@@ -281,7 +282,9 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 			}
 		} else if (node->kind == NodeKind::Name) {
 			const auto *name = static_cast<Name *>(node);
-			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter)) {
+			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
+					(p_consumers.ordinary_number(name->type) || name->type == p_consumers.boolean ||
+					(name->type && name->type->symbol && name->type->symbol->package == p_godot && name->type->symbol->name == "Vector2"))) {
 				return true;
 			}
 		} else if (node->kind == NodeKind::Member) {
@@ -299,6 +302,13 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 		return false;
 	});
 	return first;
+}
+
+void retain_detached(const Parents &p_parents, Expr *p_initial, uint32_t p_effect, uint32_t p_escape, std::vector<Binding> &r_bindings) {
+	const uint32_t end = std::min(p_effect, p_escape);
+	r_bindings.erase(std::remove_if(r_bindings.begin(), r_bindings.end(), [&](const Binding &p_bind) {
+		return last_iteration(p_parents, p_initial, p_bind.operation) > end;
+	}), r_bindings.end());
 }
 
 bool direct_use(Consumers &p_consumers, Name *p_name, const Type *p_type) {
@@ -337,6 +347,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 		Consumers consumers{ compilation_, parents, returns, number_, boolean_, {} };
 		std::vector<Binding> bindings;
 		bool safe = true, assigned = false;
+		uint32_t escape = p_body->end;
 		for (Name *name : uses[local]) {
 			Node *use = parent(parents, name);
 			if (!fresh && direct_use(consumers, name, type)) {
@@ -347,6 +358,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 			if (!bind) {
 				safe = false;
 				if (fresh) {
+					escape = std::min(escape, name->offset);
 					continue;
 				}
 				break;
@@ -354,15 +366,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 			bindings.push_back(*bind);
 		}
 		if (fresh) {
-			uint32_t end = first_effect(p_body, initial, bindings, godot_);
-			for (Name *name : uses[local]) {
-				if (std::none_of(bindings.begin(), bindings.end(), [name](const Binding &p_bind) { return p_bind.access->object == name; })) {
-					end = std::min(end, name->offset);
-				}
-			}
-			bindings.erase(std::remove_if(bindings.begin(), bindings.end(), [&, creation = initial](const Binding &p_bind) {
-				return last_iteration(parents, creation, p_bind.operation) > end;
-			}), bindings.end());
+			retain_detached(parents, initial, first_effect(p_body, initial, bindings, godot_, consumers), escape, bindings);
 			safe = bindings.size() == uses[local].size();
 			if (bindings.empty() && !safe) {
 				continue;

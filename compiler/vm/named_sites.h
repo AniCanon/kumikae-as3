@@ -41,8 +41,8 @@ class NamedSites {
 	// share its class metadata. Only AS3 field and method slots depend on a script class.
 	std::map<std::string, NamedOverflow, std::less<>> shared_;
 	uint64_t generation_;
-	const NamedSite::Entry &binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &shape, void *handle,
-		std::string_view p_name, const NamedSite::Entry *delegated);
+	const NamedSite::Entry &binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
+		std::string_view p_name, const NamedSite::Entry *p_delegated);
 public:
 	explicit NamedSites(const ir::Module &p_module);
 	uint32_t vector_target(uint32_t p_function, uint32_t p_pc) const {

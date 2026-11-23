@@ -54,14 +54,14 @@ struct Candidate {
 };
 using Candidates = std::unordered_map<Symbol *, Candidate>;
 
-void find_initial_writes(Block *p_block, Block *p_region, Candidates &candidates) {
+void find_initial_writes(Block *p_block, Block *p_region, Candidates &r_candidates) {
 	for (Stmt *statement : p_block->statements) {
 		if (statement->kind == NodeKind::Block) {
-			find_initial_writes(static_cast<Block *>(statement), p_region, candidates);
+			find_initial_writes(static_cast<Block *>(statement), p_region, r_candidates);
 		} else if (statement->kind == NodeKind::VarStmt) {
 			for (auto &decl : static_cast<VarStmt *>(statement)->decl->declarators) {
 				if (decl.symbol && decl.symbol->kind == SymbolKind::Local && (!decl.type || decl.type->form == TypeRef::Any) && stored_type(decl.initializer)) {
-					candidates.emplace(decl.symbol, Candidate{ &decl, decl.initializer, nullptr, p_region });
+					r_candidates.emplace(decl.symbol, Candidate{ &decl, decl.initializer, nullptr, p_region });
 				}
 			}
 		} else if (statement->kind == NodeKind::ExprStmt) {
@@ -71,14 +71,14 @@ void find_initial_writes(Block *p_block, Block *p_region, Candidates &candidates
 				Symbol *local = local_name(assign->target);
 				if (assign->op == TokenKind::Assign && local && local->kind == SymbolKind::Local &&
 						(!local->type || local->type->form == TypeRef::Any) && stored_type(assign->value)) {
-					candidates.emplace(local, Candidate{ nullptr, assign->value, assign->target, p_region });
+					r_candidates.emplace(local, Candidate{ nullptr, assign->value, assign->target, p_region });
 				}
 			}
 		} else {
 			walk(statement, [&](Node *node) {
 				if (node->kind == NodeKind::Block) {
 					auto *block = static_cast<Block *>(node);
-					find_initial_writes(block, block, candidates);
+					find_initial_writes(block, block, r_candidates);
 					return false;
 				}
 				return node->kind != NodeKind::FunctionDecl;
@@ -87,52 +87,52 @@ void find_initial_writes(Block *p_block, Block *p_region, Candidates &candidates
 	}
 }
 
-bool validate_use(Node *p_node, Candidates &candidates) {
+bool validate_use(Node *p_node, Candidates &r_candidates) {
 	switch (p_node->kind) {
 		case NodeKind::FunctionDecl:
 			walk(p_node, [&](Node *p_part) {
 				if (p_part->kind == NodeKind::Name) {
-					candidates.erase(static_cast<Name *>(p_part)->symbol);
+					r_candidates.erase(static_cast<Name *>(p_part)->symbol);
 				}
 			});
 			return false;
 		case NodeKind::VarDecl:
 			for (auto &decl : static_cast<VarDecl *>(p_node)->declarators) {
-				auto it = candidates.find(decl.symbol);
-				if (it != candidates.end() && decl.initializer && it->second.declaration != &decl) {
-					candidates.erase(it);
+				auto it = r_candidates.find(decl.symbol);
+				if (it != r_candidates.end() && decl.initializer && it->second.declaration != &decl) {
+					r_candidates.erase(it);
 				}
 			}
 			break;
 		case NodeKind::Name: {
-			auto it = candidates.find(static_cast<Name *>(p_node)->symbol);
-			if (it != candidates.end() && p_node != it->second.target && (p_node->offset < it->second.value->end || p_node->end > it->second.region->end)) {
-				candidates.erase(it);
+			auto it = r_candidates.find(static_cast<Name *>(p_node)->symbol);
+			if (it != r_candidates.end() && p_node != it->second.target && (p_node->offset < it->second.value->end || p_node->end > it->second.region->end)) {
+				r_candidates.erase(it);
 			}
 		} break;
 		case NodeKind::Assign: {
 			const auto *assign = static_cast<Assign *>(p_node);
-			auto it = candidates.find(local_name(assign->target));
-			if (it != candidates.end() && (assign->op != TokenKind::Assign || stored_type(assign->value) != it->second.value->type)) {
-				candidates.erase(it);
+			auto it = r_candidates.find(local_name(assign->target));
+			if (it != r_candidates.end() && (assign->op != TokenKind::Assign || stored_type(assign->value) != it->second.value->type)) {
+				r_candidates.erase(it);
 			}
 		} break;
 		case NodeKind::ForIn: {
 			const auto *loop = static_cast<ForIn *>(p_node);
-			candidates.erase(local_name(loop->target));
+			r_candidates.erase(local_name(loop->target));
 			if (loop->declaration) {
 				for (auto &decl : loop->declaration->declarators) {
-					candidates.erase(decl.symbol);
+					r_candidates.erase(decl.symbol);
 				}
 			}
 		} break;
 		case NodeKind::Postfix:
-			candidates.erase(local_name(static_cast<Postfix *>(p_node)->operand));
+			r_candidates.erase(local_name(static_cast<Postfix *>(p_node)->operand));
 			break;
 		case NodeKind::Unary: {
 			const auto *unary = static_cast<Unary *>(p_node);
 			if (unary->op == TokenKind::PlusPlus || unary->op == TokenKind::MinusMinus) {
-				candidates.erase(local_name(unary->operand));
+				r_candidates.erase(local_name(unary->operand));
 			}
 		} break;
 		default:

@@ -94,6 +94,18 @@ package {
 			}
 			return found;
 		}
+		public function attachedTimer(script:Script):Number {
+			var timer:* = new Timer();
+			var before:Number = timer.waitTime;
+			timer.setScript(script);
+			var after:Number = timer.waitTime;
+			timer.free();
+			return before + after;
+		}
+		public function readStored(o:*):* {
+			try { return o.stored; }
+			catch (e:ReferenceError) { return e.errorID; }
+		}
 		public function foreignDeclarations(o:*, property:String, method:String):Array {
 			return [o.stored, o.script_score(), o[property], o[method]()];
 		}

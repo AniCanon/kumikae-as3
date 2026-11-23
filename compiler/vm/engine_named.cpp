@@ -41,15 +41,14 @@ void *EngineNamed::handle_of(Slot p_holder) const {
 	return any::is_engine(p_holder) ? any::pointer(p_holder) : engine_object_in(vm_.module_, p_holder);
 }
 
-NamedMember EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
+const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
 	void *handle = p_key.object ? nullptr : handle_of(p_holder);
 	if (!handle) {
 		return MISSING_MEMBER;
 	}
-	NamedMember found = vm_.host_.handles.named(handle, p_key.name());
+	const NamedMember &found = vm_.host_.handles.named(handle, p_key.name());
 	if (found.what == NamedMember::What::Missing && !checked_) {
-		found = vm_.host_.handles.script_member(handle, p_key.name());
-
+		return vm_.host_.handles.script_member(handle, p_key.name());
 	}
 	return found;
 }

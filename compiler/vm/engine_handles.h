@@ -97,6 +97,7 @@ struct EngineHandles {
 	virtual const NamedMember &script_member(void *, std::string_view) { return MISSING_MEMBER; }
 	// Validates a receiver for a site hit. A host without stable shape identities declines.
 	virtual std::optional<NamedShape> named_shape(void *, uintptr_t) { return {}; }
+	virtual bool delegates_script(void *, std::string_view) { return false; }
 	// The actual script handles the request even if it has changed since the site warmed.
 	virtual std::optional<bool> run_script(const NamedShape &, const Prepared &, const Argument *, size_t,
 			const Wanted &, Slot *, std::string *) { return std::nullopt; }

@@ -254,6 +254,12 @@ a second full build and a pre-54 build for the script members. The older script 
 an AS3 wrapper that passes `this`. Current builds receive the scripted node from Godot. C# uses
 `Get`, `Set` and `Call`. Its Vector2 struct has no corresponding by-name operations.
 
+The Timer control reads a freshly constructed object's wait time. The foreign-only rows read
+a GDScript field and call its method. The main build probes each operation and reports an
+unsupported row if AS3 raises the missing-property or missing-method error. On macOS the
+comparison also prints how many of eight distinct program images remain loaded after close
+for each build. `ctest -R by_name_gate_rules` exercises the timing rules without timing a run.
+
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.
 

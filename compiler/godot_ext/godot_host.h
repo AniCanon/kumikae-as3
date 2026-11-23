@@ -166,6 +166,7 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool delegates_script(void *p_receiver, std::string_view p_name) override;
 	const vm::NamedMember &script_member(void *p_receiver, std::string_view p_name) override;
 	static std::optional<vm::NamedShape> shape_of(void *p_receiver, uintptr_t p_delegated = 0);
 	std::optional<vm::NamedShape> named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }
@@ -209,9 +210,9 @@ std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Variant &p_value);
+godot::Variant *reusable_math(const vm::Wanted &p_wanted, const godot::Variant &p_value);
 // What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
 // something else.
-godot::Variant *reusable_math(const vm::Wanted &p_wanted, const godot::Variant &p_value);
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
 // One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
 std::string_view value_name(int p_type);
