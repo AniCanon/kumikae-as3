@@ -39,21 +39,29 @@ ROUNDS = 1000
 FRAMES = 3
 
 
-def unloads_on_macos(program):
-    """Use Play's dlopen flags and count the library's dyld images after close."""
+def retained_on_macos(program, reloads=8):
+    """Load a distinct Play image each time, then count all images still mapped after close."""
     import _ctypes
     import ctypes
-    path = os.path.realpath(program)
     dyld = ctypes.CDLL(None)
     dyld._dyld_get_image_name.restype = ctypes.c_char_p
 
-    def present():
-        return any(os.fsdecode(dyld._dyld_get_image_name(i)) == path for i in range(dyld._dyld_image_count()))
+    def loaded():
+        return {os.path.realpath(os.fsdecode(dyld._dyld_get_image_name(i)))
+                for i in range(dyld._dyld_image_count())}
 
-    handle = _ctypes.dlopen(path, os.RTLD_NOW | os.RTLD_LOCAL)
-    loaded = present()
-    _ctypes.dlclose(handle)
-    return loaded and not present()
+    with tempfile.TemporaryDirectory() as folder:
+        paths = set()
+        for i in range(reloads):
+            path = os.path.realpath(shutil.copyfile(program, os.path.join(folder, f"play-{i}.dylib")))
+            handle = _ctypes.dlopen(path, os.RTLD_NOW | os.RTLD_LOCAL)
+            try:
+                if path not in loaded():
+                    raise RuntimeError(f"dyld did not report {path} after dlopen")
+            finally:
+                _ctypes.dlclose(handle)
+            paths.add(path)
+        return len(paths & loaded())
 
 
 class Runner:
@@ -148,7 +156,7 @@ class Runner:
             if not program:
                 return
             if sys.platform == "darwin":
-                self.check("native: a closed Play library leaves dyld", unloads_on_macos(program), program)
+                self.check("native: a closed Play library leaves dyld", retained_on_macos(program) == 0, program)
             said = {}
             for label, library in (("interpreter", None), ("native", program)):
                 status, text = self.run(project, "probe.gd", library)
@@ -169,8 +177,10 @@ class Runner:
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
             status, text = self.run(project, "by_name.gd", program)
-            self.check("native: computed keys leave no missing names cached",
-                       "VALUE computed misses=0|0" in text and "kas3: cached missing members=0" in text, text[-1200:])
+            self.check("native: computed keys report missing properties",
+                       "VALUE computed misses=0|0" in text, text[-1200:])
+            self.check("native: foreign script declarations support literal and computed names",
+                       "VALUE foreign declarations=[true, 41, true, 41]|[true, 41, true, 41]" in text, text[-1800:])
             self.check("native: nullable math member reads raise the null-reference error",
                        "VALUE null math receivers=[1009, 1009]|[1009, 1009]" in text, text[-1600:])
             expected = "VALUE parameter alias respects position overrides=[[3, true], 5, 1]|[[3, true], 5, 1]"

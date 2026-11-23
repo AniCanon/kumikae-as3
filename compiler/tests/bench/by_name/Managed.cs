@@ -11,6 +11,14 @@ public partial class Managed : Node
 
     public double Measure(string kind, string op, Node2D target, int n)
     {
+        if (kind == "timer" || kind == "timerTyped")
+        {
+            var timer = new Timer();
+            double total = 0;
+            for (int i = 0; i < n; i++) total += timer.Get(Timer.PropertyName.WaitTime).AsDouble();
+            timer.Free();
+            return total;
+        }
         if (kind == "proven" || kind == "typed")
         {
             var fresh = new Node2D();
@@ -22,7 +30,7 @@ public partial class Managed : Node
             return result;
         }
         bool mixed = kind == "mixed";
-        bool script = kind == "script";
+        bool script = kind == "script" || kind == "foreign";
         double sum = 0;
         if (op == "read" && script)
             for (int i = 0; i < n; i++) sum += target.Get(Score).AsInt32();

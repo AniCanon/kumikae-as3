@@ -10,11 +10,13 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from native_godot import Runner, USED
+from native_godot import Runner, USED, retained_on_macos
 
 ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "value", "alias", "aliasTyped", "proven", "typed", "mixed")
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
+
+ROWS.extend(("foreign/read", "foreign/call"))
 
 TOLERANCE = 0.03
 
@@ -35,7 +37,7 @@ def failures(samples, baseline):
         for mode in ("interpreter", "native"):
             if mode in modes and "C#" in modes and not row.startswith(("aliasTyped/", "typed/")):
                 compare(modes[mode], modes["C#"], f"{mode} slower than C#")
-            if baseline is not None and mode in modes:
+            if baseline is not None and mode in modes and baseline[row][mode] is not None:
                 compare(modes[mode], baseline[row][mode], f"{mode} slower than main")
             kind, op = row.split("/")
             if mode in modes and (kind == "proven" or kind in INFERRED):
@@ -65,20 +67,23 @@ def prepare(godot, build, where):
     return project, library
 
 
-def measure(godot, project, library, mode, rows, baseline):
+def measure(godot, project, library, mode, rows, label):
     env = dict(os.environ, KAS3_NATIVE_PLAY="0")
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
         env["KAS3_PROGRAM_LIBRARY"] = library
-    wanted = [row for row in rows if mode != "C#" or row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value")]
+    wanted = [row for row in rows if mode != "C#" or row.startswith(("timer/", "timerTyped/"))
+              or row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value")]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
-           "cs" if mode == "C#" else "self" if baseline else "as", "20000", *wanted]
+           "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", "20000", *wanted]
     run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=90)
     output = run.stdout + run.stderr
-    found = re.findall(r"^NAMED (\w+/\w+) ([\d.]+)$", output, re.M)
+    found = re.findall(r"^NAMED (\w+/\w+) ([\d.]+|unsupported)$", output, re.M)
     check(mode, run.returncode == 0 and (USED in output) == (mode == "native")
           and [name for name, _ in found] == wanted and "SCRIPT ERROR" not in output, output)
-    return {name: float(micros) / 1000 for name, micros in found}
+    for row, value in found:
+        check(row, value != "unsupported" or (label == "main" and mode != "C#" and row.startswith("foreign/")), output)
+    return {name: None if micros == "unsupported" else float(micros) / 1000 for name, micros in found}
 
 
 def main():
@@ -96,21 +101,32 @@ def main():
     check("runs", args.runs >= 2, "need at least two rounds to measure spread")
     with tempfile.TemporaryDirectory() as folder:
         commands = []
+        retained = {}
         for label, build in (("PR", args.build), ("main", args.against), ("pre54", args.before_script)):
             if build:
                 project, library = prepare(godot, build.resolve(), Path(folder) / label)
+                if sys.platform == "darwin" and args.against and label != "pre54":
+                    retained[label] = retained_on_macos(library)
                 rows = ROWS if label != "pre54" else [row for row in ROWS if row.startswith("script/")]
                 for mode in ("interpreter", "native", "C#"):
                     commands.append((label, project, library, mode, rows))
+        if retained:
+            print(f"Play images retained after eight closes: PR {retained['PR']}/8, main {retained['main']}/8", flush=True)
+            check("Play image unloading", retained["PR"] == 0, retained)
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label == "pre54").items():
+                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label).items():
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():
                 for mode, times in modes.items():
-                    print(f"{label} {row} {mode}: {statistics.median(times):.3f} ms [{min(times):.3f}, {max(times):.3f}]")
+                    if all(t is None for t in times):
+                        print(f"{label} {row} {mode}: unsupported")
+                        modes[mode] = None
+                    else:
+                        check(row, None not in times, "baseline support changed between runs")
+                        print(f"{label} {row} {mode}: {statistics.median(times):.3f} ms [{min(times):.3f}, {max(times):.3f}]")
         misses = failures(samples["PR"], samples.get("main"))
         print("\n".join(misses) or "All measured distributions meet the targets.")
         if args.gate and misses:

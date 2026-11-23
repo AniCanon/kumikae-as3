@@ -7,6 +7,15 @@ package {
 		public function current():int { return score; }
 		public function addTarget(value:*):void { targets.push(value); }
 
+		public function probeForeign(target:*, read:Boolean):int {
+			try {
+				if (read) return int(target.score);
+				return int(target.current());
+			} catch (e:Error) {
+				return -e.errorID;
+			}
+		}
+
 		public function selfRead(n:int):int { return scriptRead(this, n); }
 		public function selfWrite(n:int):void { scriptWrite(this, n); }
 		public function selfCall(n:int):int { return scriptCall(this, n); }
