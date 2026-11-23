@@ -1,0 +1,28 @@
+5 2 -Infinity -2 -Infinity
+7 NaN 2 1
+2 3 2 4
+1,2,-1
+1024 0 3
+true
+said 1 null undefined 1,2 true
+
+a 0 a,b
+b 1 a,b
+applied 2
+called
+12 255 NaN 31 2
+1500 NaN true false true
+true false true
+Hi A 0
+abc  0
+a%20b%26c a b a%20b a b
+{"a":1} 10 2
+946684800000 946771200000 946684800000
+true true true true false function
+2 true true
+7 32
+Error #1063: Argument count mismatch on Math/floor(). Expected 1, got 0.
+Error #1063: Argument count mismatch on Math/floor(). Expected 1, got 2.
+Error #1063: Argument count mismatch on Math/pow(). Expected 2, got 1.
+Error #1063: Argument count mismatch on parseInt(). Expected 0, got 3.
+Error #1116: second argument to Function.prototype.apply must be an array.

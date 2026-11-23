@@ -22,6 +22,25 @@ void Bodies::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	l_.own_layout_ = EnvLayout();
 }
 
+uint32_t Bodies::parameter_register(const Parameter &p_parameter, Kind p_kind) {
+	const uint32_t local = l_.reg(p_kind);
+	if (p_kind == Kind::Obj) {
+		// The class it holds, which a call through a function value or from Godot checks.
+		l_.fn().parameter_classes.resize(local + 1, NONE);
+		l_.fn().parameter_classes[local] = l_.declared_class(p_parameter.type);
+	}
+	if (is_engine(p_kind) && p_parameter.type) {
+		// What the engine must be handing over for this parameter.
+		const Type *type = l_.compilation_.type_of(p_parameter.type);
+		std::optional<std::string> godot;
+		if (type && type->symbol && (godot = godot_name(type->symbol->name, std::string_view()))) {
+			l_.fn().engine_types.resize(local + 1);
+			l_.fn().engine_types[local] = *godot;
+		}
+	}
+	return local;
+}
+
 void Bodies::parameters(FunctionDecl *p_function) {
 	if (!l_.fn().is_static) {
 		l_.fn().registers.push_back(Kind::Obj);
@@ -34,21 +53,7 @@ void Bodies::parameters(FunctionDecl *p_function) {
 				l_.vector_class(l_.compilation_.instance_type(l_.array_)); // The Array it is made as.
 			}
 			Kind kind = parameter.is_rest ? Kind::Obj : l_.written_kind(parameter.type, parameter.offset, Kind::F64);
-			uint32_t local = l_.reg(kind);
-			if (kind == Kind::Obj) {
-				// The class it holds, which a call through a function value or from Godot checks.
-				l_.fn().parameter_classes.resize(local + 1, NONE);
-				l_.fn().parameter_classes[local] = l_.declared_class(parameter.type);
-			}
-			if (is_engine(kind) && parameter.type) {
-				// What the engine must be handing over for this parameter.
-				const Type *type = l_.compilation_.type_of(parameter.type);
-				std::optional<std::string> godot;
-				if (type && type->symbol && (godot = godot_name(type->symbol->name, std::string_view()))) {
-					l_.fn().engine_types.resize(local + 1);
-					l_.fn().engine_types[local] = *godot;
-				}
-			}
+			const uint32_t local = parameter_register(parameter, kind);
 			if (parameter.symbol) {
 				l_.locals_[parameter.symbol] = local;
 			}

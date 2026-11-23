@@ -2,6 +2,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine_values.h"
 #include "lower_functions.h"
+#include "lower_library_values.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
 
@@ -29,6 +30,9 @@ uint32_t Functions::function_value(Expr *p_expression) {
 	if (function == l_.functions_.end() && library && p_expression->kind == NodeKind::Member &&
 			static_cast<Member *>(p_expression)->object->kind != NodeKind::SuperExpr) {
 		return Dynamic(l_).method_value(static_cast<Member *>(p_expression), klass);
+	}
+	if (function == l_.functions_.end() && LibraryValues::is_function(symbol)) {
+		return LibraryValues(l_).function_value(p_expression, symbol);
 	}
 	if (function == l_.functions_.end()) {
 		l_.refuse(position, "'" + std::string(symbol->name) + "' used as a value");

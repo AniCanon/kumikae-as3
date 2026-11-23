@@ -6,6 +6,7 @@
 // value is bound to an Array of what it is read from, its AS3 name and Godot's name for it (the pair a
 // method of the library read by name is bound to, with Godot's name after it): the interpreter finds the
 // same method of the same object equal by it, and hands Godot its own Callable of the two.
+#include "lower_bodies.h"
 #include "lower_engine.h"
 #include "lower_engine_values.h"
 
@@ -233,11 +234,7 @@ void EngineValues::lower(const PendingFunction &p_pending) {
 		if (type) {
 			l_.kind_of(type, &kind);
 		}
-		const uint32_t local = l_.engine_reg(kind, type);
-		if (kind == Kind::Obj) {
-			l_.fn().parameter_classes.resize(local + 1, NONE);
-			l_.fn().parameter_classes[local] = l_.declared_class(parameter.type);
-		}
+		const uint32_t local = Bodies(l_).parameter_register(parameter, kind);
 		l_.fn().locals.push_back({ std::string(parameter.name), local });
 		least = parameter.default_value && least == decl->parameters.count ? i : least;
 	}
