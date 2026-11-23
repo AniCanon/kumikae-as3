@@ -254,8 +254,9 @@ Native compares with the interpreter, each untyped row compares with C# by name 
 the API exists, and each inferred row compares with its explicitly typed control. The controls cover
 a fresh Node2D and Timer, Number, Boolean, String, an AS3 class, Vector2 and Color.
 The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node. Timing stays
-outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
-a second full build and a pre-54 build for the script members. The older script enters through
+outside CTest. The report prints main timings only when you pass its build with
+`--against <main-build-godot>`. Add `--before-script <build-godot>` to interleave a pre-54
+build for the script members. The older script enters through
 an AS3 wrapper that passes `this`. Current builds receive the scripted node from Godot. C# uses
 `Get`, `Set` and `Call`. Its Vector2 struct has no corresponding by-name operations.
 
