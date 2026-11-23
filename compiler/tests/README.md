@@ -245,7 +245,8 @@ The gate alternates interpreted AS3, native AS3 and optimized C# on the same rec
 It checks return values and mutations, then reports median milliseconds and the observed range for
 20,000 operations. It fails if the faster end of a candidate's range exceeds the slower end of
 its reference range. Native compares with the interpreter, both compare with C# by name where
-the API exists, and the inferred local also compares with the explicitly typed local. Timing stays
+the API exists, and a fresh, non-escaping Node2D compares with its explicitly typed control.
+The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node. Timing stays
 outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
 a second full build and a pre-54 build for the script members. The older script enters through
 an AS3 wrapper that passes `this`. Current builds receive the scripted node from Godot. C# uses

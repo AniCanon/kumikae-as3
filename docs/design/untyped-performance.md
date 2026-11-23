@@ -37,12 +37,12 @@ as well as the member itself.
 | script | call | 59 / 8 / 15 / 18 / 0 / 0 | 60 / 5 / 14 / 20 / 0 / 1 |
 | value | read | 52 / 10 / 0 / 34 / 3 / 0 | 51 / 10 / 0 / 33 / 4 / 2 |
 | value | call | 57 / 9 / 0 / 31 / 3 / 0 | 53 / 9 / 0 / 35 / 3 / 1 |
-| proven | read | 30 / 19 / 7 / 35 / 9 / 0 | 26 / 16 / 6 / 36 / 10 / 5 |
-| proven | write | 30 / 16 / 11 / 19 / 25 / 0 | 32 / 15 / 6 / 26 / 16 / 5 |
-| proven | call | 36 / 22 / 9 / 9 / 24 / 0 | 37 / 18 / 8 / 11 / 25 / 0 |
-| typed | read | 77 / 0 / 0 / 10 / 12 / 0 | 0 / 0 / 0 / 0 / 88 / 12 |
-| typed | write | 63 / 0 / 0 / 2 / 35 / 0 | 0 / 0 / 0 / 0 / 93 / 6 |
-| typed | call | 63 / 0 / 0 / 3 / 34 / 0 | 0 / 0 / 0 / 0 / 96 / 4 |
+| parameter alias | read | 30 / 19 / 7 / 35 / 9 / 0 | 26 / 16 / 6 / 36 / 10 / 5 |
+| parameter alias | write | 30 / 16 / 11 / 19 / 25 / 0 | 32 / 15 / 6 / 26 / 16 / 5 |
+| parameter alias | call | 36 / 22 / 9 / 9 / 24 / 0 | 37 / 18 / 8 / 11 / 25 / 0 |
+| typed parameter alias | read | 77 / 0 / 0 / 10 / 12 / 0 | 0 / 0 / 0 / 0 / 88 / 12 |
+| typed parameter alias | write | 63 / 0 / 0 / 2 / 35 / 0 | 0 / 0 / 0 / 0 / 93 / 6 |
+| typed parameter alias | call | 63 / 0 / 0 / 3 / 34 / 0 | 0 / 0 / 0 / 0 / 96 / 4 |
 | mixed | read | 33 / 17 / 7 / 32 / 10 / 0 | 24 / 16 / 9 / 35 / 12 / 4 |
 | mixed | write | 34 / 17 / 11 / 21 / 18 / 0 | 28 / 14 / 10 / 25 / 17 / 5 |
 | mixed | call | 36 / 17 / 10 / 14 / 23 / 0 | 33 / 19 / 10 / 13 / 24 / 1 |
@@ -59,13 +59,22 @@ and 1.53 ms. Each pair uses the same 20,000-operation workload.
 
 ## Representation and guards
 
-The front end checks your source with its declared types. A representation proof examines
-function-local declarations after that check, follows writes by symbol identity, and requires
-a dominating declaration initializer or straight-line assignment. Compound assignments, loop
-targets, captured locals and reads before that first write keep dynamic storage. A typed register holds a proven value
-where its representation preserves the dynamic tag. Operations that observe the tag, including
-`typeof`, `is`, `as` and `delete`, keep their dynamic meaning. Function parameters and the
-`arguments` array retain their declared calling convention.
+The front end checks your source with its declared types. It then follows each local by symbol
+identity. The first write must dominate every read, every assignment must have the same concrete
+type, and every use must preserve AS3 behavior with that type. A local that passes uses the same
+registers and instructions as an explicitly typed declaration. The IR golden covers a property
+read, a write and a method call. A local that fails the proof keeps its dynamic accesses.
+
+For example, a fresh, detached `new Node2D()` used only for local transform operations can bind
+its members at compile time. Calling arbitrary code, publishing the node, capturing it, or reading
+it before initialization prevents that proof. A parameter declared as `Node2D` can already carry
+a foreign script. The parameter-alias fixture overrides `position`, counts reads and writes, and
+returns a different type on its fifth read. Both execution modes observe the override once per
+access and raise the conversion error. The timing matrix retains the parameter alias and its
+explicitly typed control alongside the separate pair for the fresh receiver.
+
+Operations that observe the dynamic tag, including `typeof`, `is`, `as` and `delete`, keep their
+dynamic semantics. Parameters and the `arguments` array keep their declared calling convention.
 
 A receiver's storage type alone does not prove which script is attached. At a dynamic site the
 runtime validates the live receiver and checks its script before selecting a field or engine
@@ -89,54 +98,67 @@ for every operation so a change in either path is visible.
 
 ## Cost after a site warms
 
-The table uses the same six categories and sampling interval. Receiver validation includes
-the live-object check, engine class identity and script lookup. Name lookup includes resolution
-through the shared table when a site has more than four shapes. The 46 AS3 profiles have 661
-to 748 samples apiece inside the outer script call. The 21 managed profiles have 381 to 827
-samples apiece below a managed frame. The last two columns give the percentage of those
-samples with an engine frame on the stack, including engine calls nested inside a guard or
-conversion. Rounding can move the sum of a row by one percentage point.
+With the same fixtures and the unfused interpreter, GDScript read has 816 samples, mixed read
+has 824, and mixed write has 809. The six-category breakdowns are 51 / 0 / 4 / 18 / 27 / 0,
+60 / 0 / 12 / 19 / 8 / 0 and 52 / 0 / 16 / 10 / 22 / 0 respectively. The additional conversion
+work on reads includes copying the getter result into a typed local.
+
+The mixed fixture passes eight receivers from six engine classes through one instruction. For
+each of read, write and call, counters record four inline fills and four overflow fills during
+warmup. The next 20,000 accesses divide evenly between the inline cache and the shared table.
+They create zero entries and zero name strings. Each overflowing site keeps the address of its
+shared table and probes it with numeric identities.
+
+The interpreter keeps the current frame and register base across scalar instructions. A named
+math read followed by a single-use conversion can write directly into the typed destination
+when its existing handle and the actual result have the expected type. Native code uses the
+same instruction analysis. A different result goes through ordinary AS3 conversion using the
+value the getter already returned. Foreign property reads still call Godot's named getter once.
+A math value passed directly to a setter can borrow its handle for that call.
+
+The table uses the six sampling categories above. The last two columns include Godot frames
+nested inside receiver checks and conversions. Each AS3 cell comes from a separate sample of
+the operation, with 709 to 757 samples inside the outer AS3 call. Percentages are rounded.
+C# uses its by-name API on the same receivers.
 
 | Receiver | Operation | Interpreter | Native | In Godot, interpreter / native (%) | C# in Godot |
 |---|---|---|---|---:|---:|
-| node | read | 68 / 0 / 12 / 8 / 12 / 0 | 24 / 0 / 18 / 26 / 17 / 15 | 22 / 28 | 34% |
-| node | write | 58 / 0 / 14 / 1 / 27 / 0 | 32 / 0 / 26 / 0 / 35 / 8 | 34 / 50 | 40% |
-| node | call | 50 / 0 / 15 / 6 / 29 / 0 | 23 / 0 / 24 / 0 / 46 / 8 | 35 / 58 | 35% |
-| inherited | read | 76 / 0 / 4 / 12 / 9 / 0 | 28 / 0 / 6 / 26 / 16 / 24 | 14 / 20 | 47% |
-| inherited | write | 61 / 0 / 6 / 1 / 32 / 0 | 37 / 0 / 8 / 0 / 41 / 14 | 33 / 43 | 51% |
-| inherited | call | 55 / 0 / 5 / 4 / 36 / 0 | 26 / 0 / 9 / 0 / 56 / 9 | 37 / 58 | 37% |
-| gdscript | read | 54 / 0 / 3 / 17 / 27 / 0 | 12 / 0 / 4 / 36 / 34 / 14 | 32 / 40 | 40% |
-| gdscript | write | 46 / 0 / 4 / 1 / 49 / 0 | 18 / 0 / 8 / 0 / 65 / 8 | 50 / 67 | 45% |
-| gdscript | call | 39 / 2 / 3 / 7 / 49 / 0 | 30 / 4 / 3 / 4 / 56 / 3 | 50 / 57 | 32% |
-| script | read | 79 / 0 / 6 / 15 / 0 / 0 | 34 / 0 / 23 / 14 / 0 / 29 | 1 / 4 | 41% |
-| script | write | 83 / 0 / 10 / 7 / 0 / 0 | 39 / 0 / 25 / 0 / 0 / 36 | 2 / 5 | 40% |
-| script | call | 78 / 0 / 6 / 16 / 0 / 0 | 26 / 0 / 18 / 10 / 0 / 46 | 1 / 4 | 48% |
-| value | read | 67 / 0 / 3 / 24 / 7 / 0 | 41 / 0 / 5 / 30 / 10 / 13 | 9 / 16 | n/a |
-| value | call | 66 / 0 / 3 / 25 / 6 / 0 | 43 / 0 / 4 / 29 / 9 / 15 | 8 / 15 | n/a |
-| proven | read | 65 / 0 / 14 / 10 / 11 / 0 | 0 / 0 / 57 / 0 / 26 / 17 | 22 / 57 | 32% |
-| proven | write | 58 / 0 / 13 / 1 / 28 / 0 | 0 / 0 / 36 / 0 / 58 / 6 | 34 / 78 | 42% |
-| proven | call | 47 / 0 / 15 / 0 / 38 / 0 | 0 / 0 / 26 / 0 / 68 / 6 | 47 / 82 | 33% |
-| typed | read | 73 / 0 / 0 / 10 / 17 / 0 | 0 / 0 / 0 / 0 / 83 / 16 | 21 / 83 | 32% |
-| typed | write | 56 / 0 / 0 / 0 / 44 / 0 | 0 / 0 / 0 / 0 / 93 / 7 | 44 / 93 | 38% |
-| typed | call | 53 / 0 / 0 / 0 / 47 / 0 | 0 / 0 / 0 / 0 / 96 / 4 | 47 / 96 | 30% |
-| mixed | read | 63 / 0 / 11 / 18 / 7 / 0 | 23 / 0 / 17 / 29 / 13 / 18 | 18 / 27 | 52% |
-| mixed | write | 54 / 0 / 14 / 12 / 20 / 0 | 33 / 0 / 17 / 9 / 31 / 11 | 28 / 40 | 50% |
-| mixed | call | 48 / 0 / 13 / 15 / 24 / 0 | 32 / 1 / 15 / 7 / 37 / 7 | 33 / 48 | 36% |
+| node | read | 66 / 0 / 24 / 0 / 11 / 0 | 39 / 0 / 32 / 0 / 14 / 15 | 22 / 30 | 32% |
+| node | write | 49 / 0 / 20 / 1 / 30 / 0 | 28 / 0 / 24 / 0 / 36 / 12 | 39 / 48 | 41% |
+| node | call | 41 / 0 / 18 / 4 / 37 / 0 | 23 / 0 / 25 / 0 / 43 / 10 | 45 / 56 | 33% |
+| inherited | read | 79 / 0 / 7 / 0 / 15 / 0 | 50 / 0 / 11 / 0 / 17 / 22 | 16 / 19 | 44% |
+| inherited | write | 54 / 0 / 6 / 1 / 39 / 0 | 34 / 0 / 8 / 0 / 44 / 13 | 39 / 46 | 53% |
+| inherited | call | 48 / 0 / 5 / 6 / 40 / 0 | 26 / 0 / 6 / 0 / 55 / 13 | 41 / 56 | 34% |
+| gdscript | read | 45 / 0 / 5 / 18 / 33 / 0 | 17 / 0 / 7 / 22 / 42 / 12 | 38 / 52 | 40% |
+| gdscript | write | 37 / 0 / 6 / 1 / 56 / 0 | 18 / 0 / 6 / 0 / 64 / 13 | 58 / 64 | 50% |
+| gdscript | call | 40 / 3 / 3 / 7 / 47 / 0 | 26 / 5 / 3 / 5 / 57 / 4 | 48 / 58 | 35% |
+| script | read | 81 / 0 / 8 / 11 / 0 / 0 | 32 / 0 / 22 / 10 / 0 / 36 | 2 / 4 | 40% |
+| script | write | 79 / 0 / 12 / 9 / 0 / 0 | 35 / 0 / 25 / 0 / 0 / 40 | 2 / 6 | 39% |
+| script | call | 79 / 0 / 5 / 16 / 0 / 0 | 23 / 0 / 17 / 10 / 0 / 49 | 1 / 2 | 49% |
+| value | read | 67 / 0 / 3 / 23 / 7 / 0 | 41 / 0 / 5 / 28 / 10 / 17 | 9 / 15 | n/a |
+| value | call | 68 / 0 / 4 / 22 / 6 / 0 | 40 / 0 / 4 / 28 / 11 / 18 | 8 / 16 | n/a |
+| alias | read | 65 / 0 / 24 / 0 / 11 / 0 | 39 / 0 / 29 / 0 / 15 / 16 | 24 / 29 | 26% |
+| alias | write | 46 / 0 / 19 / 1 / 33 / 0 | 28 / 0 / 24 / 0 / 34 / 14 | 40 / 46 | 43% |
+| alias | call | 42 / 0 / 18 / 6 / 34 / 0 | 22 / 0 / 24 / 0 / 41 / 12 | 42 / 52 | 36% |
+| aliasTyped | read | 61 / 0 / 0 / 13 / 26 / 0 | 0 / 0 / 0 / 0 / 86 / 14 | 34 / 86 | 32% |
+| aliasTyped | write | 46 / 0 / 0 / 0 / 54 / 0 | 0 / 0 / 0 / 0 / 94 / 6 | 54 / 94 | 41% |
+| aliasTyped | call | 46 / 0 / 0 / 0 / 54 / 0 | 0 / 0 / 0 / 0 / 97 / 3 | 54 / 97 | 33% |
+| proven | read | 70 / 0 / 0 / 10 / 20 / 0 | 0 / 0 / 0 / 0 / 84 / 16 | 26 / 84 | 32% |
+| proven | write | 60 / 0 / 0 / 0 / 40 / 0 | 0 / 0 / 0 / 0 / 95 / 5 | 40 / 95 | 40% |
+| proven | call | 52 / 0 / 0 / 0 / 48 / 0 | 0 / 0 / 0 / 0 / 97 / 3 | 48 / 97 | 31% |
+| typed | read | 66 / 0 / 0 / 10 / 24 / 0 | 0 / 0 / 0 / 0 / 82 / 18 | 30 / 82 | 32% |
+| typed | write | 61 / 0 / 0 / 0 / 39 / 0 | 0 / 0 / 0 / 0 / 92 / 8 | 39 / 92 | 40% |
+| typed | call | 53 / 0 / 0 / 0 / 47 / 0 | 0 / 0 / 0 / 0 / 94 / 5 | 47 / 94 | 32% |
+| mixed | read | 59 / 0 / 18 / 11 / 12 / 0 | 38 / 0 / 21 / 12 / 16 / 13 | 26 / 29 | 47% |
+| mixed | write | 51 / 0 / 17 / 7 / 25 / 0 | 29 / 0 / 23 / 7 / 28 / 13 | 35 / 41 | 50% |
+| mixed | call | 47 / 1 / 14 / 9 / 29 / 0 | 25 / 0 / 17 / 9 / 40 / 9 | 38 / 52 | 35% |
 
-A native read through an inferred Node2D local spends 57% of its samples validating the
-receiver. A Godot caller can replace the script on the same node between two visits to the
-same instruction. The guard checks the live class and calls Godot's script getter. The typed
-getter then writes Vector2 into reusable storage. An explicitly typed access calls the bound
-getter directly. Sampling finds an engine frame in 57% of inferred reads and 83% of typed
-reads. These percentages describe different total durations.
+For 20,000 GDScript reads, the interpreter median is 1.305 ms and C# is 1.310 ms.
+Mixed reads take 1.443 ms and 1.459 ms. Mixed writes take 1.441 ms and 1.418 ms, with
+overlapping seven-run ranges of 1.431–1.459 ms and 1.375–1.462 ms. The mixed interpreter
+read spends 59% of sampled time in dispatch, 18% in receiver validation, 11% in conversion
+and 12% in other Godot work. The proven native read spends zero sampled time validating its
+receiver and takes 0.100 ms, against 0.103 ms for its declared control.
 
-The mixed interpreter read spends 63% in dispatch and 18% in conversion and ownership. You
-can see the interpreter loop, site access and heap transfers on the sampled stacks. Godot
-appears in 18% of its samples and 52% of the managed samples. On a GDScript receiver, Godot
-handles the named read or write so the script gets its chance to intercept the property. For
-writes, the engine appears in 50% of interpreter samples, 67% of native samples and 45% of
-managed samples. The remaining AS3 cost includes the interpreter instructions, site selection
-and value conversion.
-
-Rebuild generated native libraries when you update to runtime layout `0x4b41533300000010`.
+Rebuild generated native libraries for runtime layout `0x4b41533300000011`.
 The loader checks the layout before using a site's runtime entry points.
