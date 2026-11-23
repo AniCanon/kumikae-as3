@@ -3,10 +3,19 @@ import sys
 import unittest
 from pathlib import Path
 
-from by_name_gate import failures
+from by_name_gate import failures, batch_sizes
 
 
 class GateTests(unittest.TestCase):
+    def test_batch_sizes_use_fastest_mode_and_match_controls(self):
+        pilots = {"timer/read": [0.04, 0.50], "timerTyped/read": [0.02, 0.49],
+                  "node/write": [1.2, 2.0], "foreign/call": [None, 2.5]}
+        rounds = batch_sizes(pilots)
+        self.assertGreaterEqual(rounds["timer/read"] * 0.02 / 20000, 1.0)
+        self.assertEqual(rounds["timer/read"], rounds["timerTyped/read"])
+        self.assertEqual(rounds["node/write"], 20000)
+        self.assertEqual(rounds["foreign/call"], 20000)
+
     def test_native_uses_medians(self):
         times = {"node/read": {"native": [1, 12, 13], "interpreter": [9, 10, 20]}}
         self.assertEqual(failures(times, None), [

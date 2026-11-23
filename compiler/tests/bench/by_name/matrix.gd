@@ -34,7 +34,14 @@ func measure() -> void:
 	for kind: String in inferred:
 		cases[kind] = inferred[kind]
 		cases[kind + "Typed"] = inferred[kind]
-	var rows := args.slice(2)
+	var pilot := args[2] == "pilot"
+	var rows: Array[String] = []
+	var sizes := {}
+	for entry: String in args.slice(3):
+		var row := entry.get_slice("=", 0)
+		rows.append(row)
+		if not pilot:
+			sizes[row] = int(entry.get_slice("=", 1))
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
@@ -48,9 +55,9 @@ func measure() -> void:
 	# Time equal windows in both directions so the same pair runs first and last equally often.
 	var reverse := rows.duplicate()
 	reverse.reverse()
-	var order := rows + reverse + reverse + rows
+	var order := rows if pilot else rows + reverse + reverse + rows
 	var windows := {}
-	for row in order:
+	for row: String in order:
 		var kind := row.get_slice("/", 0)
 		var op := row.get_slice("/", 1)
 		var target = cases[kind]
@@ -63,13 +70,11 @@ func measure() -> void:
 		var method := StringName(family + op.capitalize())
 		# Accumulate measured batches so short native rows outlast the clock resolution
 		# and both controls reach steady state before their recorded work begins.
-		var rounds := n * 10 if kind.trim_suffix("Typed") in inferred else n
-		if kind.begins_with("configure"):
-			rounds = maxi(1, n / 100)
+		var rounds: int = sizes.get(row, maxi(1, n / 100) if kind.begins_with("configure") else n)
 		var warm_us := 0
 		var timed_us := 0
 		var batches := []
-		while timed_us < 40000:
+		while (batches.size() < 3 if pilot else timed_us < 40000):
 			for child: Node2D in targets:
 				child.position = Vector2(3, 4)
 				child.rotation = 0
@@ -88,7 +93,7 @@ func measure() -> void:
 			if op == "read" or (op == "call" and (own or kind == "value")):
 				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
 			elif kind in ["proven", "typed"]:
-				valid = result == 17 if op == "write" else absf(result - rounds * 0.0001) < 0.002
+				valid = result == 17 if op == "write" else absf(angle_difference(result, rounds * 0.0001)) < rounds * 0.0000001
 			elif op == "write" and own:
 				valid = target.score == rounds - 1
 			else:
@@ -98,18 +103,22 @@ func measure() -> void:
 					if op == "write":
 						valid = valid and child.position == Vector2(8, 9)
 					else:
-						valid = valid and absf(child.rotation - count * 0.0001) < 0.002
+						valid = valid and absf(angle_difference(child.rotation, count * 0.0001)) < maxf(0.002, count * 0.0000001)
 			if not valid:
 				printerr("Wrong result for ", row, " after ", rounds, " rounds: ", result)
 				quit(1)
 				return
-			if warm_us < 20000:
+			if warm_us < (1000 if pilot else 20000):
 				warm_us += elapsed
 			else:
 				timed_us += elapsed
 				batches.append(elapsed)
 		if not windows.has(row):
 			windows[row] = []
+		if not pilot and median(batches) < 500:
+			printerr("Batch below 0.5 ms for ", row, ": ", median(batches), " us")
+			quit(1)
+			return
 		windows[row].append(median(batches) * n / rounds)
 	for row in rows:
 		var times: Array = windows[row]

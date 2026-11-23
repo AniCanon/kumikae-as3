@@ -1,5 +1,6 @@
 """Compare checked by-name operations in one headless Godot .NET project per build."""
 import argparse
+import math
 import os
 from pathlib import Path
 import re
@@ -23,6 +24,26 @@ TOLERANCE = 0.03
 
 INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color", "timer", "configure")
 ROWS.extend(f"{kind}{suffix}/read" for kind in INFERRED for suffix in ("", "Typed"))
+
+
+OPERATIONS = 20000
+
+
+def batch_sizes(pilots):
+    """One workload per row across builds and modes, shared by each inferred/typed pair."""
+    counts = {}
+    for row, times in pilots.items():
+        initial = OPERATIONS // 100 if row.startswith("configure") else OPERATIONS
+        fastest = min(time for time in times if time is not None)
+        # Keep long batches. Aim for two milliseconds on short ones to allow clock variation.
+        counts[row] = initial if fastest * initial >= OPERATIONS else math.ceil(2 * OPERATIONS / fastest)
+    for row in counts:
+        kind, op = row.split("/")
+        control = "typed" if kind == "proven" else kind + "Typed"
+        other = f"{control}/{op}"
+        if other in counts:
+            counts[row] = counts[other] = max(counts[row], counts[other])
+    return counts
 
 
 def failures(samples, baseline):
@@ -67,7 +88,7 @@ def prepare(godot, build, where):
     return project, library
 
 
-def measure(godot, project, library, mode, rows, label):
+def measure(godot, project, library, mode, rows, label, sizes=None):
     env = dict(os.environ, KAS3_NATIVE_PLAY="0")
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
@@ -75,8 +96,9 @@ def measure(godot, project, library, mode, rows, label):
     wanted = [row for row in rows if mode != "C#" or row.startswith(("timer/", "timerTyped/", "configure/", "configureTyped/"))
               or row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value")]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
-           "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", "20000", *wanted]
-    run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=90)
+           "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", str(OPERATIONS),
+           "timed" if sizes else "pilot", *[f"{row}={sizes[row]}" if sizes else row for row in wanted]]
+    run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     found = re.findall(r"^NAMED (\w+/\w+) ([\d.]+|unsupported)$", output, re.M)
     check(mode, run.returncode == 0 and (USED in output) == (mode == "native")
@@ -113,10 +135,15 @@ def main():
         if retained:
             print(f"Play images retained after eight closes: PR {retained['PR']}/8, main {retained['main']}/8", flush=True)
             check("Play image unloading", retained["PR"] == 0, retained)
+        pilots = {}
+        for label, project, library, mode, rows in commands:
+            for row, time in measure(godot, project, library, mode, rows, label).items():
+                pilots.setdefault(row, []).append(time)
+        sizes = batch_sizes(pilots)
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label).items():
+                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label, sizes).items():
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():
