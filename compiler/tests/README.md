@@ -234,6 +234,21 @@ Vector2 measures a read and a call together, and times the rejected write separa
 Use `--script-only` with a build that supports only the script case. The existing .NET export
 runs the same two nodes through C#'s Get, Set and Call with `bench/languages/run.py --untyped-cs`.
 
+To check each by-name operation separately, set `KAS3_GODOT_DOTNET` to the Godot 4.7 .NET
+executable and run this command from the repository root:
+
+```sh
+python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --gate
+```
+
+The gate alternates interpreted AS3, native AS3 and optimized C# on the same receiver fixtures.
+It checks return values and mutations, then reports median milliseconds and the observed range for
+20,000 operations. It fails if the faster end of a candidate's range exceeds the slower end of
+its reference range. Native compares with the interpreter, both compare with C# by name where
+the API exists, and the inferred local also compares with the explicitly typed local. Timing stays
+outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
+a second full build and an older build that supports only the script members.
+
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.
 
