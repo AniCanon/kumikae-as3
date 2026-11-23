@@ -228,6 +228,7 @@ with `Array` or `Date`, the error says `use 'as'` alone.
 | `+` with a `String` on either side | `String` |
 | A whole-number literal | `int` if it fits, then `uint`, then `Number` |
 | An assignment | The type of what is assigned to |
+| The variable of `for each (var enemy:Enemy in list)` | Its declared type. Each element is stored as an assignment stores it: one that isn't an `Enemy` is TypeError #1034 |
 | `x as T` | `T`. The value is `null` when `x` isn't a `T`, for `int`, `uint`, `Number` and `Boolean` too: stored in a variable of such a type, the `null` becomes `0` or `false` |
 | `v[i]` on a vector, with a numeric `i` | The element type. Any other index is `*` |
 | An unknown member of `Object`, `Array`, `Dictionary`, `Date`, `RegExp` or `Error` | `*` |
