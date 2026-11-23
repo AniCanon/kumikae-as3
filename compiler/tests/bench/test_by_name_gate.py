@@ -15,6 +15,11 @@ class GateTests(unittest.TestCase):
         times = {"proven/read": one, "typed/read": {**one, "native": [2, 3]}}
         self.assertEqual(len(failures(times)), 1)
 
+    def test_unproven_parameter_alias_compares_to_managed(self):
+        modes = {"interpreter": [4, 5], "native": [4, 5], "C#": [4, 5]}
+        times = {"alias/read": {**modes, "C#": [1, 2]}, "aliasTyped/read": modes}
+        self.assertEqual(len(failures(times)), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

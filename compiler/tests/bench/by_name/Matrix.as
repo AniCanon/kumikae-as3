@@ -53,7 +53,7 @@ package {
 				target.rotate(0.0001);
 			}
 		}
-		public function provenRead(source:Node2D, n:int):Number {
+		public function aliasRead(source:Node2D, n:int):Number {
 			var target = source;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
@@ -62,40 +62,92 @@ package {
 			}
 			return sum;
 		}
-		public function provenWrite(source:Node2D, n:int):void {
+		public function aliasWrite(source:Node2D, n:int):void {
 			var target = source;
 			var point:Vector2 = new Vector2(8, 9);
 			for (var i:int = 0; i < n; i++) {
 				target.position = point;
 			}
 		}
-		public function provenCall(source:Node2D, n:int):void {
+		public function aliasCall(source:Node2D, n:int):void {
 			var target = source;
 			for (var i:int = 0; i < n; i++) {
 				target.rotate(0.0001);
 			}
+		}
+		public function aliasTypedRead(source:Node2D, n:int):Number {
+			var target:Node2D = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var point:Vector2 = target.position;
+				sum += point.x;
+			}
+			return sum;
+		}
+		public function aliasTypedWrite(source:Node2D, n:int):void {
+			var target:Node2D = source;
+			var point:Vector2 = new Vector2(8, 9);
+			for (var i:int = 0; i < n; i++) {
+				target.position = point;
+			}
+		}
+		public function aliasTypedCall(source:Node2D, n:int):void {
+			var target:Node2D = source;
+			for (var i:int = 0; i < n; i++) {
+				target.rotate(0.0001);
+			}
+		}
+		public function provenRead(source:Node2D, n:int):Number {
+			var target:* = new Node2D();
+			target.position = new Vector2(3, 4);
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var point:Vector2 = target.position;
+				sum += point.x;
+			}
+			target.free();
+			return sum;
+		}
+		public function provenWrite(source:Node2D, n:int):Number {
+			var target:* = new Node2D();
+			const point:Vector2 = new Vector2(8, 9);
+			for (var i:int = 0; i < n; i++) target.position = point;
+			var finalPoint:Vector2 = target.position;
+			target.free();
+			return finalPoint.x + finalPoint.y;
+		}
+		public function provenCall(source:Node2D, n:int):Number {
+			var target:* = new Node2D();
+			for (var i:int = 0; i < n; i++) target.rotate(0.0001);
+			var angle:Number = target.rotation;
+			target.free();
+			return angle;
 		}
 		public function typedRead(source:Node2D, n:int):Number {
-			var target:Node2D = source;
+			var target:Node2D = new Node2D();
+			target.position = new Vector2(3, 4);
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
 				var point:Vector2 = target.position;
 				sum += point.x;
 			}
+			target.free();
 			return sum;
 		}
-		public function typedWrite(source:Node2D, n:int):void {
-			var target:Node2D = source;
-			var point:Vector2 = new Vector2(8, 9);
-			for (var i:int = 0; i < n; i++) {
-				target.position = point;
-			}
+		public function typedWrite(source:Node2D, n:int):Number {
+			var target:Node2D = new Node2D();
+			const point:Vector2 = new Vector2(8, 9);
+			for (var i:int = 0; i < n; i++) target.position = point;
+			var finalPoint:Vector2 = target.position;
+			target.free();
+			return finalPoint.x + finalPoint.y;
 		}
-		public function typedCall(source:Node2D, n:int):void {
-			var target:Node2D = source;
-			for (var i:int = 0; i < n; i++) {
-				target.rotate(0.0001);
-			}
+		public function typedCall(source:Node2D, n:int):Number {
+			var target:Node2D = new Node2D();
+			for (var i:int = 0; i < n; i++) target.rotate(0.0001);
+			var angle:Number = target.rotation;
+			target.free();
+			return angle;
 		}
 		public function mixedRead(source:Node2D, n:int):Number {
 			var target = source;

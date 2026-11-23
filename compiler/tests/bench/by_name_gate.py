@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from native_godot import Runner, USED
 
-ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "value", "proven", "typed", "mixed")
+ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "value", "alias", "aliasTyped", "proven", "typed", "mixed")
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
@@ -25,10 +25,11 @@ def failures(samples):
         if "native" in modes and "interpreter" in modes:
             compare(modes["native"], modes["interpreter"], "native slower than interpreter")
         for mode in ("interpreter", "native"):
-            if mode in modes and "C#" in modes and not row.startswith("typed/"):
+            if mode in modes and "C#" in modes and not row.startswith(("aliasTyped/", "typed/")):
                 compare(modes[mode], modes["C#"], f"{mode} slower than C#")
-            if row.startswith("proven/") and mode in modes:
-                compare(modes[mode], samples[row.replace("proven/", "typed/")][mode], f"{mode} slower than typed")
+            kind, op = row.split("/")
+            if kind == "proven" and mode in modes:
+                compare(modes[mode], samples[f"typed/{op}"][mode], f"{mode} slower than typed")
     return misses
 
 

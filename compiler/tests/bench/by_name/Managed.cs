@@ -11,6 +11,16 @@ public partial class Managed : Node
 
     public double Measure(string kind, string op, Node2D target, int n)
     {
+        if (kind == "proven" || kind == "typed")
+        {
+            var fresh = new Node2D();
+            if (op == "read") fresh.Position = new Vector2(3, 4);
+            double result = Measure("node", op, fresh, n);
+            if (op == "write") result = fresh.Position.X + fresh.Position.Y;
+            if (op == "call") result = fresh.Rotation;
+            fresh.Free();
+            return result;
+        }
         bool mixed = kind == "mixed";
         bool script = kind == "script";
         double sum = 0;

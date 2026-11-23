@@ -23,7 +23,7 @@ func measure() -> void:
 		if managed:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "script": script,
-			"value": Vector2(3, 4), "proven": node, "typed": node, "mixed": node}
+			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "mixed": node}
 	for kind: String in cases:
 		var target = cases[kind]
 		for op in ["read", "write", "call"]:
@@ -52,6 +52,8 @@ func measure() -> void:
 				var valid := true
 				if op == "read" or (op == "call" and (own or kind == "value")):
 					valid = result == rounds * (7 if own else (5 if op == "call" else 3))
+				elif kind in ["proven", "typed"]:
+					valid = result == 17 if op == "write" else absf(result - rounds * 0.0001) < 0.002
 				elif op == "write" and own:
 					valid = target.score == rounds - 1
 				else:
