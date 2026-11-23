@@ -207,6 +207,14 @@ bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p
 				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
 		return false;
 	}
+	if (p_wanted.kind == ir::Kind::Any && p_wanted.reuse && p_value.get_type() >= Variant::VECTOR2 && p_value.get_type() <= Variant::COLOR) {
+		auto *held = static_cast<Variant *>(p_wanted.reuse);
+		if (held->get_type() == p_value.get_type()) {
+			*held = p_value;
+			*r_result = vm::any::godot_value(held);
+			return true;
+		}
+	}
 	const std::optional<vm::Slot> taken = from_variant(p_wanted.kind, p_value);
 	if (!taken) {
 		*r_error = std::string(vm::OUT_OF_MEMORY);

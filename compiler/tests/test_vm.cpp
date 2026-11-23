@@ -1241,6 +1241,7 @@ static void test_engine_members_by_name() {
 						 "    try { o.callback = 1; } catch (e:ReferenceError) { a.push(e.message); }\n"
 						 "    try { o.absent; } catch (e:ReferenceError) { a.push(e.message); } return a.join('/'); }\n"
 						 "  public function invoke(o:*):String { return o.callback() + '/' + o.own; }\n"
+						 "  public function repeated(o:*):void { for (var i:int = 0; i < 8; i++) { var v:* = o.position; } }\n"
 						 "  public function reads(o:*):String { return o.name + \"/\" + o[\"name\"]; }\n"
 						 "  public function writes(o:*, v:*):void { o.position = v; o[\"name\"] = \"new\"; }\n"
 						 "  public function calls(o:Object):void { o.queueFree(); o.addChild(o, true); }\n"
@@ -1268,6 +1269,16 @@ static void test_engine_members_by_name() {
 		struct Engine : FakeEngine {
 			vm::Prepared binding;
 			vm::NamedMember member{ vm::NamedMember::What::Method, "queue_free", true, false, &binding };
+			int reuses = 0;
+			bool return_math = false;
+			bool get(void *holder, std::string_view name, const vm::Wanted &wanted, vm::Slot *out, std::string *error) override {
+				if (return_math && name == "position") {
+					reuses += wanted.reuse != nullptr;
+					*out = vm::any::godot_value(wanted.reuse ? wanted.reuse : box());
+					return true;
+				}
+				return FakeEngine::get(holder, name, wanted, out, error);
+			}
 			int lookups = 0;
 			vm::NamedShape named_shape(void *p_handle, uintptr_t) override {
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
@@ -1353,6 +1364,9 @@ static void test_engine_members_by_name() {
 			}
 			CHECK_EQ(engine.lookups, before + 1);
 		}
+		engine.return_math = true;
+		CHECK(interpreter.call_method(object, "repeated", given, 1, nullptr));
+		CHECK_EQ(engine.reuses, 7);
 		interpreter.release_object(object);
 		engine.drop(node);
 	}

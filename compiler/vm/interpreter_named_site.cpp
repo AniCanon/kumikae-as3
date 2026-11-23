@@ -2,9 +2,9 @@
 
 namespace kas3::vm {
 
-bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, NamedCall *r_call) {
+bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, NamedCall *r_call, void *p_reuse) {
 	std::string error;
-	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error);
+	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error, p_reuse);
 	if (done && !*done && !failing_) {
 		raise_engine(library_, error);
 	}
@@ -42,7 +42,8 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	}
 	Slot result = any::undefined();
 	NamedCall call;
-	if (!access_named(*site, p_in.op, reference ? any::godot_object(registers[holder].p) : registers[holder], text->view(), args, count, &result, &call)) {
+	void *reuse = p_in.op == ir::Op::DynGet && any::tag(registers[p_in.a]) == AnyTag::Value ? any::pointer(registers[p_in.a]) : nullptr;
+	if (!access_named(*site, p_in.op, reference ? any::godot_object(registers[holder].p) : registers[holder], text->view(), args, count, &result, &call, reuse)) {
 		if (!call.receiver || count || module_.functions[call.function].parameters != 1 || module_.functions[call.function].rest) {
 			return false;
 		}
@@ -57,7 +58,9 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 		return true;
 	}
 	if (!write && p_in.a != ir::NONE && !failing_) {
-		put(ir::Kind::Any, stack_[base + p_in.a], result);
+		if (!reuse || result.bits != stack_[base + p_in.a].bits) {
+			put(ir::Kind::Any, stack_[base + p_in.a], result);
+		}
 	} else {
 		drop_any(result);
 	}

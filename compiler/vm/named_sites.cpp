@@ -92,7 +92,7 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 }
 
 std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error) {
+		const Slot *p_arguments, size_t p_count, Slot *r_result, NamedCall *r_call, std::string *r_error, void *p_reuse) {
 	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
@@ -151,7 +151,7 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		}
 		operands[i + 1] = { Kind::Any, p_arguments[i] };
 	}
-	const Wanted wanted{ write ? Kind::Void : Kind::Any, {} };
+	const Wanted wanted{ write ? Kind::Void : Kind::Any, {}, p_reuse };
 	const Prepared *bind = write ? member->setter : member->invoke;
 	if (bind) {
 		if (auto done = p_engine.run_named(shape, *bind, operands, p_count + 1, wanted, r_result, r_error)) {

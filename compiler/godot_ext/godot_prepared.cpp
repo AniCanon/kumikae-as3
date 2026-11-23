@@ -256,7 +256,7 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 		return true;
 	}
 	if (kind == ir::Kind::Any && type >= Variant::VECTOR2 && type <= Variant::COLOR) {
-		Variant *made = make_handle(p_worked.zero);
+		Variant *made = result_handle(p_result, p_worked);
 		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, inside(*made, type));
 		*r_result = vm::any::godot_value(made);
 		return true;
