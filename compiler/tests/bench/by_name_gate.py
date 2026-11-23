@@ -19,7 +19,7 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
 TOLERANCE = 0.03
 
 
-INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color")
+INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color", "timer")
 ROWS.extend(f"{kind}{suffix}/read" for kind in INFERRED for suffix in ("", "Typed"))
 
 

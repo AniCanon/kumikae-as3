@@ -23,6 +23,10 @@ uint32_t Engine::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of
 	}
 	uint32_t object = l_.expression(p_object, Kind::Void);
 	Kind kind = l_.kind_at(object);
+	// A fresh receiver can bind before it escapes even when the local needs dynamic storage later.
+	if (kind == Kind::Any && p_object->kind == NodeKind::Name && p_object->type && l_.is_godot_object(p_object->type->symbol)) {
+		return l_.from_untyped(object, p_object->type, Kind::Ref, p_position);
+	}
 	if (kind == Kind::Ref || kind == Kind::Val) {
 		*r_of_value = kind == Kind::Val;
 		return object;

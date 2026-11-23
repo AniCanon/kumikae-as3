@@ -235,32 +235,38 @@ void index_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_ini
 	});
 }
 
-// An unfamiliar engine operation may publish its receiver or attach a script. It can bind
-// while the receiver is fresh if control cannot repeat it or reach another access afterward.
-bool final_access(const Parents &parents, const Binding &binding, Block *body) {
-	Node *node = binding.operation;
-	while (node && node != body) {
-		switch (node->kind) {
-			case NodeKind::For: case NodeKind::ForIn: case NodeKind::While: case NodeKind::DoWhile:
-				return false;
-			default:
-				node = parent(parents, node);
-		}
-	}
-	return node == body;
+bool loop(NodeKind p_kind) {
+	return p_kind == NodeKind::For || p_kind == NodeKind::ForIn || p_kind == NodeKind::While || p_kind == NodeKind::DoWhile;
 }
 
-template <class Numeric>
-bool stays_detached(Block *p_body, Symbol *receiver, Expr *initial, const std::vector<Binding> &bindings,
-		Package *godot_, const Type *boolean_, Numeric numeric) {
-	bool safe = true;
-	std::unordered_set<Node *> known{ initial, static_cast<New *>(initial)->callee };
-	for (const Binding &binding : bindings) {
+// Include effects on the back edge when the receiver was created outside the loop.
+uint32_t last_iteration(const Parents &p_parents, Expr *p_initial, Expr *p_access) {
+	uint32_t end = p_access->end;
+	for (Node *node = p_access; node; node = parent(p_parents, node)) {
+		if (loop(node->kind) && node->offset > p_initial->end) {
+			end = std::max(end, node->end);
+		}
+	}
+	return end;
+}
+
+// The first operation that can expose the receiver or execute user code ends its proof.
+// An operation can itself bind before it publishes the receiver. Later statements cannot
+// affect an earlier access unless control can return to it through a loop.
+uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding> &p_bindings, Package *p_godot) {
+	uint32_t first = p_body->end;
+	std::unordered_set<Node *> known{ p_initial, static_cast<New *>(p_initial)->callee };
+	for (const Binding &binding : p_bindings) {
+		known.insert(binding.access->object);
 		known.insert(binding.access);
 		known.insert(binding.operation);
+		const bool read = binding.operation == binding.access && binding.member->kind == SymbolKind::Property;
+		if (!read && !isolated_transform(*binding.member)) {
+			first = std::min(first, binding.operation->end);
+		}
 	}
 	walk(p_body, [&](Node *node) {
-		if (!safe || node->end <= initial->offset) {
+		if (node->end <= p_initial->offset || node->offset >= first) {
 			return false;
 		}
 		if (known.count(node) || node->kind == NodeKind::TypeRef) {
@@ -269,26 +275,30 @@ bool stays_detached(Block *p_body, Symbol *receiver, Expr *initial, const std::v
 		if (node->kind == NodeKind::New) {
 			auto *value = static_cast<New *>(node);
 			const auto *klass = value->type ? value->type->symbol : nullptr;
-			safe = klass && klass->package == godot_ && klass->unit && klass->unit->is_declaration && klass->name == "Vector2";
-			known.insert(value->callee);
+			if (klass && klass->package == p_godot && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color")) {
+				known.insert(value->callee);
+				return true;
+			}
+		} else if (node->kind == NodeKind::Name) {
+			const auto *name = static_cast<Name *>(node);
+			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter)) {
+				return true;
+			}
 		} else if (node->kind == NodeKind::Member) {
 			const auto *member = static_cast<Member *>(node)->member;
-			safe = member && member->owner && member->owner->package == godot_ && member->owner->unit &&
-					member->owner->unit->is_declaration && member->owner->name == "Vector2" && (member->name == "x" || member->name == "y");
-		} else if (node->kind == NodeKind::Name) {
-			auto *name = static_cast<Name *>(node);
-			safe = name->symbol == receiver || (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
-					(numeric(name->type) || name->type == boolean_ || (name->type && name->type->symbol &&
-					name->type->symbol->package == godot_ && name->type->symbol->name == "Vector2")));
-		} else if (node->kind >= NodeKind::NumberLit && node->kind <= NodeKind::Conditional) {
-			safe = node->kind == NodeKind::NumberLit || node->kind == NodeKind::BoolLit || node->kind == NodeKind::StringLit || node->kind == NodeKind::Binary ||
-					node->kind == NodeKind::Postfix || node->kind == NodeKind::Assign || node->kind == NodeKind::Unary;
-		} else if (node->kind == NodeKind::ForIn || node->kind == NodeKind::FunctionDecl) {
-			safe = false;
+			if (member && member->owner && member->owner->package == p_godot && member->owner->name == "Vector2" && (member->name == "x" || member->name == "y")) {
+				return true;
+			}
+		} else if ((node->kind < NodeKind::NumberLit || node->kind > NodeKind::Conditional ||
+				node->kind == NodeKind::NumberLit || node->kind == NodeKind::StringLit || node->kind == NodeKind::BoolLit ||
+				node->kind == NodeKind::Binary || node->kind == NodeKind::Assign || node->kind == NodeKind::Postfix || node->kind == NodeKind::Unary) &&
+				node->kind != NodeKind::ForIn && node->kind != NodeKind::FunctionDecl) {
+			return true;
 		}
-		return safe;
+		first = std::min(first, node->offset);
+		return false;
 	});
-	return safe;
+	return first;
 }
 
 bool direct_use(Consumers &p_consumers, Name *p_name, const Type *p_type) {
@@ -334,27 +344,43 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 				continue;
 			}
 			auto bind = can_bind ? member_use(compilation_, type, name, parents, p_body, consumers, fresh || pure_class) : std::nullopt;
-			if (!bind || (fresh && !isolated_transform(*bind->member) &&
-					(name != uses[local].back() || !final_access(parents, *bind, p_body)))) {
+			if (!bind) {
 				safe = false;
+				if (fresh) {
+					continue;
+				}
 				break;
 			}
 			bindings.push_back(*bind);
 		}
-		if (!safe || (!bindings.empty() && (assigned || (pure_class && initial->kind != NodeKind::New && !(klass->modifiers & Modifiers::Final))))) {
+		if (fresh) {
+			uint32_t end = first_effect(p_body, initial, bindings, godot_);
+			for (Name *name : uses[local]) {
+				if (std::none_of(bindings.begin(), bindings.end(), [name](const Binding &p_bind) { return p_bind.access->object == name; })) {
+					end = std::min(end, name->offset);
+				}
+			}
+			bindings.erase(std::remove_if(bindings.begin(), bindings.end(), [&, creation = initial](const Binding &p_bind) {
+				return last_iteration(parents, creation, p_bind.operation) > end;
+			}), bindings.end());
+			safe = bindings.size() == uses[local].size();
+			if (bindings.empty() && !safe) {
+				continue;
+			}
+		} else if (!safe || (!bindings.empty() && (assigned || (pure_class && initial->kind != NodeKind::New && !(klass->modifiers & Modifiers::Final))))) {
 			continue;
 		}
-		if (fresh && !stays_detached(p_body, local, initial, bindings, godot_, boolean_, [&](const Type *t) { return numeric(t); })) {
-			continue;
-		}
-		local->storage = type;
-		for (const auto &[expr, result] : consumers.results) {
-			expr->type = result;
-		}
-		for (Name *name : uses[local]) {
-			name->type = type;
+		if (safe) {
+			local->storage = type;
+			for (Name *name : uses[local]) {
+				name->type = type;
+			}
+			for (const auto &[expr, result] : consumers.results) {
+				expr->type = result;
+			}
 		}
 		for (const Binding &binding : bindings) {
+			binding.access->object->type = type;
 			binding.access->member = binding.member;
 			binding.access->type = symbol_type(binding.member, nullptr);
 			binding.operation->type = binding.result;

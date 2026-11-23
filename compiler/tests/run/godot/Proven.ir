@@ -20,7 +20,10 @@ class Proven on Godot's Node
   .0 $owner:GodotObject
   #0 Proven/inferred
   #1 Proven/declared
-  #2 Proven/acrossCallback
+  #2 Proven/timerInferred
+  #3 Proven/timerDeclared
+  #4 Proven/beforeEscape
+  #5 Proven/acrossCallback
   new Proven
 class Function
   .0 function:int
@@ -96,6 +99,79 @@ function Proven/declared(r0:Object):Number
   @18 Return r9
   @19 ConstF64 r10 nan
   @20 Return r10
+function Proven/timerInferred(r0:Object, r1:int, r2:Object):Number
+  godot r3:Timer r6:Timer
+  @0 ConstF64 r4 nan
+  @2 HostNew r6 [Timer] ()
+  @3 Move r3 r6
+  @5 ConstF64 r7 0
+  @6 Move r4 r7
+  @8 ConstI32 r8 0
+  @9 Move r5 r8
+  @11 I32ToF64 r9 r5
+  @12 I32ToF64 r10 r1
+  @13 LtF64 r11 r9 r10
+  @14 JumpIfNot r11 @25
+  @16 HostGet r12 r3 [Timer.waitTime]
+  @17 AddF64 r13 r4 r12
+  @18 Move r4 r13
+  @19 I32ToF64 r14 r5
+  @20 ConstF64 r15 1
+  @21 AddF64 r16 r14 r15
+  @22 F64ToI32 r17 r16
+  @23 Move r5 r17
+  @24 Jump @10
+  @26 HostCall _ [GodotObject.free] (r3)
+  @28 CallFunction r18 r2 ()
+  @30 Return r4
+  @31 ConstF64 r19 nan
+  @32 Return r19
+function Proven/timerDeclared(r0:Object, r1:int, r2:Object):Number
+  godot r3:Timer r6:Timer
+  @0 ConstF64 r4 nan
+  @2 HostNew r6 [Timer] ()
+  @3 Move r3 r6
+  @5 ConstF64 r7 0
+  @6 Move r4 r7
+  @8 ConstI32 r8 0
+  @9 Move r5 r8
+  @11 I32ToF64 r9 r5
+  @12 I32ToF64 r10 r1
+  @13 LtF64 r11 r9 r10
+  @14 JumpIfNot r11 @25
+  @16 HostGet r12 r3 [Timer.waitTime]
+  @17 AddF64 r13 r4 r12
+  @18 Move r4 r13
+  @19 I32ToF64 r14 r5
+  @20 ConstF64 r15 1
+  @21 AddF64 r16 r14 r15
+  @22 F64ToI32 r17 r16
+  @23 Move r5 r17
+  @24 Jump @10
+  @26 HostCall _ [GodotObject.free] (r3)
+  @28 CallFunction r18 r2 ()
+  @30 Return r4
+  @31 ConstF64 r19 nan
+  @32 Return r19
+function Proven/beforeEscape(r0:Object, r1:Object):Number
+  godot r5:Timer r7:Timer
+  @0 ConstF64 r3 nan
+  @1 ConstF64 r4 nan
+  @3 HostNew r5 [Timer] ()
+  @4 ToAny r6 r5
+  @5 Move r2 r6
+  @7 FromAny r7 r2 17
+  @8 HostGet r8 r7 [Timer.waitTime]
+  @9 Move r3 r8
+  @11 CallFunction r9 r1 (r2)
+  @13 ConstStr r10 "waitTime"
+  @14 DynGet r11 r2 r10
+  @15 FromAny r12 r11 -1
+  @16 Move r4 r12
+  @18 AddF64 r13 r3 r4
+  @19 Return r13
+  @20 ConstF64 r14 nan
+  @21 Return r14
 function Proven/acrossCallback(r0:Object, r1:Object):Number
   godot r3:Vector2 r4:Node2D r9:Vector2
   @1 HostNew r4 [Node2D] ()

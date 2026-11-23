@@ -153,6 +153,20 @@ package {
 		private function lengthOf(value:String):int { return value.length; }
 		private function flag():Boolean { return true; }
 
+		public function timerRead(source:Node2D, n:int):Number {
+			var timer:* = new Timer();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
+			timer.free();
+			return sum;
+		}
+		public function timerTypedRead(source:Node2D, n:int):Number {
+			var timer:Timer = new Timer();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
+			timer.free();
+			return sum;
+		}
 		public function numberRead(source:Node2D, n:int):Number {
 			var alias:* = this.numberField;
 			var sum:Number = 0;

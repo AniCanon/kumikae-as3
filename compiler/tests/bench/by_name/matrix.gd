@@ -24,7 +24,7 @@ func measure() -> void:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "mixed": node}
-	var inferred := {"number": node, "boolean": node, "string": node, "as3Class": node,
+	var inferred := {"timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
 	for kind: String in inferred:
 		cases[kind] = inferred[kind]
@@ -67,7 +67,7 @@ func measure() -> void:
 			var own := kind == "script"
 			var valid := true
 			if op == "read" or (op == "call" and (own or kind == "value")):
-				valid = result == rounds * (7 if own else (5 if op == "call" else 3))
+				valid = result == rounds * (7 if own else (5 if op == "call" else (1 if kind.begins_with("timer") else 3)))
 			elif kind in ["proven", "typed"]:
 				valid = result == 17 if op == "write" else absf(result - rounds * 0.0001) < 0.002
 			elif op == "write" and own:

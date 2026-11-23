@@ -19,6 +19,29 @@ package {
 			target.free();
 			return result.x;
 		}
+		public function timerInferred(n:int, after:Function):Number {
+			var timer:* = new Timer();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
+			timer.free();
+			after();
+			return sum;
+		}
+		public function timerDeclared(n:int, after:Function):Number {
+			var timer:Timer = new Timer();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) sum += timer.waitTime;
+			timer.free();
+			after();
+			return sum;
+		}
+		public function beforeEscape(publish:Function):Number {
+			var timer:* = new Timer();
+			var first:Number = timer.waitTime;
+			publish(timer);
+			var second:Number = timer.waitTime;
+			return first + second;
+		}
 		public function acrossCallback(callback:Function):Number {
 			var target = new Node2D();
 			callback();
