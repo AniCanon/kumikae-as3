@@ -72,6 +72,10 @@ package game {
 - **`as` and a cast work on Godot's classes and on your script classes.** `node as Coin` gives the `Coin`
   that the node carries, or `null`. `Coin(node)` gives it too, and raises TypeError #1034 if the node has no
   such script.
+- **A Godot class is a class value,** like a class of your own: `var kind:Class = Sprite2D;`. With the
+  class in a variable, `new kind()`, `node is kind`, `node as kind` and `kind(node)` do what they do with
+  the class's name. A value type works too: `new kind(1, 2)` where `kind` holds `Vector2`. A class the
+  engine won't create, such as `Input`, raises an error at `new`.
 - **A class that extends no Godot class is a plain AS3 object.** It has no node behind it, and you can't
   hand it to Godot.
 - **A script on a reference-counted Godot class,** such as `RefCounted` or `Resource`, lives while AS3 or
@@ -456,8 +460,6 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
-- A Godot class isn't a class value: `var kind:Class = Node2D` is refused. `is`, `as` and `new` take the
-  class by name.
 - A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
   a variable of its type first.
 - A script class in the default package with the same name as a Godot class is ambiguous. Put it in a

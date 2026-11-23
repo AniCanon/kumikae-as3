@@ -114,7 +114,6 @@ These are designed separately. Nothing above delivers them, and the design keeps
 - **A cycle through a Godot `Array` or `Dictionary` isn't collected.** The collector follows AS3 objects,
   Godot's reference-counted objects and listeners.
 - **Godot's string-format operator (`"%s" % value`) isn't available.** Use AS3 string concatenation.
-- **A Godot class isn't a class value.** `var kind:Class = Node2D` is refused.
 - **A Godot value or object held in a `*` or an `Object` has no members by name,** and no `for in`. Store it
   in a variable of its type first.
 - **A script class with the same name as a Godot class is ambiguous** when it's in the default package. Put
