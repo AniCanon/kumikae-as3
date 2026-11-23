@@ -112,11 +112,17 @@ const void *bare(const vm::Argument &p_operand, int p_type, Scalar *r_scalar) {
 			return real || kind == ir::Kind::I32 || unsigned_whole ? r_scalar : nullptr;
 		}
 		case Variant::INT:
+			if (kind != ir::Kind::I64 && kind != ir::Kind::I32 && kind != ir::Kind::U32 && kind != ir::Kind::U8) {
+				return nullptr;
+			}
 			r_scalar->integer = kind == ir::Kind::I64 ? p_operand.slot.l : kind == ir::Kind::I32 ? p_operand.slot.i : (int64_t)p_operand.slot.u;
-			return kind == ir::Kind::I64 || kind == ir::Kind::I32 || kind == ir::Kind::U32 || kind == ir::Kind::U8 ? r_scalar : nullptr;
+			return r_scalar;
 		case Variant::BOOL:
+			if (kind != ir::Kind::Bool) {
+				return nullptr;
+			}
 			r_scalar->boolean = p_operand.slot.b;
-			return kind == ir::Kind::Bool ? r_scalar : nullptr;
+			return r_scalar;
 		default: {
 			Variant *held = kind == ir::Kind::Val ? static_cast<Variant *>(p_operand.slot.p) : nullptr;
 			return held && held->get_type() == p_type ? inside(*held, p_type) : nullptr;
