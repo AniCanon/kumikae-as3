@@ -1,5 +1,6 @@
 // The interpreter as a library: what a debugger will use, and what the host is told.
 #include "check.h"
+#include "../godot_ext/literal_misses.h"
 
 #include "any.h"
 #include "ast_walk.h"
@@ -1256,6 +1257,7 @@ static void test_engine_members_by_name() {
 						 "    try { o.absent; } catch (e:ReferenceError) { a.push(e.message); } return a.join('/'); }\n"
 						 "  public function invoke(o:*):String { return o.callback() + '/' + o.own; }\n"
 						 "  public function repeated(o:*):void { for (var i:int = 0; i < 8; i++) { var v:* = o.position; } }\n"
+						 "  public function computed(o:*, i:int):Boolean { return ('computedSlot' + i) in o; }\n"
 						 "  public function reads(o:*):String { return o.name + \"/\" + o[\"name\"]; }\n"
 						 "  public function writes(o:*, v:*):void { o.position = v; o[\"name\"] = \"new\"; }\n"
 						 "  public function calls(o:Object):void { o.queueFree(); o.addChild(o, true); }\n"
@@ -1293,6 +1295,8 @@ static void test_engine_members_by_name() {
 				}
 				return FakeEngine::get(holder, name, wanted, out, error);
 			}
+			LiteralMisses misses;
+			int computed_walks = 0;
 			int lookups = 0;
 			uintptr_t receiver_type = 1;
 			std::optional<vm::NamedShape> named_shape(void *p_handle, uintptr_t) override {
@@ -1306,6 +1310,9 @@ static void test_engine_members_by_name() {
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name, vm::NameSource p_source) override {
 				lookups++;
+				if (p_name == "computedSlot3") {
+					return *misses.lookup(p_name, p_source, [&] { ++computed_walks; return &vm::MISSING_MEMBER; });
+				}
 				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name, p_source);
 			}
 			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *, const vm::Object *) override {
@@ -1332,6 +1339,14 @@ static void test_engine_members_by_name() {
 			}
 			return said;
 		};
+		// The computed key passes through EngineNamed and the same miss cache Godot uses.
+		vm::Slot computed[] = { given[0], {} };
+		computed[1].i = 3;
+		for (int i = 0; i < 2; i++) {
+			CHECK(interpreter.call_method(object, "computed", computed, 2, &result));
+			CHECK(!result.b);
+		}
+		CHECK_EQ(engine.computed_walks, 2);
 		// A property read and written by Godot's name for it.
 		CHECK_EQ(text("reads", 1), std::string("Player/Player"));
 		CHECK_EQ(engine.log, std::string("get #32.name\nget #32.name\n"));

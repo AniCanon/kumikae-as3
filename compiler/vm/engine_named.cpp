@@ -46,7 +46,7 @@ const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) 
 	if (!handle) {
 		return MISSING_MEMBER;
 	}
-	const NamedMember &found = vm_.host_.handles.named(handle, p_key.name());
+	const NamedMember &found = vm_.host_.handles.named(handle, p_key.name(), NameSource::Computed);
 	if (found.what == NamedMember::What::Missing && !checked_) {
 		return vm_.host_.handles.script_member(handle, p_key.name());
 	}
