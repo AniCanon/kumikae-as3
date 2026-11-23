@@ -1,1 +1,1 @@
-dynamic_local_tags.as:28:17: warning: 'exact' has no type: it is taken as '*'. Write ':*' to say so
+dynamic_local_tags.as:29:17: warning: 'exact' has no type: it is taken as '*'. Write ':*' to say so

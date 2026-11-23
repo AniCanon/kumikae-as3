@@ -17,8 +17,9 @@ class RangeError extends Error
   .3 stack:String
   new RangeError
 class LocalArithmetic
-  #0 LocalArithmetic/twice
-  #1 LocalArithmetic/total
+  #0 LocalArithmetic/wide
+  #1 LocalArithmetic/twice
+  #2 LocalArithmetic/total
   new LocalArithmetic
 class Amount
   .0 value:int
@@ -66,7 +67,21 @@ function LocalArithmetic(r0:Object):void
   @16 F64ToStr r14 r13
   @17 StrToStr r15 r14
   @18 Trace (r15)
-  @19 ReturnVoid
+  @20 Call r16 LocalArithmetic/wide (r0)
+  @21 F64ToStr r17 r16
+  @22 StrToStr r18 r17
+  @23 Trace (r18)
+  @24 ReturnVoid
+function LocalArithmetic/wide(r0:Object):Number
+  @0 ConstF64 r1 nan
+  @2 ConstF64 r2 2147483647
+  @3 Move r1 r2
+  @5 ConstF64 r3 1.5
+  @6 AddF64 r4 r1 r3
+  @7 Move r1 r4
+  @9 Return r1
+  @10 ConstF64 r5 nan
+  @11 Return r5
 function LocalArithmetic/twice(r0:Object, r1:Number):Number
   @1 ConstI32 r2 2
   @2 I32ToF64 r4 r2

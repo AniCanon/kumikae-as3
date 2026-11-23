@@ -70,6 +70,10 @@ To update the golden files:
 python3 compiler/tests/run_golden.py compiler/build/kas3c compiler/tests --update
 ```
 
+Run `python3 compiler/tests/inference_controls.py` to build the local inference controls in a
+temporary directory. Each run changes one compiler rule. Disabling a proof must change the
+typed IR. Choosing the wrong storage must change the standalone program's output.
+
 A golden file that records a bug is worse than no test. Read what `--update` wrote.
 
 ## Rules

@@ -6,6 +6,7 @@ package {
             trace(failedWrite());
             trace(closureWrite());
             try { trace(nullableText(null)); } catch (e:TypeError) { trace(e.errorID); }
+            trace(changedType());
         }
         private function nullableText(source:String):int { var value:* = source; return value.length; }
         private function branch(take:Boolean):String {
@@ -41,6 +42,11 @@ package {
             var key:* = "x";
             var item:Object = {x: exact};
             trace(delete item[key], key in item);
+        }
+        private function changedType():Number {
+            var value:* = 7;
+            value = "9.5";
+            return value;
         }
     }
 }

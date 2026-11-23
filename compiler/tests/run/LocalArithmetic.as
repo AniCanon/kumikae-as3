@@ -3,6 +3,13 @@ package {
 		public function LocalArithmetic() {
 			trace(total(3.5, true), total(-2, false));
 			trace(total(2147483647, true));
+			trace(wide());
+		}
+
+		private function wide():Number {
+			var sum:* = 2147483647;
+			sum += 1.5;
+			return sum;
 		}
 
 		private function twice(value:Number):Number { return value * 2; }
