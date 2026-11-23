@@ -1,5 +1,6 @@
 // Classes as values: `var c:Class = Player`, `x is c`, `new c(a)`. A class value is an object of the
 // module's Class class that says which class it is (ir::CLASS_CODE): there is one for each class.
+#include "engine_named.h"
 #include "library_calls.h"
 
 namespace kas3 {
@@ -66,7 +67,11 @@ void Interpreter::class_op(const Function &p_function, const Instruction &p_in) 
 		for (const uint32_t each : list) {
 			given->push_back(share(Kind::Any, stack_[base + each]));
 		}
-		class_new(*code, *given, p_in.a);
+		if (ir::is_godot_class(*code)) {
+			EngineNamed(*this).construct(*code & ~ir::CLASS_GODOT, *given, p_in.a); // One of Godot's classes.
+		} else {
+			class_new(*code, *given, p_in.a);
+		}
 		for (Slot each : *given) {
 			drop_any(each);
 		}
@@ -113,7 +118,15 @@ void Interpreter::class_call(uint32_t p_code, const std::vector<Slot> &p_given, 
 	const ir::Class *klass = p_code < module_.classes.size() ? &module_.classes[p_code] : nullptr;
 	const AnyTag tag = any::tag(p_given[0]);
 	Slot made = any::null();
-	if (klass && klass->element != Kind::Void && !klass->array) {
+	if (ir::is_godot_class(p_code)) {
+		// One of Godot's classes: the value when it is one, null for null, as `Node2D(x)` is where it is named.
+		if (any_is(p_given[0], p_code)) {
+			made = share(Kind::Any, p_given[0]);
+		} else if (tag != AnyTag::Null && tag != AnyTag::Undefined) {
+			coercion_failed(p_given[0], Kind::Ref, p_code & ~ir::CLASS_GODOT);
+			return;
+		}
+	} else if (klass && klass->element != Kind::Void && !klass->array) {
 		Slot vector;
 		if (!vm::vector_from(library_, p_code, p_given[0], &vector)) {
 			return;
@@ -149,7 +162,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 	// Too many: avmplus's message gives how many are required (MethodEnv's argcError), which is none.
 	const auto count_error = [&]() {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
-				"Error #1063: Argument count mismatch on " + class_name(p_code) + "(). Expected 0, got " + std::to_string(p_given.size()) + ".");
+				"Error #1063: Argument count mismatch on " + vm::class_name(module_, p_code) + "(). Expected 0, got " + std::to_string(p_given.size()) + ".");
 	};
 	const ir::Class *klass = p_code < module_.classes.size() ? &module_.classes[p_code] : nullptr;
 	const bool object = p_code == ir::ANY_IS_OBJECT || (klass && klass->table && !klass->dictionary);

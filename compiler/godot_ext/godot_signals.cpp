@@ -73,6 +73,69 @@ static Caller caller() {
 	return found;
 }
 
+// One of Godot's own methods that a script added as a listener (`timeout.add(queueFree)`): Godot's own
+// Callable, about which nothing says a script added it. Each is noted here with its signal, by what they
+// are to Godot, so that numListeners and removeAll() count it with the script's own methods.
+struct Added {
+	uint64_t signal_object = 0;
+	std::string signal;
+	uint64_t object = 0;
+	std::string method;
+
+	Added(const Signal &p_signal, const Callable &p_callable) :
+			signal_object(p_signal.get_object_id()), signal(String(p_signal.get_name()).utf8().get_data()), object(p_callable.get_object_id()),
+			method(String(p_callable.get_method()).utf8().get_data()) {}
+	bool operator==(const Added &p_other) const {
+		return signal_object == p_other.signal_object && object == p_other.object && signal == p_other.signal && method == p_other.method;
+	}
+	// Whether the listener is still in its signal: not once either object is freed, or it was removed.
+	bool connected() const {
+		Object *from = ObjectDB::get_instance(ObjectID(signal_object));
+		Object *to = ObjectDB::get_instance(ObjectID(object));
+		return from && to && from->is_connected(String::utf8(signal.c_str()), Callable(to, String::utf8(method.c_str())));
+	}
+};
+
+static std::vector<Added> &added() {
+	static std::vector<Added> all;
+	return all;
+}
+
+static void note_added(const Signal &p_signal, const Callable &p_callable) {
+	static size_t sweep_at = 64;
+	std::vector<Added> &all = added();
+	if (all.size() >= sweep_at) {
+		// Those that are gone are forgotten each time the list has doubled: a constant cost for each one noted.
+		all.erase(std::remove_if(all.begin(), all.end(), [](const Added &p_each) { return !p_each.connected(); }), all.end());
+		sweep_at = std::max<size_t>(64, all.size() * 2);
+	}
+	all.emplace_back(p_signal, p_callable);
+}
+
+static void forget_added(const Signal &p_signal, const Callable &p_callable) {
+	std::vector<Added> &all = added();
+	all.erase(std::remove(all.begin(), all.end(), Added(p_signal, p_callable)), all.end());
+}
+
+// Whether a script added the listener, and for a singleton's signal whether it is the calling object's own:
+// a method of the Godot object that object is attached to.
+static bool added_by_script(const Signal &p_signal, const Callable &p_callable, bool p_shared, const Caller &p_asking) {
+	if (p_callable.is_custom()) {
+		return p_shared ? listener_belongs_to(p_callable, p_asking.object, p_asking.klass) : is_script_listener(p_callable);
+	}
+	const std::vector<Added> &all = added();
+	if (!p_callable.is_standard() || std::find(all.begin(), all.end(), Added(p_signal, p_callable)) == all.end()) {
+		return false;
+	}
+	if (!p_shared) {
+		return true;
+	}
+	const ir::Module &module = Project::get().module();
+	const bool attached = p_asking.object && !module.classes[p_asking.object->klass].native_base.empty();
+	void *owner = attached ? vm::owner_field(const_cast<vm::Object *>(p_asking.object)).p : nullptr;
+	return owner && static_cast<Variant *>(owner)->get_validated_object() == p_callable.get_object();
+}
+
 // numListeners and removeAll(): the listeners scripts added, counted or taken away. On a singleton's
 // signal, which every script shares, only the calling script's own, as C# lets code take away only the
 // handlers it holds.
@@ -80,9 +143,7 @@ static bool script_listeners(Signal &p_signal, std::string_view p_verb, const vm
 	Array connections = p_signal.get_connections();
 	const bool shared = of_singleton(p_signal);
 	const Caller asking = shared ? caller() : Caller();
-	const auto counts = [&](const Callable &p_callable) {
-		return shared ? listener_belongs_to(p_callable, asking.object, asking.klass) : is_script_listener(p_callable);
-	};
+	const auto counts = [&](const Callable &p_callable) { return added_by_script(p_signal, p_callable, shared, asking); };
 	if (p_verb == "@numListeners") {
 		// The ones removeAll() would take away.
 		int64_t count = 0;
@@ -97,6 +158,7 @@ static bool script_listeners(Signal &p_signal, std::string_view p_verb, const vm
 		Callable callable = Dictionary(connections[i])["callable"];
 		if (counts(callable) && p_signal.is_connected(callable)) {
 			p_signal.disconnect(callable);
+			forget_added(p_signal, callable);
 		}
 	}
 	return true;
@@ -127,6 +189,9 @@ static bool add_listener(Signal &p_signal, const Callable &p_callable, bool p_co
 			return false;
 		}
 		listener_added(p_callable, p_signal);
+		if (p_callable.is_standard()) {
+			note_added(p_signal, p_callable);
+		}
 	}
 	return true;
 }
@@ -155,6 +220,7 @@ bool signal_verb(const Variant &p_receiver, std::string_view p_verb, const vm::A
 	if (p_verb == "@remove") {
 		if (connected) {
 			signal.disconnect(callable);
+			forget_added(signal, callable);
 		}
 		return true;
 	}

@@ -63,7 +63,7 @@ void Statements::leave_return(uint32_t p_position, uint32_t p_value) {
 	}
 }
 
-// What a catch takes: its class, a test of the value for String, int, uint, Number and Boolean, or
+// What a catch takes: its class, a test of the value for String, int, uint, Number, Boolean and Int64, or
 // anything (NONE) for `*`, `Object` or no type.
 uint32_t Statements::catch_type(const CatchClause &p_clause) {
 	const Type *type = p_clause.type ? l_.compilation_.type_of(p_clause.type) : nullptr;
@@ -88,6 +88,9 @@ uint32_t Statements::catch_type(const CatchClause &p_clause) {
 	}
 	if (symbol == l_.boolean_) {
 		return ANY_IS_BOOLEAN;
+	}
+	if (symbol == l_.int64_ && l_.int64_) {
+		return ANY_IS_INT64;
 	}
 	uint32_t index = NONE;
 	if (!l_.class_index(symbol, &index)) {

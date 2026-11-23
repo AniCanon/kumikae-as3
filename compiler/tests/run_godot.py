@@ -394,6 +394,33 @@ check("functions.gd: print, printerr and pushWarning reach Godot's output",
 check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,
       output[-1200:])
 
+# Godot's methods as values, as GDScript's own method references behave.
+output = compare("callables.gd", [
+    "a listener that is one of Godot's methods", "held, called and then given to Godot", "passed where a Function is declared",
+    "the same method of the same object", "Godot's own Callable is what the signal holds",
+    "arguments are counted and converted", "call and apply", "a typed callback", "a method Godot's collection calls",
+    "statics, a global function and a singleton", "a singleton's method as a listener", "a method of a value",
+    "called after its object is freed", "added after its object is freed",
+])
+check("callables.gd: nothing is reported", "SCRIPT ERROR" not in output and "ERROR:" not in output, output[-1500:])
+
+# Godot's classes as class values, as GDScript's own classes held in variables behave.
+output = compare("kinds.gd", [
+    "new, is and as with a class value", "a script object is its Godot object", "a value type as a class value", "a reference-counted class",
+    "a cast of a node", "a cast of null", "a cast of a number fails", "a cast of a value fails as it does where the class is named", "the same class",
+    "a class the engine won't create",
+])
+check("kinds.gd: a cast that fails is AS3's coercion error", "Error #1034: Type Coercion failed: cannot convert 5 to Node2D." in output and
+      "at Kinds/cast()" in output, output[-1500:])
+
+# Godot's values and objects held untyped, used by name, as GDScript's untyped variables are.
+output = compare("by_name.gd", [
+    "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
+    "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
+    "a freed object",
+])
+check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
+
 # Every default the name table records must be one Godot can read back.
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
                       os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)

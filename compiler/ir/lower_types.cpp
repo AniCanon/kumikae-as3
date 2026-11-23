@@ -496,7 +496,7 @@ uint32_t Lowerer::convert_primitive(uint32_t p_reg, Kind p_to, uint32_t p_positi
 
 bool Lowerer::null_as(const Expr *p_expression) const {
 	Kind kind = Kind::Void;
-	if (!p_expression || !kind_of(p_expression->type, &kind) || !(is_numeric(kind) || kind == Kind::Bool) || kind == Kind::I64) {
+	if (!p_expression || !kind_of(p_expression->type, &kind) || !(is_numeric(kind) || kind == Kind::Bool)) {
 		return false;
 	}
 	if (p_expression->kind == NodeKind::Conditional) {

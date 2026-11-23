@@ -213,7 +213,8 @@ auto Dynamic::made(New *p_new, const Symbol *p_class) -> std::optional<uint32_t>
 
 // A call of a property by its name: worked out after the arguments, as Flash looks the property up then.
 // Object's own methods (hasOwnProperty and the rest) are called this way on anything: the interpreter
-// answers them when the value has no property of that name. toString() is left to the library.
+// answers them when the value has no property of that name. toString() with no argument is left to the
+// library.
 auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 	if (p_call->callee->kind != NodeKind::Member) {
 		return std::nullopt;
@@ -222,7 +223,9 @@ auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 	// A number that may be null (`(x as Number).toFixed(1)`) is asked as an untyped value is, by the name:
 	// with null there, that is AS3's TypeError #1009.
 	const Symbol *symbol = l_.null_as(callee->object) ? nullptr : callee->resolved();
-	const bool object_method = symbol && symbol->owner == l_.object_ && symbol->name != "toString";
+	// toString() with an argument, on a value typed Object, is the value's own (a Number's takes a radix).
+	const bool object_method = symbol && symbol->owner == l_.object_ &&
+			(symbol->name != "toString" || (p_call->arguments.count > 0 && by_name(callee->object)));
 	if (callee->object->kind == NodeKind::SuperExpr || (symbol && !object_method) || (!symbol && callee->name == "toString" && p_call->arguments.count == 0)) {
 		return std::nullopt;
 	}

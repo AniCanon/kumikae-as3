@@ -12,7 +12,7 @@ bool optional_index(uint32_t p_id, size_t p_size) {
 }
 
 bool any_is_code(uint32_t p_code) {
-	return p_code >= ANY_IS_INT && p_code <= ANY_IS_OBJECT;
+	return p_code >= ANY_IS_INT && p_code <= ANY_IS_INT64;
 }
 
 bool type_check_valid(const Module &p_module, Kind p_kind, uint32_t p_check) {
@@ -103,7 +103,8 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 		return p_in.c < p_module.classes.size() || any_is_code(p_in.c);
 	}
 	if (p_in.op == Op::ClassValue) {
-		return p_in.b < p_module.classes.size() || any_is_code(p_in.b);
+		return p_in.b < p_module.classes.size() || (any_is_code(p_in.b) && p_in.b != ANY_IS_INT64) ||
+				(is_godot_class(p_in.b) && (p_in.b & ~CLASS_GODOT) < p_module.engine_names.size());
 	}
 	if (p_in.op == Op::HostBind) {
 		return (p_in.c & BIND_SLOT) != 0 || p_in.c < p_module.functions.size();
@@ -147,7 +148,7 @@ bool function_valid(const Module &p_module, const Function &p_fn) {
 		}
 	}
 	for (const Handler &h : p_fn.handlers) {
-		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || (h.type >= ANY_IS_INT && h.type <= ANY_IS_BOOLEAN);
+		const bool valid_type = h.type == NONE || h.type < p_module.classes.size() || (h.type >= ANY_IS_INT && h.type <= ANY_IS_BOOLEAN) || h.type == ANY_IS_INT64;
 		if (h.start > h.end || h.end > p_fn.code.size() || h.target >= p_fn.code.size() || h.reg >= p_fn.registers.size() ||
 				!valid_type) {
 			return false;

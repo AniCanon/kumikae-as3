@@ -62,7 +62,7 @@ bool engine_equal(Library &p_library, Kind p_first, void *p_a, Kind p_second, vo
 bool any_equal(Library &p_library, Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 	const ir::Module &module = p_library.module();
 	if (any::tag(p_a) == AnyTag::Object && any::tag(p_b) == AnyTag::Object &&
-			same_function(module, static_cast<const Object *>(any::pointer(p_a)), static_cast<const Object *>(any::pointer(p_b)))) {
+			same_function(p_library, static_cast<const Object *>(any::pointer(p_a)), static_cast<const Object *>(any::pointer(p_b)))) {
 		*r_equal = true; // One method of one object, taken twice: as EqRef has it.
 		return true;
 	}
@@ -291,26 +291,48 @@ bool any_arithmetic(Library &p_library, Op p_op, Slot p_b, Slot p_c, Slot *r_out
 
 } // namespace
 
-bool same_function(const ir::Module &p_module, const Object *p_a, const Object *p_b) {
-	if (!p_a || !p_b || p_a->klass != p_module.function_class || p_b->klass != p_module.function_class) {
+const Vector *bound_pair(const ir::Module &p_module, const Object *p_function) {
+	const Object *first = static_cast<const Object *>(own_field(const_cast<Object *>(p_function), ir::FUNCTION_FIRST).p);
+	const bool pair = first && first->klass == p_module.array_class && static_cast<const Vector *>(first)->length >= 2;
+	return pair ? static_cast<const Vector *>(first) : nullptr;
+}
+
+bool engine_method(const ir::Module &p_module, const Object *p_function, void **r_object, std::string_view *r_method) {
+	const Vector *bound = bound_pair(p_module, p_function);
+	if (!bound || bound->length < 3 || any::tag(slots_of(bound)[0]) != AnyTag::Godot || any::tag(slots_of(bound)[2]) != AnyTag::String) {
+		return false;
+	}
+	*r_object = any::pointer(slots_of(bound)[0]);
+	*r_method = static_cast<const Str *>(any::pointer(slots_of(bound)[2]))->view();
+	return true;
+}
+
+bool same_function(Library &p_library, const Object *p_a, const Object *p_b) {
+	const ir::Module &module = p_library.module();
+	if (!p_a || !p_b || p_a->klass != module.function_class || p_b->klass != module.function_class) {
 		return false;
 	}
 	Object *a = const_cast<Object *>(p_a);
 	Object *b = const_cast<Object *>(p_b);
-	if (own_field(a, ir::FUNCTION_INDEX).i != own_field(b, ir::FUNCTION_INDEX).i) {
-		return false;
-	}
-	if (static_cast<uint32_t>(own_field(a, ir::FUNCTION_INDEX).i) == p_module.library_function) {
-		// A method of the library, which both are (what such a one is bound to is a pair, the value and
-		// the name, where any other function's is its object): the same when read from the same value by
-		// the same name.
-		const Vector *bound_a = static_cast<const Vector *>(own_field(a, ir::FUNCTION_FIRST).p);
-		const Vector *bound_b = static_cast<const Vector *>(own_field(b, ir::FUNCTION_FIRST).p);
-		if (!bound_a || !bound_b || bound_a == bound_b) {
-			return bound_a && bound_a == bound_b;
-		}
+	const Vector *bound_a = bound_pair(module, a);
+	const Vector *bound_b = bound_pair(module, b);
+	if (bound_a && bound_b) {
+		// A method of the library or one of Godot's, which both are (what such a one is bound to is a pair,
+		// the value and the name, where any other function's is its object): the same when read from the
+		// same value by the same name. One of Godot's values or objects is the same where Godot says so.
+		const Slot held_a = slots_of(bound_a)[0], held_b = slots_of(bound_b)[0];
 		const bool named = static_cast<const Str *>(any::pointer(slots_of(bound_a)[1]))->view() == static_cast<const Str *>(any::pointer(slots_of(bound_b)[1]))->view();
-		return named && slots_of(bound_a)[0].bits == slots_of(bound_b)[0].bits;
+		if (!named || any::is_engine(held_a) != any::is_engine(held_b)) {
+			return false;
+		}
+		if (any::is_engine(held_a)) {
+			return engine_equal(p_library, any::tag(held_a) == AnyTag::Value ? Kind::Val : Kind::Ref, any::pointer(held_a),
+					any::tag(held_b) == AnyTag::Value ? Kind::Val : Kind::Ref, any::pointer(held_b));
+		}
+		return held_a.bits == held_b.bits && own_field(a, ir::FUNCTION_INDEX).i == own_field(b, ir::FUNCTION_INDEX).i;
+	}
+	if (bound_a || bound_b || own_field(a, ir::FUNCTION_INDEX).i != own_field(b, ir::FUNCTION_INDEX).i) {
+		return false;
 	}
 	return own_field(a, ir::FUNCTION_FIRST).p == own_field(b, ir::FUNCTION_FIRST).p && own_field(a, ir::FUNCTION_FIRST).p;
 }

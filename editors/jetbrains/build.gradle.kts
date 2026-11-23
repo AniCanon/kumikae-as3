@@ -100,14 +100,54 @@ val uiProbeJar = tasks.register<Jar>("uiProbeJar") {
     from(sourceSets.test.get().output) { include("**/UiProbe*.class") }
     from("src/uiProbe/plugin.xml") { into("META-INF") }
 }
+// This starter has its own descriptor and no Kumikae dependency, so it also runs with Kumikae disabled.
+val reopenProbeJar = tasks.register<Jar>("reopenProbeJar") {
+    archiveBaseName = "rider-reopen-probe"
+    from(sourceSets.test.get().output) {
+        for (type in listOf(
+            "RiderReopenStarter",
+            "UiProbeRiderReopen",
+            "UiProbeRiderPanels",
+            "UiProbeRetention",
+            "UiProbeDispatch",
+            "UiProbeHeap",
+            "UiProbeFeedbackGuard",
+        )) {
+            include("**/$type.class", "**/$type\$*.class")
+        }
+    }
+    from("src/reopenProbe/plugin.xml") { into("META-INF") }
+}
+for (mode in listOf("Disabled", "Enabled")) {
+    val probeTask = "runRiderReopen$mode"
+    intellijPlatformTesting.runIde.register(probeTask) {
+        localPath = riderHome.map { file(it) }
+        plugins {
+            disablePlugin("com.redhat.devtools.lsp4ij")
+            if (mode == "Disabled") disablePlugin("app.anicanon.kumikae.as3")
+        }
+        task {
+            val report = layout.buildDirectory.dir("reports/$probeTask").get().asFile
+            pluginXml.set(layout.projectDirectory.file("src/reopenProbe/plugin.xml"))
+            args("rider-reopen-check", report.absolutePath, mode)
+            jvmArgs("-XX:SoftRefLRUPolicyMSPerMB=0")
+            timeout = Duration.ofMinutes(3)
+            doFirst { report.resolve("result.txt").delete() }
+            doLast { check(report.resolve("result.txt").readText().trim() == "passed") }
+        }
+    }
+    tasks.withType<PrepareSandboxTask>().configureEach {
+        if (name == "prepareSandbox_$probeTask") from(reopenProbeJar) { into("rider-reopen-probe/lib") }
+    }
+}
 if (providers.gradleProperty("uiProbe").isPresent) {
     tasks.withType<PrepareSandboxTask>().configureEach {
-        if (name.startsWith("prepareSandbox_run")) {
+        if (name.startsWith("prepareSandbox_run") && !name.startsWith("prepareSandbox_runRiderReopen")) {
             from(uiProbeJar) { into("kumikae-as3-ui-probe/lib") }
             providers.gradleProperty("gameTargetPlugin").orNull?.let { from(zipTree(it)) }
         }
     }
-    tasks.withType<RunIdeTask>().configureEach {
+    tasks.withType<RunIdeTask>().matching { !it.name.startsWith("runRiderReopen") }.configureEach {
         val report = layout.buildDirectory.dir(
             when (name) {
                 "runIde" -> "reports/ui"
@@ -116,7 +156,11 @@ if (providers.gradleProperty("uiProbe").isPresent) {
             },
         ).get().asFile
         args("kumikae-as3-ui-check", report.absolutePath)
-        if (listOf("KUMIKAE_COMPLETION_RETENTION_CHECK", "KUMIKAE_COMPLETION_RETENTION_PROBE")
+        if (listOf(
+                "KUMIKAE_COMPLETION_RETENTION_CHECK",
+                "KUMIKAE_COMPLETION_RETENTION_PROBE",
+                "KUMIKAE_RIDER_STARTUP_PROBE",
+            )
                 .any { providers.environmentVariable(it).orNull == "1" }
         ) {
             // Leak checks must collect soft caches too; this flag applies only to the probe JVM.

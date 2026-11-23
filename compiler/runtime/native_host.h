@@ -27,6 +27,7 @@ namespace rt {
 enum class Builtin : uint32_t {
 	NullCheck, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
 	SplitByPattern, // split() by a RegExp.
+	IsInt64, // What a catch of an Int64 asks of the error.
 };
 
 // What a Native instruction asks of the host (its second operand): a function's body run, or one of the

@@ -112,6 +112,13 @@ const Type *Typer::call(Call *p_call) {
 			element = member->object->type->element;
 		}
 	}
+	if (symbol && symbol->kind == SymbolKind::Method && callee->kind == NodeKind::Member && symbol->owner == compilation_.builtin("Object") &&
+			static_cast<Member *>(callee)->object->type == compilation_.instance_type(symbol->owner)) {
+		// One of Object's own methods on a value typed `Object`: what runs is the method of what the value
+		// is by then (a Number's toString takes a radix), so the arguments are not counted here, as
+		// Adobe's compiler does not count them.
+		return compilation_.type_of(static_cast<FunctionDecl *>(symbol->node)->return_type);
+	}
 	if (symbol && (symbol->kind == SymbolKind::Method || symbol->kind == SymbolKind::Function ||
 						  symbol->kind == SymbolKind::LocalFunction)) {
 		FunctionDecl *function = static_cast<FunctionDecl *>(symbol->node);

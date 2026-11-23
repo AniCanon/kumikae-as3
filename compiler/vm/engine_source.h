@@ -41,6 +41,10 @@ struct EngineSource {
 	// alive for as long as that value lives. p_owner is the engine object the script object is attached
 	// to, or null.
 	[[nodiscard]] virtual void *bind(Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) = 0;
+	// One of the engine's own methods of one of its objects, as a function the engine can call: its own
+	// Callable of that object and method (Godot's name for it), which holds no reference to the object and
+	// stops being valid when the object is freed.
+	[[nodiscard]] virtual void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) = 0;
 };
 
 } // namespace vm

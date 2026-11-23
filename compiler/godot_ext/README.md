@@ -39,6 +39,7 @@ nothing differently for the editor, so one library serves both.
 | `godot_source.cpp`, `godot_utility.cpp` | Constructors, constants, singletons, static methods, the clock, and Godot's global functions |
 | `godot_signals.cpp`, `godot_emit.cpp`, `listeners.cpp` | Listening to a signal, emitting one, and listeners as the cycle collector sees them |
 | `godot_untyped.cpp`, `godot_collections.cpp` | Untyped values to and from `Variant`, and AS3 collections handed to Godot |
+| `godot_named.cpp` | What a Godot value has under an AS3 name, from the name table, for a value held untyped |
 | `callable`, `bound_method.h` | A method as a Godot callable |
 | `restart.cpp` | What a reload reports, and restarting the running scene |
 | `ios_export` | Editor export plugin for iOS (native objects), Android (`libkas3_program.so`), and Web (`res://.kas3/program.kas3`) |
@@ -64,6 +65,9 @@ The editor turns compiler candidates into Godot's insertions at the caret.
   instruction needs: an operator's evaluator for its operand types, a method bind, a property's accessors,
   a constant's value. Nothing is looked up by name while the program runs. An instruction that meets
   values of other types than expected falls back to a request by name.
+- **One of Godot's methods as a function is Godot's own Callable** of the object and the method
+  (`GodotHost::bind_method`), never a callable of the extension's. `godot_signals.cpp` notes each one a
+  script adds as a listener, so that `numListeners` and `removeAll()` count it.
 - **In the interpreter, a Godot value is boxed** in a handle (a `godot::Variant` the interpreter holds).
   A handle on an object that isn't reference counted, such as a node, is shared by everyone who copies it.
 - **Calls can nest.** The engine calls a script, which calls the engine, which can call a script again,

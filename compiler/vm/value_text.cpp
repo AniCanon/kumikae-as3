@@ -345,6 +345,9 @@ std::string class_name(const ir::Module &p_module, uint32_t p_code) {
 		default:
 			break;
 	}
+	if (ir::is_godot_class(p_code)) {
+		return p_module.engine_names[p_code & ~ir::CLASS_GODOT].key; // As AS3 names it: GodotObject, Node2D.
+	}
 	const std::string &name = p_code < p_module.classes.size() ? p_module.classes[p_code].name : std::string("?");
 	const bool vector = p_code < p_module.classes.size() && p_module.classes[p_code].element != Kind::Void;
 	return vector || name.rfind('.') == std::string::npos ? name : name.substr(name.rfind('.') + 1);

@@ -72,6 +72,10 @@ package game {
 - **`as` and a cast work on Godot's classes and on your script classes.** `node as Coin` gives the `Coin`
   that the node carries, or `null`. `Coin(node)` gives it too, and raises TypeError #1034 if the node has no
   such script.
+- **A Godot class is a class value,** like a class of your own: `var kind:Class = Sprite2D;`. With the
+  class in a variable, `new kind()`, `node is kind`, `node as kind` and `kind(node)` do what they do with
+  the class's name. A value type works too: `new kind(1, 2)` where `kind` holds `Vector2`. A class the
+  engine won't create, such as `Input`, raises an error at `new`.
 - **A class that extends no Godot class is a plain AS3 object.** It has no node behind it, and you can't
   hand it to Godot.
 - **A script on a reference-counted Godot class,** such as `RefCounted` or `Resource`, lives while AS3 or
@@ -114,6 +118,9 @@ Other things to know:
   what it expects: `var x:Number = lerp(a, b, 0.5);`.
 - **`Input.singleton` is the singleton object itself,** for where you need to pass it.
 - **A method is a function wherever Godot takes a callable:** `children.filter(isEnemy)`.
+- **One of Godot's own methods is a function too:** `timer.timeout.add(queueFree)`,
+  `tween.tweenCallback(node.queueFree)`, `var hide:Function = sprite.hide`. See
+  [Godot's methods as values](#godots-methods-as-values).
 - **Enums are `int`.**
 - **Methods that take raw pointers aren't available.** There are 60 of them.
 
@@ -235,6 +242,38 @@ Godot's integers have 64 bits, and AS3's `int` has 32. Godot's integer is the AS
 - Where Godot accepts any type, as `print` and `setMeta` do, a `Number` goes as a float even when its
   value is whole, and an `int`, `uint` or `Int64` goes as an integer.
 
+### Godot's values held untyped
+
+A Godot value or object held in a `*` or an `Object` variable has its members by their AS3 names, as an
+untyped variable has them in GDScript:
+
+```actionscript
+package game {
+    import godot.*;
+
+    public class Finder extends Node {
+        public function mark(path:String):String {
+            var found:* = getNode(path);
+            found.name = "target";
+            found.addToGroup("marked");
+            return found.name;
+        }
+    }
+}
+```
+
+- **The name is looked up as the line runs,** in the value's class and then in each class it extends.
+- **A name that isn't there is an AS3 error:** ReferenceError #1069 when you read it, ReferenceError #1056
+  when you write it, and TypeError #1006 when you call it.
+- **A node that carries one of your scripts has the script's public members first,** and then Godot's.
+  Your own script object held untyped reaches its Godot object's members the same way.
+- **A method you read without calling it is a function.** It's the same function a typed read gives. See
+  [Godot's methods as values](#godots-methods-as-values).
+- **Arguments go to Godot as they're held,** and Godot checks them: an `int` as an integer, a `Number` as a
+  float, a function as a `Callable`.
+- **A value type held untyped is a copy, and its parts can't be written.** `found.position.x = 5` raises an
+  error that says so. Read the value into a variable of its type, change it, and store it back.
+
 ## Signals
 
 A signal is a property of type `Signal`. You add and remove listeners on it.
@@ -251,13 +290,51 @@ A signal is a property of type `Signal`. You add and remove listeners on it.
 | `signal.emit(...)` | Emits the signal |
 
 - **A listener is a method or a function expression.** A method's listener is removed when its object is
-  freed.
+  freed. The method can be one of Godot's own: `timer.timeout.add(queueFree)`.
 - **A listener's parameters are checked when the signal fires.** An argument that doesn't fit is an AS3
   error that says so.
 - **On a singleton's signal, `removeAll()` and `numListeners` cover only the calling object's listeners.**
   A signal such as `Input.joyConnectionChanged` is shared by the whole game.
 - **`node[name].add(listener)` reaches a signal by its AS3 name** when you only know the name at run time.
 - **Godot's `connect` isn't declared.** Use `add`.
+
+### Godot's methods as values
+
+A method of a Godot object is a value, like a method of your own class. Read it without calling it:
+
+```actionscript
+package game {
+    import godot.*;
+
+    public class Bullet extends Area2D {
+        [Export] public var timer:Timer;
+
+        override public function _ready():void {
+            timer.timeout.add(queueFree);
+            var tween:Tween = createTween();
+            tween.tweenCallback(hide);
+            var stop:Function = timer.stop;
+            stop();
+        }
+    }
+}
+```
+
+- **Godot gets its own `Callable`** of that object and that method, where it takes a function. No AS3 code
+  runs when the signal fires.
+- **In AS3 the value is a `Function`.** A call through it counts and converts its arguments as a call of one
+  of your functions does: one argument too many is ArgumentError #1063, and a value of the wrong type is
+  TypeError #1034. An argument you leave out takes Godot's default.
+- **The same method of the same object is the same function.** `node.hide == node.hide` is true, so
+  `signal.remove(node.hide)` removes what `signal.add(node.hide)` added.
+- **It doesn't keep a node alive.** After the node is freed, calling it is TypeError #1009, and Godot drops
+  the listener.
+- **A static method and a global function are values too:** `Vector2.fromAngle`, `Input.isActionPressed`,
+  `lerpf`.
+- **It fits a [typed callback](language.md#typed-callbacks)** when the signature is the same:
+  `var later:()=>void = node.queueFree;`.
+- **A method that takes any number of arguments isn't a value:** `callDeferred`, `emitSignal`, `print`. Call
+  it from a function of your own.
 
 ### Declare a signal
 
@@ -413,12 +490,10 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
-- A method of Godot's isn't a value: `timer.timeout.add(queueFree)` is refused. Pass a method of your own
-  that calls it.
-- A Godot class isn't a class value: `var kind:Class = Node2D` is refused. `is`, `as` and `new` take the
-  class by name.
-- A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
-  a variable of its type first.
+- `for in` and `for each` don't run over a Godot value held in a `*` or an `Object`, and a Godot value isn't
+  a `Dictionary` key. Store it in a variable of its type first.
+- The slim Web extension carries no table of Godot's names, so a member of a Godot value held untyped can't
+  be reached by name there. The script gets an error that says so.
 - A script class in the default package with the same name as a Godot class is ambiguous. Put it in a
   package.
 - `super._process(delta)` on a Godot virtual does nothing, as Godot's own empty versions do. It can't

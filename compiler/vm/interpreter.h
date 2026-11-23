@@ -35,6 +35,7 @@ class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
 	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
+	friend class EngineNamed; // Godot's classes and members an untyped value reaches by name (vm/engine_named.h).
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -305,7 +306,6 @@ private:
 	// Classes as values (vm/class_values.cpp).
 	std::unordered_map<uint32_t, Object *> class_values_; // The one object for each class, kept until the interpreter goes.
 	Object *class_value(uint32_t p_code);
-	std::string class_name(uint32_t p_code) const { return vm::class_name(module_, p_code); }
 	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
@@ -331,7 +331,7 @@ private:
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
 	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
-	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(module_, p_a, p_b); }
+	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(const_cast<Library &>(library_), p_a, p_b); }
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);

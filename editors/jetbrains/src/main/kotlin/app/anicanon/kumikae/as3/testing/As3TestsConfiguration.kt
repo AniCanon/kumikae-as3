@@ -95,12 +95,12 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                 val projectRoot = try {
                     root()
                 } catch (error: RuntimeConfigurationError) {
-                    throw ExecutionException(error.message)
+                    throw ExecutionException(error)
                 }
                 val runnerScript = try {
                     runner()
                 } catch (error: RuntimeConfigurationError) {
-                    throw ExecutionException(error.message)
+                    throw ExecutionException(error)
                 }
                 val compiler = CompilerLocator.findForProject(projectRoot)
                     ?: throw ExecutionException("Build kas3c or place it on the search path.")

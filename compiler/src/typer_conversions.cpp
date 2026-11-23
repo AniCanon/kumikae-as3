@@ -295,6 +295,7 @@ void Typer::written(Expr *p_target) {
 			}
 			break;
 		case SymbolKind::Function:
+		case SymbolKind::LocalFunction: // One declared inside a function, as Adobe's compiler has it too.
 			error(offset, "can't assign to the function " + name);
 			break;
 		case SymbolKind::Class:

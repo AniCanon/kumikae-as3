@@ -1,12 +1,17 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.language.As3Language
 import app.anicanon.kumikae.as3.ui.IconButtonControl
 import app.anicanon.kumikae.as3.ui.TabControl
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.ui.LafManager
+import com.intellij.lang.parameterInfo.LanguageParameterInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.application.ex.ApplicationEx
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.PlatformUtils
 import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
@@ -32,7 +37,12 @@ class UiProbeStarter : ApplicationStarter {
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
                 val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
-                if (System.getenv("KUMIKAE_GODOT_SETUP_PROBE") == "1") {
+                if (System.getenv("KUMIKAE_RIDER_STARTUP_PROBE") == "1") {
+                    UiProbeRiderReopen.run(destination)
+                    UiProbeRiderLifecycle.checkNativeUnload(destination)
+                } else if (System.getenv("KUMIKAE_LSP_DESCRIPTOR_PROBE") == "1") {
+                    checkLanguageClientRegistration(destination)
+                } else if (System.getenv("KUMIKAE_GODOT_SETUP_PROBE") == "1") {
                     checkThemes(destination, godotSetupOnly = true)
                 } else if (System.getenv("KUMIKAE_IOS_TARGET_PROBE_ONLY") == "1") {
                     UiProbeIosTargets.run(destination)
@@ -62,6 +72,17 @@ class UiProbeStarter : ApplicationStarter {
         Files.writeString(destination.resolve("result.txt"), failure?.stackTraceToString() ?: "passed\n")
         val application = ApplicationManager.getApplication()
         application.invokeLater { (application as ApplicationEx).exit(true, true, if (failure == null) 0 else 1) }
+    }
+
+    private fun checkLanguageClientRegistration(destination: Path) = onEdt {
+        val dependency = PluginManagerCore.getPlugin(PluginId.getId("com.redhat.devtools.lsp4ij"))
+        val enabled = dependency?.isEnabled == true
+        val expectDependency = !destination.fileName.toString().endsWith("WithoutLsp4ij")
+        check(enabled == expectDependency) { "Expected LSP4IJ enabled=$expectDependency, got $enabled" }
+        val handlers = LanguageParameterInfo.INSTANCE.allForLanguage(As3Language)
+        val handler = "com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"
+        val registered = handlers.any { it.javaClass.name == handler }
+        check(registered == (enabled && !PlatformUtils.isRider())) { "Unexpected AS3 parameter handlers: $handlers" }
     }
 
     private fun checkThemes(destination: Path, deviceSettingsOnly: Boolean = false, godotSetupOnly: Boolean = false) {

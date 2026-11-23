@@ -28,6 +28,10 @@ The byte kind and its integer conversions also use appended wire values.
   stored in an `int`, which is what the checker's types say.
 - **Ready for a debugger.** Every instruction has a source position, every function lists its named
   locals, and each statement begins with a marker where a hook can stop the program.
+- **Godot's methods as values.** Where Godot takes a function, a method of a Godot object is
+  `HostBindMethod`: Godot's own Callable of the object and the method. Anywhere else it's a `Function`
+  whose function is a forwarder the lowerer writes: it takes what Godot's method declares and calls it.
+  A method read from an object is bound to an Array of the object, the AS3 name and Godot's name.
 - **Godot by name table.** An instruction that asks something of Godot names it by an index into
   `Module::engine_names`, never by text. Each entry is a copy of one line of the generated name table, so a
   back end finds Godot's method, property or operator once.
@@ -58,6 +62,8 @@ The byte kind and its integer conversions also use appended wire values.
 | `lower_vectors`, `lower_vector_methods`, `lower_math` | `Vector.<T>` and `Math` |
 | `lower_library`, `lower_regexp`, `lower_date`, `lower_json` | The rest of the standard library |
 | `lower_engine`, `lower_engine_calls` | Godot's members: properties, constants, singletons, operators, methods and global functions |
+| `lower_engine_values` | Godot's methods and functions as values |
+| `lower_library_values` | The library's own functions as values (`Math.max`, `trace`): a function written from the library's declaration, whose body is the call lowered as it is anywhere else |
 
 The lowerer is one class split across files. `Lowerer` keeps the state. Each group of what it lowers is a
 helper class that it befriends, such as `Statements`, `Operators` or `Calls`. A helper holds the lowerer

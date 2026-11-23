@@ -217,7 +217,17 @@ Object *Reload::object(Object *p_old) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	if (p_old->klass == from_.module_.class_class) {
 		// A class value: the class of the same name in the new program, whose one object for it this is.
-		const uint32_t code = static_cast<uint32_t>(own_field(p_old, ir::CLASS_CODE).i);
+		uint32_t code = static_cast<uint32_t>(own_field(p_old, ir::CLASS_CODE).i);
+		if (ir::is_godot_class(code)) {
+			// One of Godot's classes: the new program's name for the same one, which it has if it names the class.
+			const std::string &key = from_.module_.engine_names[code & ~ir::CLASS_GODOT].key;
+			const std::vector<ir::EngineName> &names = to_.module_.engine_names;
+			const auto named = std::find_if(names.begin(), names.end(), [&key](const ir::EngineName &p_name) { return p_name.key == key; });
+			if (named == names.end()) {
+				return lost(p_old->klass);
+			}
+			code = ir::CLASS_GODOT | static_cast<uint32_t>(named - names.begin());
+		}
 		const auto same = code < from_.module_.classes.size() ? classes_.find(from_.module_.classes[code].name) : classes_.end();
 		if (code < from_.module_.classes.size() && same == classes_.end()) {
 			return lost(code);
@@ -254,6 +264,15 @@ Object *Reload::object(Object *p_old) {
 		if (!callback) {
 			return lost(p_old->klass);
 		}
+	}
+	if (callback && !own_field(p_old, ir::FUNCTION_FIRST).p && to_.module_.functions[*callback].is_static) {
+		// A function bound to nothing is one object for a whole program (`f == Math.max`): the new program's.
+		Object *lone = to_.make_function(*callback, nullptr);
+		if (lone) {
+			moved_.emplace(p_old, lone);
+			retain(lone);
+		}
+		return lone;
 	}
 	Object *fresh = new_object(named->second, to_.heap_.object_slots(named->second), to_.heap_.list_for(named->second));
 	if (!fresh) {

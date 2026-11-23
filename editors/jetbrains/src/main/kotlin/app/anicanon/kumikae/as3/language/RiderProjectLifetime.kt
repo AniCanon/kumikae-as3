@@ -36,8 +36,8 @@ internal class RiderLifetimeListener : ProjectManagerListener {
         frame?.afterClose(project)
     }
 
-    // Deprecated in favour of a startup activity, which runs too late: the native startup activities this
-    // replaces have run by then. No undeprecated hook runs before them in the builds this plugin supports.
+    // On RD-262.10968.170, a restored Problems window can create its panel before a ProjectActivity
+    // runs. Install the adapters before restoration. The Rider startup probe exercises a second open.
     @Suppress("OVERRIDE_DEPRECATION")
     override fun projectOpened(project: Project) {
         if (needsRiderLifetimeRepair()) {

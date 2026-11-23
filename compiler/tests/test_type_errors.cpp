@@ -445,6 +445,11 @@ static void test_review_findings() {
 			{ "can't assign to the constant 'LIMIT'" });
 	expect(program("", "public function a():int { return 1; function /*!*/g():int {} }"),
 			{ "'g' is declared to return 'int' but never returns a value" });
+	// A function declared inside a function is not a variable to assign to.
+	expect(program("function inner():void {} /*!*/inner = null; var f:Function = inner; f = null;"), { "can't assign to the function 'inner'" });
+	// One of Object's methods on a value typed Object takes what the value's own method takes.
+	expect(program("var o:Object = 255; var s:String = o.toString(16); o.toString(); o.valueOf(); var n:Number = 1; n./*!*/toString(1, 2);"),
+			{ "'toString' takes at most 1 argument but 2 were given" });
 	expect(program("flash.utils./*!*/getTimer = null; flash.utils./*!*/getTimer(1);"),
 			{ "can't assign to the function 'getTimer'", "'getTimer' takes no arguments but 1 was given" });
 	expect("package { public class /*!*/Main extends Base implements Shape { override public function /*!*/f(r:Array):void {} } }\n"

@@ -54,7 +54,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 |---|---|
 | Classes | Fields, constructors, methods, static members, getters and setters, inheritance with `override` and `super`, `final`, and the four access levels |
 | Interfaces | Methods, getters and setters. A class can implement several, and an interface can extend several |
-| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, `call` and `apply` |
+| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, the library's functions as values (`Math.max`, `trace`, `parseInt`, `String.fromCharCode`), `call` and `apply` |
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
@@ -85,10 +85,6 @@ The compiler reports each of these as an error with its own message.
 - **Weak keys:** `new Dictionary(true)`.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.** Reading a name that one of
   these doesn't have gives `undefined`, as in Flash.
-- **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
-  value works: `list.push`, `text.charAt`.
-- **`is` and `as` with `Int64`.** Store the value in an `Int64` variable instead: it's converted, and
-  checked, as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
   class that extends `RegExp` or `Dictionary`.
 
@@ -134,7 +130,8 @@ trace(next(2), next(3)); // 12 15
 ```
 
 A callback can hold a function expression, a script method bound to its receiver, a package function,
-another callback with the same signature, or `null`. Bindings require an exact match, including the
+one of [Godot's methods](godot.md#godots-methods-as-values), another callback with the same signature, or
+`null`. Bindings require an exact match, including the
 result. Calls check the number and types of arguments and perform the same scalar conversions as
 a named call. Write `()=>void` for a callback that takes no arguments and returns nothing.
 
@@ -173,7 +170,8 @@ A mismatch raises `TypeError`.
 - **`Int64`.** A 64-bit integer type, because Godot's integers have 64 bits. Arithmetic on it wraps at 64
   bits, `/` gives a `Number`, and a comparison with a `Number` is exact. An `Int64` converts to `int`,
   `uint` or `Number` where one is expected, and raises a `RangeError` if the value doesn't fit. Writing
-  `int(x)` truncates instead, as in Flash.
+  `int(x)` truncates instead, as in Flash. `value is Int64` is true for a whole number an `Int64` holds,
+  `value as Int64` gives it or `null`, and `catch (e:Int64)` catches one.
 - **`[Export]` and `[Signal]`.** Metadata tags on fields of a class that extends a Godot class. See
   [Using AS3 in Godot](godot.md#export-a-field-to-the-inspector).
 - **Operators on Godot's value types.** `position + velocity * delta` works on `Vector2` and the other
@@ -213,6 +211,9 @@ A value of type A fits where B is expected when one of these holds:
 - A is a class itself, such as `Player`, and B is `Class`.
 - B is one of Godot's collections and A is the AS3 collection that converts to it. See
   [Using AS3 in Godot](godot.md#collections).
+
+A class doesn't fit `Function`: `names.map(String)` is an error. Pass a function that converts,
+such as `function(item:*, index:int, list:Array):String { return String(item); }`.
 
 When B is a subclass of A, the error asks for a cast:
 `a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`. Where calling the type isn't a cast, as

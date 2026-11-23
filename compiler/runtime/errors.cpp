@@ -173,7 +173,7 @@ bool catches(Context *c, uint32_t p_type) {
 		return vm::any::tag(error) == vm::AnyTag::Object && is_class(c, static_cast<const Object *>(vm::any::pointer(error)), p_type);
 	}
 	// One of the ANY_IS_ codes, which follow one another as the host's thunks for them do.
-	const uint32_t which = static_cast<uint32_t>(Builtin::IsInt) + (p_type - ir::ANY_IS_INT);
+	const uint32_t which = p_type == ir::ANY_IS_INT64 ? static_cast<uint32_t>(Builtin::IsInt64) : static_cast<uint32_t>(Builtin::IsInt) + (p_type - ir::ANY_IS_INT);
 	c->failing = false;
 	const bool is = host.builtin(static_cast<Builtin>(which), &error).b;
 	c->pending = error;

@@ -1,5 +1,6 @@
 // Properties read by name as the program runs (holder[key] as an untyped value), and whether a holder has
 // one (`in` and hasOwnProperty()).
+#include "engine_named.h"
 #include "interpreter_internal.h"
 
 #include "table.h"
@@ -123,6 +124,12 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
 		return false;
 	}
+	if (!klass.native_base.empty()) {
+		// A script object attached to one of Godot's objects: what Godot's object has, after its own.
+		if (const std::optional<bool> done = EngineNamed(*this).get(p_holder, p_key, r_value)) {
+			return *done;
+		}
+	}
 	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
 		return method_value(p_holder, p_key.text, r_value);
 	}
@@ -164,7 +171,14 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 		return false;
 	}
 	if (any::is_engine(p_holder)) {
-		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
+		// One of Godot's values or objects: its member by the AS3 name, or one of Object's own methods.
+		if (const std::optional<bool> done = EngineNamed(*this).get(p_holder, p_key, r_value)) {
+			return *done;
+		}
+		if (listed(OBJECT_METHODS, p_key.text)) {
+			return method_value(p_holder, p_key.text, r_value);
+		}
+		raise_not_found(p_key, p_holder);
 		return false;
 	}
 	if (tag == AnyTag::String && p_key.text == "length") {
@@ -188,11 +202,10 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		any_null_check(p_holder);
 		return false;
 	}
-	if (!klass && any::is_engine(p_holder)) {
-		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
-		return false;
-	}
 	bool has = (p_prototype && listed(OBJECT_METHODS, p_key.text)) || static_has(object, p_key);
+	if ((!klass && any::is_engine(p_holder)) || (klass && !klass->native_base.empty())) {
+		has = has || EngineNamed(*this).has(p_holder, p_key); // What Godot's value or object has by that name.
+	}
 	if (klass && klass->table) {
 		has = has || entry_of(entries_of(object), p_key).has_value();
 	} else if (klass && klass->element != Kind::Void) {

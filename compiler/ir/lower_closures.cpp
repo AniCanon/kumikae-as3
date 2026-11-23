@@ -5,7 +5,9 @@
 // the environment the function itself was given. Every read and write of the variable, in the function
 // and in those written inside it, goes through that object, so that they all see one variable.
 #include "lower_bodies.h"
+#include "lower_engine_values.h"
 #include "lower_functions.h"
+#include "lower_library_values.h"
 #include "lower_statements.h"
 
 namespace kas3 {
@@ -232,6 +234,14 @@ void Functions::lower_pending_functions() {
 		PendingFunction pending = std::move(l_.pending_functions_.back());
 		l_.pending_functions_.pop_back();
 		Bodies(l_).begin(pending.index, *pending.unit, pending.klass);
+		if (pending.forwarded && pending.written) {
+			LibraryValues(l_).lower(pending);
+			continue;
+		}
+		if (pending.forwarded) {
+			EngineValues(l_).lower(pending);
+			continue;
+		}
 		l_.received_env_ = true;
 		l_.chain_ = std::move(pending.chain);
 		FunctionDecl *decl = pending.decl;

@@ -24,6 +24,8 @@ public:
 
 	// Parameters take the first registers; an instance method's first is `this`.
 	void parameters(FunctionDecl *p_function);
+	// The register of one parameter, of the kind it is held as, with what a caller's value is checked against.
+	uint32_t parameter_register(const Parameter &p_parameter, Kind p_kind);
 
 	void end(uint32_t p_position);
 

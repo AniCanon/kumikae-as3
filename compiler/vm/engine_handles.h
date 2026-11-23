@@ -20,6 +20,18 @@ struct Prepared {
 	virtual ~Prepared() {}
 };
 
+// What an engine value has under an AS3 name, found as a program runs (`untyped.name`): whether the name is
+// a property (a signal and a part of a value too) or a method of the value's class or of one it extends,
+// and Godot's name for it, which the host keeps for as long as it lives. Unknown: a host that has no table
+// of Godot's names can't say.
+struct NamedMember {
+	enum class What : uint8_t { Missing, Unknown, Property, Method };
+	What what = What::Missing;
+	std::string_view godot;
+	bool read = true; // A property with a getter.
+	bool written = true; // A property with a setter.
+};
+
 struct EngineHandles {
 	virtual ~EngineHandles() {}
 	// Asked once for each engine instruction when a program is loaded, before any of it runs: what the host
@@ -57,13 +69,17 @@ struct EngineHandles {
 	// engine's objects: the script object that object carries, if its class is p_class or extends it (a node
 	// whose script is a class is an object of that class). Null for a handle on anything else: no object, one
 	// freed, one with no script of the program's, or with a script of another class. With p_taken, it comes
-	// with a reference of its own, the caller's, and the engine knows the program holds it (keep()).
+	// with a reference of its own, the caller's, and the engine knows the program holds it (keep()). With
+	// p_class NONE: the script object the engine's object carries, whatever its class.
 	[[nodiscard]] virtual Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) = 0;
 
 	[[nodiscard]] virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
 			const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	[[nodiscard]] virtual bool get(void *p_receiver, std::string_view p_property, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	[[nodiscard]] virtual bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) = 0;
+	// What an engine value has under an AS3 name: asked where the value is held untyped, so that the
+	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
+	[[nodiscard]] virtual NamedMember named(void *, std::string_view) { return NamedMember(); }
 	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
 	[[nodiscard]] virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	// An element, by a number or another key: `vector[0]`.

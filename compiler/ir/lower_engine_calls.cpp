@@ -1,6 +1,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine.h"
 #include "lower_engine_calls.h"
+#include "lower_engine_values.h"
 #include "lower_vectors.h"
 
 #include "godot_names.h"
@@ -105,6 +106,9 @@ uint32_t EngineCalls::bound_method(Expr *p_expression) {
 		return l_.default_value(Kind::Val, position);
 	}
 	Symbol *symbol = l_.callee_symbol(p_expression);
+	if (const std::optional<uint32_t> godot = symbol && Lowerer::is_godot(symbol) ? EngineValues(l_).callable(p_expression, symbol) : std::nullopt) {
+		return *godot; // One of Godot's own methods: Godot's own Callable of it.
+	}
 	auto function = l_.functions_.find(declaration(symbol));
 	if (!symbol || symbol->kind != SymbolKind::Method || symbol->is_static() || function == l_.functions_.end()) {
 		// Any other function value (a function expression, a static method, one held in a variable): a

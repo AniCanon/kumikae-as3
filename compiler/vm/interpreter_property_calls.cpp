@@ -1,4 +1,5 @@
 // Objects and Dictionaries made, a property called by its name, and the loops over properties.
+#include "engine_named.h"
 #include "interpreter_internal.h"
 
 #include "table.h"
@@ -252,6 +253,11 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
 	Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+	if (any::is_engine(p_holder) || (klass && !klass->native_base.empty())) {
+		if (EngineNamed(*this).call(p_holder, p_key, p_given, p_out)) {
+			return; // One of Godot's methods by its AS3 name, called or raised.
+		}
+	}
 	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.text, p_given, p_out))) {
 		return; // A class's static method, or RegExp's or Date's, done or raised.
 	}
@@ -277,7 +283,8 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 		call_with(target, static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p), p_given, p_out);
 	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
 		// The library's method, or Object's own, on a value with no property of that name.
-	} else if (own || (klass && klass->table)) {
+	} else if (own || (klass && klass->table) || any::is_engine(p_holder)) {
+		// One of Godot's values has no such method: what calling a name that is not there is in AVM2.
 		raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
 	} else {
 		// A method of its prototype (an Array's push) can't be called by name yet; reading anything else

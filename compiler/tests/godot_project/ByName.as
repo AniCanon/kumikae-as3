@@ -1,0 +1,87 @@
+package {
+	import godot.*;
+
+	// Godot's values and objects held untyped, used by name. by_name.gd works the same thing out in GDScript,
+	// whose untyped variables do the same.
+	public class ByName extends Node2D {
+		public var score:int = 5;
+		public var heard:int = 0;
+		public function twice(n:int):int { return n * 2; }
+		private function onChanged():void { heard++; }
+
+		public function reads(o:*):Array { return [o.name, o["name"], o.visible, o.position, o.getChildCount(), o.getParent() == this, o.name is String]; }
+		public function writes(o:*):Array {
+			o.position = new Vector2(3, 4);
+			o.visible = false;
+			o["name"] = "renamed";
+			var at:Vector2 = o.position;
+			at.x += 1;
+			o.position = at;
+			return [o.position, o.visible, o.name];
+		}
+		public function calls(o:Object):Array {
+			o.show();
+			var child:* = new Node();
+			o.addChild(child);
+			child.name = "inner";
+			return [o.visible, o.getChildCount(), o.getChild(0).name, o.isAncestorOf(child), o.getNode("inner") == child];
+		}
+		// A name that is not there, in AS3's numbers and words.
+		public function missing(o:*):Array {
+			var said:Array = [];
+			try { o.nothing; } catch (e:ReferenceError) { said.push(e.message); }
+			try { o.nothing = 1; } catch (e:ReferenceError) { said.push(e.message); }
+			try { o.nothing(); } catch (e:TypeError) { said.push(e.message); }
+			try { o.hide = 1; } catch (e:ReferenceError) { said.push(e.errorID); }
+			try { o.name(); } catch (e:TypeError) { said.push(e.errorID); }
+			try { o.hide(1); } catch (e:Error) { said.push("refused"); }
+			try { o.position = "text"; } catch (e:Error) { said.push("refused"); }
+			return said;
+		}
+		public function has(o:*):Array { return ["name" in o, "nothing" in o, o.hasOwnProperty("hide"), o.hasOwnProperty("nothing")]; }
+		// One of Godot's values: its parts and its methods.
+		public function ofValue():Array {
+			var v:* = new Vector2(3, 4);
+			var color:Object = new Color(1, 0.5, 0);
+			var said:String = "written";
+			try { v.x = 6; } catch (e:Error) { said = "a copy"; }
+			return [v.x, v.y, v.length(), v.normalized().y, color.g, color.lightened(0.5).r, v is Vector2, said];
+		}
+		// A node that carries a script of the program: the script's members first, then Godot's.
+		public function scripted(o:*):Array {
+			o.score = 9;
+			o.hide();
+			return [o.score, o.twice(4), o.name, o.visible, "score" in o, "twice" in o, "hide" in o];
+		}
+		// The script's own object held untyped reaches its Godot object's members too.
+		public function self():Array {
+			var me:* = this;
+			me.rotation = 0.5;
+			me.show();
+			return [me.score, me.twice(3), me.name, me.rotation, me.visible, me.getChildCount()];
+		}
+		// A method read and not called is a function, the one a typed read gives.
+		public function method(o:*):Array {
+			var hide:Function = o.hide;
+			var typed:Node2D = o;
+			o.show();
+			hide();
+			return [o.visible, hide == o.hide, hide == typed.hide, typeof hide];
+		}
+		// A signal reached by name takes a listener.
+		public function listens(o:*):Array {
+			heard = 0;
+			o.visibilityChanged.add(onChanged);
+			var has:Boolean = o.visibilityChanged.has(onChanged);
+			o.visible = !o.visible;
+			o.visibilityChanged.remove(onChanged);
+			o.visible = !o.visible;
+			return [has, heard, o.visibilityChanged.numListeners];
+		}
+		// A freed object is null.
+		public function freed(o:*):String {
+			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }
+			return "read";
+		}
+	}
+}
