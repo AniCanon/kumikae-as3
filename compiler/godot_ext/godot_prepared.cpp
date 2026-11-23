@@ -598,6 +598,9 @@ std::unique_ptr<Worked> member_of(std::string_view p_owner, const std::vector<st
 		}
 		if (p_set) {
 			worked->parameters.push_back(type);
+			if (worked->index < 0 && type >= Variant::VECTOR2 && type <= Variant::COLOR) {
+				worked->setter_argument = gdextension_interface::variant_get_ptr_internal_getter(static_cast<GDExtensionVariantType>(type));
+			}
 		}
 		worked->names.resize(worked->parameters.size());
 		worked->result = p_set ? NO_VALUE : type;

@@ -30,17 +30,6 @@ void Interpreter::dynamic_op(const Function &p_function, const Instruction &p_in
 		case Op::TableNew:
 			table_new(p_function, p_in);
 			break;
-		case Op::DynCall:
-			if (!cached_property(p_function, p_in)) {
-				property_call(p_function, p_in);
-			}
-			break;
-		case Op::DynGet:
-		case Op::DynSet:
-			if (!cached_property(p_function, p_in)) {
-				property_op(p_function, p_in);
-			}
-			break;
 		case Op::DynKeys:
 		case Op::DynNext:
 		case Op::DynKey:

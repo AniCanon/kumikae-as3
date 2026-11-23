@@ -219,8 +219,13 @@ std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm
 		auto *receiver = static_cast<Variant *>(p_operands[0].slot.p);
 		bool valid = false;
 		if (worked.what == Worked::What::Getter) {
-			const Variant value = receiver->get_named(worked.dynamic_name, valid);
+			Variant value = receiver->get_named(worked.dynamic_name, valid);
 			if (valid) {
+				if (auto *held = reusable_math(p_result, value)) {
+					*held = std::move(value);
+					*r_value = vm::any::godot_value(held);
+					return true;
+				}
 				return take(p_result, value, worked.name, r_value, r_error);
 			}
 			*r_error = "Godot has no '" + worked.name + "' on this value";
@@ -241,6 +246,14 @@ std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm
 		return false;
 	}
 	if (p_shape.owner && worked.bound && p_count <= MOST_OPERANDS) {
+		if (worked.setter_argument && p_count == 2 && vm::any::tag(p_operands[1].slot) == vm::AnyTag::Value) {
+			auto *given = static_cast<Variant *>(vm::any::pointer(p_operands[1].slot));
+			if (given->get_type() == worked.parameters.front()) {
+				const void *arg = worked.setter_argument(given->_native_ptr());
+				gdextension_interface::object_method_bind_ptrcall(worked.bound, p_shape.owner, &arg, nullptr);
+				return true;
+			}
+		}
 		return run_bound(worked, p_shape.instance, p_operands, p_count, p_result, r_value, r_error, p_shape.owner);
 	}
 	return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);

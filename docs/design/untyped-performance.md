@@ -59,19 +59,32 @@ and 1.53 ms. Each pair uses the same 20,000-operation workload.
 
 ## Representation and guards
 
-The front end checks your source with its declared types. It then follows each local by symbol
-identity. The first write must dominate every read, every assignment must have the same concrete
-type, and every use must preserve AS3 behavior with that type. A local that passes uses the same
-registers and instructions as an explicitly typed declaration. The IR golden covers a property
-read, a write and a method call. A local that fails the proof keeps its dynamic accesses.
+The front end checks your source with its declared types, then follows each local by symbol.
+It considers an initializer or a standalone first assignment in a statement block. Reads must
+follow that write in the same straight-line region, which can include nested blocks. A write
+inside an `if`, loop or `try` block proves only the part of that block after the write.
+Every later assignment must have the same checked type. Closure capture and indirect writes
+such as `for each` keep the local dynamic.
 
-For example, a fresh, detached `new Node2D()` used only for local transform operations can bind
-its members at compile time. Calling arbitrary code, publishing the node, capturing it, or reading
-it before initialization prevents that proof. A parameter declared as `Node2D` can already carry
-a foreign script. The parameter-alias fixture overrides `position`, counts reads and writes, and
-returns a different type on its fifth read. Both execution modes observe the override once per
-access and raise the conversion error. The timing matrix retains the parameter alias and its
-explicitly typed control alongside the separate pair for the fresh receiver.
+The proof recognizes literals, construction, typed parameters and locals, fields, getters and
+typed call results. You can return the local or copy it to a declaration of the same type.
+A public member can bind when its result goes into an exactly typed declaration or return, or
+when you discard a method result. Writes and method arguments need an exact value. Member access
+on an AS3 class needs a known concrete construction or a final class. Writes to the parts
+of an untyped Godot math value stay dynamic. The IR fixtures compare Numbers, Booleans, strings,
+AS3 objects, Vector2, Color and a newly constructed Godot resource with explicit declarations.
+
+A freshly constructed engine object can bind a public member while it is known to be detached.
+For example, `var g:* = new Gradient(); return g.getPointCount();` can bind in a function returning
+`int`. The proof treats an unfamiliar engine operation as capable of publishing the receiver
+or attaching a script. It accepts that operation as the last, non-repeating access. A local
+sequence or loop of Node2D transforms can stay detached across accesses. Calling a callback
+between construction and access or publishing the object prevents the proof.
+
+A parameter declared as `Node2D` can already carry a foreign script. Its untyped alias must
+dispatch through that script even for a built-in property. The parameter-alias fixture overrides
+`position`, counts reads and writes, and changes the type on the fifth read. Both execution modes
+observe the override once per access and raise the conversion error.
 
 Operations that observe the dynamic tag, including `typeof`, `is`, `as` and `delete`, keep their
 dynamic semantics. Parameters and the `arguments` array keep their declared calling convention.
@@ -88,17 +101,17 @@ Each site has room for four receiver shapes. A shape identifies the Godot class 
 and the script class. An entry holds resolution metadata. It takes its receiver and arguments
 from the current operation. Additional shapes use the shared lookup table. An interpreter owns
 its side table separately from the immutable module, so warming a site cannot change the module
-fingerprint. Generated C++ keeps a cache at each site and checks its program generation before
+fingerprint. The host retains names resolved in its declaration table. A computed miss returns a
+shared missing-member description without retaining the key. Generated C++ keeps a cache at each site and checks its program generation before
 using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
 refused before it enters AS3, and a worker free is queued for the main thread. The instance
 lookup, host bindings and interpreter overflow table follow the same thread contract. A native
 site uses static storage in the program image so dyld can unload it when Play closes it.
 Reload gets a fresh generation. A cache hit still checks for a freed object.
 
-The native path passes its operands to the same guarded operation directly. For an engine receiver, generated code calls
-`named_access`, which calls the host interpreter's `access_named`. A decline continues through
-the ordinary generated dynamic operation and its thunk where needed. This removes the extra frame, argument copies
-and result handoff visible in the native samples. The timing gate compares both execution modes
+For an engine receiver, generated code passes its operands to `named_access`, which calls the host interpreter's `access_named`. A decline continues through
+the ordinary generated dynamic operation and its thunk where needed. A handled operation avoids the extra frame, argument copies
+and result handoff visible in the reference samples. The timing gate compares both execution modes
 for every operation so a change in either path is visible.
 
 ## Cost after a site warms
@@ -158,11 +171,10 @@ C# uses its by-name API on the same receivers.
 | mixed | write | 51 / 0 / 17 / 7 / 25 / 0 | 29 / 0 / 23 / 7 / 28 / 13 | 35 / 41 | 50% |
 | mixed | call | 47 / 1 / 14 / 9 / 29 / 0 | 25 / 0 / 17 / 9 / 40 / 9 | 38 / 52 | 35% |
 
-For 20,000 GDScript reads, the interpreter median is 1.305 ms and C# is 1.310 ms.
-Mixed reads take 1.443 ms and 1.459 ms. Mixed writes take 1.441 ms and 1.418 ms, with
-overlapping seven-run ranges of 1.431–1.459 ms and 1.375–1.462 ms. The mixed interpreter
-read spends 59% of sampled time in dispatch, 18% in receiver validation, 11% in conversion
-and 12% in other Godot work.
+On a foreign getter, the interpreter can move Godot's returned Variant into an existing handle
+of the expected math type. A bare setter with one exact math argument passes that value directly
+to the validated method bind. A foreign setter still calls Godot's named setter. The gate measures
+GDScript reads and mixed writes separately so both paths stay visible.
 
 Rebuild generated native libraries for runtime layout `0x4b41533300000012`.
 The loader checks the layout before using a site's runtime entry points.

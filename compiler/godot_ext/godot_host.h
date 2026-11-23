@@ -200,6 +200,7 @@ std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Variant &p_value);
 // What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
 // something else.
+godot::Variant *reusable_math(const vm::Wanted &p_wanted, const godot::Variant &p_value);
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
 // One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
 std::string_view value_name(int p_type);

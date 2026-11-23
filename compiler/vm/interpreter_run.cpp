@@ -99,17 +99,6 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 	}
 }
 
-// An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
-void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
-	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
-	Slot number;
-	const bool done = from_any(value, Kind::F64, NONE, &number); // An object's text may run the program.
-	drop_any(value);
-	if (done) {
-		stack_[frames_.back().base + p_in.a].d = number.d;
-	}
-}
-
 void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_registers) {
 	std::string line;
 	for (size_t i = 0; i < p_list.size(); i++) {
@@ -644,12 +633,20 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.
 				break;
-			case Op::TableNew:
+			case Op::DynCall:
+				if (!cached_property(function, in)) {
+					property_call(function, in);
+				}
+				break;
 			case Op::DynGet:
 			case Op::DynSet:
+				if (!cached_property(function, in)) {
+					property_op(function, in);
+				}
+				break;
+			case Op::TableNew:
 			case Op::DynDelete:
 			case Op::DynIn:
-			case Op::DynCall:
 			case Op::DynKeys:
 			case Op::DynNext:
 			case Op::DynKey:
