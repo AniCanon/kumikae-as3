@@ -223,7 +223,8 @@ void EngineValues::lower(const PendingFunction &p_pending) {
 	const bool bound = !l_.fn().is_static;
 	if (bound) {
 		l_.fn().registers.push_back(Kind::Obj);
-		l_.fn().locals.push_back({ "$bound", 0 });
+		l_.fn().bound_engine_method = true;
+		l_.fn().locals.push_back({ BOUND_RECEIVER, 0 });
 	}
 	uint32_t least = decl->parameters.count;
 	for (uint32_t i = 0; i < decl->parameters.count; i++) {

@@ -32,6 +32,7 @@ The byte kind and its integer conversions also use appended wire values.
   `HostBindMethod`: Godot's own Callable of the object and the method. Anywhere else it's a `Function`
   whose function is a forwarder the lowerer writes: it takes what Godot's method declares and calls it.
   A method read from an object is bound to an Array of the object, the AS3 name and Godot's name.
+  The function table identifies these forwarders by index when you compare function values.
 - **Godot by name table.** An instruction that asks something of Godot names it by an index into
   `Module::engine_names`, never by text. Each entry is a copy of one line of the generated name table, so a
   back end finds Godot's method, property or operator once.

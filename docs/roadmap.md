@@ -45,6 +45,7 @@ state of the project changes.
 
 - **Scripts on nodes:** properties, methods, signals, singletons, constants, static methods and global
   functions, with what Godot returns checked against its declared type.
+- When you call a member by name on an attached script, you can call a function returned by a public getter.
 - **`[Export]` and `[Signal]`,** including `[Export]` fields typed as your own `Node` and `Resource` script classes.
 - **Hot reload** that keeps state and updates live objects in place. See [Hot reload](hot-reload.md).
 - **Memory:** reference counting, with a cycle collector that runs in short steps each frame.

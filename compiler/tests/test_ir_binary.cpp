@@ -128,6 +128,7 @@ static void test_round_trip_godot_script_metadata() {
 				[Export] public var origin:Vector2 = new Vector2(12, 34);
 				[Export] public var label:String = "meridian";
 				[Signal] public var dashed:Signal;
+				public function callback():Function { return moveAndSlide; }
 				override public function _physicsProcess(delta:Number):void {
 					velocity = new Vector2(speed * delta, 0);
 					moveAndSlide();
@@ -157,6 +158,22 @@ static void test_round_trip_godot_script_metadata() {
 		}
 	}
 	CHECK(found_courier);
+	size_t forwarders = 0;
+	for (size_t i = 0; i < original.functions.size(); i++) {
+		CHECK_EQ(original.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
+		if (original.functions[i].bound_engine_method) {
+			forwarders++;
+			original.functions[i].bound_engine_method = false;
+		}
+	}
+	CHECK_EQ(forwarders, size_t(1));
+	// A packed module without the flag still carries the forwarder's synthetic receiver.
+	const auto earlier = ir::write_binary(original);
+	ir::Module loaded;
+	CHECK(!ir::read_binary(earlier.data(), earlier.size(), &loaded));
+	for (size_t i = 0; i < decoded.functions.size(); i++) {
+		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
+	}
 }
 
 static void test_rejects_corrupt_or_truncated_modules() {

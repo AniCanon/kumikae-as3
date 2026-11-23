@@ -292,9 +292,20 @@ bool any_arithmetic(Library &p_library, Op p_op, Slot p_b, Slot p_c, Slot *r_out
 } // namespace
 
 const Vector *bound_pair(const ir::Module &p_module, const Object *p_function) {
-	const Object *first = static_cast<const Object *>(own_field(const_cast<Object *>(p_function), ir::FUNCTION_FIRST).p);
-	const bool pair = first && first->klass == p_module.array_class && static_cast<const Vector *>(first)->length >= 2;
-	return pair ? static_cast<const Vector *>(first) : nullptr;
+	if (!p_function || p_function->klass != p_module.function_class) {
+		return nullptr;
+	}
+	Object *function = const_cast<Object *>(p_function);
+	const auto index = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
+	if (index >= p_module.functions.size() || (index != p_module.library_function && !p_module.functions[index].bound_engine_method)) {
+		return nullptr;
+	}
+	const Object *first = static_cast<const Object *>(own_field(function, ir::FUNCTION_FIRST).p);
+	if (!first || first->klass != p_module.array_class) {
+		return nullptr;
+	}
+	const auto *bound = static_cast<const Vector *>(first);
+	return bound->length >= 2 && any::tag(slots_of(bound)[1]) == AnyTag::String ? bound : nullptr;
 }
 
 bool engine_method(const ir::Module &p_module, const Object *p_function, void **r_object, std::string_view *r_method) {

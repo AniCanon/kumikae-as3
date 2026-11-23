@@ -137,7 +137,7 @@ public:
 		u32(p_fn.owner);
 		u32(p_fn.written_in);
 		const uint8_t bits = (p_fn.is_static ? 1u : 0u) | (p_fn.is_public ? 2u : 0u) |
-				(p_fn.rest ? 4u : 0u) | (p_fn.takes_extra ? 8u : 0u);
+				(p_fn.rest ? 4u : 0u) | (p_fn.takes_extra ? 8u : 0u) | (p_fn.bound_engine_method ? 16u : 0u);
 		byte(bits);
 		u32(p_fn.parameters);
 		u32(p_fn.required);
@@ -424,6 +424,7 @@ public:
 		r_out->is_public = (bits & 2u) != 0;
 		r_out->rest = (bits & 4u) != 0;
 		r_out->takes_extra = (bits & 8u) != 0;
+		r_out->bound_engine_method = (bits & 16u) != 0;
 		if (!u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
@@ -471,6 +472,11 @@ public:
 			if (!text(&r_out->locals[i].name) || !u32(&r_out->locals[i].reg)) {
 				return false;
 			}
+		}
+		// Earlier modules identify a generated instance forwarder by its synthetic receiver.
+		if (!r_out->is_static && r_out->owner == NONE && !r_out->locals.empty() && r_out->locals.front().reg == 0 &&
+				r_out->locals.front().name == BOUND_RECEIVER) {
+			r_out->bound_engine_method = true;
 		}
 		if (!u32(&count) || !check_count(count, 6)) {
 			return false;

@@ -36,6 +36,9 @@ struct Handler {
 // anything gives, a null): Godot's own name for "any value".
 inline constexpr std::string_view ANY_GODOT_TYPE = "Variant";
 
+// The synthetic receiver of a Godot instance method read as a Function.
+inline constexpr char BOUND_RECEIVER[] = "$bound";
+
 struct Function {
 	std::string name; // "Main/update", "Main" for a constructor, "helper" for a package function.
 	uint32_t file = 0; // An index into Module::files.
@@ -57,6 +60,7 @@ struct Function {
 	// or by name may pass any number past the parameters, untyped, and `arguments` holds them after the
 	// others. A call the checker typed never passes more.
 	bool takes_extra = false;
+	bool bound_engine_method = false; // The function index names a forwarder with a saved receiver and name.
 	Kind result = Kind::Void;
 	// Godot's name for the type of each register: for every one that holds one of Godot's values (Kind::Val:
 	// "Vector2", "Callable", or ANY_GODOT_TYPE where any may be there), and for one that holds one of

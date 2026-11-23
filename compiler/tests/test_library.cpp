@@ -436,6 +436,25 @@ void test_making() {
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }
 
+// Two ordinary arrays with the same fields are distinct receivers, even when the fields
+// look like a library method's saved receiver and name.
+void check_array_receivers(Library &p_library, uint32_t p_target) {
+	Object *functions[2];
+	Vector *arrays[2];
+	for (size_t i = 0; i < 2; i++) {
+		arrays[i] = vector_new(p_library, ARRAY, 2, false);
+		slots_of(arrays[i])[0] = any::integer(3);
+		slots_of(arrays[i])[1] = any::string(new_string("member"));
+		functions[i] = make_function(p_library, p_target, arrays[i]);
+	}
+	CHECK(!same_function(p_library, arrays[0], arrays[1]));
+	CHECK(!same_function(p_library, functions[0], functions[1]));
+	for (size_t i = 0; i < 2; i++) {
+		p_library.heap.release_object(functions[i]);
+		p_library.heap.release_object(arrays[i]);
+	}
+}
+
 // A value's words and a function value's call run the program by a function's number, with typed values.
 void test_words() {
 	constexpr uint32_t FUNCTION = 3, POINT = 4, SAY = 0, VALUE = 1, JOIN = 2;
@@ -524,6 +543,7 @@ void test_words() {
 	heap.release_object(lone);
 	heap.release_object(lone);
 	CHECK_EQ(function_length(module, lone), 2);
+	check_array_receivers(library, VALUE);
 	Object *bound = make_method(library, 1, made);
 	CHECK(bound != nullptr);
 	CHECK(own_field(bound, kas3::ir::FUNCTION_FIRST).p == made && static_cast<uint32_t>(own_field(bound, kas3::ir::FUNCTION_INDEX).i) == VALUE);
