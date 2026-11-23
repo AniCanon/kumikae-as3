@@ -173,6 +173,18 @@ static void test_round_trip_godot_script_metadata() {
 	CHECK(!ir::read_binary(earlier.data(), earlier.size(), &loaded));
 	for (size_t i = 0; i < decoded.functions.size(); i++) {
 		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
+		if (decoded.functions[i].bound_engine_method) {
+			CHECK(!loaded.functions[i].locals.empty());
+			CHECK_EQ(loaded.functions[i].locals.front().name, std::string(ir::BOUND_RECEIVER));
+			CHECK_EQ(loaded.functions[i].locals.front().reg, uint32_t(0));
+		}
+		decoded.functions[i].locals.clear();
+	}
+	// The current flag also survives a writer that omits every local.
+	const auto stripped = ir::write_binary(decoded);
+	CHECK(!ir::read_binary(stripped.data(), stripped.size(), &loaded));
+	for (size_t i = 0; i < decoded.functions.size(); i++) {
+		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
 	}
 }
 
