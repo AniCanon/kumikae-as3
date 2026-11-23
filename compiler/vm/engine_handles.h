@@ -30,6 +30,8 @@ struct NamedMember {
 	std::string_view godot;
 	bool read = true; // A property with a getter.
 	bool written = true; // A property with a setter.
+	const Prepared *invoke = nullptr; // The method or getter, with the receiver as the first operand.
+	const Prepared *setter = nullptr;
 };
 
 inline constexpr NamedMember MISSING_MEMBER{};

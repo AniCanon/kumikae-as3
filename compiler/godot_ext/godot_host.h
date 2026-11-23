@@ -101,6 +101,7 @@ public:
 private:
 	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
+	std::vector<std::unique_ptr<Worked>> named_bindings_;
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
 	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.
 	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);

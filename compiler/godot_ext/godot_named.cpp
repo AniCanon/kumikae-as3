@@ -8,6 +8,7 @@
 #if !defined(KAS3_RUNTIME_ONLY)
 #include "builtins.h"
 #include "godot_names.h"
+#include "worked.h"
 #endif
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -55,8 +56,7 @@ const std::unordered_map<std::string, std::string> &renamed() {
 }
 
 // What the table says of a member, as a script may use it by name.
-vm::NamedMember described(std::string_view p_value) {
-	const std::vector<std::string_view> words = godot_words(p_value);
+vm::NamedMember described(const std::vector<std::string_view> &words) {
 	vm::NamedMember found;
 	found.godot = words[0];
 	if (words.size() == 1 && !words[0].empty() && words[0][0] == '@') {
@@ -104,7 +104,27 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 		const auto id = godot_entry((as3 == renamed().end() ? godot : as3->second) + "." + std::string(p_name));
 		if (id) {
 			const GodotEntry entry = godot_entry_at(*id);
-			const vm::NamedMember found = described(entry.value);
+			const auto words = godot_words(entry.value);
+			vm::NamedMember found = described(words);
+			const auto keep_binding = [this](std::unique_ptr<Worked> p_binding) -> const vm::Prepared * {
+				if (!p_binding) {
+					return nullptr;
+				}
+				p_binding->by_name = true;
+				named_bindings_.push_back(std::move(p_binding));
+				return named_bindings_.back().get();
+			};
+			if (found.what == vm::NamedMember::What::Method) {
+				found.invoke = keep_binding(method_of(godot, words, type, false, std::nullopt));
+			} else if (found.what == vm::NamedMember::What::Property) {
+				const ir::Kind kind = object ? ir::Kind::Ref : ir::Kind::Val;
+				if (found.read) {
+					found.invoke = keep_binding(member_of(godot, words, false, kind));
+				}
+				if (object && found.written) {
+					found.setter = keep_binding(member_of(godot, words, true, kind));
+				}
+			}
 			if (found.what != vm::NamedMember::What::Missing) {
 				// The same constant table the IR uses owns both names, across program reloads.
 				return members.emplace(entry.key.substr(entry.key.find('.') + 1), found).first->second;

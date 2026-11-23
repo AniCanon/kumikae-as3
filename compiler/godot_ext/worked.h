@@ -85,6 +85,7 @@ struct GodotHost::Worked final : vm::Prepared {
 	GDExtensionMethodBindPtr bound = nullptr;
 	mutable SignalSeen seen; // Emit.
 	bool is_static = false;
+	bool by_name = false; // Object.get/set/call let a script intercept the request.
 	// Every parameter and the result are numbers, Booleans or value types held inline (Vector2, Color): with
 	// every argument given, the method bind is called on the bare values, with no Variant at all.
 	bool bare = false;
@@ -103,6 +104,12 @@ struct GodotHost::Worked final : vm::Prepared {
 	godot::Variant value;
 	const Utility *utility = nullptr;
 };
+
+// Shared by typed instructions and members discovered on an untyped receiver. An absent argument
+// count defers the built-in method's arity check until it runs.
+std::unique_ptr<GodotHost::Worked> method_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, int p_receiver,
+		bool p_static, std::optional<size_t> p_arguments);
+std::unique_ptr<GodotHost::Worked> member_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, bool p_set, ir::Kind p_receiver);
 
 // A signal's emit(), which Godot has as a method of the signal that takes any number of values: worked out
 // as Object's emit_signal, called by its method bind (godot_emit.cpp). Nothing for any other entry.

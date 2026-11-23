@@ -3,6 +3,25 @@
 namespace kas3 {
 namespace vm {
 
+namespace {
+
+Argument receiver(Slot p_holder, void *p_handle) {
+	Argument argument{ any::tag(p_holder) == AnyTag::Value ? ir::Kind::Val : ir::Kind::Ref, Slot{} };
+	argument.slot.p = p_handle;
+	return argument;
+}
+
+// A prepared request may decline an argument type or count. Only an empty error permits a retry by name.
+std::optional<bool> prepared(EngineHandles &p_host, const Prepared *p_prepared, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
+		Slot *r_value, std::string *r_error) {
+	if (p_prepared && p_host.run(*p_prepared, p_arguments, p_count, p_wanted, r_value, r_error)) {
+		return true;
+	}
+	return r_error->empty() ? std::nullopt : std::optional<bool>(false);
+}
+
+} // namespace
+
 using ir::Kind;
 using ir::NONE;
 
@@ -101,7 +120,9 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	Wanted wanted;
 	wanted.kind = Kind::Any;
 	std::string error;
-	if (!vm_.host_.handles.get(handle, found.godot, wanted, r_value, &error)) {
+	const Argument operand = receiver(p_holder, handle);
+	const auto done = prepared(vm_.host_.handles, found.invoke, &operand, 1, wanted, r_value, &error);
+	if (!(done ? *done : vm_.host_.handles.get(handle, found.godot, wanted, r_value, &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
 	}
@@ -138,7 +159,10 @@ std::optional<bool> EngineNamed::set(Slot p_holder, const PropertyKey &p_key, Sl
 		return false;
 	}
 	std::string error;
-	if (!vm_.host_.handles.set(handle_of(p_holder), found.godot, Argument{ Kind::Any, p_value }, &error)) {
+	void *handle = handle_of(p_holder);
+	const Argument operands[] = { receiver(p_holder, handle), { Kind::Any, p_value } };
+	const auto done = prepared(vm_.host_.handles, found.setter, operands, 2, Wanted{}, nullptr, &error);
+	if (!(done ? *done : vm_.host_.handles.set(handle, found.godot, operands[1], &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
 	}
@@ -166,33 +190,41 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 		return false;
 	}
 	// Each argument as it is held; a function goes as Godot's Callable, as it does where the method is named.
-	std::vector<Argument> arguments;
-	std::vector<void *> callables;
-	bool ok = true;
-	for (size_t i = 0; ok && i < p_given.size(); i++) {
-		Object *given = vm_.held_object(p_given[i]);
+	const size_t count = p_given.size() + 1;
+	Argument few[16];
+	std::vector<Argument> many(count > 16 ? count : 0);
+	Argument *arguments = many.empty() ? few : many.data();
+	void *handle = handle_of(p_holder);
+	arguments[0] = receiver(p_holder, handle);
+	size_t ready = 1;
+	for (; ready < count; ready++) {
+		const Slot value = p_given[ready - 1];
+		Object *given = vm_.held_object(value);
 		if (given && given->klass == vm_.module_.function_class) {
-			callables.push_back(callable(given));
-			ok = callables.back() != nullptr;
-			arguments.push_back(Argument{ Kind::Val, Slot{} });
-			arguments.back().slot.p = callables.back();
-		} else if (const std::optional<std::string> why = vm_.godot_refuses(p_given[i], 0)) {
+			arguments[ready] = { Kind::Val, Slot{} };
+			arguments[ready].slot.p = callable(given);
+			if (!arguments[ready].slot.p) {
+				break;
+			}
+		} else if (const std::optional<std::string> why = vm_.godot_refuses(value, 0)) {
 			vm_.raise(vm_.module_.type_error_class, *why);
-			ok = false;
+			break;
 		} else {
-			arguments.push_back(Argument{ Kind::Any, p_given[i] });
+			arguments[ready] = { Kind::Any, value };
 		}
 	}
-	Wanted wanted;
-	wanted.kind = Kind::Any;
+	const Wanted wanted{ Kind::Any, {} };
 	Slot result = any::undefined();
 	std::string error;
-	// The frame is found again by its number afterwards: Godot may run the program, which may move the stack.
 	const size_t frame = vm_.frames_.size() - 1;
-	ok = ok && vm_.host_.handles.call(handle_of(p_holder), found.godot, arguments.data(), arguments.size(), wanted, &result, &error);
-	for (void *each : callables) {
-		if (each) {
-			vm_.host_.handles.drop(each);
+	bool ok = ready == count;
+	if (ok) {
+		const auto done = prepared(vm_.host_.handles, found.invoke, arguments, count, wanted, &result, &error);
+		ok = done ? *done : vm_.host_.handles.call(handle, found.godot, arguments + 1, count - 1, wanted, &result, &error);
+	}
+	for (size_t i = 1; i < ready; i++) {
+		if (arguments[i].kind == Kind::Val) {
+			vm_.host_.handles.drop(arguments[i].slot.p);
 		}
 	}
 	if (!ok) {

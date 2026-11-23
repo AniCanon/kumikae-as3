@@ -284,6 +284,9 @@ bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_opera
 bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	const size_t first = p_worked.is_static ? 0 : 1;
+	if (p_count != first + p_worked.parameters.size()) {
+		return false; // A dynamic call may omit defaults or give the wrong number.
+	}
 	Scalar scalars[MOST];
 	Values values;
 	GDExtensionConstTypePtr pointers[MOST];
@@ -305,6 +308,13 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 		} else if ((type == Variant::STRING || type == Variant::STRING_NAME) && given.kind == ir::Kind::Str && given.slot.p) {
 			Variant &value = values.next();
 			argument(p_worked, i - first, given, &value);
+			pointers[i - first] = inside(value, type);
+		} else if (given.kind == ir::Kind::Any) {
+			Variant &value = values.next();
+			value = to_variant(given.kind, given.slot);
+			if (value.get_type() != type || type == Variant::OBJECT) {
+				return false; // Let Godot apply its conversions and report a bad argument.
+			}
 			pointers[i - first] = inside(value, type);
 		} else if (!(pointers[i - first] = bare(given, type, &scalars[i]))) {
 			return false;
@@ -342,7 +352,10 @@ bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands
 		*r_error = FREED;
 		return false;
 	}
-	if (p_worked.bare) {
+	if (p_worked.by_name && internal::get_object_instance_binding(object)->get_script().get_type() != Variant::NIL) {
+		return false; // A script can intercept even an inherited name, differently on each instance.
+	}
+	if (p_worked.bare && !(p_worked.result == NO_VALUE && p_result.kind == ir::Kind::Any)) {
 		if (const std::optional<bool> done = run_bare(p_worked, object, p_operands + first, p_count - first, p_result, r_result)) {
 			return *done;
 		}
@@ -472,10 +485,12 @@ std::unique_ptr<Worked> operator_of(const ir::Function &p_function, const ir::In
 	return worked->evaluator ? std::move(worked) : nullptr;
 }
 
+} // namespace
+
 // A method: of one of Godot's value types (called on the bare value; `p_receiver` NO_VALUE for a static
 // one), of one of its classes (by its method bind), or one of its global functions.
-std::unique_ptr<Worked> method_of(const ir::EngineName &p_entry, const std::vector<std::string_view> &p_words, int p_receiver, bool p_static,
-		size_t p_arguments) {
+std::unique_ptr<Worked> method_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, int p_receiver, bool p_static,
+		std::optional<size_t> p_arguments) {
 	if (p_words.size() < 5 || p_words[1] != "method" || p_words[2] == "-") {
 		return nullptr;
 	}
@@ -486,17 +501,17 @@ std::unique_ptr<Worked> method_of(const ir::EngineName &p_entry, const std::vect
 	worked->is_static = p_static;
 	worked->result = type_named(p_words[3]);
 	worked->zero = zero_of(worked->result);
-	const std::optional<int> value_type_of_owner = value_type(p_entry.owner);
+	const std::optional<int> value_type_of_owner = value_type(p_owner);
 	const bool varargs = p_words.size() > 5;
 	if (!value_type_of_owner) {
 		worked->what = Worked::What::Bound;
-		worked->bound = method_bind(p_entry.owner, p_words[0], p_words[2]);
+		worked->bound = method_bind(p_owner, p_words[0], p_words[2]);
 		worked->bare = !varargs && (worked->result == NO_VALUE || held_bare(worked->result)) &&
 				std::all_of(worked->parameters.begin(), worked->parameters.end(), held_bare);
 		return worked->bound ? std::move(worked) : nullptr;
 	}
 	// Called on the bare value, a value type's method takes every argument, of its exact type.
-	if (varargs || worked->parameters.size() != p_arguments || (!p_static && p_receiver != *value_type_of_owner)) {
+	if (varargs || (p_arguments && worked->parameters.size() != *p_arguments) || (!p_static && p_receiver != *value_type_of_owner)) {
 		return nullptr;
 	}
 	worked->what = Worked::What::Builtin;
@@ -508,12 +523,12 @@ std::unique_ptr<Worked> method_of(const ir::EngineName &p_entry, const std::vect
 }
 
 // A property of one of Godot's classes, by its accessor's method bind; or a part of one of its values.
-std::unique_ptr<Worked> member_of(const ir::EngineName &p_entry, const std::vector<std::string_view> &p_words, bool p_set, ir::Kind p_receiver) {
+std::unique_ptr<Worked> member_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, bool p_set, ir::Kind p_receiver) {
 	auto worked = std::make_unique<Worked>();
 	worked->name = std::string(p_words[0]);
 	if (p_receiver == ir::Kind::Ref && p_words.size() == 8 && p_words[1] == "property") {
 		worked->what = p_set ? Worked::What::Setter : Worked::What::Getter;
-		worked->bound = method_bind(p_entry.owner, p_words[p_set ? 5 : 3], p_words[p_set ? 6 : 4]);
+		worked->bound = method_bind(p_owner, p_words[p_set ? 5 : 3], p_words[p_set ? 6 : 4]);
 		worked->index = p_words[7] == "-" ? -1 : std::atoll(std::string(p_words[7]).c_str());
 		// What the accessor takes: the index first, if it has one, then a setter's value; a getter gives it.
 		const int type = type_named(p_words[2]);
@@ -529,7 +544,7 @@ std::unique_ptr<Worked> member_of(const ir::EngineName &p_entry, const std::vect
 		worked->bare = held_bare(type);
 		return worked->bound ? std::move(worked) : nullptr;
 	}
-	const std::optional<int> owner = value_type(p_entry.owner);
+	const std::optional<int> owner = value_type(p_owner);
 	if (p_receiver != ir::Kind::Val || p_words.size() != 3 || p_words[1] != "field" || !owner) {
 		return nullptr;
 	}
@@ -542,8 +557,6 @@ std::unique_ptr<Worked> member_of(const ir::EngineName &p_entry, const std::vect
 	worked->setter = gdextension_interface::variant_get_ptr_setter((GDExtensionVariantType)*owner, member._native_ptr());
 	return worked->result >= 0 && (p_set ? worked->setter != nullptr : worked->getter != nullptr) ? std::move(worked) : nullptr;
 }
-
-} // namespace
 
 std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in,
 		std::string *r_key) {
@@ -567,7 +580,7 @@ std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_modul
 			if (std::unique_ptr<Worked> emit = emit_of(entry, words)) {
 				return emit;
 			}
-			return method_of(entry, words, receiver.value_or(NO_VALUE), false, list.size() - 1);
+			return method_of(entry.owner, words, receiver.value_or(NO_VALUE), false, list.size() - 1);
 		}
 		case ir::Op::HostCallStatic: {
 			const size_t count = p_function.argument_lists[p_in.c].size();
@@ -579,13 +592,13 @@ std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_modul
 				worked->utility = utility(entry.value, &error);
 				return worked->utility ? std::move(worked) : nullptr;
 			}
-			return method_of(entry, words, NO_VALUE, true, count);
+			return method_of(entry.owner, words, NO_VALUE, true, count);
 		}
 		case ir::Op::HostGet:
 		case ir::Op::HostSet: {
 			const ir::Kind receiver = p_function.registers[member ? p_in.b : p_in.a];
 			*r_key += " " + std::to_string((int)receiver);
-			return member_of(entry, words, !member, receiver);
+			return member_of(entry.owner, words, !member, receiver);
 		}
 		case ir::Op::HostNew: {
 			// One of Godot's value types (Vector2(x, y)); an object of one of its classes is made by name.
