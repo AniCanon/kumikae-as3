@@ -23,6 +23,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import sys
 
 # What generated code is built with (the design's flags), as strictly as our own, into a library that
 # shows one symbol and needs none of ours.
@@ -36,6 +37,23 @@ OTHER_LAYOUT = "it was built for another version of the runtime: build the progr
 ROUNDS = 1000
 # And how many frames a frame benchmark is run for.
 FRAMES = 3
+
+
+def unloads_on_macos(program):
+    """Use Play's dlopen flags and count the library's dyld images after close."""
+    import _ctypes
+    import ctypes
+    path = os.path.realpath(program)
+    dyld = ctypes.CDLL(None)
+    dyld._dyld_get_image_name.restype = ctypes.c_char_p
+
+    def present():
+        return any(os.fsdecode(dyld._dyld_get_image_name(i)) == path for i in range(dyld._dyld_image_count()))
+
+    handle = _ctypes.dlopen(path, os.RTLD_NOW | os.RTLD_LOCAL)
+    loaded = present()
+    _ctypes.dlclose(handle)
+    return loaded and not present()
 
 
 class Runner:
@@ -129,6 +147,8 @@ class Runner:
             program = self.library("the probe", project, scripts, where)
             if not program:
                 return
+            if sys.platform == "darwin":
+                self.check("native: a closed Play library leaves dyld", unloads_on_macos(program), program)
             said = {}
             for label, library in (("interpreter", None), ("native", program)):
                 status, text = self.run(project, "probe.gd", library)

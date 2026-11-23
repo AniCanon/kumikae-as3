@@ -30,7 +30,7 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	}
 	const size_t count = list ? list->size() - 1 : write ? 1 : 0;
 	line("{");
-	line("static thread_local kas3::vm::NamedSite site{};");
+	line("static kas3::vm::NamedSite site{};");
 	if (count) {
 		line("const Slot args[] = { " + given + " };");
 	}

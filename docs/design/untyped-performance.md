@@ -89,10 +89,15 @@ and the script class. An entry holds resolution metadata. It takes its receiver 
 from the current operation. Additional shapes use the shared lookup table. An interpreter owns
 its side table separately from the immutable module, so warming a site cannot change the module
 fingerprint. Generated C++ keeps a cache at each site and checks its program generation before
-using it. Reload gets a fresh generation. A cache hit still checks for a freed object.
+using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
+refused before it enters AS3, and a worker free is queued for the main thread. The instance
+lookup, host bindings and interpreter overflow table follow the same thread contract. A native
+site uses static storage in the program image so dyld can unload it when Play closes it.
+Reload gets a fresh generation. A cache hit still checks for a freed object.
 
-The native path passes its operands to the same guarded operation directly. Only an operation
-the guard declines enters the interpreter thunk. This removes the extra frame, argument copies
+The native path passes its operands to the same guarded operation directly. For an engine receiver, generated code calls
+`named_access`, which calls the host interpreter's `access_named`. A decline continues through
+the ordinary generated dynamic operation and its thunk where needed. This removes the extra frame, argument copies
 and result handoff visible in the native samples. The timing gate compares both execution modes
 for every operation so a change in either path is visible.
 
@@ -157,8 +162,7 @@ For 20,000 GDScript reads, the interpreter median is 1.305 ms and C# is 1.310 ms
 Mixed reads take 1.443 ms and 1.459 ms. Mixed writes take 1.441 ms and 1.418 ms, with
 overlapping seven-run ranges of 1.431–1.459 ms and 1.375–1.462 ms. The mixed interpreter
 read spends 59% of sampled time in dispatch, 18% in receiver validation, 11% in conversion
-and 12% in other Godot work. The proven native read spends zero sampled time validating its
-receiver and takes 0.100 ms, against 0.103 ms for its declared control.
+and 12% in other Godot work.
 
 Rebuild generated native libraries for runtime layout `0x4b41533300000011`.
 The loader checks the layout before using a site's runtime entry points.
