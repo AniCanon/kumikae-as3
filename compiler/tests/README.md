@@ -142,7 +142,7 @@ one the test project loads:
 ```sh
 cmake -S compiler -B compiler/build-san-godot -DKAS3_SANITIZE=ON -DKAS3_GODOT_CPP=<path to godot-cpp> \
     -DKAS3_GODOT_OUTPUT=$PWD/compiler/build-san-godot/out
-cmake --build compiler/build-san-godot --target kas3_godot
+cmake --build compiler/build-san-godot --target kas3_godot kas3_godot_counts
 ```
 
 Godot must load the sanitizer's runtime before the extension, and the Godot that is distributed refuses
@@ -164,8 +164,10 @@ to. On macOS, this works:
    | `ASAN_OPTIONS` | `detect_leaks=0:halt_on_error=1:detect_container_overflow=0`, because Godot itself isn't instrumented |
    | `UBSAN_OPTIONS` | `print_stacktrace=1` |
 
-3. Copy `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot`, put the sanitized
-   library in the copy's `godot_project/bin`, and run:
+3. Copy `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot`. Copy the
+   sanitized extension from `out` to the scratch project's `godot_project/bin`. Copy the extension
+   from `out/test_counts` to `godot_project/bin/test_counts` for the counter checks. Run the suite
+   with the scratch Godot executable.
 
    ```sh
    KAS3_GODOT=<the script> python3 <copy>/tests/run_godot.py <copy>/tests compiler/build/kas3c
