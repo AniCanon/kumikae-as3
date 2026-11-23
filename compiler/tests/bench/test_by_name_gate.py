@@ -4,21 +4,23 @@ from by_name_gate import failures
 
 
 class GateTests(unittest.TestCase):
-    def test_compares_each_distribution_and_each_mode(self):
-        times = {"node/read": {"native": [8, 9], "interpreter": [5, 6], "C#": [4, 5]}}
-        self.assertEqual(len(failures(times)), 2)
-        times["node/read"]["native"] = [5, 6]
-        self.assertEqual(failures(times), [])
+    def test_outliers_do_not_hide_slower_medians(self):
+        times = {"node/read": {"native": [1, 12, 13], "interpreter": [9, 10, 20], "C#": [9, 10, 20]}}
+        self.assertEqual(len(failures(times, times)), 2)
 
-    def test_proven_local_compares_to_typed_in_each_mode(self):
-        one = {"native": [5, 6], "interpreter": [5, 6], "C#": [5, 6]}
-        times = {"proven/read": one, "typed/read": {**one, "native": [2, 3]}}
-        self.assertEqual(len(failures(times)), 1)
+    def test_tolerance_includes_the_boundary(self):
+        times = {"node/read": {"native": [103], "interpreter": [100], "C#": [100]}}
+        self.assertEqual(failures(times, times), [])
 
-    def test_unproven_parameter_alias_compares_to_managed(self):
-        modes = {"interpreter": [4, 5], "native": [4, 5], "C#": [4, 5]}
-        times = {"alias/read": {**modes, "C#": [1, 2]}, "aliasTyped/read": modes}
-        self.assertEqual(len(failures(times)), 2)
+    def test_alias_compares_both_modes_with_main_and_managed(self):
+        modes = {"native": [12], "interpreter": [12], "C#": [10]}
+        main = {"native": [10], "interpreter": [10]}
+        self.assertEqual(len(failures({"alias/write": modes}, {"alias/write": main})), 4)
+
+    def test_proven_compares_with_its_typed_control(self):
+        modes = {"native": [12], "interpreter": [12]}
+        times = {"proven/read": modes, "typed/read": {"native": [10], "interpreter": [10]}}
+        self.assertEqual(len(failures(times, times)), 2)
 
 
 if __name__ == "__main__":

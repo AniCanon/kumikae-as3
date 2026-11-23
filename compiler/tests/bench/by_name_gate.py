@@ -16,17 +16,23 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
-def failures(samples):
+TOLERANCE = 0.03
+
+
+def failures(samples, baseline):
     misses = []
     for row, modes in samples.items():
         def compare(left, right, label):
-            if min(left) > max(right):
-                misses.append(f"{row}: {label} ({min(left):.3f} > {max(right):.3f} ms)")
+            candidate, reference = statistics.median(left), statistics.median(right)
+            if candidate > reference * (1 + TOLERANCE):
+                misses.append(f"{row}: {label} ({candidate:.3f} vs {reference:.3f} ms, tolerance {TOLERANCE:.0%})")
         if "native" in modes and "interpreter" in modes:
             compare(modes["native"], modes["interpreter"], "native slower than interpreter")
         for mode in ("interpreter", "native"):
             if mode in modes and "C#" in modes and not row.startswith(("aliasTyped/", "typed/")):
                 compare(modes[mode], modes["C#"], f"{mode} slower than C#")
+            if baseline is not None and mode in modes:
+                compare(modes[mode], baseline[row][mode], f"{mode} slower than main")
             kind, op = row.split("/")
             if kind == "proven" and mode in modes:
                 compare(modes[mode], samples[f"typed/{op}"][mode], f"{mode} slower than typed")
@@ -78,6 +84,8 @@ def main():
     parser.add_argument("--gate", action="store_true")
     parser.add_argument("--runs", type=int, default=7)
     args = parser.parse_args()
+    if args.gate and not args.against:
+        parser.error("--gate requires --against pointing to the main build")
     godot = os.getenv("KAS3_GODOT_DOTNET")
     check("Godot .NET", godot, "set KAS3_GODOT_DOTNET to the editor executable")
     check("runs", args.runs >= 2, "need at least two rounds to measure spread")
@@ -98,7 +106,7 @@ def main():
             for row, modes in rows.items():
                 for mode, times in modes.items():
                     print(f"{label} {row} {mode}: {statistics.median(times):.3f} ms [{min(times):.3f}, {max(times):.3f}]")
-        misses = failures(samples["PR"])
+        misses = failures(samples["PR"], samples.get("main"))
         print("\n".join(misses) or "All measured distributions meet the targets.")
         if args.gate and misses:
             sys.exit(1)

@@ -238,13 +238,13 @@ To check each by-name operation separately, set `KAS3_GODOT_DOTNET` to the Godot
 executable and run this command from the repository root:
 
 ```sh
-python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --gate
+python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --against <main-build-godot> --gate
 ```
 
 The gate alternates interpreted AS3, native AS3 and optimized C# on the same receiver fixtures.
 It checks return values and mutations, then reports median milliseconds and the observed range for
-20,000 operations. It fails if the faster end of a candidate's range exceeds the slower end of
-its reference range. Native compares with the interpreter, both compare with C# by name where
+20,000 operations. It fails if a candidate median exceeds its reference median by more than 3%. Each
+AS3 mode compares with the same row and mode on main. Native compares with the interpreter, both compare with C# by name where
 the API exists, and a fresh, non-escaping Node2D compares with its explicitly typed control.
 The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node. Timing stays
 outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
