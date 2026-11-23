@@ -185,5 +185,16 @@ of the expected math type. A bare setter with one exact math argument passes tha
 to the validated method bind. A foreign setter still calls Godot's named setter. The gate measures
 GDScript reads and mixed writes separately so both paths stay visible.
 
+The fresh Timer loop reads `waitTime` through the same host getter as an explicitly typed Timer.
+In a one-second interpreted sample, 155 samples end in the VM loop, 112 in its engine request and
+113 in bound dispatch. In native mode, 233 end in the generated function. For a GDScript-only
+property, the interpreter sample includes 129 of 728 main-thread samples at one receiver-shape
+check. The site retains the interned name and calls Godot's named getter for the live receiver.
+
+A mixed write loads each receiver from an Array. In an interpreter sample, 47 samples end in
+binding selection, 19 in pointer decoding and eight in counted-value lookup. A shared engine
+handle keeps its tag when copied. Ordinary pointers decode inline, while a platform-tagged pointer
+restores its saved high byte. Overflow sites look up a binding before allocating a new entry.
+
 Rebuild generated native libraries for runtime layout `0x4b41533300000012`.
 The loader checks the layout before using a site's runtime entry points.

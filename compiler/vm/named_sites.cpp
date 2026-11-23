@@ -155,9 +155,9 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 		}
 		auto &entries = p_site.overflow->entries;
 		const NamedOverflow::Shape key{ p_shape.type, klass, p_shape.script };
-		auto [at, added] = entries.try_emplace(key);
-		if (added) {
-			at->second = resolve(p_engine, p_module, p_shape, p_handle, p_name);
+		auto at = entries.find(key);
+		if (at == entries.end()) {
+			at = entries.emplace(key, resolve(p_engine, p_module, p_shape, p_handle, p_name)).first;
 		}
 		entry = &at->second;
 	}

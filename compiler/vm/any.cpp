@@ -16,7 +16,7 @@ namespace {
 
 // Android tags the top byte of an arm64 heap pointer. Save the tag once and use bit 3 to mark
 // pointers that need it restored. On wasm32 bit 3 belongs to the address and there is no top-byte tag.
-constexpr uint64_t HEAP_TAGGED = any::POINTER_ALIGNMENT == 16 ? uint64_t(1) << 3 : 0;
+using any::HEAP_TAGGED;
 uint64_t heap_tag = 0;
 
 [[noreturn]] void unholdable(const char *p_why) {
@@ -93,12 +93,9 @@ Slot wide(Wide *p_wide) {
 	return tagged(p_wide, WIDE);
 }
 
-void *pointer(Slot p_value) {
-	if (is_number(p_value) || (p_value.bits & INT_FLAG) || (p_value.bits & TAG_MASK) == 0) {
-		return nullptr;
-	}
+void *tagged_pointer(Slot p_value) {
 	const uint64_t address = p_value.bits & ~(TAG_MASK | HEAP_TAGGED);
-	return reinterpret_cast<void *>(static_cast<uintptr_t>((p_value.bits & HEAP_TAGGED) ? address | (heap_tag << 56) : address));
+	return reinterpret_cast<void *>(static_cast<uintptr_t>(address | (heap_tag << 56)));
 }
 Counted *counted(Slot p_value) {
 	const AnyTag kind = tag(p_value);
