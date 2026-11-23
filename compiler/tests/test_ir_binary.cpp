@@ -186,6 +186,15 @@ static void test_round_trip_godot_script_metadata() {
 	for (size_t i = 0; i < decoded.functions.size(); i++) {
 		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
 	}
+	// A version-one writer may omit both the flag and the debugger's local table.
+	for (auto &fn : original.functions) {
+		fn.locals.clear();
+	}
+	const auto old_stripped = ir::write_binary(original);
+	CHECK(!ir::read_binary(old_stripped.data(), old_stripped.size(), &loaded));
+	for (size_t i = 0; i < decoded.functions.size(); i++) {
+		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
+	}
 }
 
 static void test_rejects_corrupt_or_truncated_modules() {

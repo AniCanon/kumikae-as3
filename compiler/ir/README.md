@@ -34,7 +34,10 @@ A proven local uses the same registers, bound members and instructions as a loca
   `HostBindMethod`: Godot's own Callable of the object and the method. Anywhere else it's a `Function`
   whose function is a forwarder the lowerer writes: it takes what Godot's method declares and calls it.
   A method read from an object is bound to an Array of the object, the AS3 name and Godot's name.
-  The function table identifies these forwarders by index when you compare function values.
+  The function table identifies these forwarders by index when you compare function values. Binary
+  format version 1 permits an empty local table. The reader accepts older version-1 modules and
+  recognizes an unflagged forwarder by its synthetic receiver or, with locals stripped, by its
+  receiver load and matching engine call. It rejects an unsupported format version.
 - **Godot by name table.** An instruction that asks something of Godot names it by an index into
   `Module::engine_names`, never by text. Each entry is a copy of one line of the generated name table, so a
   back end finds Godot's method, property or operator once.
