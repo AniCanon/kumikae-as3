@@ -404,6 +404,15 @@ output = compare("callables.gd", [
 ])
 check("callables.gd: nothing is reported", "SCRIPT ERROR" not in output and "ERROR:" not in output, output[-1500:])
 
+# Godot's classes as class values, as GDScript's own classes held in variables behave.
+output = compare("kinds.gd", [
+    "new, is and as with a class value", "a script object is its Godot object", "a value type as a class value", "a reference-counted class",
+    "a cast of a node", "a cast of null", "a cast of a number fails", "a cast of a value fails as it does where the class is named", "the same class",
+    "a class the engine won't create",
+])
+check("kinds.gd: a cast that fails is AS3's coercion error", "Error #1034: Type Coercion failed: cannot convert 5 to Node2D." in output and
+      "at Kinds/cast()" in output, output[-1500:])
+
 # Every default the name table records must be one Godot can read back.
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
                       os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)

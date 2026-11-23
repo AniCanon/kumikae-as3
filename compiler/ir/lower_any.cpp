@@ -231,7 +231,11 @@ std::optional<uint32_t> Lowerer::class_code(const Type *p_class) {
 		Dynamic(*this).table_class(false); // What `new` of it makes.
 		return ANY_IS_OBJECT;
 	}
-	if (!symbol || is_godot(symbol) || !class_index(symbol, &index)) {
+	if (symbol && is_godot(symbol)) {
+		// One of Godot's classes or value types, by its name. A class of constants (Key) has none: it is no type.
+		return engine_name(symbol, std::string_view(), &index) ? std::optional<uint32_t>(CLASS_GODOT | index) : std::nullopt;
+	}
+	if (!symbol || !class_index(symbol, &index)) {
 		return std::nullopt;
 	}
 	return index;

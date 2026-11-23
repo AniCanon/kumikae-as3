@@ -178,8 +178,9 @@ inline bool is_held(Kind p_kind) {
 	   instruction of a function that names `arguments`. */ \
 	X(Arguments, "R--") \
 	/* Classes as values. A class value is an object of the module's class_class whose one field \
-	   (CLASS_CODE) says which class: a class index, or one of the ANY_IS_ codes (int, uint, Number, \
-	   String, Boolean, Object), as AnyIs's third operand does. ClassValue: out (an object), that code; \
+	   (CLASS_CODE) says which class: a class index, one of the ANY_IS_ codes (int, uint, Number, \
+	   String, Boolean, Object), as AnyIs's third operand does, or CLASS_GODOT with an engine name for one \
+	   of Godot's classes. ClassValue: out (an object), that code; \
 	   the same object every time for one class. The rest take the class as an untyped register, found \
 	   out as they run (what is no class is AS3's TypeError): ClassIs and ClassInstanceOf out (Boolean), \
 	   the value (untyped), the class: `x is c`, `x instanceof c`; ClassAs out (untyped: the value, or \
@@ -225,6 +226,12 @@ const uint32_t ANY_IS_STRING = 0xFFFFFFF3u;
 const uint32_t ANY_IS_BOOLEAN = 0xFFFFFFF4u;
 const uint32_t ANY_IS_OBJECT = 0xFFFFFFF5u; // Anything but null and undefined. Only a class value holds it.
 const uint32_t BIND_SLOT = 0x80000000u; // In HostBind: the operand is a method-table slot.
+// A class value's code for one of Godot's classes or value types: this bit, and its entry in the module's
+// engine_names. No class index and no ANY_IS_ code has this bit without the one above it.
+const uint32_t CLASS_GODOT = 0x40000000u;
+constexpr bool is_godot_class(uint32_t p_code) {
+	return (p_code & 0xC0000000u) == CLASS_GODOT;
+}
 
 struct Instruction {
 	Op op = Op::Stmt;

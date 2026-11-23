@@ -103,7 +103,8 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 		return p_in.c < p_module.classes.size() || any_is_code(p_in.c);
 	}
 	if (p_in.op == Op::ClassValue) {
-		return p_in.b < p_module.classes.size() || any_is_code(p_in.b);
+		return p_in.b < p_module.classes.size() || any_is_code(p_in.b) ||
+				(is_godot_class(p_in.b) && (p_in.b & ~CLASS_GODOT) < p_module.engine_names.size());
 	}
 	if (p_in.op == Op::HostBind) {
 		return (p_in.c & BIND_SLOT) != 0 || p_in.c < p_module.functions.size();

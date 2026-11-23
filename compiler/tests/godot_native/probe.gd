@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Calls each method of Probe.as, of Entry.as and of the test project's Places.as, Loops.as, Callables.as and Emits.as and prints what
+# Calls each method of Probe.as, of Entry.as and of the test project's Places.as, Loops.as, Callables.as, Kinds.as and Emits.as and prints what
 # it gives: run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two
 # outputs to each other.
 var killer: Node
@@ -101,6 +101,17 @@ func _callables() -> void:
 	callables.free()
 
 
+# Godot's classes as class values (the test project's Kinds.as, which kinds.gd holds to what GDScript gives).
+func _kinds() -> void:
+	var kinds := Node2D.new()
+	kinds.set_script(load("res://Kinds.as"))
+	root.add_child(kinds)
+	print("PROBE class values=", kinds.call("made"), " ", kinds.call("own"), " ", kinds.call("values"), " ", kinds.call("counted"), " ",
+			kinds.call("cast", kinds) == kinds, " ", kinds.call("cast", null), " ", kinds.call("cast", 5), " ", kinds.call("castFails"), " ",
+			kinds.call("castNamedFails"), " ", kinds.call("same"), " ", kinds.call("refused"))
+	kinds.free()
+
+
 # What signals carry between AS3 and Godot (the test project's Emits.as, by the rows emits.gd holds to what
 # GDScript gives): what AS3 gave for each.
 func _emits_said(from: int) -> void:
@@ -188,6 +199,7 @@ func _initialize() -> void:
 	_places()
 	_loops()
 	_callables()
+	_kinds()
 	emits = load("res://emits_cases.gd").new()
 	emits.begin(root)
 	_emits_said(0)

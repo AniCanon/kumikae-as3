@@ -478,6 +478,8 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 				return p_argument.slot.b ? "true" : "false";
 			case ir::Kind::Str:
 				return p_argument.slot.p ? "\"" + std::string(static_cast<vm::Str *>(p_argument.slot.p)->view()) + "\"" : "null";
+			case ir::Kind::Any:
+				return vm::any::text(p_argument.slot).value_or("#" + std::to_string((intptr_t)vm::any::pointer(p_argument.slot)));
 			default:
 				return "#" + std::to_string((intptr_t)p_argument.slot.p);
 		}
@@ -1124,6 +1126,60 @@ static void test_engine_method_values() {
 		interpreter.release_object(object);
 		engine.drop(others[0].p);
 		engine.drop(others[1].p);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// One of Godot's classes as a class value: `new`, `is`, `as` and a call of it ask the engine by the class's
+// name, as they do where the class is named.
+static void test_engine_class_values() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Kinds extends Node {\n"
+						 "  private function make(kind:Class):* { return new kind(); }\n"
+						 "  public function made():Boolean { var c:Class = Node2D; var n:* = make(c); return n is c; }\n"
+						 "  public function value():String { var v:Class = Vector2; var made:* = new v(1, 2); return String(made as v) + String(v); }\n"
+						 "  public function own():Boolean { var c:Class = Node; return this is c && c == Node && !(c == Node2D); }\n"
+						 "  public function cast(x:*):* { var c:Class = Node2D; return c(x); }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Kinds.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		engine.aligned = true; // An untyped value holds what `new` of a class value makes.
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Kinds"), engine.box()); // #16
+		vm::Slot result;
+		CHECK(interpreter.call_method(object, "made", nullptr, 0, &result));
+		CHECK(result.b);
+		CHECK_EQ(engine.log, std::string("construct Node2D() -> #32\nis #32 Object\nis #32 Node2D\n"));
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "value", nullptr, 0, &result));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#48>[class Vector2]"));
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		CHECK_EQ(engine.log, std::string("construct Vector2(1, 2) -> #48\nis #48 Object\nis #48 Vector2\ntext #48\n"));
+		// A script object is the Godot object it is attached to.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "own", nullptr, 0, &result));
+		CHECK(result.b);
+		CHECK_EQ(engine.log, std::string("is #16 Node\n"));
+		// A call of the class is a cast: the value, null for null, and AS3's TypeError for anything else.
+		vm::Slot given = vm::any::integer(5);
+		CHECK(!interpreter.call_method(object, "cast", &given, 1, &result));
+		CHECK(engine.errors.find("TypeError: Error #1034: Type Coercion failed: cannot convert 5 to Node2D.") == 0);
+		given = vm::any::null();
+		CHECK(interpreter.call_method(object, "cast", &given, 1, &result));
+		CHECK(vm::any::tag(result) == vm::AnyTag::Null);
+		interpreter.release_object(object);
+		CHECK_EQ(engine.boxes, 0);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -4276,6 +4332,7 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_method_values();
+	test_engine_class_values();
 	test_engine_prepared();
 	test_vector_of_values();
 	test_engine_operators();
