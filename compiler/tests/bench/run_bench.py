@@ -75,6 +75,10 @@ def against(build, other, runs):
 
 def main():
     arguments = sys.argv[1:]
+    if "--untyped" in arguments:
+        from untyped import benchmark
+        benchmark(arguments, native=False)
+        return
     if not arguments:
         sys.exit(__doc__)
     build = os.path.abspath(arguments[0])

@@ -79,6 +79,10 @@ def compare(name, first, second, labels, runs):
 
 def main():
     arguments = sys.argv[1:]
+    if "--untyped" in arguments:
+        from untyped import benchmark
+        benchmark(arguments, native=True)
+        return
     if not arguments:
         sys.exit(__doc__)
     build = os.path.abspath(arguments[0])

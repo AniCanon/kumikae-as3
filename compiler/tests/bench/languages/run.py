@@ -114,13 +114,13 @@ def refreshed(project, extension):
     return exported(project)
 
 
-def export(godot, extension, where):
+def export(godot, extension, where, untyped=False):
     """A release export of the project with this extension's library; the path of the program it made."""
     project = os.path.join(where, "project")
     if os.path.isdir(os.path.join(project, "out", "cmp.app")):
         return refreshed(project, extension)
     os.makedirs(os.path.join(project, "bin"))
-    for name in PROJECT_FILES:
+    for name in PROJECT_FILES + (("Untyped.as", "untyped.gd") if untyped else ()):
         shutil.copy(os.path.join(HERE, name), project)
     shutil.copytree(os.path.join(HERE, "frames"), os.path.join(project, "frames"), ignore=shutil.ignore_patterns("*.uid", "*.import"))
     shutil.copy(os.path.join(extension, "kas3.gdextension"), project)
@@ -327,9 +327,22 @@ def main():
         if value("--keep"):
             where = os.path.abspath(value("--keep"))
             os.makedirs(where, exist_ok=True)
-        builds = [(extension, export(godot, extension, os.path.join(where, "first")))]
+        builds = [(extension, export(godot, extension, os.path.join(where, "first-untyped" if "--untyped-cs" in arguments else "first"), "--untyped-cs" in arguments))]
         if other:
-            builds.append((other, export(godot, other, os.path.join(where, "second"))))
+            builds.append((other, export(godot, other, os.path.join(where, "second-untyped" if "--untyped-cs" in arguments else "second"), "--untyped-cs" in arguments)))
+        if "--untyped-cs" in arguments:
+            samples = {}
+            for _ in range(runs):
+                for which, program in builds:
+                    run = step("C# by-name access", [program, "--headless", "--", "untyped-cs", "cs"], where)
+                    rows = re.findall(r"^NAMED (\w+) (\d+)$", run.stdout, re.M)
+                    if [case for case, _ in rows] != ["script", "node"]:
+                        sys.exit(run.stdout + run.stderr)
+                    for case, micros in rows:
+                        samples.setdefault((which, case), []).append(int(micros) / 1000)
+            for (which, case), times in samples.items():
+                print(f"{which} C# {case} {statistics.median(times):.3f} ms  spread {max(times)-min(times):.3f} ms ({runs} runs)")
+            return
         best = {which: {} for which, _ in builds}
         # The scripts as native code, by the kas3c built with each extension (its build folder is beside
         # compiler/tests, as build-godot is), unless one is named.

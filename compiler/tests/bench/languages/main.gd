@@ -3,6 +3,9 @@ var nodes := {}
 func _ready() -> void:
 	# Given a benchmark to run by frames, that is all this run does (frames/runner.gd).
 	for argument in OS.get_cmdline_user_args():
+		if argument == "untyped-cs":
+			load("res://untyped.gd").measure.call_deferred(get_tree())
+			return
 		if argument.begins_with("--bench="):
 			add_child(load("res://frames/runner.gd").new())
 			return

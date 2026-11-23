@@ -226,6 +226,14 @@ hits both.
 `bench/generate_project.py` writes the generated projects. `build/bench_recheck <folder>` times a re-check
 in one build.
 
+For by-name access in headless Godot, run either AS3 timing script with
+`<build-godot> --untyped [--against <other build-godot>] [--runs N]`. Each build uses its own
+`kas3c`, runtime headers and extension in the adjacent test project. The driver checks the result
+after warm-up and after 20,000 rounds. Node2D and the attached script read, write and call by name.
+Vector2 measures a read and a call together, and times the rejected write separately.
+Use `--script-only` with a build that supports only the script case. The existing .NET export
+runs the same two nodes through C#'s Get, Set and Call with `bench/languages/run.py --untyped-cs`.
+
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.
 
