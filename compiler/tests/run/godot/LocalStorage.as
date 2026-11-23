@@ -4,6 +4,28 @@ package {
 	public class LocalStorage extends Node {
 		private var amount:Number = 3.5;
 		private function truth():Boolean { return true; }
+
+		private function twice(value:Number):Number { return value * 2; }
+		public function ordinaryInferred(source:Number, enabled:Boolean):Number {
+			var amount:* = source;
+			var flag:* = enabled;
+			var box:* = new ScoreBox();
+			var total:Number = 0;
+			if (flag && amount > 0) total += amount;
+			if (flag) total += twice(amount);
+			total += box.score + 1;
+			return total + amount * 2;
+		}
+		public function ordinaryDeclared(source:Number, enabled:Boolean):Number {
+			var amount:Number = source;
+			var flag:Boolean = enabled;
+			var box:ScoreBox = new ScoreBox();
+			var total:Number = 0;
+			if (flag && amount > 0) total += amount;
+			if (flag) total += twice(amount);
+			total += box.score + 1;
+			return total + amount * 2;
+		}
 		public function wrappedNumberInferred(flag:Boolean):Number {
 			if (flag) { var local:* = this.amount; return local; } return 0;
 		}

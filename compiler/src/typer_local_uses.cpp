@@ -71,7 +71,102 @@ bool exact_argument(Expr *p_expr, const Type *p_type, const Parents &p_parents, 
 	return false;
 }
 
-std::optional<Binding> member_use(Compilation &p_compilation, const Type *p_type, Name *p_name, const Parents &p_parents, Block *p_body, const Type *p_return, bool p_write) {
+// Types tentatively proved for enclosing expressions are published only if every use succeeds.
+struct Consumers {
+	Compilation &compilation;
+	const Parents &parents;
+	const Type *returns;
+	const Type *number;
+	const Type *boolean;
+	std::unordered_map<Expr *, const Type *> results;
+
+	bool ordinary_number(const Type *p_type) const {
+		return p_type == number || (p_type && p_type->symbol &&
+				(p_type->symbol == compilation.builtin("int") || p_type->symbol == compilation.builtin("uint")));
+	}
+
+	bool argument(Call *p_call, Expr *p_expr, const Type *p_type) const {
+		Expr *callee = p_call->callee;
+		const Symbol *symbol = callee->kind == NodeKind::Name ? static_cast<Name *>(callee)->symbol :
+				callee->kind == NodeKind::Member ? static_cast<Member *>(callee)->resolved() : nullptr;
+		for (uint32_t i = 0; i < p_call->arguments.count; i++) {
+			if (p_call->arguments[i] != p_expr) {
+				continue;
+			}
+			if (callee->type && callee->type->kind == Type::Callback) {
+				return i < callee->type->parameters.size() && callee->type->parameters[i] == p_type;
+			}
+			if (symbol && symbol->node && symbol->node->kind == NodeKind::FunctionDecl) {
+				const auto &parameters = static_cast<FunctionDecl *>(symbol->node)->parameters;
+				return i < parameters.count && !parameters[i].is_rest && compilation.type_of(parameters[i].type) == p_type;
+			}
+		}
+		return false;
+	}
+
+	const Type *binary_result(Binary *p_binary, Expr *p_expr, const Type *p_type) const {
+		const Type *other = (p_binary->left == p_expr ? p_binary->right : p_binary->left)->type;
+		if (p_type == boolean && other == boolean && (p_binary->op == TokenKind::AmpAmp || p_binary->op == TokenKind::PipePipe)) {
+			return boolean;
+		}
+		if (!ordinary_number(p_type) || !ordinary_number(other)) {
+			return nullptr;
+		}
+		switch (p_binary->op) {
+			case TokenKind::Plus: case TokenKind::Minus: case TokenKind::Star: case TokenKind::Slash: case TokenKind::Percent:
+				return number;
+			case TokenKind::Less: case TokenKind::LessEqual: case TokenKind::Greater: case TokenKind::GreaterEqual:
+			case TokenKind::Equal: case TokenKind::NotEqual: case TokenKind::StrictEqual: case TokenKind::StrictNotEqual:
+				return boolean;
+			default:
+				return nullptr;
+		}
+	}
+
+	bool receives(Expr *p_expr, const Type *p_type) {
+		Node *use = parent(parents, p_expr);
+		if (!use || !p_type) {
+			return false;
+		}
+		switch (use->kind) {
+			case NodeKind::Return:
+				return returns == p_type;
+			case NodeKind::Call:
+				return argument(static_cast<Call *>(use), p_expr, p_type);
+			case NodeKind::If: case NodeKind::While: case NodeKind::DoWhile:
+				return p_type == boolean || ordinary_number(p_type);
+			case NodeKind::For:
+				return static_cast<For *>(use)->condition == p_expr && (p_type == boolean || ordinary_number(p_type));
+			case NodeKind::Conditional:
+				return static_cast<Conditional *>(use)->condition == p_expr && (p_type == boolean || ordinary_number(p_type));
+			case NodeKind::Binary: {
+				auto *binary = static_cast<Binary *>(use);
+				const Type *result = binary_result(binary, p_expr, p_type);
+				if (result && (binary->type == result || receives(binary, result))) {
+					results[binary] = result;
+					return true;
+				}
+				return false;
+			}
+			case NodeKind::Assign: {
+				auto *assign = static_cast<Assign *>(use);
+				if (assign->value != p_expr) {
+					return false;
+				}
+				if (assign->op == TokenKind::Assign) {
+					return assign->target->type == p_type;
+				}
+				return ordinary_number(p_type) && ordinary_number(assign->target->type) &&
+						(assign->op == TokenKind::PlusAssign || assign->op == TokenKind::MinusAssign ||
+						assign->op == TokenKind::StarAssign || assign->op == TokenKind::SlashAssign || assign->op == TokenKind::PercentAssign);
+			}
+			default:
+				return initializer_type(compilation, use, p_expr) == p_type;
+		}
+	}
+};
+
+std::optional<Binding> member_use(Compilation &p_compilation, const Type *p_type, Name *p_name, const Parents &p_parents, Block *p_body, Consumers &p_consumers, bool p_write) {
 	Node *use = parent(p_parents, p_name);
 	if (!use || use->kind != NodeKind::Member) {
 		return std::nullopt;
@@ -85,13 +180,9 @@ std::optional<Binding> member_use(Compilation &p_compilation, const Type *p_type
 	if (!operation) {
 		return std::nullopt;
 	}
-	const auto receives = [&](Expr *expr, const Type *type) {
-		Node *use = parent(p_parents, expr);
-		return type && (initializer_type(p_compilation, use, expr) == type || (use && use->kind == NodeKind::Return && p_return == type));
-	};
 	if (member->kind == SymbolKind::Field || (member->kind == SymbolKind::Property && member->getter)) {
 		const Type *result = p_compilation.type_of(member->getter ? member->getter->return_type : member->type);
-		if (receives(access, result)) {
+		if (p_consumers.receives(access, result)) {
 			return Binding{ access, member, access, result };
 		}
 		if (!p_write || operation->kind != NodeKind::Assign || (member->kind == SymbolKind::Property && !member->setter) || member->is_const) {
@@ -107,7 +198,7 @@ std::optional<Binding> member_use(Compilation &p_compilation, const Type *p_type
 		auto *call = static_cast<Call *>(operation);
 		auto *fn = static_cast<FunctionDecl *>(member->node);
 		const Type *result = p_compilation.type_of(fn->return_type);
-		if (call->callee != access || call->arguments.count != fn->parameters.count || (!discarded(p_parents, call) && !receives(call, result))) {
+		if (call->callee != access || call->arguments.count != fn->parameters.count || (!discarded(p_parents, call) && !p_consumers.receives(call, result))) {
 			return std::nullopt;
 		}
 		for (uint32_t i = 0; i < call->arguments.count; i++) {
@@ -200,22 +291,18 @@ bool stays_detached(Block *p_body, Symbol *receiver, Expr *initial, const std::v
 	return safe;
 }
 
-bool direct_use(Compilation &compilation, const Parents &parents, Name *name, const Type *type, const Type *returns) {
-	Node *use = parent(parents, name);
-	if (!use) {
-		return false;
+bool direct_use(Consumers &p_consumers, Name *p_name, const Type *p_type) {
+	Node *use = parent(p_consumers.parents, p_name);
+	if (use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name) {
+		return discarded(p_consumers.parents, static_cast<Assign *>(use));
 	}
-	if (use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == name) {
-		return discarded(parents, static_cast<Assign *>(use));
-	}
-	if (use->kind == NodeKind::Return) {
-		return type == returns;
-	}
-	if (use->kind == NodeKind::Call && type->symbol == compilation.builtin("int")) {
+	if (use && use->kind == NodeKind::Call && p_type->symbol == p_consumers.compilation.builtin("int")) {
 		Expr *callee = static_cast<Call *>(use)->callee;
-		return callee->kind == NodeKind::Name && static_cast<Name *>(callee)->symbol == compilation.builtin("trace");
+		if (callee->kind == NodeKind::Name && static_cast<Name *>(callee)->symbol == p_consumers.compilation.builtin("trace")) {
+			return true;
+		}
 	}
-	return initializer_type(compilation, use, name) == type;
+	return p_consumers.receives(p_name, p_type);
 }
 
 } // namespace
@@ -237,15 +324,16 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 		const bool math = klass && klass->package == godot_ && klass->unit && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color");
 		const bool pure_class = klass && klass->unit && !klass->unit->is_declaration && !(klass->modifiers & Modifiers::Dynamic);
 		const bool can_bind = fresh || math || pure_class || type == string_ || numeric(type) || type == boolean_;
+		Consumers consumers{ compilation_, parents, returns, number_, boolean_, {} };
 		std::vector<Binding> bindings;
 		bool safe = true, assigned = false;
 		for (Name *name : uses[local]) {
 			Node *use = parent(parents, name);
-			if (!fresh && direct_use(compilation_, parents, name, type, returns)) {
-				assigned |= use->kind == NodeKind::Assign;
+			if (!fresh && direct_use(consumers, name, type)) {
+				assigned |= use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == name;
 				continue;
 			}
-			auto bind = can_bind ? member_use(compilation_, type, name, parents, p_body, returns, fresh || pure_class) : std::nullopt;
+			auto bind = can_bind ? member_use(compilation_, type, name, parents, p_body, consumers, fresh || pure_class) : std::nullopt;
 			if (!bind || (fresh && !isolated_transform(*bind->member) &&
 					(name != uses[local].back() || !final_access(parents, *bind, p_body)))) {
 				safe = false;
@@ -260,6 +348,9 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 			continue;
 		}
 		local->storage = type;
+		for (const auto &[expr, result] : consumers.results) {
+			expr->type = result;
+		}
 		for (Name *name : uses[local]) {
 			name->type = type;
 		}

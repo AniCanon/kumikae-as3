@@ -150,14 +150,14 @@ package {
 			return angle;
 		}
 		private var numberField:Number = 3;
+		private function lengthOf(value:String):int { return value.length; }
 		private function flag():Boolean { return true; }
 
 		public function numberRead(source:Node2D, n:int):Number {
 			var alias:* = this.numberField;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias;
-				sum += read;
+				sum += alias;
 			}
 			return sum;
 		}
@@ -166,8 +166,7 @@ package {
 			var alias:Number = this.numberField;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias;
-				sum += read;
+				sum += alias;
 			}
 			return sum;
 		}
@@ -176,8 +175,7 @@ package {
 			var alias:* = flag();
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Boolean = alias;
-				if (read) sum += 3;
+				if (alias) sum += 3;
 			}
 			return sum;
 		}
@@ -186,8 +184,7 @@ package {
 			var alias:Boolean = flag();
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Boolean = alias;
-				if (read) sum += 3;
+				if (alias) sum += 3;
 			}
 			return sum;
 		}
@@ -196,8 +193,7 @@ package {
 			var alias:* = "abc";
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:int = alias.length;
-				sum += read;
+				sum += lengthOf(alias);
 			}
 			return sum;
 		}
@@ -206,8 +202,7 @@ package {
 			var alias:String = "abc";
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:int = alias.length;
-				sum += read;
+				sum += lengthOf(alias);
 			}
 			return sum;
 		}
@@ -216,8 +211,7 @@ package {
 			var alias:* = new MatrixScore();
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:int = alias.value;
-				sum += read;
+				sum += alias.value;
 			}
 			return sum;
 		}
@@ -226,8 +220,7 @@ package {
 			var alias:MatrixScore = new MatrixScore();
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:int = alias.value;
-				sum += read;
+				sum += alias.value;
 			}
 			return sum;
 		}
@@ -236,8 +229,7 @@ package {
 			var alias:* = source;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias.x;
-				sum += read;
+				sum += alias.x;
 			}
 			return sum;
 		}
@@ -246,8 +238,7 @@ package {
 			var alias:Vector2 = source;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias.x;
-				sum += read;
+				sum += alias.x;
 			}
 			return sum;
 		}
@@ -256,8 +247,7 @@ package {
 			var alias:* = source;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias.g;
-				sum += read;
+				sum += alias.g;
 			}
 			return sum;
 		}
@@ -266,8 +256,7 @@ package {
 			var alias:Color = source;
 			var sum:Number = 0;
 			for (var i:int = 0; i < n; i++) {
-				var read:Number = alias.g;
-				sum += read;
+				sum += alias.g;
 			}
 			return sum;
 		}
