@@ -278,39 +278,39 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 			first = std::min(first, binding.operation->end);
 		}
 	}
-	walk(p_body, [&](Node *node) {
-		if (node->end <= p_initial->offset || node->offset >= first) {
+	walk(p_body, [&](Node *p_node) {
+		if (p_node->end <= p_initial->offset || p_node->offset >= first) {
 			return false;
 		}
-		if (known.count(node) || node->kind == NodeKind::TypeRef) {
+		if (known.count(p_node) || p_node->kind == NodeKind::TypeRef) {
 			return true;
 		}
-		if (node->kind == NodeKind::New) {
-			auto *value = static_cast<New *>(node);
+		if (p_node->kind == NodeKind::New) {
+			auto *value = static_cast<New *>(p_node);
 			const auto *klass = value->type ? value->type->symbol : nullptr;
 			if (native_value(klass, p_godot)) {
 				known.insert(value->callee);
 				return true;
 			}
-		} else if (node->kind == NodeKind::Name) {
-			const auto *name = static_cast<Name *>(node);
+		} else if (p_node->kind == NodeKind::Name) {
+			const auto *name = static_cast<Name *>(p_node);
 			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
-					(p_consumers.ordinary_number(p_consumers.operand(static_cast<Name *>(node))) || name->type == p_consumers.boolean ||
+					(p_consumers.ordinary_number(p_consumers.operand(static_cast<Name *>(p_node))) || name->type == p_consumers.boolean ||
 					(name->type && native_value(name->type->symbol, p_godot)))) {
 				return true;
 			}
-		} else if (node->kind == NodeKind::Member) {
-			const auto *member = static_cast<Member *>(node)->member;
+		} else if (p_node->kind == NodeKind::Member) {
+			const auto *member = static_cast<Member *>(p_node)->member;
 			if (member && member->kind == SymbolKind::Field && !member->is_static() && native_value(member->owner, p_godot)) {
 				return true;
 			}
-		} else if ((node->kind < NodeKind::NumberLit || node->kind > NodeKind::Conditional ||
-				node->kind == NodeKind::NumberLit || node->kind == NodeKind::StringLit || node->kind == NodeKind::BoolLit ||
-				node->kind == NodeKind::Binary || node->kind == NodeKind::Assign || node->kind == NodeKind::Postfix || node->kind == NodeKind::Unary) &&
-				node->kind != NodeKind::ForIn && node->kind != NodeKind::FunctionDecl) {
+		} else if ((p_node->kind < NodeKind::NumberLit || p_node->kind > NodeKind::Conditional ||
+				p_node->kind == NodeKind::NumberLit || p_node->kind == NodeKind::StringLit || p_node->kind == NodeKind::BoolLit ||
+				p_node->kind == NodeKind::Binary || p_node->kind == NodeKind::Assign || p_node->kind == NodeKind::Postfix || p_node->kind == NodeKind::Unary) &&
+				p_node->kind != NodeKind::ForIn && p_node->kind != NodeKind::FunctionDecl) {
 			return true;
 		}
-		first = std::min(first, node->offset);
+		first = std::min(first, p_node->offset);
 		return false;
 	});
 	return first;

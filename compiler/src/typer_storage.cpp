@@ -75,13 +75,13 @@ void find_initial_writes(Block *p_block, Block *p_region, Candidates &r_candidat
 				}
 			}
 		} else {
-			walk(statement, [&](Node *node) {
-				if (node->kind == NodeKind::Block) {
-					auto *block = static_cast<Block *>(node);
+			walk(statement, [&](Node *p_node) {
+				if (p_node->kind == NodeKind::Block) {
+					auto *block = static_cast<Block *>(p_node);
 					find_initial_writes(block, block, r_candidates);
 					return false;
 				}
-				return node->kind != NodeKind::FunctionDecl;
+				return p_node->kind != NodeKind::FunctionDecl;
 			});
 		}
 	}
@@ -152,7 +152,7 @@ void Typer::infer_storage(Block *p_body) {
 	if (candidates.empty()) {
 		return;
 	}
-	walk(p_body, [&](Node *node) { return validate_use(node, candidates); });
+	walk(p_body, [&](Node *p_node) { return validate_use(p_node, candidates); });
 	std::unordered_map<Symbol *, Expr *> initial;
 	for (const auto &[symbol, decl] : candidates) {
 		initial.emplace(symbol, decl.value);

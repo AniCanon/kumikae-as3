@@ -154,7 +154,7 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 			p_site.overflow = &found->second;
 		}
 		auto &entries = p_site.overflow->entries;
-		const NamedOverflow::Shape key{ p_shape.type, klass, p_shape.script };
+		const NamedOverflow::Shape key{ p_shape.type, klass, p_shape.script ? std::optional<uint64_t>(p_shape.script) : std::nullopt };
 		auto at = entries.find(key);
 		if (at == entries.end()) {
 			if (entries.size() == NamedOverflow::CAPACITY) {
