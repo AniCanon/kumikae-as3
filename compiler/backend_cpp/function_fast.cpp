@@ -213,8 +213,12 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				share(p_in.a, reg(p_in.b));
 				return true;
 			}
-			if (kind(p_in.b) == Kind::I64 || ir::is_engine(kind(p_in.b))) {
-				return false; // An Int64 is held in a box, which the library makes; one of Godot's is the host's.
+			if (ir::is_engine(kind(p_in.b))) {
+				put(p_in.a, "own_engine_any(c, shared(c, " + reg(p_in.b) + ").handle, " + (kind(p_in.b) == Kind::Ref ? "true)" : "false)"));
+				return true;
+			}
+			if (kind(p_in.b) == Kind::I64) {
+				return false; // An Int64 is held in a box, which the library makes.
 			}
 			if (kind(p_in.b) != Kind::F64) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");

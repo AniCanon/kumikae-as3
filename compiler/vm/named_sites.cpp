@@ -63,8 +63,8 @@ static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_mod
 				entry.method = klass.methods[slot];
 				return entry;
 			}
-			if ((full.size() == p_name.size() + 4 && full.substr(4) == p_name &&
-					(full.substr(0, 4) == "get " || full.substr(0, 4) == "set "))) {
+			if (full.size() == p_name.size() + 4 && full.substr(4) == p_name &&
+					(full.substr(0, 4) == "get " || full.substr(0, 4) == "set ")) {
 				return entry; // A method or accessor needs the full AS3 call convention.
 			}
 		}
@@ -97,26 +97,36 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		return std::nullopt;
 	}
 	void *handle = any::pointer(p_holder);
-	const NamedShape shape = p_engine.named_shape(handle);
+	if (p_site.generation != generation_) {
+		p_site.used = 0;
+		p_site.delegated = NONE;
+		p_site.generation = generation_;
+	}
+	const auto *delegated = p_site.delegated == NONE ? nullptr : &p_site.entries[p_site.delegated];
+	const NamedShape shape = p_engine.named_shape(handle, delegated ? delegated->type : 0);
 	if (!shape.type) {
 		return std::nullopt;
 	}
-	if (p_site.generation != generation_) {
-		p_site.used = 0;
-		p_site.generation = generation_;
-	}
-	const NamedSite::Entry *entry = nullptr;
-	for (size_t i = 0; i < p_site.used; i++) {
+	const NamedSite::Entry *entry = shape.delegate ? delegated : nullptr;
+	for (size_t i = 0; !entry && i < p_site.used; i++) {
 		const auto &candidate = p_site.entries[i];
 		if (shape.type == candidate.type && shape.script == candidate.script && candidate.klass == (shape.instance ? shape.instance->klass : NONE)) {
 			entry = &candidate;
 			break;
 		}
 	}
-	NamedSite::Entry extra;
-	if (!entry) {
-		extra = resolve(p_engine, p_module, shape, handle, p_name);
-		entry = p_site.used < p_site.entries.size() ? &(p_site.entries[p_site.used++] = extra) : &extra;
+	if (!entry && p_site.used < p_site.entries.size()) {
+		if (shape.script && !shape.instance) {
+			p_site.delegated = p_site.used;
+		}
+		entry = &(p_site.entries[p_site.used++] = resolve(p_engine, p_module, shape, handle, p_name));
+	} else if (!entry) {
+		auto &members = shared_[{ shape.type, shape.instance ? shape.instance->klass : NONE }];
+		auto at = members.find(p_name);
+		if (at == members.end()) {
+			at = members.emplace(std::string(p_name), resolve(p_engine, p_module, shape, handle, p_name)).first;
+		}
+		entry = &at->second;
 	}
 	if (entry->field != NONE) {
 		return scalar_field(p_module.classes[shape.instance->klass], shape.instance, entry->field, p_op, p_arguments, r_result) ?
@@ -143,7 +153,7 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 	}
 	const Wanted wanted{ write ? Kind::Void : Kind::Any, {} };
 	const Prepared *bind = write ? member->setter : member->invoke;
-	if (bind && (!shape.script || shape.instance)) {
+	if (bind) {
 		if (auto done = p_engine.run_named(shape, *bind, operands, p_count + 1, wanted, r_result, r_error)) {
 			return done;
 		}

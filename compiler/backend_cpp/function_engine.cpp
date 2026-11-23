@@ -225,6 +225,14 @@ bool FunctionWriter::engine_alias(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine_inline(const Instruction &p_in) {
+	if ((p_in.op == Op::HostPresent || p_in.op == Op::ToAny) && !parts(p_in.b).empty()) {
+		if (p_in.op == Op::HostPresent) {
+			line(reg(p_in.a) + " = c->engine != nullptr;");
+		} else {
+			line("store_parts_any(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ");");
+		}
+		return true;
+	}
 	// A value held inline moved to a register that holds the same: a plain copy, as of a number.
 	if (p_in.op == Op::Move && !parts(p_in.a).empty() && parts(p_in.a) == parts(p_in.b)) {
 		if (p_in.a != p_in.b) {
@@ -258,7 +266,7 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 		// An operand may be a register that stands for a field's handle (value_from_): the value is copied
 		// out of the handle first, and a field that holds none is the library's to say so.
 		const auto lent = [&](uint32_t p_register, std::string_view p_type) {
-			return value_from_[p_register] != NONE && has_parts(p_type) && value_type(p_register) == p_type;
+			return has_parts(p_type) && value_type(p_register) == p_type && (value_from_[p_register] != NONE || holds_handle(p_register, p_type));
 		};
 		const bool fit = std::equal(operands.begin(), operands.end(), each.operands, [&](uint32_t p_register, std::string_view p_type) {
 			return holds(p_register, p_type) || lent(p_register, p_type);
@@ -272,7 +280,8 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 			const std::string name = "$" + std::to_string(i);
 			std::string value = each.operands[i] == "number" ? "static_cast<double>(" + reg(operands[i]) + ")" : reg(operands[i]);
 			if (!holds(operands[i], each.operands[i])) {
-				const std::string handle = own_field(value_from_[operands[i]]) + ".handle";
+				const auto field = value_from_[operands[i]];
+				const std::string handle = (field == NONE ? reg(operands[i]) : own_field(field)) + ".handle";
 				value = "a" + std::to_string(i);
 				guard += (guard.empty() ? "" : " && ") + handle;
 				copies += "\tconst " + std::string(each.operands[i]) + " " + value + " = unbox<" + std::string(each.operands[i]) + ">(c, " + handle + ");\n";
@@ -383,7 +392,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const size_t missing = parameters.size() - std::min(parameters.size(), given.size());
 	const bool gives = result != "void";
 	// What comes back in a handle is made where a new handle keeps it, by the host (EngineApi::call_kept).
-	const bool kept = in_handle(result);
+	const bool kept = in_handle(result) || (out != NONE && has_parts(result) && holds_handle(out, result) && parts(out).empty());
 	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 4 ||
 			(out != NONE && (!gives || !(kept ? holds_handle(out, result) : holds(out, result)))) ||
 			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result) || kept))) {

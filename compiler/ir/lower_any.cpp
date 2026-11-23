@@ -191,6 +191,11 @@ uint32_t Lowerer::empty_untyped(const Type *p_type, uint32_t p_position) {
 }
 
 uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
+	if (p_expression && p_expression->kind == NodeKind::Member && p_kind != Kind::Any && p_kind != Kind::Void) {
+		if (const auto direct = Dynamic(*this).guarded(p_expression, p_type)) {
+			return *direct;
+		}
+	}
 	if (p_expression && p_expression->kind == NodeKind::Name) {
 		const Symbol *symbol = static_cast<Name *>(p_expression)->symbol;
 		auto local = locals_.find(symbol);

@@ -55,7 +55,7 @@ constexpr const char *does(Op p_op) {
 		case Op::HostNew: case Op::HostCall: case Op::HostGet: case Op::HostSet: case Op::HostOperate: case Op::HostIndexGet:
 		case Op::HostIndexSet: case Op::HostBind: case Op::HostMember: case Op::HostToStr: case Op::HostPresent: case Op::HostIsClass:
 		case Op::HostAsClass: case Op::HostDefault: case Op::HostSingleton: case Op::HostConstant: case Op::HostCallStatic:
-		case Op::HostCollection: case Op::OwnerOf: case Op::FunctionToCallable: case Op::HostBindMethod:
+		case Op::HostPlain: case Op::HostCollection: case Op::OwnerOf: case Op::FunctionToCallable: case Op::HostBindMethod:
 			return "asks Godot";
 		case Op::Random:
 			return "asks for a random number";

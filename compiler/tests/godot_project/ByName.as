@@ -95,6 +95,17 @@ package {
 			return seen;
 		}
 
+		public function freeAfterRead(o:*):String {
+			var first:String = "";
+			for (var i:int = 0; i < 2; i++) {
+				try { first = String(o.name); }
+				catch (e:TypeError) { return first + "/" + e.errorID; }
+				var node:Node = o;
+				node.free();
+			}
+			return first;
+		}
+
 		// A freed object is null.
 		public function freed(o:*):String {
 			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }

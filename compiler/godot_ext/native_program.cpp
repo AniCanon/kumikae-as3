@@ -274,7 +274,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed };
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &GodotHost::plain_named };
 		find_values(&made);
 		return made;
 	}();
@@ -477,7 +477,7 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 		return false;
 	}
 	r_resolved->bind = const_cast<void *>(worked->bound);
-	if (kept) {
+	if (kept || has_parts(worked->result)) {
 		Variant *zero = make_handle(worked->zero);
 		singletons_.push_back(zero);
 		r_resolved->handle = zero;

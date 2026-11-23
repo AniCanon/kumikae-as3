@@ -615,7 +615,22 @@ void checked_uint_conversion_keeps_its_error_path() {
 	CHECK(text && text->find("thunk(c,") != std::string::npos);
 }
 
+void engine_handles_box_once() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module = module_of({ Kind::Val, Kind::Ref, Kind::Any },
+			{ ir::Instruction{ Op::ToAny, 2, 0 }, ir::Instruction{ Op::ToAny, 2, 1 } });
+	module.functions[0].parameters = 2;
+	module.functions[0].required = 2;
+	const auto made = backend_cpp::generate(module);
+	CHECK(made.unsupported.empty());
+	const auto *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("own_engine_any(c, shared(c, r0).handle, false)") != std::string::npos);
+	CHECK(text && text->find("own_engine_any(c, shared(c, r1).handle, true)") != std::string::npos);
+}
+
 int main() {
+	engine_handles_box_once();
 	checked_uint_conversion_keeps_its_error_path();
 	a_typed_callback_uses_the_typed_entry();
 	a_program_it_takes_is_written_whole();

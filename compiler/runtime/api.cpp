@@ -51,6 +51,10 @@ Slot any_null(Context *) {
 	return vm::any::null();
 }
 
+Slot own_engine_any(Context *, void *p_handle, bool p_ref) {
+	return p_ref ? vm::any::godot_object(p_handle) : vm::any::godot_value(p_handle);
+}
+
 void *any_pointer(Context *, Slot p_any) {
 	return vm::any::pointer(p_any);
 }

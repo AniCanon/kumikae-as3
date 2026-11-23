@@ -91,7 +91,7 @@ def main():
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows, label != "PR").items():
+                for row, time in measure(godot, project, library, mode, rows, label == "pre54").items():
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():

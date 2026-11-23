@@ -22,9 +22,37 @@ using namespace godot;
 
 namespace kas3 {
 
-vm::NamedShape GodotHost::named_shape(void *p_receiver) {
+#if !defined(KAS3_RUNTIME_ONLY)
+uintptr_t GodotHost::handle_class(void *p_receiver, void *p_raw) {
+	auto &type_id = rt::head_of(p_receiver)->godot_class;
+	if (!type_id) {
+		StringName klass;
+		if (!gdextension_interface::object_get_class_name(p_raw, gdextension_interface::library, klass._native_ptr())) {
+			return 0;
+		}
+		type_id = class_identity(klass);
+	}
+	return type_id;
+}
+
+static std::optional<uint64_t> attached_script(void *p_raw) {
+	static const auto get_script = [] {
+		const auto entry = godot_entry("GodotObject.getScript");
+		return entry ? method_bind("Object", "get_script", godot_words(godot_entry_at(*entry).value)[2]) : nullptr;
+	}();
+	if (!get_script) {
+		return std::nullopt;
+	}
+	Variant script;
+	gdextension_interface::object_method_bind_ptrcall(get_script, p_raw, nullptr, script._native_ptr());
+	return script.get_type() == Variant::OBJECT ? gdextension_interface::variant_get_object_instance_id(script._native_ptr()) : 0;
+}
+#endif
+
+vm::NamedShape GodotHost::shape_of(void *p_receiver, uintptr_t p_delegated) {
 #if defined(KAS3_RUNTIME_ONLY)
 	(void)p_receiver;
+	(void)p_delegated;
 	return {};
 #else
 	const Variant &value = *static_cast<const Variant *>(p_receiver);
@@ -37,29 +65,37 @@ vm::NamedShape GodotHost::named_shape(void *p_receiver) {
 	if (!raw) {
 		return {};
 	}
-	auto &type_id = rt::head_of(p_receiver)->godot_class;
+	const uintptr_t type_id = handle_class(p_receiver, raw);
 	if (!type_id) {
-		StringName klass;
-		if (!gdextension_interface::object_get_class_name(raw, gdextension_interface::library, klass._native_ptr())) {
-			return {};
-		}
-		type_id = class_identity(klass);
+		return {};
 	}
 	const uint64_t owner_id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
 	if (vm::Object *instance = script_object_by_id(owner_id)) {
 		return { static_cast<uintptr_t>(type_id), uint64_t(instance->klass) + 1, instance, raw };
 	}
-	static const auto get_script = [] {
-		const auto entry = godot_entry("GodotObject.getScript");
-		return entry ? method_bind("Object", "get_script", godot_words(godot_entry_at(*entry).value)[2]) : nullptr;
-	}();
-	if (!get_script) {
-		return {};
+	// This binding goes through Godot's named dispatch, so a different foreign script or a
+	// detached script on the same engine class needs no separate query for the Script resource.
+	if (p_delegated == type_id) {
+		return { static_cast<uintptr_t>(type_id), 0, nullptr, raw, true };
 	}
-	Variant script;
-	gdextension_interface::object_method_bind_ptrcall(get_script, raw, nullptr, script._native_ptr());
-	const uint64_t id = script.get_type() == Variant::OBJECT ? gdextension_interface::variant_get_object_instance_id(script._native_ptr()) : 0;
-	return { static_cast<uintptr_t>(type_id), id, nullptr, raw };
+	const auto id = attached_script(raw);
+	return id ? vm::NamedShape{ type_id, *id, nullptr, raw } : vm::NamedShape{};
+#endif
+}
+
+bool GodotHost::plain_named(void *p_handle, const void *p_class) {
+#if defined(KAS3_RUNTIME_ONLY)
+	(void)p_handle;
+	(void)p_class;
+	return false;
+#else
+	if (!p_handle || !p_class) {
+		return false;
+	}
+	uintptr_t expected;
+	std::memcpy(&expected, p_class, sizeof(expected));
+	void *raw = live_handle_object(p_handle);
+	return raw && expected == handle_class(p_handle, raw) && attached_script(raw) == 0;
 #endif
 }
 
@@ -154,6 +190,7 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 					return nullptr;
 				}
 				p_binding->by_name = true;
+					p_binding->dynamic_name = name(p_binding->name);
 				named_bindings_.push_back(std::move(p_binding));
 				return named_bindings_.back().get();
 			};

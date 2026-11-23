@@ -95,6 +95,15 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 			r_value->p = object;
 			return nothing || (object && (p_class == NONE || is_class(c, object, p_class)));
 		}
+		case Kind::Val:
+			if (tag == AnyTag::Value && p_class < c->host->module.engine_names.size()) {
+				void *handle = vm::any::pointer(p_any);
+				if (c->host->handles.is_class(handle, c->host->module.engine_names[p_class].name)) {
+					r_value->p = handle;
+					return true;
+				}
+			}
+			return false;
 		case Kind::Any:
 			// Into an `Object` (a class given): undefined becomes null. Into a `*`: as it is.
 			*r_value = p_class != NONE && tag == AnyTag::Undefined ? vm::any::null() : p_any;

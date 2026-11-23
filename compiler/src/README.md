@@ -11,6 +11,8 @@ all read its result.
 **Depends on:** nothing else in this repository. It includes no header from `ir/`, `vm/`, `godot_ext/` or
 `lsp/`, and no Godot header. Godot's API arrives as AS3 declarations, like any source file.
 
+The checker keeps a separate storage type for a function-local variable when a dominating write and every other write agree. Your source type still governs member lookup and diagnostics. Captures, loop targets and reads before initialization keep dynamic storage.
+
 ## Files
 
 | Files | Job |

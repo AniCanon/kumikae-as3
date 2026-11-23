@@ -105,6 +105,7 @@ enum class Kind : uint8_t;
 	X(any_string, Slot, (Context *c, Str *p_string), (c, p_string)) \
 	X(any_object, Slot, (Context *c, Object *p_object), (c, p_object)) \
 	X(any_null, Slot, (Context *c), (c)) \
+	X(own_engine_any, Slot, (Context *c, void *p_handle, bool p_ref), (c, p_handle, p_ref)) \
 	X(any_pointer, void *, (Context *c, Slot p_any), (c, p_any)) \
 	X(to_int32, int32_t, (Context *c, double p_value), (c, p_value)) \
 	X(to_uint32, uint32_t, (Context *c, double p_value), (c, p_value)) \

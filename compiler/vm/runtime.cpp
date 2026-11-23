@@ -208,6 +208,9 @@ void free_vector(Vector *p_vector) {
 }
 
 uint32_t to_uint32(double p_value) {
+	if (p_value >= 0.0 && p_value < 4294967296.0) {
+		return static_cast<uint32_t>(p_value);
+	}
 	if (!std::isfinite(p_value)) {
 		return 0;
 	}
@@ -220,6 +223,9 @@ uint32_t to_uint32(double p_value) {
 }
 
 int32_t to_int32(double p_value) {
+	if (p_value >= -2147483648.0 && p_value < 2147483648.0) {
+		return static_cast<int32_t>(p_value);
+	}
 	return (int32_t)to_uint32(p_value);
 }
 

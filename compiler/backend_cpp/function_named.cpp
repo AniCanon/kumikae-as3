@@ -6,6 +6,11 @@ namespace kas3::backend_cpp {
 bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	using ir::Kind;
 	using ir::Op;
+	if (p_in.op == Op::HostPlain && kind(p_in.b) == Kind::Ref) {
+		const std::string name = "c->names[" + std::to_string(thunks_.name_index(p_in.c)) + "]";
+		line(reg(p_in.a) + " = c->engine && c->engine->plain && c->engine->plain(" + reg(p_in.b) + ".handle, " + name + ");");
+		return true;
+	}
 	const bool write = p_in.op == Op::DynSet;
 	if (!write && p_in.op != Op::DynGet && p_in.op != Op::DynCall) {
 		return false;

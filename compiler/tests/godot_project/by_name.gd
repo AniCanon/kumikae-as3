@@ -117,6 +117,9 @@ func _physics_process(_delta: float) -> bool:
 	control.free()
 	foreign.free()
 	reference.free()
+	var warmed := Node2D.new()
+	warmed.name = "warmed"
+	show("freed after warming the site", ask("freeAfterRead", [warmed]), "warmed/1009")
 	var gone := Node2D.new()
 	var held = gone
 	gone.free()

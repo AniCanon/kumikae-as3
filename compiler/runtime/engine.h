@@ -77,6 +77,7 @@ struct EngineApi {
 	// host built for it, Context::names), where that is a value with parts of the type asked for: in a new
 	// handle, the caller's. Null for anything else (no Dictionary, no such key, a value of another type).
 	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
+	bool (*plain)(void *p_handle, const void *p_class);
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
@@ -260,6 +261,29 @@ constexpr uint8_t given_parts() {
 template <typename T>
 inline Val boxed(const Context *c, const T &p_value) {
 	return Val{ c->engine ? c->engine->box(PartsOf<T>::code, &p_value) : nullptr };
+}
+// Each math handle is owned by its slot. A copy of that slot gets a separate handle.
+template <typename T>
+inline bool replace_parts(const Context *c, void *p_handle, const T &p_value) {
+	if (!c->engine || !p_handle) {
+		return false;
+	}
+	const size_t type = static_cast<size_t>(PartsOf<T>::code);
+	const uint8_t at = c->engine->value_at[type];
+	int32_t held;
+	std::memcpy(&held, p_handle, sizeof(held));
+	if (!at || held != c->engine->value_type[type]) {
+		return false;
+	}
+	std::memcpy(static_cast<char *>(p_handle) + at, &p_value, sizeof(T));
+	return true;
+}
+template <typename T>
+inline void store_parts_any(Context *c, Slot &r_place, const T &p_value) {
+	if (vm::any::tag(r_place) == vm::AnyTag::Value && replace_parts(c, any_pointer(c, r_place), p_value)) {
+		return;
+	}
+	put(c, r_place, own_engine_any(c, boxed(c, p_value).handle, false));
 }
 template <typename T>
 inline T unbox(const Context *c, const void *p_handle) {

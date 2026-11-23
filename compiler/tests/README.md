@@ -247,7 +247,9 @@ It checks return values and mutations, then reports median milliseconds and the 
 its reference range. Native compares with the interpreter, both compare with C# by name where
 the API exists, and the inferred local also compares with the explicitly typed local. Timing stays
 outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
-a second full build and an older build that supports only the script members.
+a second full build and a pre-54 build for the script members. The older script enters through
+an AS3 wrapper that passes `this`. Current builds receive the scripted node from Godot. C# uses
+`Get`, `Set` and `Call`. Its Vector2 struct has no corresponding by-name operations.
 
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.

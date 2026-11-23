@@ -1210,7 +1210,8 @@ static void test_engine_class_values() {
 static void test_inferred_local_storage() {
 	Compilation compilation;
 	compilation.add("Storage.as", "package { public class Storage { public function check(input:int):void {"
-			"var exact:* = input; exact = input; var mixed:* = input; mixed = null;"
+			"var exact:* = input; exact = input; var later:*; later = input; var mixed:* = input; mixed = null;"
+			"var item:* = input; for each (var item:* in [input, null]) trace(item);"
 			"trace(early); var early:* = input; var captured:* = input;"
 			"var change:Function = function():void { captured = undefined; }; trace(exact, mixed, early, captured); } } }");
 	compilation.check();
@@ -1219,13 +1220,13 @@ static void test_inferred_local_storage() {
 	size_t count = 0;
 	for (const auto &function : module.functions) {
 		for (const auto &local : function.locals) {
-			if (local.name == "exact" || local.name == "mixed" || local.name == "early") {
-				CHECK(function.registers[local.reg] == (local.name == "exact" ? ir::Kind::I32 : ir::Kind::Any));
+			if (local.name == "exact" || local.name == "later" || local.name == "mixed" || local.name == "early" || local.name == "item") {
+				CHECK(function.registers[local.reg] == ((local.name == "exact" || local.name == "later") ? ir::Kind::I32 : ir::Kind::Any));
 				count++;
 			}
 		}
 	}
-	CHECK_EQ(count, size_t(3));
+	CHECK_EQ(count, size_t(5));
 }
 
 static void test_engine_members_by_name() {
@@ -1268,9 +1269,9 @@ static void test_engine_members_by_name() {
 			vm::Prepared binding;
 			vm::NamedMember member{ vm::NamedMember::What::Method, "queue_free", true, false, &binding };
 			int lookups = 0;
-			vm::NamedShape named_shape(void *p_handle) override {
+			vm::NamedShape named_shape(void *p_handle, uintptr_t) override {
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
-				return {1, script ? 2u : 0u, script, p_handle};
+				return { 1, script ? 2u : 0u, script, p_handle };
 			}
 			bool fail_after_call = false;
 			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
@@ -1339,6 +1340,19 @@ static void test_engine_members_by_name() {
 		CHECK(!interpreter.call_method(object, "calls", given, 1, nullptr));
 		CHECK_EQ(engine.log, std::string("prepared call\n"));
 		engine.scripts.erase(node);
+		// A generated site can outlive its interpreter. A new program resolves its own binding.
+		vm::NamedSite native_site;
+		vm::NamedCall method;
+		for (int generation = 0; generation < 2; generation++) {
+			vm::Interpreter fresh(module, engine);
+			const int before = engine.lookups;
+			for (int hit = 0; hit < 2; hit++) {
+				vm::Slot value = vm::any::undefined();
+				CHECK(fresh.access_named(native_site, ir::Op::DynGet, given[0], "name", nullptr, 0, &value, &method));
+				fresh.discard(ir::Kind::Any, value);
+			}
+			CHECK_EQ(engine.lookups, before + 1);
+		}
 		interpreter.release_object(object);
 		engine.drop(node);
 	}

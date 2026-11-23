@@ -20,6 +20,9 @@ bool Lowerer::gives_nothing(const Expr *p_expression) {
 }
 
 void Lowerer::effect(Expr *p_expression) {
+	if (p_expression && (p_expression->kind == NodeKind::Call || p_expression->kind == NodeKind::Assign) && Dynamic(*this).guarded(p_expression)) {
+		return;
+	}
 	if (p_expression && gives_nothing(p_expression)) {
 		Expressions(*this).evaluate(p_expression, Kind::Void);
 	} else {

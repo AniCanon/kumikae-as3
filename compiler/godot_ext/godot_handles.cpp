@@ -72,7 +72,7 @@ bool GodotHost::is_class(void *p_value, std::string_view p_class) {
 	const Variant *value = static_cast<const Variant *>(p_value);
 	if (value && value->get_type() != Variant::OBJECT) {
 		// One of Godot's value types: its name is the class.
-		return Variant::get_type_name(value->get_type()) == text_of(p_class);
+		return value_name(value->get_type()) == p_class;
 	}
 	if (!value || is_freed(*value)) {
 		return false;
@@ -143,6 +143,17 @@ bool GodotHost::assign(void *p_to, const void *p_from) {
 		return false;
 	}
 	*static_cast<Variant *>(p_to) = *from;
+	return true;
+}
+
+bool GodotHost::assign_math(void *p_to, const void *p_from, std::string_view p_class) {
+	auto &to = *static_cast<Variant *>(p_to);
+	const auto &from = *static_cast<const Variant *>(p_from);
+	const auto type = from.get_type();
+	if (type < Variant::VECTOR2 || type > Variant::COLOR || type != to.get_type() || (!p_class.empty() && value_name(type) != p_class)) {
+		return false;
+	}
+	to = from;
 	return true;
 }
 

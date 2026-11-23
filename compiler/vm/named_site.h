@@ -13,6 +13,7 @@ struct NamedShape {
 	uint64_t script = 0; // An attached script's identity, zero for a bare receiver.
 	Object *instance = nullptr;
 	void *owner = nullptr; // The validated engine object, borrowed for this access.
+	bool delegate = false; // Godot resolves the current non-AS3 script on this access.
 };
 
 struct NamedCall {
@@ -32,6 +33,7 @@ struct NamedSite {
 	std::array<Entry, 4> entries{};
 	uint64_t generation = 0;
 	uint32_t used = 0;
+	uint32_t delegated = UINT32_MAX;
 };
 
 } // namespace kas3::vm

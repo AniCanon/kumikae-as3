@@ -50,6 +50,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	std::unordered_map<Place, Name, PlaceHash> names_;
 #if !defined(KAS3_RUNTIME_ONLY)
 	// Godot 4 stores the interned name pointer in its opaque StringName. Keep the name alive as the key.
+	static uintptr_t handle_class(void *p_receiver, void *p_raw);
 	static uintptr_t class_identity(const godot::StringName &p_class) {
 		uintptr_t identity;
 		static_assert(sizeof(p_class) == sizeof(identity));
@@ -159,7 +160,10 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	vm::NamedShape named_shape(void *p_receiver) override;
+	static vm::NamedShape shape_of(void *p_receiver, uintptr_t p_delegated = 0);
+	static bool plain_named(void *p_handle, const void *p_class);
+	bool plain(void *p_handle, std::string_view p_class) override { return plain_named(p_handle, name(p_class)._native_ptr()); }
+	vm::NamedShape named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }
 	std::optional<bool> run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
 	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
@@ -180,6 +184,7 @@ public:
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
 	[[nodiscard]] bool assign(void *p_to, const void *p_from) override;
+	[[nodiscard]] bool assign_math(void *p_to, const void *p_from, std::string_view p_class) override;
 	// For the cycle collector: a reference-counted object that a script listens to or that has a script
 	// is a node (by its id), and so is a listener (callable.h).
 	[[nodiscard]] uint64_t node(void *p_value) override;
@@ -201,6 +206,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Varian
 // something else.
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
 // One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
+std::string_view value_name(int p_type);
 std::optional<int> value_type(std::string_view p_name);
 
 } // namespace kas3

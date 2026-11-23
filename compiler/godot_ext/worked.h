@@ -71,6 +71,7 @@ struct SignalSeen {
 struct GodotHost::Worked final : vm::Prepared {
 	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility, Construct, Emit } what = What::Constant;
 	std::string name; // Godot's name for it, for the errors it reports.
+	godot::StringName dynamic_name; // A property dispatched through an attached foreign script.
 	// Operator: Godot's evaluator for these types; the types of its operands, and of what it gives.
 	GDExtensionPtrOperatorEvaluator evaluator = nullptr;
 	int operands[2] = { NO_VALUE, NO_VALUE };

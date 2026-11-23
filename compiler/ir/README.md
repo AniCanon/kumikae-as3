@@ -16,6 +16,8 @@ A byte register has kind `U8`. The VM slot uses its unsigned integer member. Con
 keeps the low eight bits of an unsigned integer, and arithmetic widens it before operating.
 The byte kind and its integer conversions also use appended wire values.
 
+`HostPlain` checks that a live receiver has the expected Godot class and carries no script. For a proven local, the lowerer can then use a typed getter, setter or final method. The fallback uses the original by-name operation with the arguments already evaluated.
+
 ## The IR
 
 `CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.

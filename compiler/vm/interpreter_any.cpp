@@ -68,11 +68,19 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			result(Kind::Any, p_in.b ? any::null() : any::undefined());
 			break;
 		case Op::ToAny:
+			if (p_function.registers[p_in.b] == Kind::Val && b.p && any::tag(p_registers[p_in.a]) == AnyTag::Value &&
+					host_.handles.assign_math(any::pointer(p_registers[p_in.a]), b.p, {})) {
+				break;
+			}
 			result(Kind::Any, to_any(p_function.registers[p_in.b], b));
 			break;
 		case Op::FromAny: {
 			// An object that speaks for itself is held while it does, by any_text().
 			const Kind kind = p_function.registers[p_in.a];
+			if (kind == Kind::Val && p_registers[p_in.a].p && any::tag(b) == AnyTag::Value &&
+					host_.handles.assign_math(p_registers[p_in.a].p, any::pointer(b), p_in.c == NONE ? std::string_view{} : module_.engine_names[p_in.c].name)) {
+				break;
+			}
 			Slot out;
 			if (from_any(b, kind, p_in.c, &out)) {
 				result(kind, out);

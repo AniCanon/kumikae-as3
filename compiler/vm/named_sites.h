@@ -4,6 +4,8 @@
 #include "engine_handles.h"
 #include "named_site.h"
 
+#include <map>
+
 namespace kas3::vm {
 
 class NamedSites {
@@ -13,6 +15,10 @@ class NamedSites {
 	};
 	std::vector<std::vector<Place>> places_;
 	std::vector<NamedSite> sites_;
+	// Overflow shapes share resolution across sites. Foreign scripts dispatch through Godot and
+	// share its class metadata. Only AS3 field and method slots depend on a script class.
+	using Members = std::map<std::string, NamedSite::Entry, std::less<>>;
+	std::map<std::pair<uintptr_t, uint32_t>, Members> shared_;
 	uint64_t generation_;
 public:
 	explicit NamedSites(const ir::Module &p_module);

@@ -1,4 +1,5 @@
 #include "interpreter_internal.h"
+#include "numeric_dispatch.h"
 
 #include <algorithm>
 #include <cmath>
@@ -192,6 +193,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			}
 			case Op::I32ToF64:
 				r[in.a].d = r[in.b].i;
+				numeric_tail(module_, function, frame.pc, r);
 				break;
 			case Op::U32ToF64:
 				r[in.a].d = r[in.b].u;
@@ -640,6 +642,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::CallVirtual:
 			case Op::CallInterface:
 				enter(function, in, r); // `frame` and `r` are stale after this.
+				break;
+			case Op::HostPlain:
+				flag(function.registers[in.b] == Kind::Ref && r[in.b].p && host_.handles.plain(r[in.b].p, module_.strings[in.c]));
 				break;
 			case Op::IsClass:
 				flag(is_class(static_cast<Object *>(r[in.b].p), in.c));

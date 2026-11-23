@@ -726,6 +726,31 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
 	const Worked &worked = static_cast<const Worked &>(p_bind);
+	if (p_shape.delegate || (p_shape.script && !p_shape.instance)) {
+		auto *receiver = static_cast<Variant *>(p_operands[0].slot.p);
+		bool valid = false;
+		if (worked.what == What::Getter) {
+			const Variant value = receiver->get_named(worked.dynamic_name, valid);
+			if (valid) {
+				return take(p_result, value, worked.name, r_value, r_error);
+			}
+			*r_error = "Godot has no '" + worked.name + "' on this value";
+		} else if (worked.what == What::Setter) {
+			const vm::Slot given = p_operands[1].slot;
+			if (vm::any::tag(given) == vm::AnyTag::Value) {
+				receiver->set_named(worked.dynamic_name, *static_cast<const Variant *>(vm::any::pointer(given)), valid);
+			} else {
+				receiver->set_named(worked.dynamic_name, to_variant(ir::Kind::Any, given), valid);
+			}
+			if (valid) {
+				return true;
+			}
+			*r_error = "Godot could not set '" + worked.name + "' on this value";
+		} else {
+			return std::nullopt;
+		}
+		return false;
+	}
 	if (p_shape.owner && worked.bound && p_count <= MOST) {
 		return run_bound(worked, p_shape.instance, p_operands, p_count, p_result, r_value, r_error, p_shape.owner);
 	}
