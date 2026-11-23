@@ -74,6 +74,8 @@ host that keeps nothing gets the request by name instead.
 
 ### Errors
 
+- When you call a member by name on an attached script, its public methods, fields and accessors take
+  precedence over Godot members. A getter that returns a function runs once before the call.
 - **Every failure is an AS3 error** with a class, a message and a stack line. Handles and objects are
   released on the error path too. The tests count what is left alive.
 - **The interpreter never recurses in C++ for an AS3 call.** It keeps its own stack of frames, so runaway

@@ -35,7 +35,7 @@ bool listed(const std::array<std::string_view, Count> &p_names, std::string_view
 // does not have is AS3's ReferenceError #1069; one the interpreter can't reach yet says so.
 bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
 	*r_value = any::undefined();
-	Object *object = held_object(p_holder);
+	Object *object = property_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	if (klass && klass->table) {
 		if (const std::optional<uint32_t> at = entry_of(entries_of(object), p_key)) {
@@ -195,7 +195,7 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 
 // key in holder (p_prototype: what its prototype has counts), or holder.hasOwnProperty(key).
 bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has) {
-	Object *object = held_object(p_holder);
+	Object *object = property_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const AnyTag tag = any::tag(p_holder);
 	if (!klass && (tag == AnyTag::Null || tag == AnyTag::Undefined)) {
@@ -203,9 +203,6 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		return false;
 	}
 	bool has = (p_prototype && listed(OBJECT_METHODS, p_key.name())) || static_has(object, p_key);
-	if ((!klass && any::is_engine(p_holder)) || (klass && !klass->native_base.empty())) {
-		has = has || EngineNamed(*this).has(p_holder, p_key); // What Godot's value or object has by that name.
-	}
 	if (klass && klass->table) {
 		has = has || entry_of(entries_of(object), p_key).has_value();
 	} else if (klass && klass->element != Kind::Void) {
@@ -223,6 +220,9 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		has = has || p_key.name() == "length" || (p_prototype && library_name(p_holder, p_key.name()));
 	} else if (tag != AnyTag::Boolean) {
 		has = has || (p_prototype && listed(NUMBER_METHODS, p_key.name()));
+	}
+	if ((!klass && any::is_engine(p_holder)) || (klass && !klass->native_base.empty())) {
+		has = has || EngineNamed(*this).has(p_holder, p_key); // What Godot's value or object has by that name.
 	}
 	*r_has = has;
 	return true;

@@ -22,8 +22,6 @@ class EngineNamed {
 
 	// The handle the value reaches Godot by: its own, or the Godot object a script object is attached to.
 	void *handle_of(Slot p_holder) const;
-	// The script object the Godot object an untyped value holds carries, if it has a member of that name.
-	Object *script_with(Slot p_holder, const PropertyKey &p_key) const;
 	const NamedMember &member(Slot p_holder, const PropertyKey &p_key) const;
 	bool method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value);
 	bool unknown(const PropertyKey &p_key);
@@ -49,8 +47,7 @@ public:
 	// takes nothing first; one of Godot's own methods is Godot's own Callable of its object. A method's is
 	// the one its object would give, so that adding and removing a listener match. Null if it raised.
 	void *callable(Object *p_function);
-	// Whether a class's objects have a public member of their own of that name.
-	bool own_member(const ir::Class &p_class, const PropertyKey &p_key) const;
+
 };
 
 } // namespace vm

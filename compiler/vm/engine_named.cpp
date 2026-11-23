@@ -45,14 +45,8 @@ void *EngineNamed::handle_of(Slot p_holder) const {
 	return any::is_engine(p_holder) ? any::pointer(p_holder) : engine_object_in(vm_.module_, p_holder);
 }
 
-bool EngineNamed::own_member(const ir::Class &p_class, const PropertyKey &p_key) const {
-	return p_class.field(p_key.name(), true) || vm_.named_method(p_class, p_key.name()) || vm_.named_method(p_class, p_key.name(), "get ") ||
-			vm_.named_method(p_class, p_key.name(), "set ");
-}
-
-Object *EngineNamed::script_with(Slot p_holder, const PropertyKey &p_key) const {
-	Object *script = any::tag(p_holder) == AnyTag::Godot ? vm_.host_.handles.script_of(any::pointer(p_holder), NONE, false) : nullptr;
-	return script && own_member(vm_.module_.classes[script->klass], p_key) ? script : nullptr;
+Object *Interpreter::property_object(Slot p_holder) const {
+	return any::tag(p_holder) == AnyTag::Godot ? host_.handles.script_of(any::pointer(p_holder), NONE, false) : held_object(p_holder);
 }
 
 const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) const {
@@ -97,9 +91,6 @@ bool EngineNamed::unknown(const PropertyKey &p_key) {
 }
 
 std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
-	if (Object *script = script_with(p_holder, p_key)) {
-		return vm_.get_property(any::object(script), p_key, r_value);
-	}
 	const NamedMember &found = member(p_holder, p_key);
 	void *handle = handle_of(p_holder);
 	switch (found.what) {
@@ -130,9 +121,6 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 }
 
 std::optional<bool> EngineNamed::set(Slot p_holder, const PropertyKey &p_key, Slot p_value) {
-	if (Object *script = script_with(p_holder, p_key)) {
-		return vm_.set_property(any::object(script), p_key, p_value);
-	}
 	const NamedMember &found = member(p_holder, p_key);
 	switch (found.what) {
 		case NamedMember::What::Missing:
@@ -170,14 +158,6 @@ std::optional<bool> EngineNamed::set(Slot p_holder, const PropertyKey &p_key, Sl
 }
 
 std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
-	if (Object *script = script_with(p_holder, p_key)) {
-		vm_.call_named(any::object(script), p_key, p_given, p_out);
-		return !vm_.failing_;
-	}
-	const Object *object = vm_.held_object(p_holder);
-	if (object && own_member(vm_.module_.classes[object->klass], p_key)) {
-		return std::nullopt; // The script object's own member: the program's to call.
-	}
 	const NamedMember &found = member(p_holder, p_key);
 	if (found.what == NamedMember::What::Missing) {
 		return std::nullopt;
@@ -268,7 +248,7 @@ void *EngineNamed::callable(Object *p_function) {
 }
 
 bool EngineNamed::has(Slot p_holder, const PropertyKey &p_key) const {
-	return script_with(p_holder, p_key) || member(p_holder, p_key).what != NamedMember::What::Missing;
+	return member(p_holder, p_key).what != NamedMember::What::Missing;
 }
 
 } // namespace vm

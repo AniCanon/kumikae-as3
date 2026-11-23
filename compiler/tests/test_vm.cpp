@@ -1211,6 +1211,9 @@ static void test_engine_members_by_name() {
 	const char *source = "package { import godot.*;\n"
 						 "public class Loose extends Node {\n"
 						 "  public var own:int = 7;\n"
+						 "  private function label():String { return 'called'; }\n"
+						 "  public function get callback():Function { own++; return label; }\n"
+						 "  public function invoke(o:*):String { return o.callback() + '/' + o.own; }\n"
 						 "  public function reads(o:*):String { return o.name + \"/\" + o[\"name\"]; }\n"
 						 "  public function writes(o:*, v:*):void { o.position = v; o[\"name\"] = \"new\"; }\n"
 						 "  public function calls(o:Object):void { o.queueFree(); o.addChild(o, true); }\n"
@@ -1276,6 +1279,12 @@ static void test_engine_members_by_name() {
 		CHECK(interpreter.call_method(object, "method", given, 1, &result));
 		CHECK(result.b);
 		CHECK(engine.log.find("call #32.queue_free()\n") != std::string::npos && engine.log.find("bind #32.queue_free -> ") != std::string::npos);
+		// A callback read from an attached script runs its getter once through either receiver.
+		engine.scripts[node] = object;
+		CHECK_EQ(text("invoke", 1), std::string("called/8"));
+		given[0] = vm::any::object(object);
+		CHECK_EQ(text("invoke", 1), std::string("called/9"));
+		engine.scripts.erase(node);
 		interpreter.release_object(object);
 		engine.drop(node);
 	}

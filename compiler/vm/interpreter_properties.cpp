@@ -194,7 +194,7 @@ bool Interpreter::refuse_write(const char *p_number, const char *p_words, std::s
 // holder[key] = value. A sealed object takes a value into a public field, coerced as a store into it is; a
 // name it lacks is AS3's ReferenceError #1056, and one of its methods #1037.
 bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value) {
-	Object *object = held_object(p_holder);
+	Object *object = property_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), p_holder); };
 	if (klass && klass->table) {

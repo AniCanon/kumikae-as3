@@ -274,6 +274,7 @@ private:
 	void raise_unsupported(const std::string &p_what);
 	void raise_not_found(const PropertyKey &p_key, Slot p_holder);
 	bool refuse_write(const char *p_number, const char *p_words, std::string_view p_name, Slot p_holder); // False.
+	Object *property_object(Slot p_holder) const; // A script object, including one reached through its Godot node.
 	bool property_key(Slot p_holder, Slot p_key, PropertyKey *r_key);
 	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
