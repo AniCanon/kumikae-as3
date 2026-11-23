@@ -50,4 +50,4 @@ def benchmark(arguments, native):
                 for case, micros in rows:
                     samples.setdefault((build, case), []).append(int(micros) / 1000)
         for (build, case), times in samples.items():
-            print(f"{build} {case:8} {statistics.median(times):8.3f} ms  spread {max(times)-min(times):.3f} ms ({runs} runs)")
+            print(f"{build} {case:8} {statistics.median(times):8.3f} ms  spread {max(times)-min(times):.3f} ms ({runs} runs, {min(times):.3f} to {max(times):.3f})")
