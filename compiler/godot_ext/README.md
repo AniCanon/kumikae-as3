@@ -39,6 +39,7 @@ nothing differently for the editor, so one library serves both.
 | `godot_source.cpp`, `godot_utility.cpp` | Constructors, constants, singletons, static methods, the clock, and Godot's global functions |
 | `godot_signals.cpp`, `godot_emit.cpp`, `listeners.cpp` | Listening to a signal, emitting one, and listeners as the cycle collector sees them |
 | `godot_untyped.cpp`, `godot_collections.cpp` | Untyped values to and from `Variant`, and AS3 collections handed to Godot |
+| `godot_named.cpp` | What a Godot value has under an AS3 name, from the name table, for a value held untyped |
 | `callable`, `bound_method.h` | A method as a Godot callable |
 | `restart.cpp` | What a reload reports, and restarting the running scene |
 | `ios_export` | Editor export plugin for iOS (native objects), Android (`libkas3_program.so`), and Web (`res://.kas3/program.kas3`) |

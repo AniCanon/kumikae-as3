@@ -242,6 +242,38 @@ Godot's integers have 64 bits, and AS3's `int` has 32. Godot's integer is the AS
 - Where Godot accepts any type, as `print` and `setMeta` do, a `Number` goes as a float even when its
   value is whole, and an `int`, `uint` or `Int64` goes as an integer.
 
+### Godot's values held untyped
+
+A Godot value or object held in a `*` or an `Object` variable has its members by their AS3 names, as an
+untyped variable has them in GDScript:
+
+```actionscript
+package game {
+    import godot.*;
+
+    public class Finder extends Node {
+        public function mark(path:String):String {
+            var found:* = getNode(path);
+            found.name = "target";
+            found.addToGroup("marked");
+            return found.name;
+        }
+    }
+}
+```
+
+- **The name is looked up as the line runs,** in the value's class and then in each class it extends.
+- **A name that isn't there is an AS3 error:** ReferenceError #1069 when you read it, ReferenceError #1056
+  when you write it, and TypeError #1006 when you call it.
+- **A node that carries one of your scripts has the script's public members first,** and then Godot's.
+  Your own script object held untyped reaches its Godot object's members the same way.
+- **A method you read without calling it is a function.** It's the same function a typed read gives. See
+  [Godot's methods as values](#godots-methods-as-values).
+- **Arguments go to Godot as they're held,** and Godot checks them: an `int` as an integer, a `Number` as a
+  float, a function as a `Callable`.
+- **A value type held untyped is a copy, and its parts can't be written.** `found.position.x = 5` raises an
+  error that says so. Read the value into a variable of its type, change it, and store it back.
+
 ## Signals
 
 A signal is a property of type `Signal`. You add and remove listeners on it.
@@ -460,8 +492,10 @@ The [roadmap](roadmap.md#known-limits) lists the known limits. The ones you're m
 
 - Only macOS is tested.
 - Godot's string-format operator (`"%s" % value`) isn't available. Use AS3 string concatenation.
-- A Godot value or object held in a `*` or an `Object` has no members by name, and no `for in`. Store it in
-  a variable of its type first.
+- `for in` and `for each` don't run over a Godot value held in a `*` or an `Object`, and a Godot value isn't
+  a `Dictionary` key. Store it in a variable of its type first.
+- The slim Web extension carries no table of Godot's names, so a member of a Godot value held untyped can't
+  be reached by name there. The script gets an error that says so.
 - A script class in the default package with the same name as a Godot class is ambiguous. Put it in a
   package.
 - `super._process(delta)` on a Godot virtual does nothing, as Godot's own empty versions do. It can't

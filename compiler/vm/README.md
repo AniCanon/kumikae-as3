@@ -53,7 +53,7 @@ host that keeps nothing gets the request by name instead.
 | `json_*` | `JSON` |
 | `uri_text` | `escape`, `unescape` and the URI functions |
 | `class_values.cpp`, `class_statics.cpp` | Classes as values |
-| `engine_named` | What an untyped value does with Godot by name: a Godot class held as a class value made new |
+| `engine_named` | What an untyped value does with Godot by name: a Godot class held as a class value made new, and a member of a Godot value read, written or called by its AS3 name |
 | `library_calls`, `library_members.cpp`, `interpreter_library.cpp`, `interpreter_functions.cpp` | Library methods called by name on an untyped value, and function values |
 | `reload`, `reload_update.cpp`, `constructions` | Hot reload: moving live objects onto a new build, and updating them in place |
 | `native_code.h` | How the interpreter hands a function to native code |
