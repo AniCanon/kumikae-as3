@@ -11,13 +11,9 @@ Argument receiver(Slot p_holder, void *p_handle) {
 	return argument;
 }
 
-// A prepared request may decline an argument type or count. Only an empty error permits a retry by name.
 std::optional<bool> prepared(EngineHandles &p_host, const Prepared *p_prepared, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
 		Slot *r_value, std::string *r_error) {
-	if (p_prepared && p_host.run(*p_prepared, p_arguments, p_count, p_wanted, r_value, r_error)) {
-		return true;
-	}
-	return r_error->empty() ? std::nullopt : std::optional<bool>(false);
+	return p_prepared ? p_host.run(*p_prepared, p_arguments, p_count, p_wanted, r_value, r_error) : std::nullopt;
 }
 
 } // namespace

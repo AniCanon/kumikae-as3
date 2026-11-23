@@ -117,6 +117,6 @@ std::unique_ptr<GodotHost::Worked> emit_of(const ir::EngineName &p_entry, const 
 // Emits the signal a handle holds, with values that are Godot's already: `p_pointers` has room for the
 // signal's name first, then the `p_count` values. False, with nothing done, where the handle holds no
 // signal or the signal's object is gone: what that is, the request by name says.
-bool emit_signal(const GodotHost::Worked &p_worked, const godot::Variant *p_signal, const godot::Variant **p_pointers, size_t p_count);
+std::optional<bool> emit_signal(const GodotHost::Worked &p_worked, const godot::Variant *p_signal, const godot::Variant **p_pointers, size_t p_count, std::string *r_error);
 
 } // namespace kas3

@@ -1238,7 +1238,18 @@ static void test_engine_members_by_name() {
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	{
-		FakeEngine engine;
+		struct Engine : FakeEngine {
+			vm::Prepared binding;
+			vm::NamedMember member{ vm::NamedMember::What::Method, "queue_free", true, false, &binding };
+			bool fail_after_call = false;
+			const vm::NamedMember &named(void *p_handle, std::string_view p_name) override {
+				return fail_after_call && p_name == "queueFree" ? member : FakeEngine::named(p_handle, p_name);
+			}
+			std::optional<bool> run(const vm::Prepared &, const vm::Argument *, size_t, const vm::Wanted &, vm::Slot *, std::string *) override {
+				log += "prepared call\n";
+				return false;
+			}
+		} engine;
 		engine.module = &module;
 		engine.aligned = true;
 		vm::Interpreter interpreter(module, engine);
@@ -1284,6 +1295,11 @@ static void test_engine_members_by_name() {
 		CHECK_EQ(text("invoke", 1), std::string("called/8"));
 		given[0] = vm::any::object(object);
 		CHECK_EQ(text("invoke", 1), std::string("called/9"));
+		given[0] = vm::any::godot_object(node);
+		engine.fail_after_call = true;
+		engine.log.clear();
+		CHECK(!interpreter.call_method(object, "calls", given, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("prepared call\n"));
 		engine.scripts.erase(node);
 		interpreter.release_object(object);
 		engine.drop(node);
@@ -1480,10 +1496,10 @@ struct PreparingEngine : FakeEngine {
 		worked.back()->what = p_module.engine_names[p_in.b].key;
 		return worked.back().get();
 	}
-	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+	[[nodiscard]] std::optional<bool> run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *) override {
 		if (refuse_to_run) {
-			return false;
+			return std::nullopt;
 		}
 		log += "run " + static_cast<const Worked &>(p_prepared).what + " (" + list(p_operands, p_count) + ")\n";
 		if (in_place && p_wanted.reuse) {

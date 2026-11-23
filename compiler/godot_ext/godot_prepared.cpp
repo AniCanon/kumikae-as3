@@ -256,12 +256,12 @@ GDExtensionMethodBindPtr method_bind(std::string_view p_class, std::string_view 
 
 // A Variant's internal pointer is taken for a handle's own value: a method that changes its value (append)
 // changes the handle, as a call by name on it does.
-bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result) {
+std::optional<bool> GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result) {
 	Scalar left_scalar, right_scalar;
 	const void *left = bare(p_operands[0], p_worked.operands[0], &left_scalar);
 	const void *right = p_count == 2 ? bare(p_operands[1], p_worked.operands[1], &right_scalar) : nullptr;
 	if (!left || (p_count == 2 && !right) || !r_result) {
-		return false;
+		return std::nullopt;
 	}
 	Scalar out;
 	out.integer = 0;
@@ -287,11 +287,11 @@ bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_opera
 	}
 }
 
-bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+std::optional<bool> GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	const size_t first = p_worked.is_static ? 0 : 1;
 	if (p_count != first + p_worked.parameters.size()) {
-		return false; // A dynamic call may omit defaults or give the wrong number.
+		return std::nullopt; // A dynamic call may omit defaults or give the wrong number.
 	}
 	Scalar scalars[MOST];
 	Values values;
@@ -300,7 +300,7 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 	if (!p_worked.is_static) {
 		Variant *held = p_operands[0].kind == ir::Kind::Val ? static_cast<Variant *>(p_operands[0].slot.p) : nullptr;
 		if (!held || held->get_type() != p_worked.receiver) {
-			return false;
+			return std::nullopt;
 		}
 		receiver = inside(*held, p_worked.receiver);
 	}
@@ -319,11 +319,11 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 			Variant &value = values.next();
 			value = to_variant(given.kind, given.slot);
 			if (value.get_type() != type || type == Variant::OBJECT) {
-				return false; // Let Godot apply its conversions and report a bad argument.
+				return std::nullopt; // Let Godot apply its conversions and report a bad argument.
 			}
 			pointers[i - first] = inside(value, type);
 		} else if (!(pointers[i - first] = bare(given, type, &scalars[i]))) {
-			return false;
+			return std::nullopt;
 		}
 	}
 	if (p_worked.result == Variant::OBJECT) {
@@ -347,19 +347,19 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 	return take(p_result, result, p_worked.name, r_result, r_error);
 }
 
-bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	GDExtensionObjectPtr object = nullptr;
 	const size_t first = p_worked.is_static ? 0 : 1;
 	if (!p_worked.is_static && !object_of(p_operands[0], &object)) {
-		return false;
+		return std::nullopt;
 	}
 	if (!p_worked.is_static && !object) {
 		*r_error = FREED;
 		return false;
 	}
 	if (p_worked.by_name && internal::get_object_instance_binding(object)->get_script().get_type() != Variant::NIL) {
-		return false; // A script can intercept even an inherited name, differently on each instance.
+		return std::nullopt; // A script can intercept even an inherited name, differently on each instance.
 	}
 	if (p_worked.bare && !(p_worked.result == NO_VALUE && p_result.kind == ir::Kind::Any)) {
 		if (const std::optional<bool> done = run_bare(p_worked, object, p_operands + first, p_count - first, p_result, r_result)) {
@@ -375,7 +375,7 @@ bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands
 		pointers[count++] = &index;
 	}
 	if (p_count - first + count > MOST) {
-		return false;
+		return std::nullopt;
 	}
 	for (size_t i = first; i < p_count; i++, count++) {
 		Variant &value = values.next();
@@ -396,10 +396,10 @@ bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands
 
 // One of Godot's value types made from its arguments, by Godot's constructor for their types; into the
 // handle the result's register holds, where it holds one.
-bool GodotHost::run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+std::optional<bool> GodotHost::run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	if (!r_result) {
-		return false;
+		return std::nullopt;
 	}
 	Values values;
 	const Variant *pointers[MOST];
@@ -428,18 +428,19 @@ bool GodotHost::run_construct(const Worked &p_worked, const vm::Argument *p_oper
 	return true;
 }
 
-bool GodotHost::run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+std::optional<bool> GodotHost::run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	Variant *held = p_operands[0].kind == ir::Kind::Val ? static_cast<Variant *>(p_operands[0].slot.p) : nullptr;
 	if (!held || held->get_type() != p_worked.receiver) {
-		return false;
+		return std::nullopt;
 	}
 	if (p_worked.what == What::FieldSet) {
 		Scalar scalar;
 		const void *value = bare(p_operands[1], p_worked.result, &scalar);
-		if (value) {
-			p_worked.setter(inside(*held, p_worked.receiver), value);
+		if (!value) {
+			return std::nullopt;
 		}
-		return value != nullptr;
+		p_worked.setter(inside(*held, p_worked.receiver), value);
+		return true;
 	}
 	if (r_result && p_result.kind == ir::Kind::F64 && p_worked.result == Variant::FLOAT) {
 		p_worked.getter(inside(*held, p_worked.receiver), &r_result->d); // A part that is a Number: no Variant at all.
@@ -678,11 +679,11 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 	return { kept, used };
 }
 
-bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
 	const Worked &worked = static_cast<const Worked &>(p_prepared);
 	if (p_count > MOST) {
-		return false;
+		return std::nullopt;
 	}
 	switch (worked.what) {
 		case What::Operator:
@@ -709,10 +710,10 @@ bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operan
 			for (size_t i = 1; i < p_count; i++) {
 				pointers[i] = new (values.room()) Variant(to_variant(p_operands[i].kind, p_operands[i].slot));
 			}
-			return p_operands[0].kind == ir::Kind::Val && emit_signal(worked, static_cast<const Variant *>(p_operands[0].slot.p), pointers, p_count - 1);
+			return p_operands[0].kind == ir::Kind::Val ? emit_signal(worked, static_cast<const Variant *>(p_operands[0].slot.p), pointers, p_count - 1, r_error) : std::nullopt;
 		}
 	}
-	return false;
+	return std::nullopt;
 }
 
 } // namespace kas3
