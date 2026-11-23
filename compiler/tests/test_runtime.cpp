@@ -401,11 +401,9 @@ static void test_text_units() {
 	append_unit(&built, 0xD83D);
 	append_unit(&built, 0xDE00);
 	CHECK_EQ(built, std::string("\xF0\x9F\x98\x80"));
+	CHECK(sizeof(Str) <= 3 * sizeof(uint32_t));
 	Str *whole = join_strings("a" + high, low + "b");
 	CHECK(whole && whole->view() == face);
-	CHECK(whole && !whole->cached_units);
-	CHECK(whole && whole->length() == 4);
-	CHECK(whole && whole->cached_units == 4);
 	CHECK(whole && whole->length() == 4);
 	free_string(whole);
 	CHECK_EQ(find_units(face, high, 0), 1);

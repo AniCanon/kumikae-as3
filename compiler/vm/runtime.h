@@ -32,8 +32,8 @@ struct Counted {
 
 struct Str : Counted {
 	uint32_t size; // In bytes.
-	mutable std::optional<int32_t> cached_units;
-	int32_t length() const; // The UTF-16 length of these immutable bytes.
+	int32_t units; // UTF-16 length of these immutable bytes.
+	int32_t length() const { return units; }
 	char *data() { return reinterpret_cast<char *>(this + 1); }
 	const char *data() const { return reinterpret_cast<const char *>(this + 1); }
 	std::string_view view() const { return std::string_view(data(), size); }

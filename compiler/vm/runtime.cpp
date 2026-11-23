@@ -64,19 +64,13 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 		std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
 	}
 	string->data()[size] = 0;
+	string->units = utf16_length(string->view());
 	strings_alive++;
 	return string;
 }
 
 Str *new_string(std::string_view p_text) {
 	return join_strings(p_text, std::string_view());
-}
-
-int32_t Str::length() const {
-	if (!cached_units) {
-		cached_units = utf16_length(view());
-	}
-	return *cached_units;
 }
 
 void free_string(Str *p_string) {
