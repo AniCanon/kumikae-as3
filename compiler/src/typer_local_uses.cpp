@@ -471,6 +471,15 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 						return use && use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == p_name;
 					}))) {
 				local.symbol->storage = local.type;
+				if (!proof.storage) {
+					Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
+					for (Name *name : uses[local.symbol]) {
+						Node *use = parent(parents, name);
+						if (use && use->kind == NodeKind::Call && consumers.argument(static_cast<Call *>(use), name, local.type)) {
+							name->type = local.type;
+						}
+					}
+				}
 			}
 			if (proof.storage) {
 				for (Name *name : uses[local.symbol]) {

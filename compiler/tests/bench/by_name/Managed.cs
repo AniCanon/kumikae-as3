@@ -34,7 +34,19 @@ public partial class Managed : Node
             timer.Free();
             return total;
         }
-        if (kind == "proven" || kind == "typed")
+        if ((kind == "proven" || kind == "typed") && op == "call")
+        {
+            double total = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var fresh = new Node2D();
+                fresh.Call(Node2D.MethodName.Rotate, 0.0001);
+                total += fresh.Rotation;
+                fresh.Free();
+            }
+            return total;
+        }
+        if (kind == "proven" || kind == "typed" || kind == "detached")
         {
             var fresh = new Node2D();
             if (op == "read") fresh.Position = new Vector2(3, 4);

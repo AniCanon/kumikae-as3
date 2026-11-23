@@ -17,7 +17,7 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
-ROWS.extend(("foreign/read", "foreign/call"))
+ROWS.extend(("foreign/read", "foreign/call", "detached/call"))
 
 TOLERANCE = 0.03
 

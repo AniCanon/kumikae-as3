@@ -125,7 +125,7 @@ package {
 			target.free();
 			return finalPoint.x + finalPoint.y;
 		}
-		public function provenCall(source:Node2D, n:int):Number {
+		public function detachedCall(source:Node2D, n:int):Number {
 			var target:* = new Node2D();
 			for (var i:int = 0; i < n; i++) target.rotate(0.0001);
 			var angle:Number = target.rotation;
@@ -151,13 +151,31 @@ package {
 			target.free();
 			return finalPoint.x + finalPoint.y;
 		}
+		public function provenCall(source:Node2D, n:int):Number {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var target:* = new Node2D();
+				target.rotate(0.0001);
+				sum += finishAngle(target);
+			}
+			return sum;
+		}
 		public function typedCall(source:Node2D, n:int):Number {
-			var target:Node2D = new Node2D();
-			for (var i:int = 0; i < n; i++) target.rotate(0.0001);
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var target:Node2D = new Node2D();
+				target.rotate(0.0001);
+				sum += finishAngle(target);
+			}
+			return sum;
+		}
+		private function finishAngle(target:Node2D):Number {
 			var angle:Number = target.rotation;
 			target.free();
 			return angle;
 		}
+		private function dispose(timer:Timer):void { timer.free(); }
+
 		private var numberField:Number = 3;
 		private function lengthOf(value:String):int { return value.length; }
 		private function flag():Boolean { return true; }
@@ -171,7 +189,7 @@ package {
 				timer.autostart = true;
 				sum += timer.waitTime;
 				source.addChild(timer);
-				timer.free();
+				dispose(timer);
 			}
 			return sum;
 		}
@@ -184,7 +202,7 @@ package {
 				timer.autostart = true;
 				sum += timer.waitTime;
 				source.addChild(timer);
-				timer.free();
+				dispose(timer);
 			}
 			return sum;
 		}

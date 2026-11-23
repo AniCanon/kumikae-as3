@@ -28,7 +28,7 @@ func measure() -> void:
 		if managed:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "script": script,
-			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "mixed": node}
+			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
 	for kind: String in inferred:
@@ -48,6 +48,8 @@ func measure() -> void:
 				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
 					continue
 				if kind == "foreign" and op == "write":
+					continue
+				if kind == "detached" and op != "call":
 					continue
 				if kind == "value" and (op == "write" or managed):
 					continue
@@ -92,7 +94,9 @@ func measure() -> void:
 			var valid := true
 			if op == "read" or (op == "call" and (own or kind == "value")):
 				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
-			elif kind in ["proven", "typed"]:
+			elif kind in ["proven", "typed"] and op == "call":
+				valid = absf(result - rounds * 0.0001) < rounds * 0.0000001
+			elif kind in ["proven", "typed", "detached"]:
 				valid = result == 17 if op == "write" else absf(angle_difference(result, rounds * 0.0001)) < rounds * 0.0000001
 			elif op == "write" and own:
 				valid = target.score == rounds - 1
