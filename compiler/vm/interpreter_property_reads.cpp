@@ -182,7 +182,7 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 		return false;
 	}
 	if (tag == AnyTag::String && p_key.name() == "length") {
-		*r_value = any::integer(utf16_length(static_cast<const Str *>(any::pointer(p_holder))->view()));
+		*r_value = any::integer(static_cast<const Str *>(any::pointer(p_holder))->length());
 		return true;
 	}
 	const bool number = tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide;

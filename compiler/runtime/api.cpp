@@ -20,7 +20,7 @@ int compare_text(Context *, const Str *p_a, const Str *p_b) {
 }
 
 int32_t text_length(Context *, const Str *p_text) {
-	return p_text ? vm::utf16_length(p_text->view()) : 0;
+	return p_text ? p_text->length() : 0;
 }
 
 double text_to_number(Context *, const Str *p_text) {

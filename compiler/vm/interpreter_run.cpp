@@ -472,7 +472,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				r[in.a].i = string ? utf16_length(string->view()) : 0;
+				r[in.a].i = string ? string->length() : 0;
 				break;
 			}
 			case Op::StrCall:

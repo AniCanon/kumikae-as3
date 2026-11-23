@@ -200,5 +200,9 @@ binding selection, 19 in pointer decoding and eight in counted-value lookup. A s
 handle keeps its tag when copied. Ordinary pointers decode inline, while a platform-tagged pointer
 restores its saved high byte. Overflow sites look up a binding before allocating a new entry.
 
-Rebuild generated native libraries for runtime layout `0x4b41533300000012`.
+An AS3 String holds immutable UTF-8 bytes. The first length read counts UTF-16 units and saves
+the result on that string. Typed, dynamic and generated length reads share it. This avoids scanning
+the same text for each call in a loop and leaves strings whose length you never read unscanned.
+
+Rebuild generated native libraries for runtime layout `0x4b41533300000013`.
 The loader checks the layout before using a site's runtime entry points.

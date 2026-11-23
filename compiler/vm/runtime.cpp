@@ -72,6 +72,13 @@ Str *new_string(std::string_view p_text) {
 	return join_strings(p_text, std::string_view());
 }
 
+int32_t Str::length() const {
+	if (!cached_units) {
+		cached_units = utf16_length(view());
+	}
+	return *cached_units;
+}
+
 void free_string(Str *p_string) {
 	strings_alive--;
 	std::free(p_string);
