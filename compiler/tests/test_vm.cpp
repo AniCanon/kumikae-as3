@@ -489,8 +489,10 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return out;
 	}
+	bool aligned = false; // Every box 16-aligned, as an untyped value holds a handle.
 	void *box() {
 		boxes++;
+		next = aligned ? (next + 15) / 16 * 16 : next;
 		return (void *)(intptr_t)next++;
 	}
 	void give(ir::Kind p_kind, vm::Slot *r_result, double p_number, const std::string &p_text) {
@@ -609,6 +611,11 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "bind " + (module ? module->functions[p_function].name : std::to_string(p_function)) + " of " +
 				(module ? module->classes[p_object->klass].name : std::string("?")) + " owner #" + std::to_string((intptr_t)p_owner) + " -> #" +
 				std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
+	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *) override {
+		void *made = box();
+		log += "bind #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + " -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
@@ -1029,6 +1036,94 @@ static void test_engine_listeners() {
 		interpreter.release_object(object);
 		interpreter.release_object(other);
 		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+static uint32_t class_named(const ir::Module &p_module, const char *p_name);
+
+// One of Godot's methods as a value: Godot's own Callable of the object and the method where Godot takes a
+// function, and anywhere else a Function that calls the method with what it declares.
+static void test_engine_method_values() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Wired extends Node {\n"
+						 "  public function listen(other:Node):void { renamed.add(queueFree); other.renamed.addOnce(other.queueFree); renamed.add(Input.isActionPressed); }\n"
+						 "  public function held(other:Node):void { var f:Function = other.queueFree; f(); renamed.add(f); }\n"
+						 "  public function same(other:Node):Boolean { var f:Function = queueFree; var g:* = this.queueFree; return f == g && f != other.queueFree; }\n"
+						 "  public function fewer(other:Node, child:Node):void { var add:Function = other.addChild; add(child); add(child, true); add(child, true, 2); }\n"
+						 "  public function tooMany(other:Node):void { var f:Function = other.queueFree; f(1); }\n"
+						 "  public function notOne(other:Node):void { var add:Function = other.addChild; add(\"text\"); }\n"
+						 "  public function typed():void { var later:()=>void = queueFree; later(); }\n"
+						 "  public function statics():Number { var turn:Function = Vector2.fromAngle; turn(2); var mix:Function = lerpf; var down:Function = Input.isActionPressed;\n"
+						 "    down(\"jump\"); return mix(1, 2, 0.5); }\n"
+						 "  public function shown():String { var f:Function = queueFree; return f.length + \" \" + Vector2.fromAngle.length; }\n"
+						 "  public function nobody():void { var other:Node; var f:Function = other.queueFree; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Wired.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		engine.aligned = true; // A method read from an object is bound to it untyped.
+		vm::Object *object = interpreter.construct(class_named(module, "Wired"), engine.box()); // #16
+		CHECK(object != nullptr);
+		vm::Slot others[2];
+		others[0].bits = others[1].bits = 0;
+		others[0].p = engine.box(); // #32
+		others[1].p = engine.box(); // #48
+		const auto ran = [&](const char *p_method, size_t p_count) {
+			engine.log.clear();
+			engine.errors.clear();
+			return interpreter.call_method(object, p_method, others, p_count, nullptr);
+		};
+		// Where Godot takes a function: no function value is made, and Godot is asked for its own Callable.
+		CHECK(ran("listen", 1));
+		CHECK_EQ(engine.log, std::string("get #16.renamed\nbind #16.queue_free -> #80\ncall #64.@add(#80)\n"
+										 "get #32.renamed\nbind #32.queue_free -> #112\ncall #96.@addOnce(#112)\n"
+										 "get #16.renamed\nsingleton Input -> #144\nbind #144.is_action_pressed -> #160\ncall #128.@add(#160)\n"));
+		// Held in a variable it is called as Godot's method is, and given to Godot it is the same Callable.
+		CHECK(ran("held", 1));
+		CHECK_EQ(engine.log, std::string("is #32 Node\ncall #32.queue_free()\nget #16.renamed\nbind #32.queue_free -> #192\ncall #176.@add(#192)\n"));
+		// The same method of the same object is one function, as Godot says which object is the same.
+		CHECK(ran("same", 1));
+		CHECK_EQ(engine.log, std::string("operate == (#16, #16) as Boolean\noperate == (#16, #32) as Boolean\n"));
+		// Arguments left out are left out of Godot's call, which has its own defaults.
+		CHECK(ran("fewer", 2));
+		CHECK_EQ(engine.log, std::string("is #48 Node\nis #32 Node\ncall #32.add_child(#48)\nis #48 Node\nis #32 Node\ncall #32.add_child(#48, true)\n"
+										 "is #48 Node\nis #32 Node\ncall #32.add_child(#48, true, 2)\n"));
+		// AS3's own checks of a call through a function value.
+		CHECK(!ran("tooMany", 1));
+		CHECK_EQ(engine.errors.substr(0, engine.errors.find('\n')),
+				std::string("ArgumentError: Error #1063: Argument count mismatch on godot.Node/queueFree(). Expected 0, got 1."));
+		CHECK(!ran("notOne", 1));
+		CHECK(engine.errors.find("TypeError: Error #1034") == 0);
+		CHECK_EQ(engine.log, std::string());
+		// A typed callback takes one whose signature is the callback's.
+		CHECK(ran("typed", 0));
+		CHECK_EQ(engine.log, std::string("is #16 Node\ncall #16.queue_free()\n"));
+		// A method of no object, a global function, and a method of the engine's one object of a class.
+		vm::Slot result;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "statics", nullptr, 0, &result));
+		CHECK_EQ(result.d, 0.5);
+		CHECK(engine.log.find("static Vector2.from_angle") == 0 && engine.log.find("call #") != std::string::npos && engine.log.find("static .lerpf") != std::string::npos);
+		CHECK(interpreter.call_method(object, "shown", nullptr, 0, &result));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("0 1"));
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		CHECK(!ran("nobody", 0));
+		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		interpreter.release_object(object);
+		engine.drop(others[0].p);
+		engine.drop(others[1].p);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -4180,6 +4275,7 @@ int main() {
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();
+	test_engine_method_values();
 	test_engine_prepared();
 	test_vector_of_values();
 	test_engine_operators();

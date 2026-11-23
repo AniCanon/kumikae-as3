@@ -331,7 +331,7 @@ private:
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
 	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
-	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(module_, p_a, p_b); }
+	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(const_cast<Library &>(library_), p_a, p_b); }
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);

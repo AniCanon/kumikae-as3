@@ -394,6 +394,16 @@ check("functions.gd: print, printerr and pushWarning reach Godot's output",
 check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,
       output[-1200:])
 
+# Godot's methods as values, as GDScript's own method references behave.
+output = compare("callables.gd", [
+    "a listener that is one of Godot's methods", "held, called and then given to Godot", "passed where a Function is declared",
+    "the same method of the same object", "Godot's own Callable is what the signal holds",
+    "arguments are counted and converted", "call and apply", "a typed callback", "a method Godot's collection calls",
+    "statics, a global function and a singleton", "a singleton's method as a listener", "a method of a value",
+    "called after its object is freed", "added after its object is freed",
+])
+check("callables.gd: nothing is reported", "SCRIPT ERROR" not in output and "ERROR:" not in output, output[-1500:])
+
 # Every default the name table records must be one Godot can read back.
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
                       os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)

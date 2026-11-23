@@ -1,5 +1,6 @@
 // Function values: a method or a function taken as a value, and a call through one.
 #include "lower_dynamic.h"
+#include "lower_engine_values.h"
 #include "lower_functions.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
@@ -18,8 +19,7 @@ uint32_t Functions::function_value(Expr *p_expression) {
 		return l_.default_value(Kind::Obj, position);
 	}
 	if (Lowerer::is_godot(symbol)) {
-		l_.refuse(position, "one of Godot's methods used as a value");
-		return l_.default_value(Kind::Obj, position);
+		return EngineValues(l_).function_value(p_expression, symbol);
 	}
 	if (const std::optional<uint32_t> bound = Members(l_).interface_value(p_expression, symbol)) {
 		return *bound;

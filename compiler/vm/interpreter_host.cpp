@@ -294,6 +294,18 @@ Outcome bind(Request &p_request) {
 	return p_request.done(p_request.result.p != nullptr);
 }
 
+// One of Godot's methods of one of Godot's objects, as Godot's own Callable of the two.
+Outcome bind_method(Request &p_request) {
+	void *receiver = p_request.handle(p_request.in.b);
+	if (!receiver) {
+		return Outcome::Missing;
+	}
+	p_request.target = p_request.in.a;
+	p_request.kind = Kind::Val;
+	p_request.result.p = p_request.host.source.bind_method(receiver, p_request.name(p_request.in.c), &p_request.error);
+	return p_request.done(p_request.result.p != nullptr);
+}
+
 std::string not_a_signal(std::string_view p_name) {
 	return "'" + std::string(p_name) + "' is not a signal";
 }
@@ -429,6 +441,8 @@ Outcome perform(Request &p_request) {
 			return get(p_request);
 		case Op::HostBind:
 			return bind(p_request);
+		case Op::HostBindMethod:
+			return bind_method(p_request);
 		case Op::HostMember:
 			return member(p_request);
 		case Op::HostIndexGet:
@@ -441,6 +455,19 @@ Outcome perform(Request &p_request) {
 }
 
 } // namespace
+
+void raise_engine(Library &p_library, const std::string &p_error) {
+	static const std::string_view type_error = "TypeError: ";
+	static const std::string_view range_error = "RangeError: ";
+	const ir::Module &module = p_library.module();
+	if (p_error.compare(0, type_error.size(), type_error) == 0) {
+		p_library.runner.raise(module.type_error_class, p_error.substr(type_error.size()));
+	} else if (p_error.compare(0, range_error.size(), range_error) == 0) {
+		p_library.runner.raise(module.range_error_class, p_error.substr(range_error.size()));
+	} else {
+		p_library.runner.raise(module.error_class, p_error.empty() ? "the engine refused" : p_error);
+	}
+}
 
 // One request to the engine. Raises an AS3 error if the engine refuses.
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
@@ -500,19 +527,9 @@ bool Interpreter::ask_engine(const Function &p_function, const Instruction &p_in
 		case Outcome::Missing:
 			raise_null();
 			return false;
-		case Outcome::Refused: {
-			// The engine's side may say that an error is AS3's TypeError: see engine_handles.h.
-			static const std::string_view type_error = "TypeError: ";
-			static const std::string_view range_error = "RangeError: ";
-			if (request.error.compare(0, type_error.size(), type_error) == 0) {
-				raise(module_.type_error_class, request.error.substr(type_error.size()));
-			} else if (request.error.compare(0, range_error.size(), range_error) == 0) {
-				raise(module_.range_error_class, request.error.substr(range_error.size()));
-			} else {
-				raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
-			}
+		case Outcome::Refused:
+			raise_engine(library_, request.error);
 			return false;
-		}
 		case Outcome::Done:
 			break;
 	}

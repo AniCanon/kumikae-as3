@@ -144,6 +144,19 @@ void Interpreter::to_callable(const Instruction &p_in) {
 		put(Kind::Val, r[p_in.a], made);
 		return;
 	}
+	std::string error;
+	void *object = nullptr;
+	std::string_view method;
+	if (engine_method(module_, value, &object, &method)) {
+		// One of Godot's methods of one of its objects: Godot's own Callable of the two.
+		made.p = host_.source.bind_method(object, method, &error);
+		if (made.p) {
+			put(Kind::Val, r[p_in.a], made);
+		} else {
+			raise_engine(library_, error);
+		}
+		return;
+	}
 	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	const Function &callee = module_.functions[target];
 	// A function expression that captured nothing is given nothing first: the value itself goes there.
@@ -151,7 +164,6 @@ void Interpreter::to_callable(const Instruction &p_in) {
 	Object *bound = callee.is_static || !first ? value : first;
 	const ir::Class &klass = module_.classes[bound->klass];
 	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? owner_field(bound).p : nullptr;
-	std::string error;
 	made.p = host_.source.bind(bound, target, owner, &error);
 	if (!made.p) {
 		raise(module_.error_class, error.empty() ? "the engine could not take this function" : error);

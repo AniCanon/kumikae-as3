@@ -81,6 +81,9 @@ struct PendingFunction {
 	std::vector<EnvLayout> chain; // The environments it can reach, nearest first.
 	bool expression = false; // Written as an expression: its name, if it has one, is its own to call.
 	bool given_environment = false; // Whether its first register holds an environment.
+	// One of Godot's methods or functions, where the function is the one that calls it for a value of it
+	// (lower_engine_values.cpp): there is then no declaration to lower.
+	Symbol *forwarded = nullptr;
 };
 
 // Whether one of Godot's value types has parts (Vector2, Color): a variable of it starts at the type's zero.

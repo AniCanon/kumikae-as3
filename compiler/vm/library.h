@@ -228,8 +228,19 @@ inline ir::Kind any_operator_gives(ir::Op p_op) {
 }
 // Whether a vector's element of the kind is the value looked for, as `===` has it.
 bool element_is(Library &p_library, ir::Kind p_kind, Slot p_element, Slot p_value);
-// Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`).
-bool same_function(const ir::Module &p_module, const Object *p_a, const Object *p_b);
+// Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`). One of
+// Godot's methods is the same on what Godot finds equal: the same object.
+bool same_function(Library &p_library, const Object *p_a, const Object *p_b);
+// What a function value is bound to in place of an object, where it is a method of the library read by
+// name or one of Godot's methods: an Array of what the method was read from (untyped), the name it was
+// read by and, for one of Godot's, Godot's name for it. Null for any other function value.
+const Vector *bound_pair(const ir::Module &p_module, const Object *p_function);
+// For a function value that is one of Godot's methods of one of Godot's objects: the handle on the object
+// and Godot's name for the method. False for any other.
+bool engine_method(const ir::Module &p_module, const Object *p_function, void **r_object, std::string_view *r_method);
+// What the engine's side said of a request it refused, raised: AS3's TypeError or RangeError where the
+// words start with its name (engine_handles.h), an Error otherwise.
+void raise_engine(Library &p_library, const std::string &p_error);
 
 // String(x) of an untyped value, added to r_text: an object's toString() is the program's, and Godot's
 // text for one of its own can run a script. False if it raised.

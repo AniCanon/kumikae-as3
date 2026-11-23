@@ -196,7 +196,10 @@ inline bool is_held(Kind p_kind) {
 	X(AnySub, "RRR") X(AnyMul, "RRR") X(AnyDiv, "RRR") X(AnyMod, "RRR") X(AnyNeg, "RR-") \
 	X(F64ToF32, "RR-") X(F32ToF64, "RR-") X(AddF32, "RRR") X(SubF32, "RRR") X(MulF32, "RRR") X(DivF32, "RRR") X(ModF32, "RRR") X(I64ToF32, "RR-") \
 	X(U32ToU8, "RR-") X(U8ToU32, "RR-") X(I32ToU8, "RR-") X(U8ToI32, "RR-") \
-	X(CallTypedFunction, "rRA")
+	X(CallTypedFunction, "rRA") \
+	/* One of Godot's methods bound to the Godot object it is read from, as Godot's own Callable of that \
+	   object and method: out, the object, the method (E). */ \
+	X(HostBindMethod, "RRE")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

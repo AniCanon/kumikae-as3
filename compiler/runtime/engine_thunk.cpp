@@ -26,6 +26,7 @@ bool asks_engine(uint8_t p_op) {
 		case Op::HostCallStatic:
 		case Op::HostCollection:
 		case Op::HostBind:
+		case Op::HostBindMethod:
 		case Op::HostMember:
 		case Op::HostIndexGet:
 		case Op::HostIndexSet:

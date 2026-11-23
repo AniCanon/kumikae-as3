@@ -69,6 +69,10 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
+	[[nodiscard]] void *bind_method(void *, std::string_view, std::string *r_error) override {
+		refuse(r_error);
+		return nullptr;
+	}
 };
 
 } // namespace vm

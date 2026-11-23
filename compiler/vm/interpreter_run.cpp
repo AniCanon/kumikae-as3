@@ -730,6 +730,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostCallStatic:
 			case Op::HostCollection:
 			case Op::HostBind:
+			case Op::HostBindMethod:
 			case Op::HostMember:
 			case Op::HostIndexGet:
 			case Op::HostIndexSet:

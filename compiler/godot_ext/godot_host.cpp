@@ -467,6 +467,15 @@ void *GodotHost::bind(vm::Object *p_object, uint32_t p_function, void *p_owner, 
 	return make_callable(p_object, p_function, owner);
 }
 
+void *GodotHost::bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) {
+	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
+	if (!object) {
+		*r_error = FREED;
+		return nullptr;
+	}
+	return make_handle(Callable(object, name(p_method)));
+}
+
 bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
 	if (!object) {

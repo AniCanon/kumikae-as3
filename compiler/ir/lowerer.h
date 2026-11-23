@@ -59,6 +59,7 @@ class Lowerer {
 	std::unordered_map<uint32_t, uint32_t> engine_names_; // module_.engine_names by the name table's id.
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> slot_names_; // Per class.
 	std::unordered_map<const Unit *, uint32_t> files_;
+	std::unordered_map<const Symbol *, uint32_t> forwarders_; // The function that calls each of Godot's methods used as a value.
 
 	// The function being lowered.
 	Unit *unit_ = nullptr;
@@ -238,6 +239,7 @@ class Lowerer {
 	friend class Members; // Getters, setters and interfaces (lower_members.cpp).
 	friend class Dynamic; // Properties by name: lower_dynamic.h
 	friend class EngineCalls; // Calls of Godot's methods and functions: lower_engine_calls.h
+	friend class EngineValues; // Godot's methods and functions as values: lower_engine_values.h
 	friend class Statements; // Statements and where control goes: lower_statements.h
 	friend class Operators; // Operators on two values, and `is` and `as`: lower_operators.h
 	friend class Engine; // Godot's members, values and operators: lower_engine.h
