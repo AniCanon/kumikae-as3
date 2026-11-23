@@ -1,0 +1,114 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class LocalArithmetic
+  #0 LocalArithmetic/twice
+  #1 LocalArithmetic/total
+  new LocalArithmetic
+class Amount
+  .0 value:int
+  new Amount
+entry LocalArithmetic
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function LocalArithmetic(r0:Object):void
+  @1 ConstF64 r1 3.5
+  @2 ConstBool r2 1
+  @3 Call r3 LocalArithmetic/total (r0, r1, r2)
+  @4 F64ToStr r4 r3
+  @5 ConstF64 r5 -2
+  @6 ConstBool r6 0
+  @7 Call r7 LocalArithmetic/total (r0, r5, r6)
+  @8 F64ToStr r8 r7
+  @9 StrToStr r9 r4
+  @10 StrToStr r10 r8
+  @11 Trace (r9, r10)
+  @13 ConstF64 r11 2147483647
+  @14 ConstBool r12 1
+  @15 Call r13 LocalArithmetic/total (r0, r11, r12)
+  @16 F64ToStr r14 r13
+  @17 StrToStr r15 r14
+  @18 Trace (r15)
+  @19 ReturnVoid
+function LocalArithmetic/twice(r0:Object, r1:Number):Number
+  @1 ConstI32 r2 2
+  @2 I32ToF64 r4 r2
+  @3 MulF64 r3 r1 r4
+  @4 Return r3
+  @5 ConstF64 r5 nan
+  @6 Return r5
+function LocalArithmetic/total(r0:Object, r1:Number, r2:Boolean):Number
+  @0 ConstF64 r3 nan
+  @1 ConstF64 r6 nan
+  @3 Move r3 r1
+  @5 Move r4 r2
+  @7 InitClass Amount
+  @8 New r7 Amount
+  @9 Call _ Amount (r7)
+  @10 Move r5 r7
+  @12 GetField r8 r5 .0
+  @13 ConstI32 r9 1
+  @14 I32ToF64 r11 r8
+  @15 I32ToF64 r12 r9
+  @16 AddF64 r10 r11 r12
+  @17 Move r6 r10
+  @19 Move r13 r4
+  @20 JumpIfNot r13 @24
+  @21 ConstF64 r14 0
+  @22 LtF64 r15 r14 r3
+  @23 Move r13 r15
+  @24 JumpIfNot r13 @28
+  @26 AddF64 r16 r6 r3
+  @27 Move r6 r16
+  @29 JumpIfNot r4 @34
+  @31 Call r17 LocalArithmetic/twice (r0, r3)
+  @32 AddF64 r18 r6 r17
+  @33 Move r6 r18
+  @35 ConstI32 r19 2
+  @36 I32ToF64 r21 r19
+  @37 MulF64 r20 r3 r21
+  @38 AddF64 r22 r6 r20
+  @39 Return r22
+  @40 ConstF64 r23 nan
+  @41 Return r23
+function Amount(r0:Object):void
+  @0 ConstI32 r1 3
+  @1 SetField r0 .0 r1
+  @2 ReturnVoid

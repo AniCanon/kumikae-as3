@@ -610,8 +610,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				any_op(function, in, r);
 				break;
-			case Op::AnyConst:
 			case Op::FromAny:
+				if (function.registers[in.a] == Kind::I32 && any::tag(r[in.b]) == AnyTag::Int) {
+					set_int32(r[in.a], any::to_int_payload(r[in.b]));
+					goto dispatch;
+				}
+				any_op(function, in, r);
+				break;
+			case Op::AnyConst:
 			case Op::AnyText:
 			case Op::AnyTypeof:
 			case Op::AnyEq:

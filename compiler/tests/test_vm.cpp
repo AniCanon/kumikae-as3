@@ -3571,6 +3571,14 @@ static void test_numeric_tails() {
 	vm::numeric_tail(module, fn, pc, values);
 	CHECK_EQ(pc, 0u);
 	CHECK_EQ(values[2].d, 5.75);
+	fn.code = { { Op::I32ToF64, 1, 0 }, { Op::AddF64, 2, 2, 1 }, { Op::F64ToI32, 0, 2 }, { Op::Move, 5, 0 } };
+	values[0].i = 7;
+	values[2].d = 2147483645.0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 4u);
+	CHECK_EQ(values[1].d, 7.0);
+	CHECK_EQ(values[2].d, 2147483652.0);
+	CHECK_EQ(values[5].i, -2147483644);
 }
 
 static void test_vector_move_targets() {
@@ -3585,6 +3593,54 @@ static void test_vector_move_targets() {
 	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
 	fn.code.back() = { Op::Return, 2 };
 	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
+}
+
+// Both paths return the second handle. The fused read owns one fewer copy of it.
+static void test_vector_move_execution() {
+	using ir::Kind;
+	using ir::Op;
+	struct CountingEngine : FakeEngine {
+		int copies = 0;
+		void *copy(void *p_handle) override {
+			copies += p_handle != nullptr;
+			return FakeEngine::copy(p_handle);
+		}
+	} engine;
+	ir::Module module;
+	compile("package { public class Main { public function pair(value:*):Array { return [null, value]; }"
+			" public function pick(a:Array):* { return a[1]; } } }", &module, "Main.as");
+	auto fn = std::find_if(module.functions.begin(), module.functions.end(), [](const ir::Function &p_fn) { return p_fn.name == "Main/pick"; });
+	CHECK(fn != module.functions.end());
+	if (fn == module.functions.end()) {
+		return;
+	}
+	fn->locals.clear();
+	fn->registers = { Kind::Obj, Kind::Obj, Kind::I32, Kind::Any, Kind::Any };
+	fn->code = { { Op::ConstI32, 2, 1 }, { Op::VecGet, 3, 1, 2 }, { Op::Move, 4, 3 }, { Op::Return, 4 } };
+	auto execute = [&] {
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		auto *object = interpreter.construct(class_named(module, "Main"), nullptr);
+		void *handle = engine.box();
+		vm::Slot input = vm::any::godot_object(handle), array{}, result{};
+		CHECK(interpreter.call_method(object, "pair", &input, 1, &array));
+		engine.copies = 0;
+		CHECK(interpreter.call_method(object, "pick", &array, 1, &result));
+		const int copies = engine.copies;
+		CHECK(result.bits == input.bits);
+		if (vm::any::is_engine(result)) {
+			engine.drop(vm::any::pointer(result));
+		}
+		interpreter.release_object(static_cast<vm::Object *>(array.p));
+		interpreter.release_object(object);
+		engine.drop(handle);
+		CHECK_EQ(engine.boxes, 0);
+		return copies;
+	};
+	engine.aligned = true;
+	const int fused = execute();
+	fn->code.push_back({ Op::Jump, 2 }); // A second entry into Move prevents fusion.
+	CHECK_EQ(execute(), fused + 1);
 }
 
 // Exercise repeated and changed literals in the same register.
@@ -4694,6 +4750,7 @@ int main() {
 	test_failed_static_initializer();
 	test_numeric_tails();
 	test_vector_move_targets();
+	test_vector_move_execution();
 	test_literal_dispatch();
 	test_loop_markers();
 	test_engine_calls();

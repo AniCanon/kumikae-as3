@@ -17,13 +17,17 @@ inline void numeric_tail(const ir::Module &p_module, const ir::Function &p_funct
 		r_values[in[1].a].bits = 0;
 		r_values[in[1].a].b = before;
 		r_pc = r_values[in[2].a].b ? r_pc + 3 : in[2].b;
-	} else if (count >= 5 && in[0].op == Op::ConstF64 && in[1].op == Op::AddF64 && in[2].op == Op::F64ToI32 &&
-			in[3].op == Op::Move && in[4].op == Op::Jump && p_function.registers[in[3].a] == ir::Kind::I32) {
-		r_values[in[0].a].d = p_module.numbers[in[0].b];
+	} else if (count >= 4 && in[1].op == Op::AddF64 && in[2].op == Op::F64ToI32 &&
+			in[3].op == Op::Move && p_function.registers[in[3].a] == ir::Kind::I32) {
+		const bool increment = in[0].op == Op::ConstF64 && count >= 5 && in[4].op == Op::Jump;
+		if (!increment && in[0].op != Op::I32ToF64) {
+			return;
+		}
+		r_values[in[0].a].d = increment ? p_module.numbers[in[0].b] : static_cast<double>(r_values[in[0].b].i);
 		r_values[in[1].a].d = r_values[in[1].b].d + r_values[in[1].c].d;
 		r_values[in[2].a].i = to_int32(r_values[in[2].b].d);
 		r_values[in[3].a] = r_values[in[3].b];
-		r_pc = in[4].a;
+		r_pc = increment ? in[4].a : r_pc + 4;
 	}
 }
 
