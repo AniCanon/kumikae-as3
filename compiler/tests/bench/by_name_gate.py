@@ -29,6 +29,36 @@ ROWS.extend(f"{kind}{suffix}/read" for kind in INFERRED for suffix in ("", "Type
 OPERATIONS = 20000
 
 
+def short_pairs(pilots):
+    pairs = []
+    for row in pilots:
+        kind, op = row.split("/")
+        if kind != "proven" and kind not in INFERRED:
+            continue
+        other = ("typed" if kind == "proven" else kind + "Typed") + "/" + op
+        if other in pilots and min(pilots[row] + pilots[other]) < 0.05:
+            pairs.append((row, other))
+    return pairs
+
+
+def swap_placement(source, pairs):
+    # Keep each workload's name and body together. Only its position in the compiled image changes.
+    methods = {}
+    for match in re.finditer(r"^\t\tpublic function (\w+)\b[^\n]*", source, re.M):
+        end = match.end()
+        if not match.group().rstrip().endswith("}"):
+            end = source.index("\n\t\t}", end) + len("\n\t\t}")
+        methods[match[1]] = match.start(), end
+    replacements = []
+    for pair in pairs:
+        for left, right in (pair, pair[::-1]):
+            start, end = methods[right]
+            replacements.append((*methods[left], source[start:end]))
+    for start, end, body in sorted(replacements, reverse=True):
+        source = source[:start] + body + source[end:]
+    return source
+
+
 def batch_sizes(pilots):
     """One workload per row across builds and modes, shared by each inferred/typed pair."""
     counts = {}
@@ -72,11 +102,21 @@ def check(label, ok, output):
         raise SystemExit(f"{label}: {output}")
 
 
-def prepare(godot, build, where):
+def prepare(godot, build, where, pairs=()):
     tests = build.parent / "tests"
     runner = Runner(godot, tests / "godot_project", tests, build / "kas3c", check)
     source = HERE / "by_name"
-    project = Path(runner.project(where, source, ["Matrix.as", "Managed.cs", "matrix.gd", "foreign.gd", "custom.gd",
+    matrix = source / "Matrix.as"
+    if pairs:
+        where.mkdir(parents=True)
+        def method(row):
+            family, operation = row.split("/")
+            return family + operation.capitalize()
+        methods = [(method(left), method(right)) for left, right in pairs]
+        swapped = where / matrix.name
+        swapped.write_text(swap_placement(matrix.read_text(), methods))
+        matrix = swapped
+    project = Path(runner.project(where, source, [str(matrix), "Managed.cs", "matrix.gd", "foreign.gd", "custom.gd",
                                   str(HERE / "languages/project.godot"), str(HERE / "languages/CmpCs.csproj")]))
     cache = Path(os.environ.get("NUGET_PACKAGES", Path.home() / ".nuget/packages"))
     # Restore only from the developer's installed packages.
@@ -136,14 +176,36 @@ def main():
             print(f"Play images retained after eight closes: PR {retained['PR']}/8, main {retained['main']}/8", flush=True)
             check("Play image unloading", retained["PR"] == 0, retained)
         pilots = {}
+        native_pilots = {}
         for label, project, library, mode, rows in commands:
             for row, time in measure(godot, project, library, mode, rows, label).items():
                 pilots.setdefault(row, []).append(time)
+                if mode == "native" and time is not None:
+                    native_pilots.setdefault(row, []).append(time)
         sizes = batch_sizes(pilots)
+        pairs = short_pairs(native_pilots)
+        mirrored = {}
+        if pairs:
+            print("Balanced native code placement for " + ", ".join(a for a, _ in pairs), flush=True)
+            for label, build in (("PR", args.build), ("main", args.against)):
+                if build:
+                    mirrored[label] = prepare(godot, build.resolve(), Path(folder) / (label + "-swapped"), pairs)
+        swapped_rows = {row for pair in pairs for row in pair}
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label, sizes).items():
+                order = rows[::-1] if turn % 2 else rows
+                alternate = [row for row in order if row in swapped_rows]
+                def second_layout():
+                    return measure(godot, *mirrored[label], mode, alternate, label, sizes)
+                cross = mode == "native" and label in mirrored
+                second = second_layout() if cross and turn % 2 else {}
+                times = measure(godot, project, library, mode, order, label, sizes)
+                if cross and not turn % 2:
+                    second = second_layout()
+                for row, time in times.items():
+                    if row in second:
+                        time = (time + second[row]) / 2
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():

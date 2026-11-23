@@ -248,7 +248,11 @@ python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --against <mai
 The gate alternates interpreted AS3, native AS3 and optimized C# on the same receiver fixtures.
 A pilot measures each build and mode and sizes short batches for two milliseconds. Both sides
 of an inferred/typed pair use the same iteration count, as do all builds and modes. A timed
-window below half a millisecond is rejected. It checks the result of every batch. Each process times four windows per row, twice in each
+window below half a millisecond is rejected. If a native control pair takes less than 0.05 ms
+per 20,000 operations in the pilot, the gate builds a second image with the two functions in
+opposite positions. Each round averages their times across both layouts. Longer rows keep the
+original single-layout comparison. The gate checks the result of every batch. Each process
+times four windows per row, twice in each
 direction. Each window warms for at least 20 ms and collects at least 40 ms of timed batches.
 The process takes the median batch time in each window, then the median of the four windows,
 normalized to 20,000 operations. The report gives the median and range across seven rounds.

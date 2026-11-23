@@ -3,10 +3,22 @@ import sys
 import unittest
 from pathlib import Path
 
-from by_name_gate import failures, batch_sizes
+from by_name_gate import failures, batch_sizes, swap_placement, short_pairs
 
 
 class GateTests(unittest.TestCase):
+    def test_placement_swaps_whole_methods_and_only_short_pairs(self):
+        source = ("\t\tpublic function timerRead():int { return 1; }\n"
+                  "\t\tprivate function unrelated():void {}\n"
+                  "\t\tpublic function timerTypedRead():int { return 2; }\n")
+        self.assertEqual(swap_placement(source, [("timerRead", "timerTypedRead")]), (
+            "\t\tpublic function timerTypedRead():int { return 2; }\n"
+            "\t\tprivate function unrelated():void {}\n"
+            "\t\tpublic function timerRead():int { return 1; }\n"))
+        self.assertEqual(short_pairs({"timer/read": [0.04], "timerTyped/read": [0.05],
+                                      "proven/read": [1.01], "typed/read": [1.02]}),
+                         [("timer/read", "timerTyped/read")])
+
     def test_batch_sizes_use_fastest_mode_and_match_controls(self):
         pilots = {"timer/read": [0.04, 0.50], "timerTyped/read": [0.02, 0.49],
                   "node/write": [1.2, 2.0], "foreign/call": [None, 2.5]}
