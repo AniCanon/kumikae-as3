@@ -222,7 +222,7 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 // holder[key] = value on a sealed object: one of RegExp's or Date's properties, a public field, or a setter.
 bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder) {
 	const ir::Class &klass = module_.classes[p_object->klass];
-	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), p_holder); };
+	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.name(), any::object(p_object)); };
 	if (const std::optional<bool> done = static_set(p_object, p_key, p_holder, p_value)) {
 		return *done;
 	}
@@ -260,7 +260,7 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 		raise_unsupported("adding a property to " + holder_name(p_holder));
 		return false;
 	}
-	return cannot("1056", "Cannot create property ");
+	return refuse_write("1056", "Cannot create property ", p_key.name(), p_holder);
 }
 
 // A public setter: given the value as its parameter takes it.
@@ -328,7 +328,7 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 // a vector's length). An element of an Array becomes undefined.
 bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool *r_done) {
 	*r_done = true;
-	Object *object = held_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
 	Entries *entries = klass && klass->table ? entries_of(object) : nullptr;
 	if (klass && klass->element != Kind::Void) {

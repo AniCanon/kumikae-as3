@@ -273,7 +273,7 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 			}
 		} else if (named_method(*klass, p_key.name(), "set ")) {
 			raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-					"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(p_holder) + ".");
+					"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(any::object(object)) + ".");
 			return;
 		}
 	} else if (klass && (klass->table || klass->array)) {

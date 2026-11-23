@@ -121,7 +121,7 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	}
 	if (named_method(klass, p_key.name(), "set ")) {
 		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(p_holder) + ".");
+				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(any::object(p_object)) + ".");
 		return false;
 	}
 	if (!klass.native_base.empty()) {

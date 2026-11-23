@@ -1213,6 +1213,11 @@ static void test_engine_members_by_name() {
 						 "  public var own:int = 7;\n"
 						 "  private function label():String { return 'called'; }\n"
 						 "  public function get callback():Function { own++; return label; }\n"
+						 "  public function set only(v:int):void {}\n"
+						 "  public function traits(o:*):String { var a:Array = ['own' in o, o.hasOwnProperty('own'), delete o.own, delete o.absent];\n"
+						 "    try { o.only; } catch (e:ReferenceError) { a.push(e.message); }\n"
+						 "    try { o.callback = 1; } catch (e:ReferenceError) { a.push(e.message); }\n"
+						 "    try { o.absent; } catch (e:ReferenceError) { a.push(e.message); } return a.join('/'); }\n"
 						 "  public function invoke(o:*):String { return o.callback() + '/' + o.own; }\n"
 						 "  public function reads(o:*):String { return o.name + \"/\" + o[\"name\"]; }\n"
 						 "  public function writes(o:*, v:*):void { o.position = v; o[\"name\"] = \"new\"; }\n"
@@ -1292,6 +1297,8 @@ static void test_engine_members_by_name() {
 		CHECK(engine.log.find("call #32.queue_free()\n") != std::string::npos && engine.log.find("bind #32.queue_free -> ") != std::string::npos);
 		// A callback read from an attached script runs its getter once through either receiver.
 		engine.scripts[node] = object;
+		CHECK_EQ(text("traits", 1), std::string("true/true/false/true/Error #1077: Illegal read of write-only property only on Loose./"
+				"Error #1074: Illegal write to read-only property callback on Loose./Error #1069: Property absent not found on Object and there is no default value."));
 		CHECK_EQ(text("invoke", 1), std::string("called/8"));
 		given[0] = vm::any::object(object);
 		CHECK_EQ(text("invoke", 1), std::string("called/9"));
