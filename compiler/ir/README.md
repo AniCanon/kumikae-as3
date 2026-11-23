@@ -63,6 +63,7 @@ The byte kind and its integer conversions also use appended wire values.
 | `lower_library`, `lower_regexp`, `lower_date`, `lower_json` | The rest of the standard library |
 | `lower_engine`, `lower_engine_calls` | Godot's members: properties, constants, singletons, operators, methods and global functions |
 | `lower_engine_values` | Godot's methods and functions as values |
+| `lower_library_values` | The library's own functions as values (`Math.max`, `trace`): a function written from the library's declaration, whose body is the call lowered as it is anywhere else |
 
 The lowerer is one class split across files. `Lowerer` keeps the state. Each group of what it lowers is a
 helper class that it befriends, such as `Statements`, `Operators` or `Calls`. A helper holds the lowerer

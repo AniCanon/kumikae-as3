@@ -54,7 +54,7 @@ definition, named after the file. Inside Godot, the program is every `.as` file 
 |---|---|
 | Classes | Fields, constructors, methods, static members, getters and setters, inheritance with `override` and `super`, `final`, and the four access levels |
 | Interfaces | Methods, getters and setters. A class can implement several, and an interface can extend several |
-| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, `call` and `apply` |
+| Functions | Default parameters, `...rest`, `arguments`, function expressions and functions declared inside a function, which capture their variables, methods as values, the library's functions as values (`Math.max`, `trace`, `parseInt`, `String.fromCharCode`), `call` and `apply` |
 | Statements | `if`, `switch`, `while`, `do`, `for`, `for in`, `for each`, labeled `break` and `continue`, `try`/`catch`/`finally`, `throw` |
 | Types | `int`, `uint`, `Number`, `Boolean`, `String`, `Object`, `*`, `Class`, `Function`, and your own classes |
 | Operators | All of AS3's, including `is`, `as`, `instanceof`, `in`, `delete` and `typeof` |
@@ -85,8 +85,6 @@ The compiler reports each of these as an error with its own message.
 - **Weak keys:** `new Dictionary(true)`.
 - **A property added to a `Date`, a `RegExp`, an `Error` or a `Function`.** Reading a name that one of
   these doesn't have gives `undefined`, as in Flash.
-- **A static library function as a value:** `Math.max`, `String.fromCharCode`, `trace`. A method of a
-  value works: `list.push`, `text.charAt`.
 - **`is` and `as` with `Int64`.** Store the value in an `Int64` variable instead: it's converted, and
   checked, as it is stored.
 - **A method of an interface that a class gets only from the built-in library or from Godot's API,** and a
@@ -214,6 +212,9 @@ A value of type A fits where B is expected when one of these holds:
 - A is a class itself, such as `Player`, and B is `Class`.
 - B is one of Godot's collections and A is the AS3 collection that converts to it. See
   [Using AS3 in Godot](godot.md#collections).
+
+A class doesn't fit `Function`, as in Flash: `names.map(String)` is an error. Pass a function that converts,
+such as `function(item:*, index:int, list:Array):String { return String(item); }`.
 
 When B is a subclass of A, the error asks for a cast:
 `a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`. Where calling the type isn't a cast, as
