@@ -50,7 +50,14 @@ class GameTargetContribution : CustomLoadingExtensionPointBean<Predicate<Virtual
         }
         val context = SimpleDataContext.builder().add(CommonDataKeys.PROJECT, project)
         if (game != null) context.add(CommonDataKeys.VIRTUAL_FILE, game)
-        val event = AnActionEvent.createEvent(action, context.build(), null, "KumikaeGameTarget", ActionUiKind.NONE, null)
+        val event = AnActionEvent.createEvent(
+            action,
+            context.build(),
+            null,
+            "KumikaeGameTarget",
+            ActionUiKind.NONE,
+            null,
+        )
         ActionUtil.performAction(action, event)
     }
 
