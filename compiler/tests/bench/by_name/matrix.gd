@@ -3,6 +3,11 @@ extends SceneTree
 func _initialize() -> void:
 	measure.call_deferred()
 
+func median(samples: Array) -> float:
+	samples.sort()
+	var mid := samples.size() >> 1
+	return (float(samples[(samples.size() - 1) >> 1]) + float(samples[mid])) / 2.0
+
 func measure() -> void:
 	var args := OS.get_cmdline_user_args()
 	var managed := args[0] == "cs"
@@ -40,14 +45,19 @@ func measure() -> void:
 				if kind == "value" and (op == "write" or managed):
 					continue
 				rows.append("%s/%s" % [kind, op])
-	for row in rows:
+	# Time equal windows in both directions so the same pair runs first and last equally often.
+	var reverse := rows.duplicate()
+	reverse.reverse()
+	var order := rows + reverse + reverse + rows
+	var windows := {}
+	for row in order:
 		var kind := row.get_slice("/", 0)
 		var op := row.get_slice("/", 1)
 		var target = cases[kind]
 		if kind == "foreign" and args[0] == "main":
 			var probe = script.call("probeForeign", target, op == "read")
 			if probe == (-1069 if op == "read" else -1006):
-				print("NAMED ", row, " unsupported")
+				windows[row] = []
 				continue
 		var family: String = {"inherited": "node", "gdscript": "node", "foreign": "script"}.get(kind, kind)
 		var method := StringName(family + op.capitalize())
@@ -56,8 +66,8 @@ func measure() -> void:
 		var rounds := n * 10 if kind.trim_suffix("Typed") in inferred else n
 		var warm_us := 0
 		var timed_us := 0
-		var batches := 0
-		while timed_us < 60000:
+		var batches := []
+		while timed_us < 40000:
 			for child: Node2D in targets:
 				child.position = Vector2(3, 4)
 				child.rotation = 0
@@ -95,7 +105,12 @@ func measure() -> void:
 				warm_us += elapsed
 			else:
 				timed_us += elapsed
-				batches += 1
-		print("NAMED ", row, " ", float(timed_us) * n / (rounds * batches))
+				batches.append(elapsed)
+		if not windows.has(row):
+			windows[row] = []
+		windows[row].append(median(batches) * n / rounds)
+	for row in rows:
+		var times: Array = windows[row]
+		print("NAMED ", row, " ", "unsupported" if times.is_empty() else str(median(times)))
 	cs.free()
 	quit()
