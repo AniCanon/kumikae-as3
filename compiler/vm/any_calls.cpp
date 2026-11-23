@@ -298,6 +298,10 @@ bool any_is(Library &p_library, Slot p_value, uint32_t p_type) {
 			return tag == AnyTag::Boolean;
 		case ir::ANY_IS_OBJECT:
 			return tag != AnyTag::Null && tag != AnyTag::Undefined;
+		case ir::ANY_IS_INT64:
+			// A whole number an Int64 holds: one held as an Int64 or an int, or a Number that is whole and
+			// in its range (2^63 itself is not).
+			return tag == AnyTag::Wide || tag == AnyTag::Int || (numeric && number == std::trunc(number) && number >= -9223372036854775808.0 && number < 9223372036854775808.0);
 		default:
 			if (ir::is_godot_class(p_type)) {
 				// One of Godot's classes: an object of it or of one that extends it (a script object is the

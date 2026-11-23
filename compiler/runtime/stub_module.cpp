@@ -177,6 +177,7 @@ void add_builtins(const Program &p_program, ir::Module &r_module) {
 	static const uint32_t split_given[] = { 0, 1, 2 };
 	add(ThunkInfo{ static_cast<uint8_t>(Op::StrCall), 3, static_cast<uint32_t>(ir::StringFunction::Split), 0, split, 4, 3, nullptr, split_given, 3, 3, NONE,
 			NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::AnyIs), 1, 0, ir::ANY_IS_INT64, is_type, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
 }
 
 void add_thunks(const Program &p_program, ir::Module &r_module) {

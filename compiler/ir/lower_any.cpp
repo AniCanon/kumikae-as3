@@ -141,6 +141,9 @@ std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 	} else if (symbol == l_.number_) {
 		code = ANY_IS_NUMBER;
 		target = Kind::F64;
+	} else if (symbol == l_.int64_ && l_.int64_) {
+		code = ANY_IS_INT64;
+		target = Kind::I64;
 	} else if (symbol == l_.string_) {
 		code = ANY_IS_STRING;
 		target = Kind::Str;

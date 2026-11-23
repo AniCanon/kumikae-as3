@@ -225,6 +225,7 @@ const uint32_t ANY_IS_NUMBER = 0xFFFFFFF2u;
 const uint32_t ANY_IS_STRING = 0xFFFFFFF3u;
 const uint32_t ANY_IS_BOOLEAN = 0xFFFFFFF4u;
 const uint32_t ANY_IS_OBJECT = 0xFFFFFFF5u; // Anything but null and undefined. Only a class value holds it.
+const uint32_t ANY_IS_INT64 = 0xFFFFFFF6u; // A whole number an Int64 holds. Only `is` and `as` ask it.
 const uint32_t BIND_SLOT = 0x80000000u; // In HostBind: the operand is a method-table slot.
 // A class value's code for one of Godot's classes or value types: this bit, and its entry in the module's
 // engine_names. No class index and no ANY_IS_ code has this bit without the one above it.
