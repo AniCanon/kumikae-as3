@@ -174,7 +174,9 @@ std::string print(const Module &p_module, const Function &p_function) {
 				std::to_string(handler.target) + " into r" + std::to_string(handler.reg) + " catches ";
 		if (handler.type == NONE) {
 			out += "anything";
-		} else if (handler.type >= ANY_IS_INT) {
+		} else if (handler.type == ANY_IS_INT64) {
+			out += "Int64";
+		} else if (handler.type >= ANY_IS_INT && handler.type <= ANY_IS_BOOLEAN) {
 			const char *names[] = { "int", "uint", "Number", "String", "Boolean" };
 			out += names[handler.type - ANY_IS_INT];
 		} else {
