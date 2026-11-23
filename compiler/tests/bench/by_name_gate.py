@@ -19,6 +19,10 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
 TOLERANCE = 0.03
 
 
+INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color")
+ROWS.extend(f"{kind}{suffix}/read" for kind in INFERRED for suffix in ("", "Typed"))
+
+
 def failures(samples, baseline):
     misses = []
     for row, modes in samples.items():
@@ -34,8 +38,9 @@ def failures(samples, baseline):
             if baseline is not None and mode in modes:
                 compare(modes[mode], baseline[row][mode], f"{mode} slower than main")
             kind, op = row.split("/")
-            if kind == "proven" and mode in modes:
-                compare(modes[mode], samples[f"typed/{op}"][mode], f"{mode} slower than typed")
+            if mode in modes and (kind == "proven" or kind in INFERRED):
+                control = "typed" if kind == "proven" else kind + "Typed"
+                compare(modes[mode], samples[f"{control}/{op}"][mode], f"{mode} slower than typed")
     return misses
 
 
@@ -65,15 +70,15 @@ def measure(godot, project, library, mode, rows, baseline):
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
         env["KAS3_PROGRAM_LIBRARY"] = library
-    wanted = [row for row in rows if mode != "C#" or not row.startswith("value/")]
+    wanted = [row for row in rows if mode != "C#" or row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value")]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
            "cs" if mode == "C#" else "self" if baseline else "as", "20000", *wanted]
     run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=90)
     output = run.stdout + run.stderr
-    found = re.findall(r"^NAMED (\w+/\w+) (\d+)$", output, re.M)
+    found = re.findall(r"^NAMED (\w+/\w+) ([\d.]+)$", output, re.M)
     check(mode, run.returncode == 0 and (USED in output) == (mode == "native")
           and [name for name, _ in found] == wanted and "SCRIPT ERROR" not in output, output)
-    return {name: int(micros) / 1000 for name, micros in found}
+    return {name: float(micros) / 1000 for name, micros in found}
 
 
 def main():
@@ -100,7 +105,7 @@ def main():
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows, label == "pre54").items():
+                for row, time in measure(godot, project, library, mode, rows[::-1] if turn % 2 else rows, label == "pre54").items():
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():

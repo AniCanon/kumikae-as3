@@ -1,0 +1,280 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class LocalStorage on Godot's Node
+  .0 $owner:GodotObject
+  .1 amount:Number
+  #0 LocalStorage/truth
+  #1 LocalStorage/wrappedNumberInferred
+  #2 LocalStorage/wrappedNumberDeclared
+  #3 LocalStorage/callbackInferred
+  #4 LocalStorage/callbackDeclared
+  #5 LocalStorage/engineResultInferred
+  #6 LocalStorage/engineResultDeclared
+  #7 LocalStorage/answerInferred
+  #8 LocalStorage/answerDeclared
+  #9 LocalStorage/textLengthInferred
+  #10 LocalStorage/textLengthDeclared
+  #11 LocalStorage/boxScoreInferred
+  #12 LocalStorage/boxScoreDeclared
+  #13 LocalStorage/argumentInferred
+  #14 LocalStorage/argumentDeclared
+  #15 LocalStorage/vectorInferred
+  #16 LocalStorage/vectorDeclared
+  #17 LocalStorage/colorInferred
+  #18 LocalStorage/colorDeclared
+  #19 LocalStorage/freshInferred
+  #20 LocalStorage/freshDeclared
+  #21 LocalStorage/straightInferred
+  #22 LocalStorage/straightDeclared
+  #23 LocalStorage/laterInferred
+  #24 LocalStorage/laterDeclared
+  new LocalStorage
+class ScoreBox
+  .0 score:int
+  new ScoreBox
+class Function
+  .0 function:int
+  .1 first:Object
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function LocalStorage/truth(r0:Object):Boolean
+  @1 ConstBool r1 1
+  @2 Return r1
+  @3 ConstBool r2 0
+  @4 Return r2
+function LocalStorage/wrappedNumberInferred(r0:Object, r1:Boolean):Number
+  @0 ConstF64 r2 nan
+  @2 JumpIfNot r1 @8
+  @4 GetField r3 r0 .1
+  @5 Move r2 r3
+  @7 Return r2
+  @9 ConstF64 r4 0
+  @10 Return r4
+  @11 ConstF64 r5 nan
+  @12 Return r5
+function LocalStorage/wrappedNumberDeclared(r0:Object, r1:Boolean):Number
+  @0 ConstF64 r2 nan
+  @2 JumpIfNot r1 @8
+  @4 GetField r3 r0 .1
+  @5 Move r2 r3
+  @7 Return r2
+  @9 ConstF64 r4 0
+  @10 Return r4
+  @11 ConstF64 r5 nan
+  @12 Return r5
+function LocalStorage/callbackInferred(r0:Object, r1:Object):Number
+  @0 ConstF64 r2 nan
+  @2 CallTypedFunction r3 r1 ()
+  @3 Move r2 r3
+  @5 Return r2
+  @6 ConstF64 r4 nan
+  @7 Return r4
+function LocalStorage/callbackDeclared(r0:Object, r1:Object):Number
+  @0 ConstF64 r2 nan
+  @2 CallTypedFunction r3 r1 ()
+  @3 Move r2 r3
+  @5 Return r2
+  @6 ConstF64 r4 nan
+  @7 Return r4
+function LocalStorage/engineResultInferred(r0:Object, r1:GodotValue):Number
+  godot r1:Vector2
+  @0 ConstF64 r2 nan
+  @2 HostCall r3 [Vector2.length] (r1)
+  @3 Move r2 r3
+  @5 Return r2
+  @6 ConstF64 r4 nan
+  @7 Return r4
+function LocalStorage/engineResultDeclared(r0:Object, r1:GodotValue):Number
+  godot r1:Vector2
+  @0 ConstF64 r2 nan
+  @2 HostCall r3 [Vector2.length] (r1)
+  @3 Move r2 r3
+  @5 Return r2
+  @6 ConstF64 r4 nan
+  @7 Return r4
+function LocalStorage/answerInferred(r0:Object):Boolean
+  @1 Call r2 LocalStorage/truth (r0)
+  @2 Move r1 r2
+  @4 Return r1
+  @5 ConstBool r3 0
+  @6 Return r3
+function LocalStorage/answerDeclared(r0:Object):Boolean
+  @1 Call r2 LocalStorage/truth (r0)
+  @2 Move r1 r2
+  @4 Return r1
+  @5 ConstBool r3 0
+  @6 Return r3
+function LocalStorage/textLengthInferred(r0:Object):int
+  @1 ConstStr r2 "abc"
+  @2 Move r1 r2
+  @4 NullCheck r1
+  @5 StrLength r3 r1
+  @6 Return r3
+  @7 ConstI32 r4 0
+  @8 Return r4
+function LocalStorage/textLengthDeclared(r0:Object):int
+  @1 ConstStr r2 "abc"
+  @2 Move r1 r2
+  @4 NullCheck r1
+  @5 StrLength r3 r1
+  @6 Return r3
+  @7 ConstI32 r4 0
+  @8 Return r4
+function LocalStorage/boxScoreInferred(r0:Object):int
+  @1 InitClass ScoreBox
+  @2 New r2 ScoreBox
+  @3 Call _ ScoreBox (r2)
+  @4 Move r1 r2
+  @6 GetField r3 r1 .0
+  @7 Return r3
+  @8 ConstI32 r4 0
+  @9 Return r4
+function LocalStorage/boxScoreDeclared(r0:Object):int
+  @1 InitClass ScoreBox
+  @2 New r2 ScoreBox
+  @3 Call _ ScoreBox (r2)
+  @4 Move r1 r2
+  @6 GetField r3 r1 .0
+  @7 Return r3
+  @8 ConstI32 r4 0
+  @9 Return r4
+function LocalStorage/argumentInferred(r0:Object, r1:Object):Object
+  @1 Move r2 r1
+  @3 Return r2
+  @4 ConstNull r3
+  @5 Return r3
+function LocalStorage/argumentDeclared(r0:Object, r1:Object):Object
+  @1 Move r2 r1
+  @3 Return r2
+  @4 ConstNull r3
+  @5 Return r3
+function LocalStorage/vectorInferred(r0:Object):Number
+  godot r1:Vector2 r4:Vector2
+  @1 ConstI64 r2 3
+  @2 ConstF64 r3 4
+  @3 HostNew r4 [Vector2] (r2, r3)
+  @4 Move r1 r4
+  @6 HostCall r5 [Vector2.length] (r1)
+  @7 Return r5
+  @8 ConstF64 r6 nan
+  @9 Return r6
+function LocalStorage/vectorDeclared(r0:Object):Number
+  godot r1:Vector2 r4:Vector2
+  @1 ConstI64 r2 3
+  @2 ConstF64 r3 4
+  @3 HostNew r4 [Vector2] (r2, r3)
+  @4 Move r1 r4
+  @6 HostCall r5 [Vector2.length] (r1)
+  @7 Return r5
+  @8 ConstF64 r6 nan
+  @9 Return r6
+function LocalStorage/colorInferred(r0:Object):Number
+  godot r1:Color r5:Color
+  @1 ConstI64 r2 1
+  @2 ConstF64 r3 0.5
+  @3 ConstF64 r4 0
+  @4 HostNew r5 [Color] (r2, r3, r4)
+  @5 Move r1 r5
+  @7 HostGet r6 r1 [Color.g]
+  @8 Return r6
+  @9 ConstF64 r7 nan
+  @10 Return r7
+function LocalStorage/colorDeclared(r0:Object):Number
+  godot r1:Color r5:Color
+  @1 ConstI64 r2 1
+  @2 ConstF64 r3 0.5
+  @3 ConstF64 r4 0
+  @4 HostNew r5 [Color] (r2, r3, r4)
+  @5 Move r1 r5
+  @7 HostGet r6 r1 [Color.g]
+  @8 Return r6
+  @9 ConstF64 r7 nan
+  @10 Return r7
+function LocalStorage/freshInferred(r0:Object):int
+  godot r1:Gradient r2:Gradient
+  @1 HostNew r2 [Gradient] ()
+  @2 Move r1 r2
+  @4 HostCall r3 [Gradient.getPointCount] (r1)
+  @5 Return r3
+  @6 ConstI32 r4 0
+  @7 Return r4
+function LocalStorage/freshDeclared(r0:Object):int
+  godot r1:Gradient r2:Gradient
+  @1 HostNew r2 [Gradient] ()
+  @2 Move r1 r2
+  @4 HostCall r3 [Gradient.getPointCount] (r1)
+  @5 Return r3
+  @6 ConstI32 r4 0
+  @7 Return r4
+function LocalStorage/straightInferred(r0:Object, r1:String):String
+  @2 Move r2 r1
+  @4 Return r2
+  @5 ConstNull r3
+  @6 Return r3
+function LocalStorage/straightDeclared(r0:Object, r1:String):String
+  @2 Move r2 r1
+  @4 Return r2
+  @5 ConstNull r3
+  @6 Return r3
+function LocalStorage/laterInferred(r0:Object, r1:String, r2:Boolean):String
+  @2 JumpIfNot r2 @7
+  @4 Move r3 r1
+  @6 Return r3
+  @8 ConstStr r4 "absent"
+  @9 Return r4
+  @10 ConstNull r5
+  @11 Return r5
+function LocalStorage/laterDeclared(r0:Object, r1:String, r2:Boolean):String
+  @2 JumpIfNot r2 @7
+  @4 Move r3 r1
+  @6 Return r3
+  @8 ConstStr r4 "absent"
+  @9 Return r4
+  @10 ConstNull r5
+  @11 Return r5
+function LocalStorage(r0:Object):void
+  @0 ConstF64 r1 3.5
+  @1 SetField r0 .1 r1
+  @2 ReturnVoid
+function ScoreBox(r0:Object):void
+  @0 ConstI32 r1 7
+  @1 SetField r0 .0 r1
+  @2 ReturnVoid

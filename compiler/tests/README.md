@@ -242,10 +242,12 @@ python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --against <mai
 ```
 
 The gate alternates interpreted AS3, native AS3 and optimized C# on the same receiver fixtures.
-It checks return values and mutations, then reports median milliseconds and the observed range for
-20,000 operations. It fails if a candidate median exceeds its reference median by more than 3%. Each
-AS3 mode compares with the same row and mode on main. Native compares with the interpreter, both compare with C# by name where
-the API exists, and a fresh, non-escaping Node2D compares with its explicitly typed control.
+It checks the result of every batch, warms each row for at least 20 ms and measures at least
+60 ms of batches per process. It normalizes each process's time to 20,000 operations and reports
+the median and range across seven rounds. Alternate rounds reverse build, mode and row order. It fails if a candidate median exceeds its reference median by more than 3%. Each
+AS3 mode compares with the same row and mode on main. Native compares with the interpreter, each untyped row compares with C# by name where
+the API exists, and each inferred row compares with its explicitly typed control. The controls cover
+a fresh Node2D, Number, Boolean, String, an AS3 class, Vector2 and Color.
 The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node. Timing stays
 outside CTest. Use `--against <build-godot>` and `--before-script <build-godot>` to interleave
 a second full build and a pre-54 build for the script members. The older script enters through

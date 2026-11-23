@@ -149,6 +149,129 @@ package {
 			target.free();
 			return angle;
 		}
+		private var numberField:Number = 3;
+		private function flag():Boolean { return true; }
+
+		public function numberRead(source:Node2D, n:int):Number {
+			var alias:* = this.numberField;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function numberTypedRead(source:Node2D, n:int):Number {
+			var alias:Number = this.numberField;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function booleanRead(source:Node2D, n:int):Number {
+			var alias:* = flag();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Boolean = alias;
+				if (read) sum += 3;
+			}
+			return sum;
+		}
+
+		public function booleanTypedRead(source:Node2D, n:int):Number {
+			var alias:Boolean = flag();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Boolean = alias;
+				if (read) sum += 3;
+			}
+			return sum;
+		}
+
+		public function stringRead(source:Node2D, n:int):Number {
+			var alias:* = "abc";
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:int = alias.length;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function stringTypedRead(source:Node2D, n:int):Number {
+			var alias:String = "abc";
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:int = alias.length;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function as3ClassRead(source:Node2D, n:int):Number {
+			var alias:* = new MatrixScore();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:int = alias.value;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function as3ClassTypedRead(source:Node2D, n:int):Number {
+			var alias:MatrixScore = new MatrixScore();
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:int = alias.value;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function vectorRead(source:Vector2, n:int):Number {
+			var alias:* = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias.x;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function vectorTypedRead(source:Vector2, n:int):Number {
+			var alias:Vector2 = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias.x;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function colorRead(source:Color, n:int):Number {
+			var alias:* = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias.g;
+				sum += read;
+			}
+			return sum;
+		}
+
+		public function colorTypedRead(source:Color, n:int):Number {
+			var alias:Color = source;
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				var read:Number = alias.g;
+				sum += read;
+			}
+			return sum;
+		}
+
 		public function mixedRead(source:Node2D, n:int):Number {
 			var target = source;
 			var sum:Number = 0;
@@ -175,4 +298,8 @@ package {
 			}
 		}
 	}
+}
+
+final class MatrixScore {
+	public var value:int = 3;
 }

@@ -11,7 +11,12 @@ all read its result.
 **Depends on:** nothing else in this repository. It includes no header from `ir/`, `vm/`, `godot_ext/` or
 `lsp/`, and no Godot header. Godot's API arrives as AS3 declarations, like any source file.
 
-The checker can give a local declared as `*` a concrete type after checking the source. It checks the first write, later assignments and each use before recording that type. A fresh, detached Node2D used only for its local transform can bind its members directly. A node received from a caller can already carry a script. Captures, reads before initialization and operations that observe dynamic behavior keep the declared type.
+After checking your source, the checker can give an untyped local the storage of its first write.
+The proof follows that declaration or assignment through its block, checks all later assignments,
+and checks each use. It covers typed parameters, fields, getters, construction and typed return values.
+A fresh engine object can bind a member while it stays detached. A node passed in by a caller can
+already carry a script. Captures, early reads and operations that observe a dynamic tag keep the
+declared representation. See [Untyped member access](../../docs/design/untyped-performance.md).
 
 ## Files
 
