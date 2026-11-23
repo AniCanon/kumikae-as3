@@ -78,6 +78,8 @@ package {
 			o.visible = !o.visible;
 			return [has, heard, o.visibilityChanged.numListeners];
 		}
+		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
+
 		// A freed object is null.
 		public function freed(o:*):String {
 			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }

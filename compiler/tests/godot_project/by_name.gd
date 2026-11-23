@@ -2,6 +2,24 @@
 # what GDScript gives for the same thing with an untyped variable; run_godot.py checks the two agree.
 extends SceneTree
 
+class Intercept extends Node2D:
+	var reads := 0
+	var writes := 0
+	var stored := true
+
+	func _get(property: StringName):
+		if property == &"visible":
+			reads += 1
+			return stored
+		return null
+
+	func _set(property: StringName, value) -> bool:
+		if property == &"visible":
+			writes += 1
+			stored = value
+			return true
+		return false
+
 var node: Node2D
 var child: Node2D
 var scripted: Node2D
@@ -73,6 +91,14 @@ func _physics_process(_delta: float) -> bool:
 	o = fresh()
 	show("a method read by name", ask("method", [o]), [false, true, true, "function"])
 	show("a signal reached by name", ask("listens", [fresh()]), [true, 1, 0])
+	var foreign := Intercept.new()
+	var reference := Intercept.new()
+	reference.set("visible", false)
+	var expected = [reference.get("visible"), reference.reads, reference.writes]
+	var seen = ask("foreignVisible", [foreign])
+	show("foreign script accessors", [seen, foreign.reads, foreign.writes], expected)
+	foreign.free()
+	reference.free()
 	var gone := Node2D.new()
 	var held = gone
 	gone.free()
