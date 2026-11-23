@@ -305,17 +305,20 @@ const String &GodotHost::text_of(std::string_view p_text) {
 }
 
 void GodotHost::print(std::string_view p_text) {
+	script_effect();
 	UtilityFunctions::print(to_godot(p_text));
 }
 
 // An error with no place it was thrown: there is no line for the editor to open.
 void GodotHost::error(std::string_view p_text) {
+	script_effect();
 	UtilityFunctions::push_error(to_godot(p_text));
 }
 
 // Shown as Godot shows a script's own error: the script's file and line are given as the error's source,
 // so that the editor can open the line.
 void GodotHost::error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) {
+	script_effect();
 	const std::string text(p_text), function(p_function), file(p_file);
 	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), p_line, false);
 }
@@ -323,6 +326,7 @@ void GodotHost::error_at(std::string_view p_text, std::string_view p_function, s
 
 bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
+	script_effect();
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	if (!p_method.empty() && p_method[0] == '@') {
 		return signal_verb(*receiver, p_method, p_arguments, p_count, p_result, r_result, r_error);
@@ -349,6 +353,7 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argu
 // The operator is Godot's own number for it, from its entry in the name table: nothing here reads its text.
 bool GodotHost::operate(int p_number, std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
+	script_effect();
 	const std::optional<Variant::Operator> op = p_count < 1 || p_count > 2 || p_number < 0 || p_number >= Variant::OP_MAX
 			? std::nullopt
 			: std::optional<Variant::Operator>((Variant::Operator)p_number);
@@ -377,6 +382,11 @@ bool GodotHost::operate(int p_number, std::string_view p_operator, const vm::Arg
 }
 
 bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	if (declarations_current.load(std::memory_order_relaxed) &&
+			(read_name_ != p_property || static_cast<const Variant *>(p_receiver)->get_type() != Variant::OBJECT ||
+			read_owner_ != live_handle_object(p_receiver))) {
+		script_effect();
+	}
 	if (!p_property.empty() && p_property[0] == '@') {
 		return signal_verb(*static_cast<Variant *>(p_receiver), p_property, nullptr, 0, p_result, r_result, r_error);
 	}
@@ -394,6 +404,7 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 }
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) {
+	script_effect();
 	if (is_freed(*static_cast<Variant *>(p_receiver))) {
 		*r_error = FREED;
 		return false;
@@ -433,6 +444,7 @@ static bool whole_index(const Variant &p_receiver, Variant *r_key, std::string *
 }
 
 bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	script_effect();
 	const Variant *receiver = static_cast<Variant *>(p_receiver);
 	if (is_freed(*receiver)) {
 		*r_error = FREED;
@@ -452,6 +464,7 @@ bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm:
 }
 
 bool GodotHost::index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) {
+	script_effect();
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	if (is_freed(*receiver)) {
 		*r_error = FREED;
@@ -492,6 +505,7 @@ void *GodotHost::bind_method(void *p_receiver, std::string_view p_method, std::s
 }
 
 bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	script_effect();
 	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
 	if (!object) {
 		*r_error = FREED;

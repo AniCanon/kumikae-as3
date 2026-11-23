@@ -4,12 +4,14 @@
 
 #include "host.h"
 #include "literal_misses.h"
+#include "script_declarations.h"
 
 #include <godot_cpp/variant/variant.hpp>
 
 #include <godot_cpp/variant/string_name.hpp>
 
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <map>
@@ -108,6 +110,9 @@ public:
 	struct Worked;
 	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
 	void new_program();
+	// Any handoff capable of executing foreign code ends this declaration snapshot.
+	void script_effect() { declarations_current.store(false, std::memory_order_relaxed); }
+	std::atomic<bool> declarations_current{ false };
 	// The programs made before the last are gone: what was worked out for a call at its own place and
 	// is not the last program's is let go of.
 	void release_unused();
@@ -118,6 +123,10 @@ private:
 	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
 	std::vector<std::unique_ptr<Worked>> named_bindings_;
+	ScriptDeclarations declarations_;
+	std::string_view read_name_;
+	const void *read_owner_ = nullptr;
+	const vm::Prepared *read_binding_ = nullptr;
 	std::map<std::string, std::array<vm::NamedMember, 2>, std::less<>> script_members_;
 	const vm::NamedMember &script_binding(std::string_view p_name, bool p_method);
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);

@@ -57,7 +57,7 @@ public partial class Managed : Node
             return result;
         }
         bool mixed = kind == "mixed";
-        bool script = kind == "script" || kind == "foreign";
+        bool script = kind == "script" || kind == "foreign" || kind == "custom";
         double sum = 0;
         if (op == "read" && script)
             for (int i = 0; i < n; i++) sum += target.Get(Score).AsInt32();

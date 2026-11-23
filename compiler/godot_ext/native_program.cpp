@@ -421,6 +421,7 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 void NativeProgram::resolve(const rt::Program &p_program) {
 	rt::Host &host = *host_;
 	host.context.engine = api();
+	host.context.script_declarations = &engine_.declarations_current;
 	host.context.gone = &gone;
 #if defined(KAS3_TEST_COUNTS)
 	host.object_lookups = &lookups;

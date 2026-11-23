@@ -82,6 +82,7 @@ bool GodotHost::is_class(void *p_value, std::string_view p_class) {
 }
 
 vm::Str *GodotHost::text(void *p_value) {
+	script_effect();
 	// A freed object is null to a script, in words too (Godot's text would be `<Freed Object>`). So is an
 	// empty handle, which a copy of one on a freed counted object is.
 	if (!present(p_value)) {
@@ -132,10 +133,15 @@ void *GodotHost::copy(void *p_value) {
 	if (is_dangling(*value)) {
 		return make_handle();
 	}
+	// Copying an engine reference can invoke a ScriptInstance reference-count callback.
+	if (value->get_type() == Variant::OBJECT) {
+		script_effect();
+	}
 	return make_handle(*value);
 }
 
 bool GodotHost::assign(void *p_to, const void *p_from) {
+	script_effect();
 	// An object (a value held as any of Godot's) is copied as copy() copies one: a freed one goes as null.
 	// Nor is a handle on an object ever written over: others may hold the same one (shares()).
 	const Variant *from = static_cast<const Variant *>(p_from);
@@ -174,6 +180,7 @@ void GodotHost::drop(void *p_value) {
 			return;
 		}
 	}
+	script_effect(); // Releasing a Variant can run a foreign destructor.
 	free_handle(value);
 }
 
@@ -213,6 +220,7 @@ bool GodotHost::node_edges(uint64_t p_node, vm::EngineNode *r_node) {
 
 // Only listeners have counts that are not exact: an object is freed by Godot when the handles on it go.
 std::vector<uint64_t> GodotHost::let_go(const std::vector<uint64_t> &p_nodes) {
+	script_effect();
 	return let_go_listeners(p_nodes);
 }
 

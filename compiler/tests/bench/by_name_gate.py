@@ -17,7 +17,7 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
-ROWS.extend(("foreign/read", "foreign/call", "detached/call"))
+ROWS.extend(("foreign/read", "foreign/call", "custom/read", "detached/call"))
 
 TOLERANCE = 0.03
 
@@ -76,7 +76,7 @@ def prepare(godot, build, where):
     tests = build.parent / "tests"
     runner = Runner(godot, tests / "godot_project", tests, build / "kas3c", check)
     source = HERE / "by_name"
-    project = Path(runner.project(where, source, ["Matrix.as", "Managed.cs", "matrix.gd", "foreign.gd",
+    project = Path(runner.project(where, source, ["Matrix.as", "Managed.cs", "matrix.gd", "foreign.gd", "custom.gd",
                                   str(HERE / "languages/project.godot"), str(HERE / "languages/CmpCs.csproj")]))
     cache = Path(os.environ.get("NUGET_PACKAGES", Path.home() / ".nuget/packages"))
     # Restore only from the developer's installed packages.
@@ -104,7 +104,7 @@ def measure(godot, project, library, mode, rows, label, sizes=None):
     check(mode, run.returncode == 0 and (USED in output) == (mode == "native")
           and [name for name, _ in found] == wanted and "SCRIPT ERROR" not in output, output)
     for row, value in found:
-        check(row, value != "unsupported" or (label == "main" and mode != "C#" and row.startswith("foreign/")), output)
+        check(row, value != "unsupported" or (label == "main" and mode != "C#" and row.startswith(("foreign/", "custom/"))), output)
     return {name: None if micros == "unsupported" else float(micros) / 1000 for name, micros in found}
 
 

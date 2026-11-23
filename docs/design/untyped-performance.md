@@ -88,7 +88,7 @@ and reads of their component fields are recognized from the generated API declar
 includes effects on its back edge. Later calls outside the loop cannot alter an earlier read.
 For example, a fresh Timer can read `waitTime` in a loop, free itself, and then call a callback.
 When you pass the Timer to the callback first, subsequent by-name accesses check its current
-script. Earlier accesses can bind even when the local needs dynamic storage after the callback.
+script. An unreassigned local keeps its engine reference in a typed register. A later untyped member access boxes that reference and dispatches through the current script.
 
 A parameter declared as `Node2D` can already carry a foreign script. Its untyped alias must
 dispatch through that script even for a built-in property. The parameter-alias fixture overrides
@@ -108,12 +108,16 @@ the ordinary path. A refusal happens before any observable operation so a setter
 
 Each site has room for four receiver shapes. A shape identifies the Godot class or value type
 and the script class. An entry holds resolution metadata. It takes its receiver and arguments
-from the current operation. Additional shapes use the shared lookup table. An interpreter owns
+from the current operation. Additional shapes share a table with at most 64 entries per literal. A full table discards its entries before resolving a new shape. An interpreter owns
 its side table separately from the immutable module, so warming a site cannot change the module
 fingerprint. The host retains resolved engine declarations. It remembers a declaration miss for a literal
 on the receiver class or value type. A computed key can reuse that answer. Starting a program
 clears the literal misses. A foreign script can declare a property or method absent from the
-engine table. The host looks up those declarations on the attached script and its base scripts.
+engine table. The host reflects the member names of the attached script and its bases into a bounded cache.
+A call, setter, possible getter, or transfer of control to Godot invalidates the snapshot. This
+also covers in-place GDScript reloads, which can keep the same resource and emit no change signal.
+A declared scalar field on a GDScript with no possible zero-argument getter can be read again
+without reflection until such an operation or a return to Godot.
 A warmed site dispatches the read or call through Godot with an interned name. Generated C++ keeps a cache at each site and checks its program generation before
 using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
 refused before it enters AS3, and a worker free is queued for the main thread. The instance

@@ -741,6 +741,7 @@ std::pair<size_t, size_t> GodotHost::own_places() const {
 
 std::optional<bool> GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error, const vm::Object *p_checked) {
+	script_effect();
 	const Worked &worked = static_cast<const Worked &>(p_prepared);
 	if (p_count > MOST) {
 		return std::nullopt;

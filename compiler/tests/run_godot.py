@@ -417,7 +417,7 @@ check("kinds.gd: a cast that fails is AS3's coercion error", "Error #1034: Type 
 output = compare("by_name.gd", [
     "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
     "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
-    "exact untyped arguments", "fresh timer after attaching a script", "foreign declarations", "foreign declaration after replacement", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
+    "exact untyped arguments", "fresh timer after attaching a script", "foreign declarations", "foreign declaration after replacement", "foreign declaration after in-place reload", "typed reload after staging source", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
     "computed misses", "null math receivers", "parameter alias keeps foreign accessors", "parameter alias respects position overrides", "freed after warming the site", "a freed object",
 ])
 check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])

@@ -21,7 +21,7 @@ namespace rt {
 // coming to disagree about what a value's bits mean (vm/any.h). A change that only adds an entry at the end
 // of a table counts too: an older library is handed a table it reads the same, but a newer one would call
 // what an older host does not have.
-inline constexpr uint64_t RUNTIME_LAYOUT = 0x4b41533300000014ull;
+inline constexpr uint64_t RUNTIME_LAYOUT = 0x4b41533300000015ull;
 
 // A size that moves without the number above moving does not build: set the number, then the size. (A
 // change that keeps every size is not caught here: the list above is what decides.)

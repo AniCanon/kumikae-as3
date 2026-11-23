@@ -316,6 +316,10 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 		line(how->begin);
 		body_ += how->label + ":;\n";
 	}
+	// A direct binding can bypass the host's interpreter, including when it invokes a callback.
+	if (p_in.op >= Op::HostNew && p_in.op <= Op::HostIndexSet) {
+		line("if (c->script_declarations) c->script_declarations->store(false, std::memory_order_relaxed);");
+	}
 	// Around what may see or change a field kept in a local, memory and the local are made to agree.
 	const std::string before = kept_written_back(pc_);
 	const std::string after = kept_read_again(pc_);

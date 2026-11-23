@@ -524,6 +524,7 @@ namespace kas3 {
 // `new` of a script class that extends one of Godot's: Godot's object of that class, made as GDScript's
 // `Node2D.new()` makes one, with the class's script attached, whose object is p_object.
 void *GodotHost::attach_new(uint32_t p_class, vm::Object *p_object, std::string *r_error) {
+	script_effect();
 	Project &program = Project::get();
 	const ir::Module &module = program.module();
 	const ir::Class &klass = module.classes[p_class];

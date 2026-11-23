@@ -106,6 +106,18 @@ package {
 			try { return o.stored; }
 			catch (e:ReferenceError) { return e.errorID; }
 		}
+		public function readAcrossReload(o:*, key:String, editor:*):Array {
+			var before:* = readStored(o);
+			var had:Boolean = key in o;
+			editor.replace_schema(o);
+			return [before, had, readStored(o), key in o];
+		}
+		public function readAcrossTypedReload(o:*, key:String, script:Script):Array {
+			var before:* = readStored(o);
+			var had:Boolean = key in o;
+			script.reload(true);
+			return [before, had, readStored(o), key in o];
+		}
 		public function foreignDeclarations(o:*, property:String, method:String):Array {
 			return [o.stored, o.script_score(), o[property], o[method]()];
 		}

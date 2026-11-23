@@ -26,6 +26,7 @@ namespace kas3 {
 
 void GodotHost::new_program() {
 	program_++;
+	script_effect();
 #if !defined(KAS3_RUNTIME_ONLY)
 	for (auto &entry : class_members_) {
 		entry.second.misses.clear();
@@ -144,33 +145,6 @@ bool GodotHost::delegates_script(void *p_receiver, std::string_view p_name) {
 		}
 	}
 	return true;
-}
-
-// Only names declared by the attached script supplement the engine's AS3 declaration table.
-const vm::NamedMember &GodotHost::script_member(void *p_receiver, std::string_view p_name) {
-	const Variant &value = *static_cast<const Variant *>(p_receiver);
-	Object *object = value.get_type() == Variant::OBJECT ? value.get_validated_object() : nullptr;
-	if (!object || script_object_by_id(object->get_instance_id())) {
-		return vm::MISSING_MEMBER;
-	}
-	Ref<Script> script = object->get_script();
-	if (script.is_null()) {
-		return vm::MISSING_MEMBER;
-	}
-	const StringName key(to_godot(p_name));
-	if (script->has_script_method(key)) {
-		return script_binding(p_name, true);
-	}
-	for (; script.is_valid(); script = script->get_base_script()) {
-		const auto properties = script->get_script_property_list();
-		for (int i = 0; i < properties.size(); i++) {
-			const Dictionary property = properties[i];
-			if (StringName(property["name"]) == key) {
-				return script_binding(p_name, false);
-			}
-		}
-	}
-	return vm::MISSING_MEMBER;
 }
 
 #if defined(KAS3_RUNTIME_ONLY)
@@ -304,9 +278,12 @@ std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const v
 		// An undeclared name can also be answered by _get. Check its declaration before invoking
 		// that hook on a replacement script, so a decline has no observable side effects.
 		static const StringName custom_get("_get");
-		if (p_shape.delegate && gdextension_interface::object_has_script_method(p_shape.owner, custom_get._native_ptr()) &&
+		if ((!declarations_current.load(std::memory_order_relaxed) || read_owner_ != p_shape.owner || read_binding_ != &p_bind) && gdextension_interface::object_has_script_method(p_shape.owner, custom_get._native_ptr()) &&
 				script_member(p_operands[0].slot.p, binding.name).what != vm::NamedMember::What::Property) {
 			return std::nullopt;
+		}
+		if (read_owner_ != p_shape.owner || read_binding_ != &p_bind) {
+			script_effect(); // A declared getter may reload any script.
 		}
 		GDExtensionBool valid = false;
 		gdextension_interface::variant_get_named(static_cast<const Variant *>(p_operands[0].slot.p)->_native_ptr(),
@@ -316,6 +293,7 @@ std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const v
 			return std::nullopt;
 		}
 	} else {
+		script_effect();
 		GDExtensionCallError error{};
 		if (p_count == 1) {
 			gdextension_interface::object_call_script_method(p_shape.owner, binding.dynamic_name._native_ptr(), nullptr, 0, value._native_ptr(), &error);
@@ -345,6 +323,7 @@ std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const v
 
 std::optional<bool> GodotHost::run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
+	script_effect();
 	const Worked &worked = static_cast<const Worked &>(p_bind);
 	if (p_shape.delegate || (p_shape.script && !p_shape.instance)) {
 		auto *receiver = static_cast<Variant *>(p_operands[0].slot.p);

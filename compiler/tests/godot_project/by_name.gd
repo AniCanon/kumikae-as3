@@ -23,6 +23,12 @@ class Intercept extends Node2D:
 			return true
 		return false
 
+class SchemaEditor extends RefCounted:
+	func replace_schema(receiver: Node2D) -> void:
+		var script: GDScript = receiver.get_script()
+		script.source_code = receiver.get_meta("next")
+		assert(script.reload(true) == OK)
+
 class VirtualOnly extends Node2D:
 	var reads := 0
 
@@ -143,6 +149,22 @@ func _physics_process(_delta: float) -> bool:
 	var removed = ask("readStored", [changing])
 	show("foreign declaration after replacement", [declared, removed, changing.get("reads")], [true, 1069, 0])
 	changing.free()
+	var live := GDScript.new()
+	var next := "extends Node2D\nvar reads := 0\nfunc _get(key):\n if key == &'stored':\n  reads += 1\n  return 'virtual'\n return null\n"
+	live.source_code = next + "var stored := true\n"
+	assert(live.reload() == OK)
+	var edited := Node2D.new()
+	edited.set_script(live)
+	edited.set_meta("next", next)
+	var observed = ask("readAcrossReload", [edited, "stored", SchemaEditor.new()])
+	show("foreign declaration after in-place reload", [observed, edited.get("reads")], [[true, true, 1069, false], 0])
+	live.source_code = next + "var stored := true\n"
+	assert(live.reload(true) == OK)
+	edited.set("stored", true)
+	live.source_code = next
+	var typed_reload = ask("readAcrossTypedReload", [edited, "stored", live])
+	show("typed reload after staging source", [typed_reload, edited.get("reads")], [[true, true, 1069, false], 0])
+	edited.free()
 	var reference := Intercept.new()
 	reference.set("visible", false)
 	var expected = [reference.get("visible"), reference.reads, reference.writes]

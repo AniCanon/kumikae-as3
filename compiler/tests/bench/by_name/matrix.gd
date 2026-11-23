@@ -16,6 +16,9 @@ func measure() -> void:
 	script.set_script(load("res://Matrix.as"))
 	var foreign := Node2D.new()
 	foreign.set_script(load("res://foreign.gd"))
+	var custom := Node2D.new()
+	custom.set_script(load("res://custom.gd"))
+	root.add_child(custom)
 	var node := Node2D.new()
 	var targets := [node, Sprite2D.new(), Marker2D.new(), Polygon2D.new(),
 			Line2D.new(), Path2D.new(), foreign, script]
@@ -27,7 +30,7 @@ func measure() -> void:
 		script.call("addTarget", child)
 		if managed:
 			cs.call("AddTarget", child)
-	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "script": script,
+	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "custom": custom, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
@@ -47,7 +50,7 @@ func measure() -> void:
 			for op in ["read", "write", "call"]:
 				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
 					continue
-				if kind == "foreign" and op == "write":
+				if (kind == "foreign" and op == "write") or (kind == "custom" and op != "read"):
 					continue
 				if kind == "detached" and op != "call":
 					continue
@@ -63,12 +66,12 @@ func measure() -> void:
 		var kind := row.get_slice("/", 0)
 		var op := row.get_slice("/", 1)
 		var target = cases[kind]
-		if kind == "foreign" and args[0] == "main":
+		if kind in ["foreign", "custom"] and args[0] == "main":
 			var probe = script.call("probeForeign", target, op == "read")
 			if probe == (-1069 if op == "read" else -1006):
 				windows[row] = []
 				continue
-		var family: String = {"inherited": "node", "gdscript": "node", "foreign": "script"}.get(kind, kind)
+		var family: String = {"inherited": "node", "gdscript": "node", "foreign": "script", "custom": "script"}.get(kind, kind)
 		var method := StringName(family + op.capitalize())
 		# Accumulate measured batches so short native rows outlast the clock resolution
 		# and both controls reach steady state before their recorded work begins.
@@ -90,7 +93,7 @@ func measure() -> void:
 			else:
 				result = script.call(method, target, rounds)
 			var elapsed := Time.get_ticks_usec() - start
-			var own := kind in ["script", "foreign"]
+			var own := kind in ["script", "foreign", "custom"]
 			var valid := true
 			if op == "read" or (op == "call" and (own or kind == "value")):
 				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))

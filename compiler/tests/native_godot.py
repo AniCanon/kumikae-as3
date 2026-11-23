@@ -182,7 +182,9 @@ class Runner:
             self.check("native: computed keys report missing properties",
                        "VALUE computed misses=0|0" in text, text[-1200:])
             self.check("native: a replacement script checks the current declaration",
-                       "VALUE foreign declaration after replacement=[true, 1069, 0]|[true, 1069, 0]" in text, text[-2200:])
+                       "VALUE foreign declaration after replacement=[true, 1069, 0]|[true, 1069, 0]" in text and
+                       "VALUE typed reload after staging source=[[true, true, 1069, false], 0]|[[true, true, 1069, false], 0]" in text and
+                       "VALUE foreign declaration after in-place reload=[[true, true, 1069, false], 0]|[[true, true, 1069, false], 0]" in text, text[-2200:])
             self.check("native: attaching a script ends the fresh Timer proof",
                        "VALUE fresh timer after attaching a script=8.5|8.5" in text, text[-2000:])
             self.check("native: foreign script declarations support literal and computed names",

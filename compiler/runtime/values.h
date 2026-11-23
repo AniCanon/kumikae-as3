@@ -79,6 +79,8 @@ struct alignas(64) Context {
 	// for each place the program asks it for something (never null: empty entries with no engine), and
 	// Godot's names for the Strings the program gives where a name is taken, each built once.
 	const EngineApi *engine = nullptr;
+	// Cleared before generated code can call into foreign scripts through an engine binding.
+	std::atomic<bool> *script_declarations = nullptr;
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;
 	Host *host = nullptr;
