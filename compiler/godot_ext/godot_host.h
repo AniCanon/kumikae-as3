@@ -14,7 +14,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace kas3 {
 
@@ -64,7 +63,6 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		bool operator()(const godot::StringName &a, const godot::StringName &b) const { return class_identity(a) == class_identity(b); }
 	};
 	using Members = std::unordered_map<std::string_view, vm::NamedMember>;
-	std::unordered_set<std::string> missing_names_; // A computed key can outlive neither its slot nor its program.
 	std::unordered_map<godot::StringName, Members, ClassHash, SameClass> class_members_;
 	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;
 #endif

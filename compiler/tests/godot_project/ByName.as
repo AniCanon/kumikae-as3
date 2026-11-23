@@ -87,6 +87,13 @@ package {
 			o.rotate(n);
 			return [o.isProcessing(), o.position, o.rotation, v.dot(v)];
 		}
+		public function missingKeys(target:*, count:int):int {
+			var found:int = 0;
+			for (var i:int = 0; i < count; i++) {
+				if (("slot" + i) in target) found++;
+			}
+			return found;
+		}
 		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
 		public function provenVisible(source:Node2D):Boolean {
 			var alias:* = source;

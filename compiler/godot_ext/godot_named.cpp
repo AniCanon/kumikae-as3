@@ -206,7 +206,8 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 		}
 		klass = object ? ClassDBSingleton::get_singleton()->get_parent_class(klass) : StringName();
 	}
-	return members.emplace(*missing_names_.emplace(p_name).first, vm::MISSING_MEMBER).first->second;
+	// A computed key belongs to the caller. Only names from the engine declaration table are retained.
+	return vm::MISSING_MEMBER;
 }
 
 #endif

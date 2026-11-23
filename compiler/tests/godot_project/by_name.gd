@@ -131,6 +131,7 @@ func _physics_process(_delta: float) -> bool:
 	replaced.set_script(Intercept)
 	show("proven receiver keeps foreign accessors", [ask("provenVisible", [replaced]), replaced.get("reads"), replaced.get("writes")],
 			[false, 1, 1])
+	show("computed misses", ask("missingKeys", [control, 256]), 0)
 	var positions := Positions.new()
 	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes], [[3, true], 5, 1])
 	positions.free()
