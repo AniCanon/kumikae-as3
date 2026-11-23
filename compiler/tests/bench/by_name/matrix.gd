@@ -29,7 +29,7 @@ func measure() -> void:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "mixed": node}
-	var inferred := {"timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
+	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
 	for kind: String in inferred:
 		cases[kind] = inferred[kind]
@@ -38,7 +38,7 @@ func measure() -> void:
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
-				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and not kind.begins_with("timer"))):
+				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
 					continue
 				if kind == "foreign" and op == "write":
 					continue
@@ -64,6 +64,8 @@ func measure() -> void:
 		# Accumulate measured batches so short native rows outlast the clock resolution
 		# and both controls reach steady state before their recorded work begins.
 		var rounds := n * 10 if kind.trim_suffix("Typed") in inferred else n
+		if kind.begins_with("configure"):
+			rounds = maxi(1, n / 100)
 		var warm_us := 0
 		var timed_us := 0
 		var batches := []
@@ -84,7 +86,7 @@ func measure() -> void:
 			var own := kind in ["script", "foreign"]
 			var valid := true
 			if op == "read" or (op == "call" and (own or kind == "value")):
-				valid = result == rounds * (7 if own else (5 if op == "call" else (1 if kind.begins_with("timer") else 3)))
+				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
 			elif kind in ["proven", "typed"]:
 				valid = result == 17 if op == "write" else absf(result - rounds * 0.0001) < 0.002
 			elif op == "write" and own:

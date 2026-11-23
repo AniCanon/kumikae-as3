@@ -12,15 +12,18 @@ Node *parent(const Parents &p_parents, Node *p_node) {
 	return at == p_parents.end() ? nullptr : at->second;
 }
 
-// These operations on a freshly constructed, detached Node2D neither publish it nor attach a script.
-// Other operations can expose even a local with no AS3 aliases (addToGroup, for example).
-bool isolated_transform(const Symbol &p_member) {
-	if (p_member.owner->name != "Node2D") {
+// The API generator records constructor forms on native value classes.
+bool native_value(const Symbol *p_class, Package *p_godot) {
+	if (!p_class || !p_class->unit || !p_class->unit->is_declaration || p_class->package != p_godot ||
+			!p_class->node || p_class->node->kind != NodeKind::ClassDecl) {
 		return false;
 	}
-	const auto &name = p_member.name;
-	return name == "position" || name == "rotation" || name == "rotationDegrees" || name == "scale" ||
-			name == "skew" || name == "transform" || name == "rotate" || name == "translate" || name == "applyScale";
+	for (const auto &tag : static_cast<ClassDecl *>(p_class->node)->metadata) {
+		if (tag.name == "Constructor") {
+			return true;
+		}
+	}
+	return false;
 }
 
 struct Binding {
@@ -271,9 +274,7 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 		known.insert(binding.access->object);
 		known.insert(binding.access);
 		known.insert(binding.operation);
-		const bool read = binding.operation == binding.access && binding.member->kind == SymbolKind::Property &&
-				(p_consumers.ordinary_number(binding.result) || binding.result == p_consumers.boolean);
-		if (!read && !isolated_transform(*binding.member)) {
+		if (binding.member->kind != SymbolKind::Property) {
 			first = std::min(first, binding.operation->end);
 		}
 	}
@@ -287,7 +288,7 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 		if (node->kind == NodeKind::New) {
 			auto *value = static_cast<New *>(node);
 			const auto *klass = value->type ? value->type->symbol : nullptr;
-			if (klass && klass->package == p_godot && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color")) {
+			if (native_value(klass, p_godot)) {
 				known.insert(value->callee);
 				return true;
 			}
@@ -295,12 +296,12 @@ uint32_t first_effect(Block *p_body, Expr *p_initial, const std::vector<Binding>
 			const auto *name = static_cast<Name *>(node);
 			if (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
 					(p_consumers.ordinary_number(p_consumers.operand(static_cast<Name *>(node))) || name->type == p_consumers.boolean ||
-					(name->type && name->type->symbol && name->type->symbol->package == p_godot && name->type->symbol->name == "Vector2"))) {
+					(name->type && native_value(name->type->symbol, p_godot)))) {
 				return true;
 			}
 		} else if (node->kind == NodeKind::Member) {
 			const auto *member = static_cast<Member *>(node)->member;
-			if (member && member->owner && member->owner->package == p_godot && member->owner->name == "Vector2" && (member->name == "x" || member->name == "y")) {
+			if (member && member->kind == SymbolKind::Field && !member->is_static() && native_value(member->owner, p_godot)) {
 				return true;
 			}
 		} else if ((node->kind < NodeKind::NumberLit || node->kind > NodeKind::Conditional ||
@@ -354,7 +355,7 @@ struct LocalProof {
 LocalProof check_uses(Block *p_body, Expr *p_initial, const Type *p_type, bool p_fresh, Package *p_godot,
 		const std::vector<Name *> &p_uses, Consumers &p_consumers, bool p_numeric) {
 	Symbol *klass = p_type->symbol;
-	const bool math = klass && klass->package == p_godot && klass->unit && klass->unit->is_declaration && (klass->name == "Vector2" || klass->name == "Color");
+	const bool math = native_value(klass, p_godot);
 	const bool pure_class = klass && klass->unit && !klass->unit->is_declaration && !(klass->modifiers & Modifiers::Dynamic);
 	const bool can_bind = p_fresh || math || pure_class || p_numeric || p_type == p_consumers.boolean || klass == p_consumers.compilation.builtin("String");
 

@@ -83,8 +83,8 @@ an untyped Godot math value still raises the copy error.
 
 A zero-argument construction of a built-in engine class establishes a fresh receiver. The proof
 tracks its uses up to a call that can run user code, an escape, or an engine operation that may
-publish the receiver. The operation itself can bind before its effects take place. Reading ordinary numeric and Boolean
-properties and performing detached Node2D transforms can continue within this region. A loop
+publish the receiver. The operation itself can bind before its effects take place. Plain engine property reads and writes can continue within this region. Native value constructors
+and reads of their component fields are recognized from the generated API declarations. A loop
 includes effects on its back edge. Later calls outside the loop cannot alter an earlier read.
 For example, a fresh Timer can read `waitTime` in a loop, free itself, and then call a callback.
 When you pass the Timer to the callback first, subsequent by-name accesses check its current

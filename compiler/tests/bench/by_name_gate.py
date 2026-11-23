@@ -21,7 +21,7 @@ ROWS.extend(("foreign/read", "foreign/call"))
 TOLERANCE = 0.03
 
 
-INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color", "timer")
+INFERRED = ("number", "boolean", "string", "as3Class", "vector", "color", "timer", "configure")
 ROWS.extend(f"{kind}{suffix}/read" for kind in INFERRED for suffix in ("", "Typed"))
 
 
@@ -72,7 +72,7 @@ def measure(godot, project, library, mode, rows, label):
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
         env["KAS3_PROGRAM_LIBRARY"] = library
-    wanted = [row for row in rows if mode != "C#" or row.startswith(("timer/", "timerTyped/"))
+    wanted = [row for row in rows if mode != "C#" or row.startswith(("timer/", "timerTyped/", "configure/", "configureTyped/"))
               or row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value")]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
            "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", "20000", *wanted]

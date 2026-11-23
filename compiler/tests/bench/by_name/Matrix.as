@@ -162,6 +162,32 @@ package {
 		private function lengthOf(value:String):int { return value.length; }
 		private function flag():Boolean { return true; }
 
+		public function configureTypedRead(source:Node2D, n:int):Number {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var timer:Timer = new Timer();
+				timer.waitTime = 2.5;
+				timer.oneShot = true;
+				timer.autostart = true;
+				sum += timer.waitTime;
+				source.addChild(timer);
+				timer.free();
+			}
+			return sum;
+		}
+		public function configureRead(source:Node2D, n:int):Number {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var timer:* = new Timer();
+				timer.waitTime = 2.5;
+				timer.oneShot = true;
+				timer.autostart = true;
+				sum += timer.waitTime;
+				source.addChild(timer);
+				timer.free();
+			}
+			return sum;
+		}
 		public function timerRead(source:Node2D, n:int):Number {
 			var timer:* = new Timer();
 			var sum = 0;

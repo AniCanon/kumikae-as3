@@ -25,22 +25,22 @@ class Proven on Godot's Node
   #4 Proven/beforeEscape
   #5 Proven/acrossCallback
   new Proven
-class Function
-  .0 function:int
-  .1 first:Object
-class ArgumentError extends Error
-  .0 message:String
-  .1 name:String
-  .2 errorID:int
-  .3 stack:String
-  new ArgumentError
 class ReferenceError extends Error
   .0 message:String
   .1 name:String
   .2 errorID:int
   .3 stack:String
   new ReferenceError
+class Function
+  .0 function:int
+  .1 first:Object
 class Array of *
+class ArgumentError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new ArgumentError
 function Error(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
   @1 SetField r0 .2 r2
@@ -66,22 +66,28 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @5 SetField r0 .3 r4
   @6 ReturnVoid
 function Proven/inferred(r0:Object):Number
-  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
+  godot r2:Vector2 r3:Node2D r5:Node2D r8:Vector2 r9:Node2D r13:Vector2
   @1 HostNew r3 [Node2D] ()
-  @2 Move r1 r3
-  @4 ConstI64 r4 3
-  @5 ConstF64 r5 4
-  @6 HostNew r6 [Vector2] (r4, r5)
-  @7 HostSet r1 [Node2D.position] r6
-  @9 ConstF64 r7 0.25
-  @10 HostCall _ [Node2D.rotate] (r1, r7)
-  @12 HostGet r8 r1 [Node2D.position]
-  @13 Move r2 r8
-  @15 HostCall _ [GodotObject.free] (r1)
-  @17 HostGet r9 r2 [Vector2.x]
-  @18 Return r9
-  @19 ConstF64 r10 nan
-  @20 Return r10
+  @2 ToAny r4 r3
+  @3 Move r1 r4
+  @5 FromAny r5 r1 11
+  @6 ConstI64 r6 3
+  @7 ConstF64 r7 4
+  @8 HostNew r8 [Vector2] (r6, r7)
+  @9 HostSet r5 [Node2D.position] r8
+  @11 FromAny r9 r1 11
+  @12 ConstF64 r10 0.25
+  @13 HostCall _ [Node2D.rotate] (r9, r10)
+  @15 ConstStr r11 "position"
+  @16 DynGet r12 r1 r11
+  @17 FromAny r13 r12 13
+  @18 Move r2 r13
+  @20 ConstStr r14 "free"
+  @21 DynCall r15 r1 (r14)
+  @23 HostGet r16 r2 [Vector2.x]
+  @24 Return r16
+  @25 ConstF64 r17 nan
+  @26 Return r17
 function Proven/declared(r0:Object):Number
   godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
   @1 HostNew r3 [Node2D] ()
@@ -190,18 +196,18 @@ function Proven/acrossCallback(r0:Object, r1:Object):Number
   @18 Return r13
 function Proven(r0:Object):void
   @0 ReturnVoid
-function ArgumentError(r0:Object, r1:String, r2:int):void
-  @0 SetField r0 .0 r1
-  @1 SetField r0 .2 r2
-  @2 ConstStr r3 "ArgumentError"
-  @3 SetField r0 .1 r3
-  @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
-  @6 ReturnVoid
 function ReferenceError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
   @1 SetField r0 .2 r2
   @2 ConstStr r3 "ReferenceError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function ArgumentError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "ArgumentError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
   @5 SetField r0 .3 r4

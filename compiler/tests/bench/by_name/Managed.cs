@@ -11,6 +11,21 @@ public partial class Managed : Node
 
     public double Measure(string kind, string op, Node2D target, int n)
     {
+        if (kind == "configure" || kind == "configureTyped")
+        {
+            double total = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var timer = new Timer();
+                timer.Set(Timer.PropertyName.WaitTime, 2.5);
+                timer.Set(Timer.PropertyName.OneShot, true);
+                timer.Set(Timer.PropertyName.Autostart, true);
+                total += timer.Get(Timer.PropertyName.WaitTime).AsDouble();
+                target.AddChild(timer);
+                timer.Free();
+            }
+            return total;
+        }
         if (kind == "timer" || kind == "timerTyped")
         {
             var timer = new Timer();
