@@ -46,6 +46,31 @@ const Type *initializer_type(Compilation &p_compilation, Node *p_parent, Expr *p
 	return nullptr;
 }
 
+// Only a dominating construction proves that a nullable math argument has a value.
+bool exact_argument(Expr *p_expr, const Type *p_type, const Parents &p_parents, Block *p_body) {
+	if (p_expr->type != p_type) {
+		return false;
+	}
+	if (p_expr->kind == NodeKind::New || p_expr->kind == NodeKind::NumberLit) {
+		return true;
+	}
+	if (p_expr->kind != NodeKind::Name) {
+		return false;
+	}
+	const auto *symbol = static_cast<Name *>(p_expr)->symbol;
+	if (!symbol || !symbol->is_const || symbol->kind != SymbolKind::Local || !symbol->node || symbol->node->kind != NodeKind::VarDecl ||
+			parent(p_parents, parent(p_parents, symbol->node)) != p_body) {
+		return false;
+	}
+	for (const auto &decl : static_cast<VarDecl *>(symbol->node)->declarators) {
+		if (decl.symbol == symbol && decl.initializer && decl.initializer->end <= p_expr->offset &&
+				decl.initializer->kind == NodeKind::New && decl.initializer->type == p_type) {
+			return true;
+		}
+	}
+	return false;
+}
+
 std::optional<Binding> isolated_use(Compilation &p_compilation, const Type *p_type, Name *p_name, const Parents &p_parents, Block *p_body) {
 	Node *use = parent(p_parents, p_name);
 	if (!use || use->kind != NodeKind::Member) {
@@ -75,7 +100,7 @@ std::optional<Binding> isolated_use(Compilation &p_compilation, const Type *p_ty
 		auto *assign = static_cast<Assign *>(operation);
 		Expr *given = assign->value;
 		if (assign->target == access && assign->op == TokenKind::Assign && discarded(p_parents, assign) &&
-				given->type == result && (given->kind == NodeKind::New || given->kind == NodeKind::NumberLit)) {
+				exact_argument(given, result, p_parents, p_body)) {
 			return Binding{ access, member, assign, result };
 		}
 	}
@@ -87,9 +112,7 @@ std::optional<Binding> isolated_use(Compilation &p_compilation, const Type *p_ty
 			return std::nullopt;
 		}
 		for (uint32_t i = 0; i < call->arguments.count; i++) {
-			const Expr *arg = call->arguments[i];
-			if (arg->type != p_compilation.type_of(fn->parameters[i].type) ||
-					(arg->kind != NodeKind::NumberLit && arg->kind != NodeKind::New)) {
+			if (!exact_argument(call->arguments[i], p_compilation.type_of(fn->parameters[i].type), p_parents, p_body)) {
 				return std::nullopt;
 			}
 		}
@@ -127,7 +150,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 	});
 	for (const auto &[local, initial] : p_initial) {
 		const Type *type = initial->type;
-		const bool engine = godot_ && type->symbol->package == godot_ && type->symbol->unit->is_declaration;
+		const bool engine = godot_ && type->symbol && type->symbol->unit && type->symbol->package == godot_ && type->symbol->unit->is_declaration;
 		const bool fresh = engine && type->symbol->name == "Node2D" && initial->kind == NodeKind::New;
 		std::vector<Binding> bindings;
 		bool safe = true;
@@ -157,6 +180,45 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 				safe = false;
 				break;
 			}
+		}
+		// Code outside the receiver expression can still run a script (which can find orphan nodes).
+		// Admit only calls we bound above, builtin value constructors, and local arithmetic.
+		if (fresh && safe) {
+			const Symbol *receiver = local;
+			std::unordered_set<Node *> known{ initial, static_cast<New *>(initial)->callee };
+			for (const Binding &binding : bindings) {
+				known.insert(binding.access);
+				known.insert(binding.operation);
+			}
+			walk(p_body, [&](Node *node) {
+				if (!safe) {
+					return false;
+				}
+				if (known.count(node) || node->kind == NodeKind::TypeRef) {
+					return true;
+				}
+				if (node->kind == NodeKind::New) {
+					auto *value = static_cast<New *>(node);
+					const auto *klass = value->type ? value->type->symbol : nullptr;
+					safe = klass && klass->package == godot_ && klass->unit && klass->unit->is_declaration && klass->name == "Vector2";
+					known.insert(value->callee);
+				} else if (node->kind == NodeKind::Member) {
+					const auto *member = static_cast<Member *>(node)->member;
+					safe = member && member->owner && member->owner->package == godot_ && member->owner->unit &&
+							member->owner->unit->is_declaration && member->owner->name == "Vector2" && (member->name == "x" || member->name == "y");
+				} else if (node->kind == NodeKind::Name) {
+					auto *name = static_cast<Name *>(node);
+					safe = name->symbol == receiver || (name->symbol && (name->symbol->kind == SymbolKind::Local || name->symbol->kind == SymbolKind::Parameter) &&
+							(numeric(name->type) || name->type == boolean_ || (name->type && name->type->symbol &&
+							name->type->symbol->package == godot_ && name->type->symbol->name == "Vector2")));
+				} else if (node->kind >= NodeKind::NumberLit && node->kind <= NodeKind::Conditional) {
+					safe = node->kind == NodeKind::NumberLit || node->kind == NodeKind::BoolLit || node->kind == NodeKind::Binary ||
+							node->kind == NodeKind::Postfix || node->kind == NodeKind::Assign || node->kind == NodeKind::Unary;
+				} else if (node->kind == NodeKind::ForIn || node->kind == NodeKind::FunctionDecl) {
+					safe = false;
+				}
+				return safe;
+			});
 		}
 		if (!safe) {
 			continue;

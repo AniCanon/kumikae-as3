@@ -42,7 +42,7 @@ const Type *stored_type(Expr *p_expr) {
 } // namespace
 
 void Typer::infer_storage(Block *p_body) {
-	if (!p_body) {
+	if (!p_body || unit_.diagnostics.has_errors()) {
 		return;
 	}
 	struct Candidate {

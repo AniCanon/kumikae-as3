@@ -19,5 +19,12 @@ package {
 			target.free();
 			return result.x;
 		}
+		public function acrossCallback(callback:Function):Number {
+			var target = new Node2D();
+			callback();
+			var result:Vector2 = target.position;
+			target.free();
+			return result.x;
+		}
 	}
 }
