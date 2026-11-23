@@ -43,6 +43,8 @@ func measure() -> void:
 				var result
 				if managed:
 					result = cs.call("Measure", kind, op, target, rounds)
+				elif args[0] == "self" and kind == "script":
+					result = script.call("self" + op.capitalize(), rounds)
 				else:
 					result = script.call(method, target, rounds)
 				var elapsed := Time.get_ticks_usec() - start

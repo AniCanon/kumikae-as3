@@ -3,7 +3,6 @@ import argparse
 import os
 from pathlib import Path
 import re
-import shutil
 import statistics
 import subprocess
 import sys
@@ -54,14 +53,14 @@ def prepare(godot, build, where):
     return project, library
 
 
-def measure(godot, project, library, mode, rows):
+def measure(godot, project, library, mode, rows, baseline):
     env = dict(os.environ, KAS3_NATIVE_PLAY="0")
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
         env["KAS3_PROGRAM_LIBRARY"] = library
     wanted = [row for row in rows if mode != "C#" or not row.startswith("value/")]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
-           "cs" if mode == "C#" else "as", "20000", *wanted]
+           "cs" if mode == "C#" else "self" if baseline else "as", "20000", *wanted]
     run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=90)
     output = run.stdout + run.stderr
     found = re.findall(r"^NAMED (\w+/\w+) (\d+)$", output, re.M)
@@ -92,7 +91,7 @@ def main():
         samples = {}
         for turn in range(args.runs):
             for label, project, library, mode, rows in (reversed(commands) if turn % 2 else commands):
-                for row, time in measure(godot, project, library, mode, rows).items():
+                for row, time in measure(godot, project, library, mode, rows, label != "PR").items():
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():

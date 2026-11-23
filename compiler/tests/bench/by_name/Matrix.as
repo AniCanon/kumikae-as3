@@ -7,6 +7,10 @@ package {
 		public function current():int { return score; }
 		public function addTarget(value:*):void { targets.push(value); }
 
+		public function selfRead(n:int):int { return scriptRead(this, n); }
+		public function selfWrite(n:int):void { scriptWrite(this, n); }
+		public function selfCall(n:int):int { return scriptCall(this, n); }
+
 		public function scriptRead(target:*, n:int):int {
 			var sum:int = 0;
 			for (var i:int = 0; i < n; i++) sum += int(target.score);
