@@ -242,6 +242,7 @@ class Typer {
 
 	void returned(Return *p_return);
 
+	static void infer_storage(Block *p_body);
 	void function(FunctionDecl *p_function);
 
 	void definition(Node *p_node);

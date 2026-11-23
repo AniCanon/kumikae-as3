@@ -110,6 +110,9 @@ func _physics_process(_delta: float) -> bool:
 	replaced.set_script(null)
 	show("replacement on the same receiver", [before, after, counts, ask("foreignVisible", [replaced])],
 			[false, false, [1, 1], false])
+	replaced.set_script(Intercept)
+	show("proven receiver keeps foreign accessors", [ask("provenVisible", [replaced]), replaced.get("reads"), replaced.get("writes")],
+			[false, 1, 1])
 	replaced.free()
 	control.free()
 	foreign.free()

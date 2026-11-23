@@ -1207,6 +1207,27 @@ static void test_engine_class_values() {
 
 // One of Godot's objects held untyped: its members by their AS3 names, as the engine's table of names has
 // them, and AS3's errors for a name that is not there.
+static void test_inferred_local_storage() {
+	Compilation compilation;
+	compilation.add("Storage.as", "package { public class Storage { public function check(input:int):void {"
+			"var exact:* = input; exact = input; var mixed:* = input; mixed = null;"
+			"trace(early); var early:* = input; var captured:* = input;"
+			"var change:Function = function():void { captured = undefined; }; trace(exact, mixed, early, captured); } } }");
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	size_t count = 0;
+	for (const auto &function : module.functions) {
+		for (const auto &local : function.locals) {
+			if (local.name == "exact" || local.name == "mixed" || local.name == "early") {
+				CHECK(function.registers[local.reg] == (local.name == "exact" ? ir::Kind::I32 : ir::Kind::Any));
+				count++;
+			}
+		}
+	}
+	CHECK_EQ(count, size_t(3));
+}
+
 static void test_engine_members_by_name() {
 	const char *source = "package { import godot.*;\n"
 						 "public class Loose extends Node {\n"
@@ -4502,6 +4523,7 @@ int main() {
 	test_engine_calls();
 	test_engine_method_values();
 	test_engine_class_values();
+	test_inferred_local_storage();
 	test_engine_members_by_name();
 	test_engine_prepared();
 	test_vector_of_values();

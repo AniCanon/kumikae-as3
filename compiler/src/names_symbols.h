@@ -41,6 +41,7 @@ struct Symbol {
 	Node *node = nullptr; // ClassDecl, InterfaceDecl, FunctionDecl or VarDecl; null for the rest.
 	TypeRef *type = nullptr; // The declared type; for a function or method, the return type. May be null.
 	uint16_t modifiers = 0; // Modifiers bits.
+	const Type *storage = nullptr; // Proven representation of a local declared as *.
 	bool is_const = false;
 	bool is_rest = false; // A `...rest` parameter.
 	bool file_private = false; // Declared outside the file's package block.

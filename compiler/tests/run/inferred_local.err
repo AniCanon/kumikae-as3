@@ -1,0 +1,1 @@
+inferred_local.as:7:17: warning: 'exact' has no type: it is taken as '*'. Write ':*' to say so

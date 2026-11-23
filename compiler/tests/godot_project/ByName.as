@@ -88,6 +88,12 @@ package {
 			return [o.isProcessing(), o.position, o.rotation, v.dot(v)];
 		}
 		public function foreignVisible(o:*):Boolean { o.visible = false; return o.visible; }
+		public function provenVisible(source:Node2D):Boolean {
+			var alias:* = source;
+			alias.visible = false;
+			var seen:Boolean = alias.visible;
+			return seen;
+		}
 
 		// A freed object is null.
 		public function freed(o:*):String {
