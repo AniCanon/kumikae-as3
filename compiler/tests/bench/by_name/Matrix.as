@@ -71,6 +71,11 @@ package {
 			try { return computedRead(target, 2); }
 			catch (e:Error) { return -e.errorID; }
 		}
+		public function literalMethod(target:*, n:int):Boolean {
+			var method:*;
+			for (var i:int = 0; i < n; ++i) method = target.isProcessingUnhandledInput;
+			return method();
+		}
 		public function changedRead(target:*, key:String, changer:*):* {
 			var method:*;
 			for (var i:int = 0; i < 5; ++i) {

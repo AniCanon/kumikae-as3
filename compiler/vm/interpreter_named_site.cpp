@@ -9,6 +9,9 @@ namespace kas3::vm {
 
 bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted) {
 	std::string error;
+#if defined(KAS3_TEST_COUNTS)
+	ScriptReadAllocations calls(p_op == ir::Op::DynGet && p_name == "isProcessingUnhandledInput", "literal");
+#endif
 	NamedRead read{ ScriptRead::Declined };
 	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error, &read, p_wanted);
 	if (read.status == ScriptRead::Method || read.status == ScriptRead::Missing) {

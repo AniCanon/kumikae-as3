@@ -164,6 +164,12 @@ class Runner:
 
                 self.check(f"{label}: reads and saved calls see a script attached during AS3 execution",
                            "CHANGED READ true" in text and "CHANGED CALL true" in text, text[-1400:])
+                literal_queries = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: literal script queries ")]
+                literal_gets = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: literal named gets ")]
+                self.check(f"{label}: a foreign literal method reads once and queries its script only on a cold site",
+                           "LITERAL true" in text and len(literal_queries) == 16 and literal_queries[0] <= 1
+                           and literal_queries[1:] == [0] * 15 and literal_gets == [1] * 16,
+                           str(literal_queries) + str(literal_gets))
                 gets = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method named gets ")]
                 queries = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method script queries ")]
                 self.check(f"{label}: a warm bare method read skips both Godot dispatches",

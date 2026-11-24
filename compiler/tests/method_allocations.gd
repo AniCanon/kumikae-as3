@@ -27,6 +27,7 @@ func _initialize() -> void:
 	print("METHOD ", result == receiver.is_processing())
 	receiver.set_script(WithMethod)
 	print("SCRIPT METHOD ", bench.call("readMethod", receiver, "probe_method", 16))
+	print("LITERAL ", bench.call("literalMethod", receiver, 16) == receiver.is_processing_unhandled_input())
 	var bare := Node2D.new()
 	for i in 7:
 		bench.call("addTarget", receiver)

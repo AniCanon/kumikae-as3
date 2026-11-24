@@ -47,9 +47,9 @@ ScriptReadAllocations::ScriptReadAllocations(bool p_report, const char *p_label)
 
 ScriptReadAllocations::~ScriptReadAllocations() {
 	if (label_) {
-		if (std::string_view(label_) == "method") {
-			std::fprintf(stderr, "kas3: method script queries %zu\n", script_queries - queries_);
-			std::fprintf(stderr, "kas3: method named gets %zu\n", named_gets - gets_);
+		if (std::string_view(label_) != "field") {
+			std::fprintf(stderr, "kas3: %s script queries %zu\n", label_, script_queries - queries_);
+			std::fprintf(stderr, "kas3: %s named gets %zu\n", label_, named_gets - gets_);
 		}
 		std::fprintf(stderr, "kas3: %s allocations %zu\n", label_, allocations - start_);
 	}
