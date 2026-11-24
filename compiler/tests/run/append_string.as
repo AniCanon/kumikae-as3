@@ -25,7 +25,15 @@ package {
 			trace(s);
 			s = String.fromCharCode(0xd83d, 0xde00);
 			trace(s.length);
+			// A stale cached count changes these lengths. Omitting the carry makes length
+			// rescan and return the same value; test_append_string checks measured() directly.
 			s += "é";
+			trace(s, s.length);
+			var piece:String = String.fromCharCode(0xd83d, 0xde00);
+			trace(piece.length);
+			s = fresh();
+			s += piece;
+			s += piece;
 			trace(s, s.length);
 
 			var power:String = "x";
