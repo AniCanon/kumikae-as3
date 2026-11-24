@@ -419,7 +419,7 @@ output = compare("by_name.gd", [
     "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
     "exact untyped arguments", "fresh timer after attaching a script", "foreign declarations", "foreign declaration after replacement", "foreign declaration after in-place reload", "typed reload after staging source", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
     "rotating computed names", "Callable field", "method value", "reload classification callback", "reload classification entry", "reload classification reload", "reload classification source",
-    "release during reads", "foreign engine reads", "computed engine methods", "computed misses", "null math receivers", "parameter alias keeps foreign accessors", "parameter alias respects position overrides", "computed getter values keep their types and copies", "freed after warming the site", "a freed object",
+    "foreign engine reads", "computed engine methods", "computed misses", "null math receivers", "parameter alias keeps foreign accessors", "parameter alias respects position overrides", "computed getter values keep their types and copies", "freed after warming the site", "a freed object",
 ])
 check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
 

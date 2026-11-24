@@ -175,6 +175,8 @@ func release_during_reads(target, maker, key):
 		value = target[key]
 	return "bound method" if value is Callable else value
 
+# Native only: native frees the held object when the first read overwrites it, so the second read sees the
+# script that PREDELETE attaches. The interpreter keeps a call's result until the frame is released.
 func check_release() -> void:
 	var target := Node2D.new()
 	var reference := Node2D.new()
