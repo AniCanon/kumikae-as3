@@ -39,7 +39,7 @@ uint32_t written_by(const Instruction &p_in) {
 } // namespace
 
 bool FunctionWriter::runs_code(const Instruction &p_in) const {
-	if ((p_in.op == Op::GetField && borrowed_[p_in.a] != NONE) || (p_in.op == Op::Release && !owns(p_in.a))) {
+	if (p_in.op == Op::GetField && borrowed_[p_in.a] != NONE) {
 		return false;
 	}
 	// What a register of a class whose objects end alone held is let go of with nothing else ending.
