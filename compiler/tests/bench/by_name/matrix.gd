@@ -8,6 +8,67 @@ func median(samples: Array) -> float:
 	var mid := samples.size() >> 1
 	return (float(samples[(samples.size() - 1) >> 1]) + float(samples[mid])) / 2.0
 
+func batch(row: String, target: Variant, rounds: int, mode: String, targets: Array, script: Node, cs: Node) -> int:
+	var kind := row.get_slice("/", 0)
+	var op := row.get_slice("/", 1)
+	var family: String = {"scriptEngineKeys": "engineKeys", "inherited": "node", "gdscript": "node", "foreign": "script", "custom": "custom" if op == "call" else "script"}.get(kind, kind)
+	var method := StringName(family + op.capitalize())
+	for child: Node2D in targets:
+		child.position = Vector2(3, 4)
+		child.rotation = 0
+	script.set("score", 7)
+	var start := Time.get_ticks_usec()
+	var result
+	if mode == "cs" and kind in ["engineKeys", "scriptEngineKeys"]:
+		result = cs.call("EngineKeysRead", target, rounds)
+	elif mode == "cs":
+		result = cs.call("Measure", kind, op, target, rounds)
+	elif mode == "self" and kind == "script":
+		result = script.call("self" + op.capitalize(), rounds)
+	else:
+		result = script.call(method, target, rounds)
+	var elapsed := Time.get_ticks_usec() - start
+	var own := kind in ["script", "foreign", "custom"]
+	var valid := true
+	if kind in ["engineKeys", "scriptEngineKeys"]:
+		valid = is_same(result, [target.position, target.modulate, target.rotation][(rounds - 1) % 3])
+	elif kind == "eightFields":
+		var tail := rounds % 8
+		valid = result == (rounds / 8) * 112 + tail * (tail + 6)
+	elif kind == "computed":
+		valid = result == 8 * rounds - rounds % 2
+	elif kind == "joinThree":
+		valid = result == rounds * 18
+	elif kind == "append":
+		valid = result == rounds * 7
+	elif kind == "appendLength":
+		var tail := rounds % 512
+		valid = result == 7 * ((rounds / 512) * 512 * 513 + tail * (tail + 1)) / 2
+	elif kind == "joinLong":
+		valid = result == target + target
+	elif kind in ["customString", "customVector", "customFields"]:
+		valid = result == rounds * {"customString": 12, "customVector": 10, "customFields": 15}[kind]
+	elif op == "read" or (op == "call" and (own or kind == "value")):
+		valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
+	elif kind in ["proven", "typed"] and op == "call":
+		valid = absf(result - rounds * 0.0001) < rounds * 0.0000001
+	elif kind in ["proven", "typed", "detached"]:
+		valid = result == 17 if op == "write" else absf(angle_difference(result, rounds * 0.0001)) < rounds * 0.0000001
+	elif op == "write" and own:
+		valid = target.score == rounds - 1
+	else:
+		for i in targets.size() if kind == "mixed" else 1:
+			var child: Node2D = targets[i] if kind == "mixed" else target
+			var count: int = (rounds + 7 - i) / 8 if kind == "mixed" else rounds
+			if op == "write":
+				valid = valid and child.position == Vector2(8, 9)
+			else:
+				valid = valid and absf(angle_difference(child.rotation, count * 0.0001)) < maxf(0.002, count * 0.0000001)
+	if not valid:
+		printerr("Wrong result for ", row, " after ", rounds, " rounds: ", result)
+		return -1
+	return elapsed
+
 func measure() -> void:
 	var args := OS.get_cmdline_user_args()
 	var managed := args[0] == "cs"
@@ -44,11 +105,14 @@ func measure() -> void:
 	var pilot := args[2] == "pilot"
 	var rows: Array[String] = []
 	var sizes := {}
+	var partners := {}
 	for entry: String in args.slice(3):
 		var row := entry.get_slice("=", 0)
 		rows.append(row)
 		if not pilot:
 			sizes[row] = int(entry.get_slice("=", 1))
+			if entry.get_slice_count("=") == 3:
+				partners[row] = entry.get_slice("=", 2)
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
@@ -68,93 +132,62 @@ func measure() -> void:
 	# Time equal windows in both directions so the same pair runs first and last equally often.
 	var reverse := rows.duplicate()
 	reverse.reverse()
-	var order := rows if pilot else rows + reverse + reverse + rows
 	var windows := {}
-	for row: String in order:
-		var kind := row.get_slice("/", 0)
-		var op := row.get_slice("/", 1)
-		var target = cases[kind]
-		if (kind in ["foreign", "computed", "eightFields"] or kind.begins_with("custom")) and args[0] == "main":
-			var probe = script.call("probeComputed", target) if kind in ["computed", "eightFields"] else script.call("probeForeign", target, op == "read")
-			if probe == (-1069 if op == "read" else -1006):
-				windows[row] = []
+	for row in rows:
+		windows[row] = []
+	var directions := [rows] if pilot else [rows, reverse, reverse, rows]
+	for order: Array in directions:
+		var visited := {}
+		for first: String in order:
+			if visited.has(first):
 				continue
-		var family: String = {"scriptEngineKeys": "engineKeys", "inherited": "node", "gdscript": "node", "foreign": "script", "custom": "custom" if op == "call" else "script"}.get(kind, kind)
-		var method := StringName(family + op.capitalize())
-		# Accumulate measured batches so short native rows outlast the clock resolution
-		# and both controls reach steady state before their recorded work begins.
-		var rounds: int = sizes.get(row, maxi(1, n / 100) if kind.begins_with("configure") else n)
-		var warm_us := 0
-		var timed_us := 0
-		var batches := []
-		while (batches.size() < 3 if pilot else timed_us < 40000):
-			for child: Node2D in targets:
-				child.position = Vector2(3, 4)
-				child.rotation = 0
-			script.set("score", 7)
-			var start := Time.get_ticks_usec()
-			var result
-			if managed and kind in engine_keys:
-				result = cs.call("EngineKeysRead", target, rounds)
-			elif managed:
-				result = cs.call("Measure", kind, op, target, rounds)
-			elif args[0] == "self" and kind == "script":
-				result = script.call("self" + op.capitalize(), rounds)
-			else:
-				result = script.call(method, target, rounds)
-			var elapsed := Time.get_ticks_usec() - start
-			var own := kind in ["script", "foreign", "custom"]
-			var valid := true
-			if kind in engine_keys:
-				valid = is_same(result, [target.position, target.modulate, target.rotation][(rounds - 1) % 3])
-			elif kind == "eightFields":
-				var tail := rounds % 8
-				valid = result == (rounds / 8) * 112 + tail * (tail + 6)
-			elif kind == "computed":
-				valid = result == 8 * rounds - rounds % 2
-			elif kind == "joinThree":
-				valid = result == rounds * 18
-			elif kind == "append":
-				valid = result == rounds * 7
-			elif kind == "appendLength":
-				var tail := rounds % 512
-				valid = result == 7 * ((rounds / 512) * 512 * 513 + tail * (tail + 1)) / 2
-			elif kind == "joinLong":
-				valid = result == target + target
-			elif kind in ["customString", "customVector", "customFields"]:
-				valid = result == rounds * {"customString": 12, "customVector": 10, "customFields": 15}[kind]
-			elif op == "read" or (op == "call" and (own or kind == "value")):
-				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
-			elif kind in ["proven", "typed"] and op == "call":
-				valid = absf(result - rounds * 0.0001) < rounds * 0.0000001
-			elif kind in ["proven", "typed", "detached"]:
-				valid = result == 17 if op == "write" else absf(angle_difference(result, rounds * 0.0001)) < rounds * 0.0000001
-			elif op == "write" and own:
-				valid = target.score == rounds - 1
-			else:
-				for i in targets.size() if kind == "mixed" else 1:
-					var child: Node2D = targets[i] if kind == "mixed" else target
-					var count: int = (rounds + 7 - i) / 8 if kind == "mixed" else rounds
-					if op == "write":
-						valid = valid and child.position == Vector2(8, 9)
+			var kind := first.get_slice("/", 0)
+			var op := first.get_slice("/", 1)
+			if (kind in ["foreign", "computed", "eightFields"] or kind.begins_with("custom")) and args[0] == "main":
+				var target = cases[kind]
+				var probe = script.call("probeComputed", target) if kind in ["computed", "eightFields"] else script.call("probeForeign", target, op == "read")
+				if probe == (-1069 if op == "read" else -1006):
+					continue
+			var group := [first]
+			if partners.has(first):
+				group.append(partners[first])
+				visited[partners[first]] = true
+			var rounds := {}
+			var batches := {}
+			var totals := {}
+			for row: String in group:
+				rounds[row] = sizes.get(row, maxi(1, n / 100) if row.begins_with("configure") else n)
+				batches[row] = []
+				totals[row] = 0
+			# Both members warm up together, then take turns in ABBA order until both windows are full.
+			var warming := true
+			while true:
+				var ready := true
+				for row: String in group:
+					var elapsed := batch(row, cases[row.get_slice("/", 0)], rounds[row], args[0], targets, script, cs)
+					if elapsed < 0:
+						quit(1)
+						return
+					totals[row] += elapsed
+					if warming:
+						ready = ready and totals[row] >= (1000 if pilot else 20000)
 					else:
-						valid = valid and absf(angle_difference(child.rotation, count * 0.0001)) < maxf(0.002, count * 0.0000001)
-			if not valid:
-				printerr("Wrong result for ", row, " after ", rounds, " rounds: ", result)
-				quit(1)
-				return
-			if warm_us < (1000 if pilot else 20000):
-				warm_us += elapsed
-			else:
-				timed_us += elapsed
-				batches.append(elapsed)
-		if not windows.has(row):
-			windows[row] = []
-		if not pilot and median(batches) < 500:
-			printerr("Batch below 0.5 ms for ", row, ": ", median(batches), " us")
-			quit(1)
-			return
-		windows[row].append(median(batches) * n / rounds)
+						batches[row].append(elapsed)
+						ready = ready and (batches[row].size() >= 3 if pilot else totals[row] >= 40000)
+				group.reverse()
+				if ready:
+					if not warming:
+						break
+					warming = false
+					for row: String in group:
+						totals[row] = 0
+			for row: String in group:
+				var duration := median(batches[row])
+				if not pilot and duration < 500:
+					printerr("Batch below 0.5 ms for ", row, ": ", duration, " us")
+					quit(1)
+					return
+				windows[row].append(duration * n / rounds[row])
 	for row in rows:
 		var times: Array = windows[row]
 		print("NAMED ", row, " ", "unsupported" if times.is_empty() else str(median(times)))

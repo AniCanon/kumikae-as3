@@ -135,7 +135,14 @@ def prepare(godot, build, where, pairs=()):
     return project, library
 
 
-def measure(godot, project, library, mode, rows, label, sizes=None):
+def row_arguments(rows, sizes, pairs):
+    if sizes is None:
+        return list(rows)
+    partners = {left: right for pair in pairs for left, right in (pair, pair[::-1])}
+    return [f"{row}={sizes[row]}" + (f"={partners[row]}" if partners.get(row) in rows else "") for row in rows]
+
+
+def measure(godot, project, library, mode, rows, label, sizes=None, pairs=()):
     env = dict(os.environ, KAS3_NATIVE_PLAY="0")
     env.pop("KAS3_PROGRAM_LIBRARY", None)
     if mode == "native":
@@ -144,7 +151,7 @@ def measure(godot, project, library, mode, rows, label, sizes=None):
               or (row not in STRING_ROWS and row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value"))]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
            "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", str(OPERATIONS),
-           "timed" if sizes else "pilot", *[f"{row}={sizes[row]}" if sizes else row for row in wanted]]
+           "timed" if sizes else "pilot", *row_arguments(wanted, sizes, pairs)]
     run = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     found = re.findall(r"^NAMED (\w+/\w+) ([\d.]+|unsupported)$", output, re.M)
@@ -204,10 +211,10 @@ def main():
                 order = rows[::-1] if turn % 2 else rows
                 alternate = [row for row in order if row in swapped_rows]
                 def second_layout():
-                    return measure(godot, *mirrored[label], mode, alternate, label, sizes)
+                    return measure(godot, *mirrored[label], mode, alternate, label, sizes, pairs)
                 cross = mode == "native" and label in mirrored
                 second = second_layout() if cross and turn % 2 else {}
-                times = measure(godot, project, library, mode, order, label, sizes)
+                times = measure(godot, project, library, mode, order, label, sizes, pairs if cross else ())
                 if cross and not turn % 2:
                     second = second_layout()
                 for row, time in times.items():

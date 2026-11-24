@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from by_name_gate import failures, batch_sizes, swap_placement, short_pairs, layout_mean
+from by_name_gate import failures, batch_sizes, swap_placement, short_pairs, layout_mean, row_arguments
 
 
 class GateTests(unittest.TestCase):
@@ -18,6 +18,13 @@ class GateTests(unittest.TestCase):
         self.assertEqual(short_pairs({"timer/read": [0.04], "timerTyped/read": [0.05],
                                       "proven/read": [1.01], "typed/read": [1.02]}),
                          [("timer/read", "timerTyped/read")])
+
+    def test_adjacent_batches_preserve_reversed_order_and_unpaired_rows(self):
+        rows = ["timerTyped/read", "node/read", "timer/read"]
+        pairs = [("timer/read", "timerTyped/read")]
+        self.assertEqual(row_arguments(rows, dict.fromkeys(rows, 42), pairs),
+                         ["timerTyped/read=42=timer/read", "node/read=42", "timer/read=42=timerTyped/read"])
+        self.assertEqual(row_arguments(rows, None, pairs), rows)
 
     def test_batch_sizes_use_fastest_mode_and_match_controls(self):
         pilots = {"timer/read": [0.04, 0.50], "timerTyped/read": [0.02, 0.49],

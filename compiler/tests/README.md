@@ -255,7 +255,8 @@ per 20,000 operations in the pilot, the gate builds a second image with the two 
 opposite positions. Each round averages their times across both layouts. Longer rows keep the
 original single-layout comparison. The gate checks the result of every batch. Each process
 times four windows per row, twice in each
-direction. Each window warms for at least 20 ms and collects at least 40 ms of timed batches.
+direction. Short native control pairs alternate individual batches in ABBA order within each window.
+Each window warms for at least 20 ms and collects at least 40 ms of timed batches.
 The process takes the median batch time in each window, then the median of the four windows,
 normalized to 20,000 operations. The report gives the median and range across seven rounds.
 Alternate rounds reverse build, mode and row order. The gate fails if a candidate median exceeds its
