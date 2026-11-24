@@ -298,8 +298,9 @@ add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)
 add_test(NAME bench_gate_rules COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_run_bench.py)
-# One huge function must lower in about linear time and memory. Sanitizers multiply both.
-if(NOT KAS3_SANITIZE)
+# One huge function must lower in about linear time and memory. Sanitizers multiply both, and a build
+# that is not optimized takes several times as long.
+if(NOT KAS3_SANITIZE AND CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
     add_test(NAME lowering_bounds COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lowering_bounds.py
         $<TARGET_FILE:kas3c>)
 endif()

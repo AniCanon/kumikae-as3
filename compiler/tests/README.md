@@ -34,7 +34,7 @@ python3 compiler/tests/run_programs.py compiler/build/kas3c compiler/tests
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program: arguments, exit codes, and the language server's framing | `cli`, `lsp_stdio` |
 | `test_generated.py` | The shape of the C++ that `kas3c cpp` writes, where the shape is its speed | `generated` |
 | `test_release_reference.cpp` | Where temporaries are released: every function of every test program, against the pass's definition worked out one instruction at a time | `test_release_reference` |
-| `test_lowering_bounds.py` | One function of thousands of statements, arguments, nested loops or nested `try` blocks must lower in about linear time and memory. Not run with sanitizers | `lowering_bounds` |
+| `test_lowering_bounds.py` | One function of thousands of statements, arguments, nested loops or nested `try` blocks must lower in about linear time and memory. Optimized builds only, and not with sanitizers | `lowering_bounds` |
 | `../godot/test_*.py` | The generator of Godot's API | `godot` |
 | `../tools/check_style.py` | The size limits | `style`, `style_self_test` |
 | `bench/` | Timings, not pass or fail. See [Benchmarks](#benchmarks) | |
