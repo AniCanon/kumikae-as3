@@ -67,7 +67,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			r[in.a].bits = 0;
 			r[in.a].b = p_value;
 		};
-		switch (in.op) {
+		switch (in.op.execution) {
 			case Op::Stmt:
 				if (--countdown_ && !hook_) {
 					goto dispatch;
@@ -92,18 +92,20 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					assign(Kind::Str, r[in.a], strings_[in.b]);
 				}
 				goto dispatch;
+			case Op::Release:
+				put(function.registers[in.a], r[in.a], Slot{});
+				break;
 			case Op::ConstNull:
 				drop(function.registers[in.a], r[in.a]);
+				break;
+			case Op::TakeMove:
+				put(function.registers[in.a], r[in.a], std::exchange(r[in.b], Slot{}));
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
 				if (!held(kind)) {
 					r[in.a] = r[in.b];
 					goto dispatch;
-				}
-				if (transfers_source()) {
-					put(kind, r[in.a], std::exchange(r[in.b], any::undefined()));
-					break;
 				}
 				if (kind == Kind::Val && r[in.a].p && r[in.b].p && host_.handles.assign(r[in.a].p, r[in.b].p)) {
 					break;
@@ -464,6 +466,16 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				put(kind, r[in.a], share(kind, value));
 				break;
 			}
+			case Op::TakeField: {
+				auto *object = static_cast<Object *>(r[in.a].p);
+				if (!object) {
+					raise_null();
+					break;
+				}
+				const auto &klass = module_.classes[object->klass];
+				put(klass.fields[in.b].kind, field(klass, object, in.b), std::exchange(r[in.c], Slot{}));
+				break;
+			}
 			case Op::SetField: {
 				Object *object = static_cast<Object *>(r[in.a].p);
 				if (!object) {
@@ -472,7 +484,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				const ir::Class &klass = module_.classes[object->klass];
 				Kind kind = klass.fields[in.b].kind;
-				put(kind, field(klass, object, in.b), held(kind) ? store_source(kind, r[in.c]) : r[in.c]);
+				put(kind, field(klass, object, in.b), share(kind, r[in.c]));
 				break;
 			}
 			case Op::GetGlobal: {
@@ -480,9 +492,12 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				put(kind, r[in.a], share(kind, globals_[in.b]));
 				break;
 			}
+			case Op::TakeGlobal:
+				put(module_.globals[in.a].kind, globals_[in.a], std::exchange(r[in.b], Slot{}));
+				break;
 			case Op::SetGlobal: {
 				Kind kind = module_.globals[in.a].kind;
-				put(kind, globals_[in.a], held(kind) ? store_source(kind, r[in.b]) : r[in.b]);
+				put(kind, globals_[in.a], share(kind, r[in.b]));
 				break;
 			}
 			case Op::ArgMissing:
@@ -521,9 +536,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				break;
 			}
+			case Op::TakeElement:
+				vector_store<true>(function, in, r);
+				break;
+			case Op::VecSet:
+				vector_store<false>(function, in, r);
+				break;
 			case Op::VecNew:
 			case Op::ArrayNew:
-			case Op::VecSet:
 			case Op::VecLength:
 			case Op::VecSetLength:
 			case Op::VecFixed:

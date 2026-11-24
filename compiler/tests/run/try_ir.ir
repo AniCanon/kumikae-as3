@@ -25,7 +25,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -33,7 +33,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -41,33 +41,43 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function try_ir(r0:Object):void
   @2 ConstStr r3 "body"
   @3 StrToStr r4 r3
   @4 Trace (r4)
-  @5 ConstI32 r2 0
-  @6 Jump @17
-  @9 ConstStr r5 "text"
-  @10 StrToStr r6 r5
-  @11 StrToStr r7 r1
-  @12 Trace (r6, r7)
-  @13 ConstI32 r2 0
-  @14 Jump @17
-  @15 ConstI32 r2 1
-  @16 Jump @17
-  @18 ConstStr r9 "finally"
-  @19 StrToStr r10 r9
-  @20 Trace (r10)
-  @21 I32ToF64 r11 r2
-  @22 ConstF64 r12 0
-  @23 EqF64 r13 r11 r12
-  @24 JumpIf r13 @29
-  @25 ConstF64 r14 1
-  @26 EqF64 r15 r11 r14
-  @27 JumpIfNot r15 @29
-  @28 Rethrow r8
-  @29 ReturnVoid
-  handler @1-@5 -> @7 into r1 catches String
-  handler @1-@15 -> @15 into r8 catches anything, for a finally
+  @5 Release r4
+  @6 ConstI32 r2 0
+  @7 Jump @20
+  @10 ConstStr r5 "text"
+  @11 StrToStr r6 r5
+  @12 StrToStr r7 r1
+  @13 Trace (r6, r7)
+  @14 Release r6
+  @15 Release r7
+  @16 ConstI32 r2 0
+  @17 Jump @20
+  @18 ConstI32 r2 1
+  @19 Jump @20
+  @21 ConstStr r9 "finally"
+  @22 StrToStr r10 r9
+  @23 Trace (r10)
+  @24 Release r10
+  @25 I32ToF64 r11 r2
+  @26 ConstF64 r12 0
+  @27 EqF64 r13 r11 r12
+  @28 JumpIf r13 @33
+  @29 ConstF64 r14 1
+  @30 EqF64 r15 r11 r14
+  @31 JumpIfNot r15 @33
+  @32 Rethrow r8
+  @33 ReturnVoid
+  @34 Release r4
+  @35 Jump @8
+  @36 Release r4
+  @37 Release r6
+  @38 Release r7
+  @39 Jump @18
+  handler @1-@6 -> @34 into r1 catches String
+  handler @1-@18 -> @36 into r8 catches anything, for a finally

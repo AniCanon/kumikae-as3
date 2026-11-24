@@ -20,6 +20,7 @@ namespace {
 // The operations that are sums, tests and moves, or reach only a vector's elements or a static field.
 bool is_plain(Op p_op) {
 	switch (p_op) {
+		case Op::Release:
 		case Op::Stmt:
 		case Op::ConstI32:
 		case Op::ConstU32:
@@ -394,6 +395,9 @@ const FunctionFacts *Facts::called(const ir::Module &p_module, uint32_t p_functi
 }
 
 bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in, const std::vector<bool> &p_counts_nothing) {
+	if (p_in.op == Op::Release) {
+		return may_end(p_function.registers[p_in.a]) && !(p_in.a < p_counts_nothing.size() && p_counts_nothing[p_in.a]);
+	}
 	if (p_in.op == Op::Call) {
 		return may_end(p_module.functions[p_in.b].result); // Kept or not, a result is let go of in the end.
 	}

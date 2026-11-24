@@ -60,7 +60,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -68,7 +68,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -76,7 +76,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function LocalStorage/truth(r0:Object):Boolean
   @1 ConstBool r1 1
@@ -98,7 +98,7 @@ function LocalStorage/ordinaryInferred(r0:Object, r1:Number, r2:Boolean):Number
   @7 InitClass ScoreBox
   @8 New r7 ScoreBox
   @9 Call _ ScoreBox (r7)
-  @10 Move r5 r7
+  @10 TakeMove r5 r7
   @12 ConstF64 r8 0
   @13 Move r6 r8
   @15 Move r9 r4
@@ -135,7 +135,7 @@ function LocalStorage/ordinaryDeclared(r0:Object, r1:Number, r2:Boolean):Number
   @7 InitClass ScoreBox
   @8 New r7 ScoreBox
   @9 Call _ ScoreBox (r7)
-  @10 Move r5 r7
+  @10 TakeMove r5 r7
   @12 ConstF64 r8 0
   @13 Move r6 r8
   @15 Move r9 r4
@@ -246,7 +246,7 @@ function LocalStorage/boxScoreInferred(r0:Object):int
   @1 InitClass ScoreBox
   @2 New r2 ScoreBox
   @3 Call _ ScoreBox (r2)
-  @4 Move r1 r2
+  @4 TakeMove r1 r2
   @6 GetField r3 r1 .0
   @7 Return r3
   @8 ConstI32 r4 0
@@ -255,7 +255,7 @@ function LocalStorage/boxScoreDeclared(r0:Object):int
   @1 InitClass ScoreBox
   @2 New r2 ScoreBox
   @3 Call _ ScoreBox (r2)
-  @4 Move r1 r2
+  @4 TakeMove r1 r2
   @6 GetField r3 r1 .0
   @7 Return r3
   @8 ConstI32 r4 0
@@ -296,7 +296,7 @@ function LocalStorage/colorInferred(r0:Object):Number
   @2 ConstF64 r3 0.5
   @3 ConstF64 r4 0
   @4 HostNew r5 [Color] (r2, r3, r4)
-  @5 Move r1 r5
+  @5 TakeMove r1 r5
   @7 HostGet r6 r1 [Color.g]
   @8 Return r6
   @9 ConstF64 r7 nan
@@ -307,7 +307,7 @@ function LocalStorage/colorDeclared(r0:Object):Number
   @2 ConstF64 r3 0.5
   @3 ConstF64 r4 0
   @4 HostNew r5 [Color] (r2, r3, r4)
-  @5 Move r1 r5
+  @5 TakeMove r1 r5
   @7 HostGet r6 r1 [Color.g]
   @8 Return r6
   @9 ConstF64 r7 nan
@@ -315,7 +315,7 @@ function LocalStorage/colorDeclared(r0:Object):Number
 function LocalStorage/freshInferred(r0:Object):int
   godot r1:Gradient r2:Gradient
   @1 HostNew r2 [Gradient] ()
-  @2 Move r1 r2
+  @2 TakeMove r1 r2
   @4 HostCall r3 [Gradient.getPointCount] (r1)
   @5 Return r3
   @6 ConstI32 r4 0
@@ -323,7 +323,7 @@ function LocalStorage/freshInferred(r0:Object):int
 function LocalStorage/freshDeclared(r0:Object):int
   godot r1:Gradient r2:Gradient
   @1 HostNew r2 [Gradient] ()
-  @2 Move r1 r2
+  @2 TakeMove r1 r2
   @4 HostCall r3 [Gradient.getPointCount] (r1)
   @5 Return r3
   @6 ConstI32 r4 0

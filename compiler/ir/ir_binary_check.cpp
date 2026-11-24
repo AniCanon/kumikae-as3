@@ -35,6 +35,7 @@ bool terminator(Op p_op) {
 bool operand_valid(const Module &p_module, const Function &p_fn, char p_shape, uint32_t p_value) {
 	switch (p_shape) {
 		case 'r': return optional_index(p_value, p_fn.registers.size());
+		case 'T': return p_value < p_fn.registers.size() && is_held(p_fn.registers[p_value]);
 		case 'R': return p_value < p_fn.registers.size();
 		case 'A': return p_value < p_fn.argument_lists.size();
 		case 'L': return p_value < p_fn.code.size();

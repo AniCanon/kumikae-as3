@@ -1,4 +1,5 @@
 #include "lower_bodies.h"
+#include "last_use.h"
 #include "lower_classes.h"
 #include "lower_members.h"
 
@@ -310,7 +311,13 @@ bool Lowerer::run(LowerMode p_mode) {
 
 bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode) {
 	Lowerer lowerer(p_compilation, *r_module);
-	return lowerer.run(p_mode);
+	if (!lowerer.run(p_mode)) {
+		return false;
+	}
+	for (auto &fn : r_module->functions) {
+		release_temporaries(fn);
+	}
+	return true;
 }
 
 } // namespace ir

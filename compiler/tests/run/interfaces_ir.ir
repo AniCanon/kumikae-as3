@@ -33,7 +33,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -41,7 +41,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -49,13 +49,13 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function interfaces_ir(r0:Object):void
   @1 InitClass Square
   @2 New r2 Square
   @3 Call _ Square (r2)
-  @4 Move r1 r2
+  @4 TakeMove r1 r2
   @6 CallInterface r3 ~area (r1)
   @7 F64ToStr r4 r3
   @8 CallInterface r5 ~get name (r1)
@@ -63,10 +63,16 @@ function interfaces_ir(r0:Object):void
   @10 IsClass r6 r1 Named
   @11 BoolToStr r7 r6
   @12 StrToStr r8 r4
-  @13 StrToStr r9 r5
-  @14 StrToStr r10 r7
-  @15 Trace (r8, r9, r10)
-  @16 ReturnVoid
+  @13 Release r4
+  @14 StrToStr r9 r5
+  @15 Release r5
+  @16 StrToStr r10 r7
+  @17 Release r7
+  @18 Trace (r8, r9, r10)
+  @19 Release r8
+  @20 Release r9
+  @21 Release r10
+  @22 ReturnVoid
 function Square/area(r0:Object):Number
   @1 ConstF64 r1 4
   @2 Return r1

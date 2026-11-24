@@ -26,7 +26,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -34,7 +34,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -42,7 +42,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function vectors_ir(r0:Object):void
   @1 ConstU32 r6 0
@@ -57,7 +57,7 @@ function vectors_ir(r0:Object):void
   @10 ConstI32 r12 3
   @11 ConstU32 r13 2
   @12 VecSet r5 r13 r12
-  @13 Move r1 r5
+  @13 TakeMove r1 r5
   @15 ConstI32 r14 1
   @16 Move r2 r14
   @18 ConstI32 r15 0
@@ -74,12 +74,12 @@ function vectors_ir(r0:Object):void
   @31 Move r3 r24
   @32 Move r25 r1
   @33 ObjToBool r26 r25
-  @34 JumpIfNot r26 @52
+  @34 JumpIfNot r26 @64
   @35 ConstF64 r27 0
   @37 VecLength r28 r25
   @38 U32ToF64 r30 r28
   @39 LtF64 r29 r27 r30
-  @40 JumpIfNot r29 @52
+  @40 JumpIfNot r29 @66
   @41 VecGet r31 r25 r27
   @42 Move r4 r31
   @44 I32ToF64 r33 r3
@@ -94,6 +94,14 @@ function vectors_ir(r0:Object):void
   @54 U32ToStr r38 r37
   @55 I32ToStr r39 r3
   @56 StrToStr r40 r38
-  @57 StrToStr r41 r39
-  @58 Trace (r40, r41)
-  @59 ReturnVoid
+  @57 Release r38
+  @58 StrToStr r41 r39
+  @59 Release r39
+  @60 Trace (r40, r41)
+  @61 Release r40
+  @62 Release r41
+  @63 ReturnVoid
+  @64 Release r25
+  @65 Jump @52
+  @66 Release r25
+  @67 Jump @52

@@ -126,6 +126,15 @@ void *object_behind(void *p_handle) {
 	return object;
 }
 
+void set_ref(void *p_private, const void *p_source) {
+	auto &snapshot = *static_cast<Variant *>(p_private);
+	if (p_source) {
+		snapshot = *static_cast<const Variant *>(p_source);
+	} else {
+		snapshot.clear();
+	}
+}
+
 void *box(rt::Parts p_type, const void *p_value) {
 	const int type = godot_type(p_type);
 	Variant zero;
@@ -281,7 +290,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed };
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &set_ref };
 		find_values(&made);
 		return made;
 	}();

@@ -73,7 +73,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	}
 	const ir::Class &klass = module_.classes[vector->klass];
 	const Kind kind = klass.element;
-	switch (p_in.op) {
+	switch (p_in.op.execution) {
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			// Arrays store tagged slots. The usual integer read can transfer one straight to its destination.
@@ -97,18 +97,6 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			}
 			break;
 		}
-		case Op::VecSet: {
-			const Kind index = p_function.registers[p_in.b];
-			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->length);
-			if (at && vector->narrow) {
-				set_place(vector, *at, r[p_in.c]);
-			} else if (at && !vector->bare) {
-				put(kind, slots_of(vector)[*at], held(kind) ? store_source(kind, r[p_in.c]) : r[p_in.c]);
-			} else {
-				vm::vector_set(library_, vector, index, r[p_in.b], r[p_in.c]);
-			}
-			break;
-		}
 		case Op::VecLength:
 			set_uint32(r[p_in.a], vector->length);
 			break;
@@ -125,6 +113,34 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			break;
 	}
 }
+
+// Dispatch selects the transferring form before entering the store.
+template <bool Transfer>
+void Interpreter::vector_store(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+	auto *vector = static_cast<Vector *>(p_registers[p_in.a].p);
+	if (!vector) {
+		raise_null();
+		return;
+	}
+	const Kind index = p_function.registers[p_in.b];
+	const Kind kind = module_.classes[vector->klass].element;
+	const auto at = element_index(index, p_registers[p_in.b], vector->length);
+	if (at && vector->narrow) {
+		set_place(vector, *at, p_registers[p_in.c]);
+	} else if (at && !vector->bare) {
+		Slot &source = p_registers[p_in.c];
+		put(kind, slots_of(vector)[*at], Transfer ? std::exchange(source, Slot{}) : share(kind, source));
+	} else {
+		const size_t source = frames_.back().base + p_in.c;
+		vm::vector_set(library_, vector, index, p_registers[p_in.b], p_registers[p_in.c]);
+		if constexpr (Transfer) {
+			put(kind, stack_[source], Slot{});
+		}
+	}
+}
+
+template void Interpreter::vector_store<true>(const Function &, const Instruction &, Slot *);
+template void Interpreter::vector_store<false>(const Function &, const Instruction &, Slot *);
 
 // VecFrom, Vector.<T>(x), by the library's function: converting an element may run the program.
 void Interpreter::vector_from(const Instruction &p_in) {

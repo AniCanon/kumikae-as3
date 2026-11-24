@@ -85,12 +85,33 @@ std::vector<bool> FunctionWriter::lent_candidates() const {
 	return candidate;
 }
 
+void FunctionWriter::find_field_refs() {
+	field_refs_.assign(function_.registers.size(), false);
+	std::vector<bool> other(function_.registers.size(), false);
+	for (const auto &in : function_.code) {
+		if (in.op == Op::Release && kind(in.a) == Kind::Ref && asked_[in.a] && owns(in.a)) {
+			field_refs_[in.a] = true;
+		}
+		if (const auto written = written_by(in); written != NONE && in.op != Op::GetField) {
+			other[written] = true;
+		}
+		if (in.op.execution != static_cast<Op>(in.op)) {
+			other[in.op == Op::SetField || in.op == Op::VecSet ? in.c : in.b] = true;
+		}
+	}
+	for (size_t i = 0; i < other.size(); ++i) {
+		field_refs_[i] = field_refs_[i] && !other[i];
+	}
+}
+
 void FunctionWriter::read_field(const Instruction &p_in, const std::string &p_field) {
 	if (signal_from_[p_in.a] != NONE || value_from_[p_in.a] != NONE) {
 		return; // The emit, or the operation on the value, that follows reads the field itself.
 	}
 	if (borrowed_[p_in.a] != NONE) {
 		line(reg(p_in.a) + " = " + p_field + ";");
+	} else if (field_refs_[p_in.a]) {
+		line("field_ref" + std::to_string(p_in.a) + ".read(c, " + reg(p_in.a) + ", " + p_field + ");");
 	} else if (kind(p_in.a) == Kind::Ref && asked_[p_in.a] && owns(p_in.a)) {
 		// Read again in a loop, the field most often holds the object the register has a handle on already.
 		line("store_again(c, " + reg(p_in.a) + ", " + p_field + ");");

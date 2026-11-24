@@ -1,6 +1,7 @@
 #include "check.h"
 
 #include "ir.h"
+#include "last_use.h"
 
 #include <cstring>
 #include <string>
@@ -15,7 +16,7 @@ static void test_ops() {
 	CHECK_EQ(std::string(op_name(Op::name)), std::string(#name)); \
 	CHECK_EQ(std::strlen(op_shape(Op::name)), (size_t)3); \
 	for (const char *c = op_shape(Op::name); *c; c++) { \
-		CHECK(std::strchr("RrINWSLAFCDGVME-", *c) != nullptr); \
+		CHECK(std::strchr("RrTINWSLAFCDGVME-", *c) != nullptr); \
 	} \
 	count++;
 	KAS3_IR_OPS(X)
@@ -117,7 +118,26 @@ static void test_print() {
 	CHECK_EQ(print(broken), std::string("static function bad():void\n  @0 Call _ ?function (?)\n  @1 ConstStr r4294967295 ?string\n"));
 }
 
+// A value carried into one branch or an argument abandoned by a throw loses its hold
+// before the first statement on the other path.
+static void test_release_edges() {
+	Function fn;
+	fn.registers = { Kind::Any, Kind::Bool, Kind::Any, Kind::Any };
+	fn.parameters = 2;
+	fn.argument_lists = { {}, { 2 } };
+	fn.code = { { Op::Call, 2, 0, 0 }, { Op::JumpIfNot, 1, 4 }, { Op::Call, NONE, 0, 1 },
+		{ Op::ReturnVoid }, { Op::Stmt }, { Op::ReturnVoid }, { Op::Stmt }, { Op::ReturnVoid } };
+	fn.handlers.push_back({ 2, 3, 6, 3 });
+	release_temporaries(fn);
+	const auto &branch = fn.code[1];
+	CHECK(branch.op == Op::JumpIfNot);
+	CHECK(fn.code[branch.b].op == Op::Release && fn.code[branch.b].a == 2);
+	const auto &caught = fn.code[fn.handlers[0].target];
+	CHECK(caught.op == Op::Release && caught.a == 2);
+}
+
 int main() {
+	test_release_edges();
 	test_ops();
 	test_print();
 	return check::finish();

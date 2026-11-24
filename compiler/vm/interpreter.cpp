@@ -1,5 +1,4 @@
 #include "interpreter_internal.h"
-#include "last_use.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -31,28 +30,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	for (size_t i = 0; i < globals_.size(); i++) {
 		globals_[i] = empty_value(ir::is_floating(module_.globals[i].kind), module_.globals[i].starts_null);
 	}
-	for (const auto &fn : module_.functions) {
-		std::vector<bool> owned(fn.registers.size());
-		for (size_t reg = 0; reg < owned.size(); ++reg) {
-			// A math handle owns only scalar parts. Keeping it lets the next iteration refill it.
-			const bool math = reg < fn.engine_types.size() && ir::bare_named(fn.engine_types[reg]) != ir::Bare::None;
-			owned[reg] = ir::is_held(fn.registers[reg]) && !math;
-		}
-		transfers_.push_back(ir::last_use_stores(fn, owned));
-	}
 	prepare_engine();
-}
-
-bool Interpreter::transfers_source() const {
-	const auto &frame = frames_.back();
-	return transfers_[frame.function][frame.pc - 1];
-}
-
-Slot Interpreter::store_source(Kind p_kind, Slot &p_source) {
-	if (transfers_source()) {
-		return std::exchange(p_source, any::undefined());
-	}
-	return share(p_kind, p_source);
 }
 
 // Each engine instruction is worked out by the host once, now, on the thread that loads the program: none

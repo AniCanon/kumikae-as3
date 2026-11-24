@@ -33,7 +33,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -41,7 +41,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -49,7 +49,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function LocalOperands(r0:Object):void
   @1 ConstF64 r1 2.5
@@ -65,11 +65,19 @@ function LocalOperands(r0:Object):void
   @11 Call r11 LocalOperands/accumulate (r0, r10)
   @12 F64ToStr r12 r11
   @13 StrToStr r13 r3
-  @14 StrToStr r14 r7
-  @15 StrToStr r15 r9
-  @16 StrToStr r16 r12
-  @17 Trace (r13, r14, r15, r16)
-  @18 ReturnVoid
+  @14 Release r3
+  @15 StrToStr r14 r7
+  @16 Release r7
+  @17 StrToStr r15 r9
+  @18 Release r9
+  @19 StrToStr r16 r12
+  @20 Release r12
+  @21 Trace (r13, r14, r15, r16)
+  @22 Release r13
+  @23 Release r14
+  @24 Release r15
+  @25 Release r16
+  @26 ReturnVoid
 function LocalOperands/square(r0:Object, r1:Number):Number
   @0 ConstF64 r2 nan
   @2 Move r2 r1
@@ -90,7 +98,7 @@ function LocalOperands/fields(r0:Object):Number
   @1 InitClass Pair
   @2 New r2 Pair
   @3 Call _ Pair (r2)
-  @4 Move r1 r2
+  @4 TakeMove r1 r2
   @6 GetField r3 r1 .0
   @7 GetField r4 r1 .1
   @8 AddF64 r5 r3 r4

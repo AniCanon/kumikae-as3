@@ -25,7 +25,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -33,7 +33,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -41,7 +41,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function wide_const(r0:Object):void
   @1 ConstI64 r2 9007199254740993
@@ -50,5 +50,7 @@ function wide_const(r0:Object):void
   @5 AddI64 r4 r1 r3
   @6 I64ToStr r5 r4
   @7 StrToStr r6 r5
-  @8 Trace (r6)
-  @9 ReturnVoid
+  @8 Release r5
+  @9 Trace (r6)
+  @10 Release r6
+  @11 ReturnVoid

@@ -60,9 +60,6 @@ private:
 	const ir::Module &module_;
 	Host host_;
 	NamedSites named_sites_;
-	std::vector<std::vector<bool>> transfers_;
-	bool transfers_source() const;
-	Slot store_source(ir::Kind p_kind, Slot &p_source);
 	CountedLoops loops_{ module_ };
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	// What each object was constructed with, while a host asks for it to be remembered: none otherwise.
@@ -319,6 +316,7 @@ private:
 	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(const_cast<Library &>(library_), p_a, p_b); }
+	template <bool Transfer> void vector_store(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);

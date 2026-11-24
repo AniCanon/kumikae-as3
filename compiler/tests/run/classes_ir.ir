@@ -34,7 +34,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -42,7 +42,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -50,14 +50,14 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function classes_ir(r0:Object):void
   @1 InitClass Square
   @2 New r2 Square
   @3 ConstF64 r3 2
   @4 Call _ Square (r2, r3)
-  @5 Move r1 r2
+  @5 TakeMove r1 r2
   @7 NullCheck r1
   @8 CallVirtual r4 #0 (r1)
   @9 F64ToStr r5 r4
@@ -68,10 +68,16 @@ function classes_ir(r0:Object):void
   @14 IsClass r8 r1 Square
   @15 BoolToStr r9 r8
   @16 StrToStr r10 r5
-  @17 StrToStr r11 r7
-  @18 StrToStr r12 r9
-  @19 Trace (r10, r11, r12)
-  @20 ReturnVoid
+  @17 Release r5
+  @18 StrToStr r11 r7
+  @19 Release r7
+  @20 StrToStr r12 r9
+  @21 Release r9
+  @22 Trace (r10, r11, r12)
+  @23 Release r10
+  @24 Release r11
+  @25 Release r12
+  @26 ReturnVoid
 function Shape(r0:Object):void
   @1 GetGlobal r1 Shape.count
   @2 I32ToF64 r2 r1

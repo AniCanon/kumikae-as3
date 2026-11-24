@@ -12,7 +12,7 @@ bool first_is_read(ir::Op p_op);
 // library works on a copy of what it is handed, so such a register is handed back.
 uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in);
 
-// Which stores can transfer the source reference without a later read observing an empty register.
-std::vector<bool> last_use_stores(const Function &p_function, const std::vector<bool> &p_owned);
+// Insert releases on completion of the instruction that last uses an owned temporary.
+void release_temporaries(Function &r_function, bool p_stripped = false);
 
 } // namespace kas3::ir

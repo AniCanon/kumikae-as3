@@ -31,7 +31,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -39,7 +39,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -47,7 +47,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function LocalArithmetic(r0:Object):void
   @1 ConstF64 r1 3.5
@@ -59,19 +59,27 @@ function LocalArithmetic(r0:Object):void
   @7 Call r7 LocalArithmetic/total (r0, r5, r6)
   @8 F64ToStr r8 r7
   @9 StrToStr r9 r4
-  @10 StrToStr r10 r8
-  @11 Trace (r9, r10)
-  @13 ConstF64 r11 2147483647
-  @14 ConstBool r12 1
-  @15 Call r13 LocalArithmetic/total (r0, r11, r12)
-  @16 F64ToStr r14 r13
-  @17 StrToStr r15 r14
-  @18 Trace (r15)
-  @20 Call r16 LocalArithmetic/wide (r0)
-  @21 F64ToStr r17 r16
-  @22 StrToStr r18 r17
-  @23 Trace (r18)
-  @24 ReturnVoid
+  @10 Release r4
+  @11 StrToStr r10 r8
+  @12 Release r8
+  @13 Trace (r9, r10)
+  @14 Release r9
+  @15 Release r10
+  @17 ConstF64 r11 2147483647
+  @18 ConstBool r12 1
+  @19 Call r13 LocalArithmetic/total (r0, r11, r12)
+  @20 F64ToStr r14 r13
+  @21 StrToStr r15 r14
+  @22 Release r14
+  @23 Trace (r15)
+  @24 Release r15
+  @26 Call r16 LocalArithmetic/wide (r0)
+  @27 F64ToStr r17 r16
+  @28 StrToStr r18 r17
+  @29 Release r17
+  @30 Trace (r18)
+  @31 Release r18
+  @32 ReturnVoid
 function LocalArithmetic/wide(r0:Object):Number
   @0 ConstF64 r1 nan
   @2 ConstF64 r2 2147483647
@@ -97,7 +105,7 @@ function LocalArithmetic/total(r0:Object, r1:Number, r2:Boolean):Number
   @7 InitClass Amount
   @8 New r7 Amount
   @9 Call _ Amount (r7)
-  @10 Move r5 r7
+  @10 TakeMove r5 r7
   @12 GetField r8 r5 .0
   @13 ConstI32 r9 1
   @14 I32ToF64 r11 r8

@@ -88,7 +88,7 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 		case Op::AnyDiv:
 		case Op::AnyMod:
 		case Op::AnyNeg:
-			return LibraryEntry{ "any_operate", static_cast<uint32_t>(p_in.op) };
+			return LibraryEntry{ "any_operate", static_cast<uint32_t>(p_in.op.execution) };
 		case Op::MakeFunction:
 			return LibraryEntry{ "function_make", p_in.b };
 		case Op::MakeMethod:

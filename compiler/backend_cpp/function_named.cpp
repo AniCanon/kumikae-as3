@@ -49,7 +49,7 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	const std::string guard = (literal ? "!kas3::vm::any::is_engine(" + reg(holder) + ")" :
 			"kas3::vm::any::tag(" + reg(holder) + ") != kas3::vm::AnyTag::Godot") + " ? kas3::vm::NamedResult::Declined : ";
 	const std::string receiver = reg(holder);
-	line("const auto handled = " + guard + "named_access(c, " + (literal ? "&site, " : "nullptr, ") + std::to_string(static_cast<unsigned>(p_in.op)) +
+	line("const auto handled = " + guard + "named_access(c, " + (literal ? "&site, " : "nullptr, ") + std::to_string(static_cast<unsigned>(p_in.op.execution)) +
 			", " + receiver + ", " + (literal ? reg(key) : "key_of(c, " + reg(key) + ")") + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", " + reuse + ", " + (!literal && repeated_read_ == pc_ ? "&bare_reads" : "nullptr") + ", &w);");
 	line("if (handled != kas3::vm::NamedResult::Declined) {");
 	check();

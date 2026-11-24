@@ -1,4 +1,5 @@
 #include "ir_binary.h"
+#include "last_use.h"
 #include "ir_binary_check.h"
 
 #include <cstring>
@@ -155,7 +156,7 @@ public:
 		}
 		u32(static_cast<uint32_t>(p_fn.code.size()));
 		for (const Instruction &in : p_fn.code) {
-			byte(static_cast<uint8_t>(in.op));
+			byte(static_cast<uint8_t>(in.op.execution));
 			u32(in.a);
 			u32(in.b);
 			u32(in.c);
@@ -412,7 +413,7 @@ public:
 		return u32_list(&r_out->interfaces) && u32_list(&r_out->interface_methods) && text_list(&r_out->signals);
 	}
 
-	bool function(Function *r_out) {
+	bool function(Function *r_out, uint8_t p_last_op) {
 		uint8_t bits = 0;
 		uint32_t count = 0;
 		if (!text(&r_out->name) || !u32(&r_out->file) || !u32(&r_out->position) || !u32(&r_out->owner) ||
@@ -450,7 +451,7 @@ public:
 		for (uint32_t i = 0; i < count; i++) {
 			uint8_t op = 0;
 			Instruction &in = r_out->code[i];
-			if (!byte(&op) || op > OP_MAX || !u32(&in.a) || !u32(&in.b) || !u32(&in.c) || !u32(&in.position)) {
+			if (!byte(&op) || op > p_last_op || !u32(&in.a) || !u32(&in.b) || !u32(&in.c) || !u32(&in.position)) {
 				return fail("invalid instruction in binary IR module");
 			}
 			in.op = static_cast<Op>(op);
@@ -592,7 +593,7 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	if (!r.u32(&version)) {
 		return r.error();
 	}
-	if (version != BINARY_VERSION) {
+	if (version != 1 && version != BINARY_VERSION) {
 		return "unsupported binary IR version " + std::to_string(version);
 	}
 	Module module;
@@ -620,7 +621,7 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	}
 	module.functions.resize(count);
 	for (uint32_t i = 0; i < count; i++) {
-		if (!r.function(&module.functions[i])) {
+		if (!r.function(&module.functions[i], version == 1 ? static_cast<uint8_t>(Op::HostBindMethod) : OP_MAX)) {
 			return r.error();
 		}
 	}
@@ -682,6 +683,9 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	}
 	for (auto &fn : module.functions) {
 		fn.bound_engine_method = fn.bound_engine_method || stripped_forwarder(fn, module);
+		if (version == 1) {
+			release_temporaries(fn, true);
+		}
 	}
 	*r_module = std::move(module);
 	return std::nullopt;

@@ -25,7 +25,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -33,7 +33,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -41,7 +41,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 SetField r0 .3 r4
+  @5 TakeField r0 .3 r4
   @6 ReturnVoid
 function string_ir(r0:Object):void
   @1 ConstStr r3 "abc"
@@ -57,24 +57,33 @@ function string_ir(r0:Object):void
   @13 Move r2 r10
   @14 NullCheck r5
   @15 StrCall r11 2 (r5, r6, r7)
-  @16 I32ToStr r12 r11
-  @17 ConstF64 r13 2.5
-  @18 ConstU32 r14 0
-  @19 U32ToF64 r15 r14
-  @20 NumText r16 1 (r13, r15)
-  @21 I32ToF64 r17 r2
-  @22 EqF64 r19 r17 r17
-  @23 Not r18 r19
-  @24 BoolToStr r20 r18
-  @25 ConstI32 r21 64
-  @26 I32ToF64 r23 r2
-  @27 I32ToF64 r24 r21
-  @28 AddF64 r22 r23 r24
-  @29 ConstF64 r25 66
-  @30 StrCall r26 12 (r22, r25)
-  @31 StrToStr r27 r12
-  @32 StrToStr r28 r16
-  @33 StrToStr r29 r20
-  @34 StrToStr r30 r26
-  @35 Trace (r27, r28, r29, r30)
-  @36 ReturnVoid
+  @16 Release r5
+  @17 I32ToStr r12 r11
+  @18 ConstF64 r13 2.5
+  @19 ConstU32 r14 0
+  @20 U32ToF64 r15 r14
+  @21 NumText r16 1 (r13, r15)
+  @22 I32ToF64 r17 r2
+  @23 EqF64 r19 r17 r17
+  @24 Not r18 r19
+  @25 BoolToStr r20 r18
+  @26 ConstI32 r21 64
+  @27 I32ToF64 r23 r2
+  @28 I32ToF64 r24 r21
+  @29 AddF64 r22 r23 r24
+  @30 ConstF64 r25 66
+  @31 StrCall r26 12 (r22, r25)
+  @32 StrToStr r27 r12
+  @33 Release r12
+  @34 StrToStr r28 r16
+  @35 Release r16
+  @36 StrToStr r29 r20
+  @37 Release r20
+  @38 StrToStr r30 r26
+  @39 Release r26
+  @40 Trace (r27, r28, r29, r30)
+  @41 Release r27
+  @42 Release r28
+  @43 Release r29
+  @44 Release r30
+  @45 ReturnVoid
