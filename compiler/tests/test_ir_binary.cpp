@@ -84,6 +84,8 @@ static void test_round_trip_program_and_execution() {
 					trace(int(bytes[0]));
 					var singles:Vector.<float> = new <float>[16777217];
 					trace(singles[0] + float(1), singles[0] + 1);
+					var inspect:(Greeter,int)=>void = function(g:Greeter, n:int):void { g.greet(String(n)); };
+					inspect(this, 1);
 					var sum:int = 0;
 					var add:(int)=>void = function(v:int):void { sum += v; };
 					for each (var n:int in nums) {
@@ -104,6 +106,7 @@ static void test_round_trip_program_and_execution() {
 	CHECK(lower_files({ { "Main.as", main_src }, { "Base.as", base }, { "Greeter.as", greeter } }, false, &original));
 
 	const std::string listing = ir::print(original);
+	CHECK(listing.find("CallObjectCallback") != std::string::npos);
 	CHECK(listing.find("CallTypedFunction") != std::string::npos);
 	CHECK(listing.find("I32ToU8") != std::string::npos);
 	CHECK(listing.find("U8ToI32") != std::string::npos);

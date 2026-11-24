@@ -136,7 +136,7 @@ result. Calls check the number and types of arguments and perform the same scala
 a named call. Write `()=>void` for a callback that takes no arguments and returns nothing.
 
 Callback parameters and results can use `Boolean`, `byte`, `int`, `uint`, `Int64`, `float`, `Number`
-and `String`. The result can also be `void`. Targets take a fixed number of required parameters. Their
+and `String`. Parameters can also use a script class or interface. The result can also be `void`. Targets take a fixed number of required parameters. Their
 bodies can use `arguments`. A callback can be passed, returned or stored in a field. Assign it to
 `Function` to use `.call`, `.apply` or other Function members. An assignment from an erased
 `Function`, `Object` or `*` to a callback is a compile error. If dynamic code supplies a function

@@ -60,14 +60,29 @@ bool instruction_valid(const Module &p_module, const Function &p_fn, const Instr
 		return false;
 	}
 	switch (p_in.op) {
-		case Op::CallTypedFunction: {
+		case Op::CallObjectCallback: case Op::CallTypedFunction: {
 			const auto scalar = [](Kind p_kind) {
 				return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64 || p_kind == Kind::U8 ||
 						is_floating(p_kind) || p_kind == Kind::Bool || p_kind == Kind::Str;
 			};
 			const auto &args = p_fn.argument_lists[p_in.c];
-			return p_fn.registers[p_in.b] == Kind::Obj && (p_in.a == NONE || scalar(p_fn.registers[p_in.a])) &&
-					std::all_of(args.begin(), args.end(), [&](uint32_t p_reg) { return p_reg < p_fn.registers.size() && scalar(p_fn.registers[p_reg]); });
+			if (p_fn.registers[p_in.b] != Kind::Obj || (p_in.a != NONE && !scalar(p_fn.registers[p_in.a]))) {
+				return false;
+			}
+			const bool paired = p_in.op == Op::CallObjectCallback;
+			if (paired && args.size() % 2 != 0) {
+				return false;
+			}
+			for (size_t i = 0; i < args.size(); ++i) {
+				if (args[i] >= p_fn.registers.size()) {
+					return false;
+				}
+				const Kind kind = p_fn.registers[args[i]];
+				if (paired && i % 2 ? kind != Kind::U32 : !scalar(kind) && !(paired && kind == Kind::Obj)) {
+					return false;
+				}
+			}
+			return true;
 		}
 		case Op::ConstU32:
 			return p_fn.registers[p_in.a] != Kind::U8 || p_in.b <= UINT8_MAX;

@@ -22,7 +22,7 @@ A proven local uses the same registers, bound members and instructions as a loca
 
 A typed loop variable uses the same checked conversion as an assignment when a collection supplies an untyped element.
 
-`CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.
+`CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. For a script-object parameter, `CallObjectCallback` also carries the declared class at the call site. Packed modules preserve these checks.
 
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,
   so values carry no tags.
