@@ -256,6 +256,20 @@ static void test_release_stays_on_its_path() {
 	}
 }
 
+// A value a branch reads for the last time ends whichever way the branch goes.
+static void test_release_after_a_branch() {
+	Function fn;
+	fn.registers = { Kind::Any };
+	fn.argument_lists = { {} };
+	fn.code = { { Op::Call, 0, 0, 0 }, { Op::JumpIf, 0, 3 }, { Op::ReturnVoid }, { Op::ReturnVoid } };
+	TemporaryReleases().insert(fn);
+	const auto &branch = fn.code[1];
+	CHECK(branch.op == Op::JumpIf);
+	CHECK(fn.code[2].op == Op::Release && fn.code[2].a == 0);
+	CHECK(fn.code[branch.b].op == Op::Release && fn.code[branch.b].a == 0);
+	CHECK(fn.code[branch.b + 1].op == Op::Jump && fn.code[fn.code[branch.b + 1].a].op == Op::ReturnVoid);
+}
+
 static void test_store_live_on_another_path() {
 	Function fn;
 	fn.registers = { Kind::Obj, Kind::Obj, Kind::Bool, Kind::Any };
@@ -278,6 +292,7 @@ int main() {
 	test_store_live_on_another_path();
 	test_release_edges();
 	test_release_stays_on_its_path();
+	test_release_after_a_branch();
 	test_ops();
 	test_print();
 	return check::finish();
