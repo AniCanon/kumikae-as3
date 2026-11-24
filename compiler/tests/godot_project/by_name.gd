@@ -328,16 +328,14 @@ func _physics_process(_delta: float) -> bool:
 			[false, 1, 1])
 	show("computed misses", ask("missingKeys", [control, 256]), 0)
 	show("null math receivers", ask("nullParts"), [1009, 1009])
-	var methods := []
-	var expected_methods := []
+	control.set_process_input(true)
+	foreign.set_process_input(false)
+	var expected_methods: Array[Callable] = []
 	for receiver in [control, foreign, control, foreign]:
-		methods.append(ask("countMethodReads", [receiver, "isProcessingInput"]))
-		var count := 0
+		ask("saveMethodReads", [receiver, "isProcessingInput"])
 		for i in 5:
-			if receiver["is_processing_input"] is Callable:
-				count += 1
-		expected_methods.append(count)
-	show("computed engine methods", methods, expected_methods)
+			expected_methods.append(receiver.get(&"is_processing_input"))
+	show("computed engine methods", ask("callReadMethods"), expected_methods.map(observed))
 	check_engine_reads()
 	check_positions()
 	replaced.free()

@@ -143,16 +143,31 @@ class Runner:
             self.check("native: %s leaves to the library what %s says" % (label, os.path.basename(listed)), counted == wanted.get(name),
                        "\nlisted   %s\ncounted  %s\n%s" % (wanted.get(name), counted, detail))
 
+    def method_allocations(self):
+        with tempfile.TemporaryDirectory() as where:
+            files = ["project.godot", os.path.join(self.tests, "bench/by_name/Matrix.as"),
+                     os.path.join(self.tests, "method_allocations.gd")]
+            project = self.project(where, self.extension, files)
+            program = self.library("the computed method benchmark", project, ["Matrix.as"], where)
+            if not program:
+                return
+            for label, library in (("interpreter", None), ("native", program)):
+                status, text = self.run(project, "method_allocations.gd", library, extra_env={"KAS3_METHOD_ALLOCATIONS": "1"})
+                allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method allocations ")]
+                self.check(f"{label}: warmed computed method reads allocate only the bound value",
+                           status == 0 and (USED in text) == bool(library) and "METHOD true" in text
+                           and len(allocations) == 16 and max(allocations[2:]) <= 1, str(allocations) + text[-600:])
+
     def probe(self):
         """The probe by the interpreter and as native code: what each run prints of it."""
         if not self.able("the native probe"):
             return
+        self.method_allocations()
         sources = os.path.join(self.tests, "godot_native")
         with tempfile.TemporaryDirectory() as where:
             # With the scripts places.gd and emits.gd hold to GDScript under the interpreter: here each is held to
             # itself as native code.
             shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd", "Loops.as", "Callables.as", "Kinds.as", "ByName.as", "by_name.gd")]
-            shared.extend([os.path.join(self.tests, "bench/by_name/Matrix.as"), os.path.join(self.tests, "method_allocations.gd")])
             project = self.project(where, sources, sorted(os.listdir(sources)) + shared)
             scripts = sorted(name for name in os.listdir(project) if name.endswith(".as"))
             program = self.library("the probe", project, scripts, where)
@@ -162,11 +177,6 @@ class Runner:
                 self.check("native: a closed Play library leaves dyld", retained_on_macos(program) == 0, program)
             said = {}
             for label, library in (("interpreter", None), ("native", program)):
-                status, text = self.run(project, "method_allocations.gd", library, extra_env={"KAS3_METHOD_ALLOCATIONS": "1"})
-                allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method allocations ")]
-                self.check(f"{label}: warmed computed method reads allocate only the bound value",
-                           status == 0 and (USED in text) == bool(library) and "METHOD true" in text
-                           and len(allocations) == 16 and max(allocations[2:]) <= 1, str(allocations) + text[-600:])
                 status, text = self.run(project, "probe.gd", library)
                 self.check("native: the probe runs (%s)" % label, status == 0, "exit %d\n%s" % (status, text[-600:]))
                 self.check("native: %s" % ("the program library is used" if library else "no library without one"),

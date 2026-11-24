@@ -183,6 +183,10 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 		vm_.raise(vm_.module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
 		return false;
 	}
+	return call_bound(p_holder, found.godot, found.script_only ? nullptr : found.invoke, p_given, p_out);
+}
+
+bool EngineNamed::call_bound(Slot p_holder, std::string_view p_godot, const Prepared *p_binding, const std::vector<Slot> &p_given, uint32_t p_out) {
 	// Each argument as it is held; a function goes as Godot's Callable, as it does where the method is named.
 	const size_t count = p_given.size() + 1;
 	Argument few[16];
@@ -213,8 +217,8 @@ std::optional<bool> EngineNamed::call(Slot p_holder, const PropertyKey &p_key, c
 	const size_t frame = vm_.frames_.size() - 1;
 	bool ok = ready == count;
 	if (ok) {
-		const auto done = prepared(vm_.host_.handles, checked_, found.script_only ? nullptr : found.invoke, arguments, count, wanted, &result, &error);
-		ok = done ? *done : vm_.host_.handles.call(handle, found.godot, arguments + 1, count - 1, wanted, &result, &error);
+		const auto done = prepared(vm_.host_.handles, checked_, p_binding, arguments, count, wanted, &result, &error);
+		ok = done ? *done : vm_.host_.handles.call(handle, p_godot, arguments + 1, count - 1, wanted, &result, &error);
 	}
 	for (size_t i = 1; i < ready; i++) {
 		if (arguments[i].kind == Kind::Val) {

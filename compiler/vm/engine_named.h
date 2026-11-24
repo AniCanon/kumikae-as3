@@ -49,6 +49,7 @@ public:
 	bool read(const NamedMember &p_member, Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	std::optional<bool> set(Slot p_holder, const PropertyKey &p_key, Slot p_value);
 	std::optional<bool> call(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool call_bound(Slot p_holder, std::string_view p_godot, const Prepared *p_binding, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool has(Slot p_holder, const PropertyKey &p_key) const;
 	// A function value as Godot's Callable, a new handle: bound to what the function is called with first (a
 	// method's object, a function expression's environment), or to the function value itself for one that

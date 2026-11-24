@@ -233,12 +233,15 @@ package {
 			return [observed(target.isProcessing), observed(target[method]),
 				target.position, target[property], observed(target.isVisibleInTree), observed(target[plain])];
 		}
-		public function countMethodReads(target:*, key:String):int {
-			var count:int = 0;
-			for (var i:int = 0; i < 5; ++i) {
-				if (target[key] is Function) ++count;
-			}
-			return count;
+		private var savedMethods:Array = [];
+		public function saveMethodReads(target:*, key:String):void {
+			for (var i:int = 0; i < 5; ++i) savedMethods.push(target[key]);
+		}
+		public function callReadMethods():Array {
+			var results:Array = [];
+			for each (var method:* in savedMethods) results.push(method());
+			savedMethods = [];
+			return results;
 		}
 	}
 }
