@@ -57,7 +57,11 @@ A proven local uses the same registers, bound members and instructions as a loca
 | `ir_reach.h` | What an instruction calls, and the code reached from a function |
 | `library_methods.h`, `library_names.h`, `library_entries.h` | The built-in library's methods by name: what each takes and gives, and the operation that carries it out. Read by the lowerer, the interpreter and the C++ backend |
 | `adjacent_uses.h` | Single-use temporaries and control-flow entries shared by the interpreter and native backend |
-| `ir_last_use.cpp`, `last_use.h` | Temporary lifetimes across branches and catch edges, including stores that take ownership |
+| `register_uses.h` | What one instruction reads, writes and may continue at, from a table worked out from the operations' shapes |
+| `sparse_set.h` | Sets of registers kept as their words of bits that are not empty |
+| `liveness.h`, `ir_liveness.cpp` | Which registers hold a value that is read later, solved over basic blocks. Handlers' targets count as successors of every block in their range |
+| `temporary_releases.h`, `ir_temporary_releases.cpp` | The pass that releases each owned temporary at its last use, on a branch's edge or before a handler, and marks the stores that take ownership |
+| `last_use.h`, `ir_last_use.cpp` | For native code: the stores whose source is dead on every successor, and registers changed in place |
 | `lower.h`, `lower.cpp` | The entry point |
 | `lowerer.h` | The `Lowerer` class: its state, and the helpers every part of the lowering uses |
 | `lower_env.h`, `lower_flow.h` | Places a value is stored in, captured variables, and the loops and `try` statements around the code being lowered |
@@ -96,4 +100,5 @@ Its lowering goes in the `lower_*.cpp` that owns that kind of code.
 ## Tests
 
 `test_ir`, `test_ir_binary`, `test_constructors`, `test_vm`, and the `programs` group, which runs every program in
-`tests/run/`.
+`tests/run/`. `test_release_reference` holds the release of temporaries to its definition for every test
+program.

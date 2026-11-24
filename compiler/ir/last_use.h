@@ -13,7 +13,4 @@ uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction 
 // Of the candidate stores, select those whose source value is dead on every successor.
 std::vector<bool> last_stores(const Function &p_function, const std::vector<bool> &p_candidate);
 
-// Insert releases on completion of the instruction that last uses an owned temporary.
-void release_temporaries(Function &r_function, bool p_stripped = false);
-
 } // namespace kas3::ir
