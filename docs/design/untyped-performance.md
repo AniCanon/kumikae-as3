@@ -101,7 +101,8 @@ observe the override once per access and raise the conversion error.
 Operations that observe the dynamic tag, including `typeof`, `is`, `as` and `delete`, keep their
 dynamic semantics. Parameters and the `arguments` array keep their declared calling convention.
 
-An untyped read on a receiver with a foreign script uses Godot's named getter. Literal and
+Explicitly typed access to a Godot member uses its declared binding and skips a foreign
+script's `_get`. An untyped read on a receiver with a foreign script uses Godot's named getter. Literal and
 computed reads translate an engine name to its Godot spelling and follow the same order as
 GDScript's `Object.get`. Godot checks the script's declared members, including methods, then
 its `_get`, then the engine class. A getter can therefore return a number for an engine method
@@ -146,7 +147,9 @@ debugger hook runs. Each function call starts with a fresh guard. A saved engine
 its prepared binding with the captured receiver and names. It checks the receiver at call time
 so a newly attached script can supply the implementation.
 
-After a script reload removes a field, its current `_get` can supply the value. A method read
+If an in-place reload during an AS3 call removes a field, the next untyped read uses the
+script's current `_get`. If Godot still cannot supply the property, AS3 raises a catchable
+`ReferenceError` 1069. A method read
 produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
 the host refreshes that script's declarations before choosing the error. Other declaration
 lookups reuse the reflected table until Godot enters AS3 again or AS3 reloads or changes a
