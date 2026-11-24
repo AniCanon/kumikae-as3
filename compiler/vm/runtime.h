@@ -198,6 +198,14 @@ size_t live_objects();
 Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
 // The two, one after the other, made at once: nothing else is allocated. Two halves of a character that
 // meet there become the character (vm/text_units.h). Null if out of memory.
+// Primitive words (numbers, null and Booleans) are ASCII. Strings retain their cached UTF-16 count.
+struct JoinOperand {
+	std::string_view bytes;
+	const Str *string = nullptr;
+	explicit JoinOperand(std::string_view p_ascii) : bytes(p_ascii) {}
+	JoinOperand(const Str *p_string) : bytes(p_string ? p_string->view() : std::string_view("null")), string(p_string) {}
+};
+Str *join_strings(JoinOperand p_first, JoinOperand p_second);
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
 // One reference; fields zeroed. Null if out of memory. It is put on the list (the collector's list_for() its

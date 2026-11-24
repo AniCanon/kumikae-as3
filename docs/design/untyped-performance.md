@@ -213,8 +213,9 @@ restores its saved high byte. Overflow sites look up a binding before allocating
 
 An AS3 String holds immutable UTF-8 bytes. The first length read counts UTF-16 units and saves
 the result on that string. Below 65,535 bytes, the byte and unit counts share a four-byte word.
-Larger strings use full-width counts. Typed, dynamic and generated length reads share it. This avoids scanning
-the same text for each call in a loop and leaves strings whose length you never read unscanned.
+Larger strings use full-width counts. Typed, dynamic and generated length reads share it. Concatenation stays lazy when
+both counts are unknown. Once either operand has a count, it measures the other operand once and
+keeps the sum. Repeated appends and length reads avoid rescanning the growing string.
 
 Rebuild generated native libraries for runtime layout `0x4b41533300000017`.
 The loader checks the layout before using a site's runtime entry points.

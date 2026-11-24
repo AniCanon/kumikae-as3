@@ -419,6 +419,21 @@ static void test_text_units() {
 	CHECK(whole && whole->length() == 4);
 	CHECK(whole && whole->units == 4);
 	free_string(whole);
+	for (size_t prefix : { 4, 65532, 65536 }) {
+		Str *built = new_string(std::string(prefix, 'a') + high);
+		Str *piece = new_string(low);
+		CHECK_EQ(built->length(), static_cast<int32_t>(prefix + 1));
+		for (int append = 0; append < 3; ++append) {
+			Str *next = join_strings(built, piece);
+			free_string(built);
+			built = next;
+			const int32_t cached = next->short_size == UINT16_MAX ? static_cast<LongStr *>(next)->full_units : next->units;
+			CHECK_EQ(cached, static_cast<int32_t>(prefix + 2 + append));
+			CHECK_EQ(next->length(), static_cast<int32_t>(prefix + 2 + append));
+		}
+		free_string(built);
+		free_string(piece);
+	}
 	CHECK_EQ(find_units(face, high, 0), 1);
 	CHECK_EQ(find_units(face, low, 0), 2);
 	CHECK_EQ(find_units(face, low + "b", 0), 2);

@@ -220,16 +220,15 @@ bool any_numbers(Library &p_library, Op p_op, const Slot *p_values, size_t p_cou
 // Two primitives joined as text, where either is text: a string is joined as it is held; only the other
 // side, a number or a word, is made into text. False, with Error #1000 raised, for no memory.
 bool join_primitives(Library &p_library, Slot p_first, Slot p_second, Slot *r_out) {
-	const auto view = [](Slot p_side, std::string *r_words) {
+	const auto part = [](Slot p_side, std::string *r_words) -> JoinOperand {
 		if (any::tag(p_side) == AnyTag::String) {
-			return static_cast<const Str *>(any::pointer(p_side))->view();
+			return static_cast<const Str *>(any::pointer(p_side));
 		}
 		*r_words = *any::text(p_side);
-		return std::string_view(*r_words);
+		return JoinOperand(*r_words);
 	};
 	std::string first_words, second_words;
-	const std::string_view first_text = view(p_first, &first_words);
-	Str *joined = join_strings(first_text, view(p_second, &second_words));
+	Str *joined = join_strings(part(p_first, &first_words), part(p_second, &second_words));
 	if (!joined) {
 		p_library.runner.out_of_memory();
 		return false;

@@ -463,8 +463,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Concat:
 				// One string after the other; a missing one reads "null".
-				if (Str *joined = join_strings(r[in.b].p ? static_cast<Str *>(r[in.b].p)->view() : std::string_view("null"),
-							r[in.c].p ? static_cast<Str *>(r[in.c].p)->view() : std::string_view("null"))) {
+				if (Str *joined = join_strings(static_cast<const Str *>(r[in.b].p), static_cast<const Str *>(r[in.c].p))) {
 					assign(Kind::Str, r[in.a], joined);
 				} else {
 					out_of_memory();

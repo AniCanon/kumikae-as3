@@ -77,6 +77,29 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	return string;
 }
 
+static bool known_length(JoinOperand p_operand) {
+	const Str *s = p_operand.string;
+	return !s || s->units != UINT16_MAX || (s->short_size == UINT16_MAX && static_cast<const LongStr *>(s)->full_units != -1);
+}
+
+Str *join_strings(JoinOperand p_first, JoinOperand p_second) {
+	Str *joined = join_strings(p_first.bytes, p_second.bytes);
+	if (joined && (known_length(p_first) || known_length(p_second))) {
+		// A newly encountered piece is measured once. Joining two surrogate halves changes the
+		// byte count but preserves both UTF-16 units.
+		const auto units = [](JoinOperand p_part) -> uint32_t {
+			return p_part.string ? static_cast<uint32_t>(p_part.string->length()) : static_cast<uint32_t>(p_part.bytes.size());
+		};
+		const uint32_t length = units(p_first) + units(p_second);
+		if (joined->short_size == UINT16_MAX) {
+			static_cast<LongStr *>(joined)->full_units = static_cast<int32_t>(length);
+		} else {
+			joined->units = static_cast<uint16_t>(length);
+		}
+	}
+	return joined;
+}
+
 int32_t Str::measure_length() const {
 	if (short_size != UINT16_MAX) {
 		units = static_cast<uint16_t>(utf16_length(view()));

@@ -12,7 +12,7 @@ void free_string(Context *, Str *p_string) {
 }
 
 Str *join_text(Context *, const Str *p_first, const Str *p_second) {
-	return vm::join_strings(p_first ? p_first->view() : std::string_view("null"), p_second ? p_second->view() : std::string_view("null"));
+	return vm::join_strings(p_first, p_second);
 }
 
 int compare_text(Context *, const Str *p_a, const Str *p_b) {
