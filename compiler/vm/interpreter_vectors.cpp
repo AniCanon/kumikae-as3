@@ -129,12 +129,12 @@ void Interpreter::vector_store(const Function &p_function, const Instruction &p_
 		set_place(vector, *at, p_registers[p_in.c]);
 	} else if (at && !vector->bare) {
 		Slot &source = p_registers[p_in.c];
-		put(kind, slots_of(vector)[*at], Transfer ? std::exchange(source, any::of_bits(0)) : share(kind, source));
+		put(kind, slots_of(vector)[*at], Transfer ? std::exchange(source, Slot{}) : share(kind, source));
 	} else {
 		const size_t source = frames_.back().base + p_in.c;
 		vm::vector_set(library_, vector, index, p_registers[p_in.b], p_registers[p_in.c]);
 		if constexpr (Transfer) {
-			put(kind, stack_[source], any::of_bits(0));
+			put(kind, stack_[source], Slot{});
 		}
 	}
 }
