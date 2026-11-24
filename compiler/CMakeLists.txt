@@ -291,6 +291,8 @@ add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
     --include ${CMAKE_CURRENT_SOURCE_DIR}/ir
     --lib $<TARGET_OBJECTS:kas3_counted_host> ${KAS3_STANDALONE_LINK_ARGS})
+add_test(NAME web_export_shutdown COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests -p test_web_export_shutdown.py)
 add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)
 # Which corpus programs can run in Godot, and what stops the others.
