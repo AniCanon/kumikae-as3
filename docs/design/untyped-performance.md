@@ -116,23 +116,30 @@ replaces one randomly chosen entry in a full table. An interpreter owns its side
 from the immutable module, so warming a site cannot change the module fingerprint. The host retains
 resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
 value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
-foreign script can declare a property or method absent from the engine table. A foreign field read asks Godot for the named value. After a script
-reload removes a field, its current `_get` can supply the value. A method read produces a bound
-method. When Godot declines a read, the host checks reflected declarations to distinguish a missing
-name from a declared field that failed. It caches these decisions by script identity until Godot
-enters AS3 again or AS3 reloads or changes a script resource. Explicit membership tests check the
-current declarations without invoking a getter. Generated C++ keeps a cache at each site and checks its program generation before
-using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
-refused before it enters AS3, and a worker free is queued for the main thread. The instance lookup,
-host bindings and interpreter overflow table follow the same thread contract. A native site uses
+foreign script can declare a property or method absent from the engine table. A foreign field
+read asks Godot for the named value. Four computed keys can keep their interned Godot names and
+native class identities. A warmed read checks the live receiver and calls Godot's named getter
+once. A nested getter can reuse those names while the outer read holds them.
+
+After a script reload removes a field, its current `_get` can supply the value. A method read
+produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
+the host refreshes that script's declarations before choosing the error. Other declaration
+lookups reuse the reflected table until Godot enters AS3 again or AS3 reloads or changes a
+script resource. Explicit membership tests check current declarations without invoking a getter.
+
+Generated C++ checks the program generation before using a literal site's cache. AS3 execution
+and instance registration run on Godot's main thread. A worker call is refused before it enters
+AS3, and a worker free is queued for the main thread. The instance lookup, host bindings and
+interpreter overflow table follow the same thread contract. A native site uses
 static storage in the program image so dyld can unload it when Play closes it. Reload gets a fresh
 generation. A cache hit still checks for a freed object.
 
 For an engine receiver, generated code passes its operands to `named_access`, which calls the host
-interpreter's `access_named`. A decline continues through the ordinary generated dynamic operation
-and its thunk where needed. A handled operation avoids the extra frame, argument copies and result
-handoff visible in the reference samples. The timing gate compares both execution modes for every
-operation so a change in either path is visible.
+interpreter's `access_named` for a literal or `read_computed` for a computed read. A decline
+continues through the ordinary generated dynamic operation and its thunk where needed. A handled
+operation avoids the extra frame, argument copies and result handoff visible in the reference
+samples. The timing gate compares both execution modes for every operation so a change in either
+path is visible.
 
 ## Cost after a site warms
 
@@ -213,9 +220,11 @@ restores its saved high byte. Overflow sites look up a binding before allocating
 
 An AS3 String holds immutable UTF-8 bytes. The first length read counts UTF-16 units and saves
 the result on that string. Below 65,535 bytes, the byte and unit counts share a four-byte word.
-Larger strings use full-width counts. Typed, dynamic and generated length reads share it. Concatenation stays lazy when
-both counts are unknown. Once either operand has a count, it measures the other operand once and
-keeps the sum. Repeated appends and length reads avoid rescanning the growing string.
+Larger strings use full-width counts. Typed, dynamic and generated length reads share the count.
+For two unmeasured short strings, the join reads the byte sizes directly from the header words.
+Once either operand has a count, the join measures the other operand once and keeps the sum.
+When an append replaces its uniquely owned short prefix, native code can grow that allocation.
+Other references keep their original string. Joining surrogate halves preserves both UTF-16 units.
 
-Rebuild generated native libraries for runtime layout `0x4b41533300000017`.
+Rebuild generated native libraries for runtime layout `0x4b4153330000001a`.
 The loader checks the layout before using a site's runtime entry points.

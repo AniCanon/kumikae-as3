@@ -271,12 +271,15 @@ an AS3 wrapper that passes `this`. Current builds receive the scripted node from
 `Get`, `Set` and `Call`. Its Vector2 struct has no corresponding by-name operations.
 
 The Timer control reads a freshly constructed object's wait time. The foreign-only rows read a
-GDScript field and call its method. The custom getter fixture reads String, Vector2 and Object
-fields and calls a script helper in the same loop. Its call row alternates the helper and a node
-method. The main build probes each operation and reports an unsupported row if AS3 raises the
-missing-property or missing-method error. On macOS the comparison also prints how many of eight
-distinct program images remain loaded after close for each build. `ctest -R by_name_gate_rules`
-exercises the timing rules without timing a run.
+GDScript field and call its method. The computed read alternates two field names from a String
+vector and compares with C# using two interned StringNames. Four rows compare string operations
+with main. They join three strings, append a piece with and without reading the growing length,
+and join two short strings into a 65,536-byte result. The custom getter fixture reads String,
+Vector2 and Object fields and calls a script helper in the same loop. Its call row alternates the
+helper and a node method. The main build probes each operation and reports an unsupported row if
+AS3 raises the missing-property or missing-method error. On macOS the comparison also prints how
+many of eight distinct program images remain loaded after close for each build. `ctest -R
+by_name_gate_rules` exercises the timing rules without timing a run.
 
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.
