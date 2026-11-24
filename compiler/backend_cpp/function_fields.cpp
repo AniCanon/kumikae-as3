@@ -138,28 +138,18 @@ std::string FunctionWriter::kept_read_again(uint32_t p_pc) const {
 	return out;
 }
 
-// A named local lives until the function exits. At a final store its reference can move
-// directly into the field if neither the replaced field nor earlier frame cleanup can run code.
-bool FunctionWriter::final_field_store(uint32_t p_pc) const {
-	const auto &in = function_.code[p_pc];
-	if (!facts_ || in.op != Op::SetField || !is_this(in.a) || !owns(in.c) || !function_.handlers.empty() ||
-			p_pc + 1 >= function_.code.size() || function_.code[p_pc + 1].op != Op::ReturnVoid) {
+// A named alias may keep an observable Godot reference alive even after its last read.
+// Strings and plain AS3 objects whose class and subclasses end alone have no such effect.
+bool FunctionWriter::can_give_field(const Instruction &p_in) const {
+	if (!facts_ || p_in.op != Op::SetField || p_in.op.execution == Op::TakeField || !owns(p_in.c)) {
 		return false;
 	}
-	const auto &fields = module_.classes[function_.owner].fields;
-	if (in.b >= fields.size()) {
+	const auto owner = class_of_[p_in.a];
+	if (owner == NONE || p_in.b >= module_.classes[owner].fields.size()) {
 		return false;
 	}
-	const auto &field = fields[in.b];
-	if (field.kind != Kind::Str && !(field.kind == Kind::Obj && field.klass < facts_->ends_alone.size() && facts_->ends_alone[field.klass])) {
-		return false;
-	}
-	for (uint32_t i = 0; i < in.c; ++i) {
-		if (owns(i) && kind(i) != Kind::Str && !ends_alone_[i]) {
-			return false;
-		}
-	}
-	return true;
+	const auto &field = module_.classes[owner].fields[p_in.b];
+	return field.kind == Kind::Str || (field.kind == Kind::Obj && field.klass < facts_->ends_alone.size() && facts_->ends_alone[field.klass]);
 }
 
 void FunctionWriter::keep(const std::string &p_place, uint32_t p_register, bool p_is_slot) {

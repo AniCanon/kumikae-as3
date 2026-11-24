@@ -99,9 +99,14 @@ void FunctionWriter::analyse() {
 	find_field_refs();
 	find_still();
 	find_kept();
+	std::vector<bool> fields;
+	for (const auto &in : function_.code) {
+		fields.push_back(can_give_field(in));
+	}
+	const auto last = ir::last_stores(function_, fields);
 	for (uint32_t pc = 0; pc < function_.code.size(); ++pc) {
 		const auto &in = function_.code[pc];
-		const bool takes = in.op.execution != static_cast<Op>(in.op) || final_field_store(pc);
+		const bool takes = in.op.execution != static_cast<Op>(in.op) || last[pc];
 		hands_over_.push_back(takes && owns(in.op == Op::SetField || in.op == Op::VecSet ? in.c : in.b) && (in.op != Op::Move || owns(in.a)));
 	}
 	find_twice();
