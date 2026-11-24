@@ -38,10 +38,27 @@ class GateTests(unittest.TestCase):
         self.assertEqual(rounds["node/write"], 20000)
         self.assertEqual(rounds["foreign/call"], 20000)
 
+    short_pilots = {"timer/read": [0.021], "timerTyped/read": [0.020]}
+
+    def assert_five_percent_slowdown(self, batches, counts):
+        times = {}
+        for row, layouts in batches.items():
+            self.assertEqual(len(layouts), 2)
+            self.assertGreater(min(layouts), 0.5)
+            cost = layout_mean(*layouts) * 20000 / counts[row]
+            times[row] = {"native": [cost]}
+        self.assertEqual(failures(times, None), [
+            "timer/read: native slower than typed (0.021 vs 0.020 ms, tolerance 3%)"])
+
     def test_short_pair_keeps_a_five_percent_cost_across_layouts(self):
-        pilots = {"timer/read": [0.021], "timerTyped/read": [0.020]}
-        counts = batch_sizes(pilots)
-        self.assertEqual(short_pairs(pilots), [("timer/read", "timerTyped/read")])
+        counts = batch_sizes(self.short_pilots)
+        self.assertEqual(short_pairs(self.short_pilots), [("timer/read", "timerTyped/read")])
+        batches = {row: [cost * counts[row] / 20000 * layout for layout in (1.1, 0.9)]
+                   for row, (cost,) in self.short_pilots.items()}
+        self.assert_five_percent_slowdown(batches, counts)
+
+    def test_headless_interleaving_keeps_a_five_percent_cost(self):
+        counts = batch_sizes(self.short_pilots)
         godot = os.getenv("KAS3_GODOT") or shutil.which("godot")
         if not godot:
             self.skipTest("set KAS3_GODOT to run the headless batch control")
@@ -60,16 +77,9 @@ class GateTests(unittest.TestCase):
         for order in orders:
             self.assertGreaterEqual(len(order), 4)
             self.assertEqual(order, ("ABBA" * len(order))[:len(order)])
-        times = {}
-        for row in pilots:
-            batches = [float(line.split()[2]) / 1000 for line in run.stdout.splitlines()
-                       if line.startswith(f"SAMPLE {row} ")]
-            self.assertEqual(len(batches), 2)
-            self.assertGreater(min(batches), 0.5)
-            cost = layout_mean(*batches) * 20000 / counts[row]
-            times[row] = {"native": [cost]}
-        self.assertEqual(failures(times, None), [
-            "timer/read: native slower than typed (0.021 vs 0.020 ms, tolerance 3%)"])
+        batches = {row: [float(line.split()[2]) / 1000 for line in run.stdout.splitlines()
+                         if line.startswith(f"SAMPLE {row} ")] for row in self.short_pilots}
+        self.assert_five_percent_slowdown(batches, counts)
 
     def test_native_uses_medians(self):
         times = {"node/read": {"native": [1, 12, 13], "interpreter": [9, 10, 20]}}
