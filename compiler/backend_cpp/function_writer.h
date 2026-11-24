@@ -83,8 +83,6 @@ class FunctionWriter {
 	// called on, so that the object behind its handle is asked for. A field read into such a register again
 	// leaves the handle it has where the field still holds the same object (store_again, runtime/engine.h).
 	std::vector<bool> asked_;
-	std::vector<bool> field_refs_;
-	void find_field_refs();
 	// Per register: it holds a value with parts inline. Only one that every instruction writing it gives a
 	// value to (what Godot makes, computes or gives for a property of that type): a register that may be
 	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.

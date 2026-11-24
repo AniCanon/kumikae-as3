@@ -42,7 +42,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -50,7 +50,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -58,7 +58,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function object_ir(r0:Object):void
   @0 AnyConst r1 1
@@ -72,75 +72,53 @@ function object_ir(r0:Object):void
   @9 ConstStr r9 "b"
   @10 ToAny r10 r9
   @11 DynSet r3 r8 r10
-  @12 Release r10
-  @13 ToAny r11 r3
-  @14 Release r3
-  @15 FromAny r12 r11 0
-  @16 Release r11
-  @17 TakeMove r1 r12
-  @19 ConstStr r13 "c"
-  @20 ConstStr r14 "a"
-  @21 DynGet r15 r1 r14
-  @22 DynSet r1 r13 r15
-  @23 Release r15
-  @24 Move r16 r1
-  @25 DynKeys r17 r16
-  @26 ConstF64 r18 0
-  @28 DynNext r19 r18 (r16, r17)
-  @29 JumpIfNot r19 @76
-  @30 DynKey r20 r18 (r16, r17)
-  @31 FromAny r21 r20 -1
-  @32 Release r20
-  @33 TakeMove r2 r21
-  @35 DynDelete r22 r1 r2
-  @36 BoolToStr r23 r22
-  @37 DynIn r24 r1 r2
-  @38 BoolToStr r25 r24
-  @39 StrToStr r26 r2
-  @40 StrToStr r27 r23
-  @41 Release r23
-  @42 StrToStr r28 r25
-  @43 Release r25
-  @44 Trace (r26, r27, r28)
-  @45 Release r26
-  @46 Release r27
-  @47 Release r28
-  @48 Jump @27
-  @50 ConstStr r29 "f"
-  @51 MakeFunction r30 object_ir/function _
-  @52 ToAny r31 r30
-  @53 Release r30
-  @54 DynSet r1 r29 r31
-  @55 Release r31
-  @57 ConstStr r32 "f"
-  @58 DynCall r33 r1 (r32)
-  @59 ConstStr r34 "hasOwnProperty"
-  @60 ConstStr r35 "f"
-  @61 ToAny r36 r35
-  @62 DynCall r37 r1 (r34, r36)
-  @63 Release r36
-  @64 FromAny r38 r37 -1
-  @65 Release r37
-  @66 AnyText r40 r33
-  @67 Release r33
-  @68 StrToStr r39 r40
-  @69 Release r40
-  @70 StrToStr r41 r38
-  @71 Release r38
-  @72 Trace (r39, r41)
-  @73 Release r39
-  @74 Release r41
-  @75 ReturnVoid
-  @76 Release r16
-  @77 Release r17
-  @78 Jump @49
+  @12 ToAny r11 r3
+  @13 FromAny r12 r11 0
+  @14 Move r1 r12
+  @16 ConstStr r13 "c"
+  @17 ConstStr r14 "a"
+  @18 DynGet r15 r1 r14
+  @19 DynSet r1 r13 r15
+  @20 Move r16 r1
+  @21 DynKeys r17 r16
+  @22 ConstF64 r18 0
+  @24 DynNext r19 r18 (r16, r17)
+  @25 JumpIfNot r19 @39
+  @26 DynKey r20 r18 (r16, r17)
+  @27 FromAny r21 r20 -1
+  @28 Move r2 r21
+  @30 DynDelete r22 r1 r2
+  @31 BoolToStr r23 r22
+  @32 DynIn r24 r1 r2
+  @33 BoolToStr r25 r24
+  @34 StrToStr r26 r2
+  @35 StrToStr r27 r23
+  @36 StrToStr r28 r25
+  @37 Trace (r26, r27, r28)
+  @38 Jump @23
+  @40 ConstStr r29 "f"
+  @41 MakeFunction r30 object_ir/function _
+  @42 ToAny r31 r30
+  @43 DynSet r1 r29 r31
+  @45 ConstStr r32 "f"
+  @46 DynCall r33 r1 (r32)
+  @47 ConstStr r34 "hasOwnProperty"
+  @48 ConstStr r35 "f"
+  @49 ToAny r36 r35
+  @50 DynCall r37 r1 (r34, r36)
+  @51 FromAny r38 r37 -1
+  @52 AnyText r40 r33
+  @53 StrToStr r39 r40
+  @54 StrToStr r41 r38
+  @55 Trace (r39, r41)
+  @56 ReturnVoid
 function ReferenceError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
   @1 SetField r0 .2 r2
   @2 ConstStr r3 "ReferenceError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function ArgumentError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -148,7 +126,7 @@ function ArgumentError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "ArgumentError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function Function/call(r0:Object, r1:Object):*
   @0 CallLibrary r2 r0 r1

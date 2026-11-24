@@ -33,13 +33,6 @@ bool FunctionWriter::constant(const Instruction &p_in) {
 		case Op::ConstStr:
 			share(p_in.a, "c->strings[" + std::to_string(p_in.b) + "]");
 			return true;
-		case Op::Release:
-			if (field_refs_[p_in.a]) {
-				line("field_ref" + std::to_string(p_in.a) + ".clear(c, " + reg(p_in.a) + ");");
-			} else if (owns(p_in.a)) {
-				put(p_in.a, std::string(zero_of(kind(p_in.a))));
-			}
-			return true;
 		case Op::ConstNull:
 			put(p_in.a, std::string(zero_of(kind(p_in.a))));
 			return true;

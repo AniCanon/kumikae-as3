@@ -27,7 +27,7 @@ function Error(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "Error"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -35,7 +35,7 @@ function TypeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "TypeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
@@ -43,7 +43,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @2 ConstStr r3 "RangeError"
   @3 SetField r0 .1 r3
   @4 ErrorStack r4 r0
-  @5 TakeField r0 .3 r4
+  @5 SetField r0 .3 r4
   @6 ReturnVoid
 function small(r0:Object):void
   @0 ConstF64 r2 1.5
@@ -60,7 +60,7 @@ function small(r0:Object):void
   @14 GetField r10 r0 .0
   @15 ConstF64 r11 5
   @16 LtF64 r12 r11 r10
-  @17 JumpIfNot r12 @33
+  @17 JumpIfNot r12 @28
   @19 ConstStr r13 "total"
   @20 GetField r14 r0 .0
   @21 F64ToStr r15 r14
@@ -68,14 +68,9 @@ function small(r0:Object):void
   @23 I32ToStr r17 r16
   @24 StrToStr r18 r13
   @25 StrToStr r19 r15
-  @26 Release r15
-  @27 StrToStr r20 r17
-  @28 Release r17
-  @29 Trace (r18, r19, r20)
-  @30 Release r18
-  @31 Release r19
-  @32 Release r20
-  @33 ReturnVoid
+  @26 StrToStr r20 r17
+  @27 Trace (r18, r19, r20)
+  @28 ReturnVoid
 function small/twice(r0:Object, r1:int):int
   @1 ConstI32 r2 2
   @2 I32ToF64 r4 r1

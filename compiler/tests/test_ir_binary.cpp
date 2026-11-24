@@ -190,14 +190,7 @@ static void test_round_trip_godot_script_metadata() {
 	for (auto &fn : original.functions) {
 		fn.locals.clear();
 	}
-	// Preserve branch offsets while expressing this program using the original instruction set.
-	for (auto &fn : original.functions) {
-		for (auto &in : fn.code) {
-			in.op = in.op == ir::Op::Release ? ir::Op::Stmt : static_cast<ir::Op>(in.op);
-		}
-	}
-	auto old_stripped = ir::write_binary(original);
-	old_stripped[4] = 1;
+	const auto old_stripped = ir::write_binary(original);
 	CHECK(!ir::read_binary(old_stripped.data(), old_stripped.size(), &loaded));
 	for (size_t i = 0; i < decoded.functions.size(); i++) {
 		CHECK_EQ(loaded.functions[i].bound_engine_method, decoded.functions[i].bound_engine_method);
@@ -217,13 +210,6 @@ static void test_rejects_corrupt_or_truncated_modules() {
 	std::vector<uint8_t> bad_version = valid;
 	bad_version[4] = 99;
 	CHECK(ir::read_binary(bad_version.data(), bad_version.size(), &out).has_value());
-
-	auto &fn = original.functions.front();
-	fn.registers.push_back(ir::Kind::Any);
-	fn.code.front() = { ir::Op::Release, static_cast<uint32_t>(fn.registers.size() - 1) };
-	auto legacy = ir::write_binary(original);
-	legacy[4] = 1;
-	CHECK(ir::read_binary(legacy.data(), legacy.size(), &out).has_value());
 
 	std::vector<uint8_t> trailing = valid;
 	trailing.push_back(0);

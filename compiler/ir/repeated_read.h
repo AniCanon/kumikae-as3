@@ -14,8 +14,6 @@ inline bool preserves_method_read(const Function &p_fn, size_t p_pc, size_t p_re
 		case Op::Move:
 			return !is_held(p_fn.registers[in.a]) || p_fn.registers[in.a] == Kind::Str ||
 					(p_pc == p_read + 1 && in.b == p_fn.code[p_read].a && in.a != p_fn.code[p_read].b);
-		case Op::Release:
-			return p_fn.registers[in.a] == Kind::Str;
 		case Op::VecGet:
 			return p_fn.registers[in.a] == Kind::Str && !is_held(p_fn.registers[in.c]);
 		case Op::Stmt:

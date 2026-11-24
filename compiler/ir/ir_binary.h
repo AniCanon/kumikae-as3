@@ -13,7 +13,7 @@
 namespace kas3 {
 namespace ir {
 
-constexpr uint32_t BINARY_VERSION = 2;
+constexpr uint32_t BINARY_VERSION = 1;
 
 // Encodes every field of a module into a compact little-endian byte stream.
 std::vector<uint8_t> write_binary(const Module &p_module);

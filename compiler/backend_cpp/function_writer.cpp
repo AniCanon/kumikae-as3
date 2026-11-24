@@ -96,13 +96,13 @@ void FunctionWriter::analyse() {
 	find_aliases();
 	find_lent_signals();
 	find_borrowed();
-	find_field_refs();
 	find_still();
 	find_kept();
-	for (const auto &in : function_.code) {
-		const bool takes = in.op.execution != static_cast<Op>(in.op);
-		hands_over_.push_back(takes && owns(in.op == Op::SetField || in.op == Op::VecSet ? in.c : in.b) && (in.op != Op::Move || owns(in.a)));
+	std::vector<bool> owned(function_.registers.size());
+	for (size_t reg = 0; reg < owned.size(); ++reg) {
+		owned[reg] = owns(reg);
 	}
+	hands_over_ = ir::last_use_stores(function_, owned);
 	find_twice();
 	find_counted();
 }
@@ -338,10 +338,6 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 	} else if (!engine(p_in) && !fast_place(p_in)) {
 		generic(p_in);
 	}
-	// The slow vector store retains its argument, while the direct store has already cleared it.
-	if (p_in.op.execution == Op::TakeElement && owns(p_in.c)) {
-		put(p_in.c, std::string(zero_of(kind(p_in.c))));
-	}
 	if (!after.empty()) {
 		line(after);
 	}
@@ -381,9 +377,6 @@ std::string FunctionWriter::prologue() const {
 	}
 	std::string unused = "(void)c;";
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
-		if (field_refs_[i]) {
-			add("FieldRef field_ref" + std::to_string(i) + "{};");
-		}
 		if (i >= function_.parameters) {
 			add(parts(i).empty() ? declared(kind(i), reg(i)) + " = " + std::string(zero_of(kind(i))) + ";"
 								 : std::string(parts(i)) + " " + reg(i) + "{};");
@@ -476,9 +469,7 @@ std::string FunctionWriter::epilogue() const {
 		out += "\t" + back + "\n";
 	}
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
-		if (field_refs_[i]) {
-			out += "\tfield_ref" + std::to_string(i) + ".finish(c, " + reg(i) + ");\n";
-		} else if (owns(i)) {
+		if (owns(i)) {
 			out += "\trelease(c, " + reg(i) + ");\n";
 		}
 	}

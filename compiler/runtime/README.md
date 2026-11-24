@@ -145,10 +145,6 @@ A call that isn't stopped pays one byte read every `ROUNDS` rounds of a loop.
 
 ## Inside Godot
 
-A generated field read can keep private Variant storage across loop iterations. Each read holds
-its own reference while the engine call runs. The last use clears the Variant, so code invoked
-during the next iteration sees the same reference count as GDScript.
-
 Generated code never sees a Godot header. What a program needs from the engine, it's handed through the
 context:
 

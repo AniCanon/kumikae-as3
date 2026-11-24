@@ -169,26 +169,6 @@ func check_engine_reads() -> void:
 	show("foreign engine reads", results, expected)
 	receiver.free()
 
-func ignore(_value) -> void:
-	pass
-
-func release_discard(target, maker) -> bool:
-	maker.make(target)
-	return target.get_script() != null
-
-func release_argument(target, maker) -> bool:
-	ignore(maker.make(target))
-	return target.get_script() != null
-
-func release_chain(target, maker) -> bool:
-	maker.make(target).get_reference_count()
-	return target.get_script() != null
-
-func release_ternary(target, maker, flag) -> bool:
-	var held = maker.make(target) if flag else null
-	held = null
-	return target.get_script() != null
-
 func released_before_return(target, maker) -> bool:
 	var held = maker.make(target)
 	held = null
@@ -218,18 +198,6 @@ func check_release() -> void:
 	reference.set_script(null)
 	show("release during reads", ask("releaseDuringReads", [target, maker, "getChildCount"]),
 			release_during_reads(reference, maker, &"get_child_count"))
-	target.set_script(null)
-	reference.set_script(null)
-	show("release discard", ask("releaseDiscard", [target, maker]), release_discard(reference, maker))
-	target.set_script(null)
-	reference.set_script(null)
-	show("release argument", ask("releaseArgument", [target, maker]), release_argument(reference, maker))
-	target.set_script(null)
-	reference.set_script(null)
-	show("release chain", ask("releaseChain", [target, maker]), release_chain(reference, maker))
-	target.set_script(null)
-	reference.set_script(null)
-	show("release ternary", ask("releaseTernary", [target, maker, true]), release_ternary(reference, maker, true))
 	target.free()
 	reference.free()
 

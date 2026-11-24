@@ -181,24 +181,6 @@ package {
 			}
 			return sum;
 		}
-		private function ignore(value:*):void {}
-		public function releaseDiscard(target:*, maker:*):Boolean {
-			maker.make(target);
-			return target.getScript() != null;
-		}
-		public function releaseArgument(target:*, maker:*):Boolean {
-			ignore(maker.make(target));
-			return target.getScript() != null;
-		}
-		public function releaseChain(target:*, maker:*):Boolean {
-			maker.make(target).getReferenceCount();
-			return target.getScript() != null;
-		}
-		public function releaseTernary(target:*, maker:*, flag:Boolean):Boolean {
-			var held:* = flag ? maker.make(target) : null;
-			held = null;
-			return target.getScript() != null;
-		}
 		public function releasedBeforeReturn(target:*, maker:*):Boolean {
 			var held:* = maker.make(target);
 			held = null;

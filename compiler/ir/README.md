@@ -57,7 +57,7 @@ A proven local uses the same registers, bound members and instructions as a loca
 | `ir_reach.h` | What an instruction calls, and the code reached from a function |
 | `library_methods.h`, `library_names.h`, `library_entries.h` | The built-in library's methods by name: what each takes and gives, and the operation that carries it out. Read by the lowerer, the interpreter and the C++ backend |
 | `adjacent_uses.h` | Single-use temporaries and control-flow entries shared by the interpreter and native backend |
-| `ir_last_use.cpp`, `last_use.h` | Temporary lifetimes across branches and catch edges, including stores that take ownership |
+| `last_use.h` | Stores that can take ownership of a temporary at its last use |
 | `lower.h`, `lower.cpp` | The entry point |
 | `lowerer.h` | The `Lowerer` class: its state, and the helpers every part of the lowering uses |
 | `lower_env.h`, `lower_flow.h` | Places a value is stored in, captured variables, and the loops and `try` statements around the code being lowered |

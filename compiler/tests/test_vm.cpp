@@ -3656,15 +3656,15 @@ static void test_stripped_temporary_ownership() {
 		}
 		CHECK(owner != ir::NONE);
 		fn.locals.clear(); // Version-one binaries can omit this table.
-		// A version-one program has ordinary stores, before ownership is worked out at load.
-		for (auto &in : fn.code) {
-			in.op = static_cast<ir::Op>(in.op);
+		std::vector<bool> owned;
+		for (auto kind : fn.registers) {
+			owned.push_back(ir::is_held(kind));
 		}
-		ir::release_temporaries(fn, true);
+		const auto transfers = ir::last_use_stores(fn, owned);
 		for (size_t pc = 0; pc < fn.code.size(); ++pc) {
 			const auto &in = fn.code[pc];
 			if (in.op == ir::Op::Move && (in.a == owner || in.b == owner)) {
-				CHECK((in.op.execution == ir::Op::TakeMove) == (in.a == owner));
+				CHECK(transfers[pc] == (in.a == owner));
 				++checked;
 			}
 		}

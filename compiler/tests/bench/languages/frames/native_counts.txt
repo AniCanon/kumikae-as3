@@ -14,11 +14,11 @@
 # PerNodeProcess: a node's handle is copied by the host once, the first time it is shared (the host looks
 # at what it is on), and the object behind it is asked for twice, after which it is read from the handle
 # for as long as Godot frees nothing the host has found. Nor with the rays of RayQueries: the register the
-# query's parameters are read into reuses private storage and the field's watched object identity.
+# query's parameters are read into keeps its handle while the field holds the same object.
 Empty: thunks=0 unresolved=2 handles=0 lookups=0
 MoveNodes: thunks=60000 unresolved=2 handles=19976 lookups=40001
 PerNodeProcess: thunks=40000 unresolved=2 handles=0 lookups=80001
-RayQueries: thunks=458 unresolved=2 handles=9 lookups=139
+RayQueries: thunks=458 unresolved=2 handles=9 lookups=156
 SignalTraffic: thunks=4 unresolved=2 handles=1 lookups=0
 NBody: thunks=0 unresolved=2 handles=0 lookups=0
 Sieve: thunks=0 unresolved=2 handles=0 lookups=0

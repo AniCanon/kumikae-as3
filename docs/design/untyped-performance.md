@@ -252,9 +252,5 @@ Once either operand has a count, the join measures the other operand once and ke
 When an append replaces its uniquely owned short prefix, native code can grow that allocation.
 Other references keep their original string. Joining surrogate halves preserves both UTF-16 units.
 
-Rebuild generated native libraries for runtime layout `0x4b4153330000001d`.
+Rebuild generated native libraries for runtime layout `0x4b4153330000001c`.
 The loader checks the layout before using a site's runtime entry points.
-
-Temporary references end after their last use on each control-flow path, including caught calls.
-A discarded result, a call argument and a chained receiver can release a Godot object before
-the next statement. A named alias keeps its own reference until it is reassigned or leaves scope.

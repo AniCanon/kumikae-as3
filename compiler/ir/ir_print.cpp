@@ -89,7 +89,6 @@ std::string number(double p_value) {
 
 std::string print_operand(const Module &p_module, const Function &p_function, char p_shape, uint32_t p_value) {
 	switch (p_shape) {
-		case 'T':
 		case 'R':
 			return "r" + std::to_string(p_value);
 		case 'r':
@@ -161,7 +160,7 @@ std::string print(const Module &p_module, const Function &p_function) {
 			continue; // Markers only: they would drown the rest.
 		}
 		const char *shape = op_shape(instruction.op);
-		out += "  @" + std::to_string(i) + " " + op_name(instruction.op.execution);
+		out += "  @" + std::to_string(i) + " " + op_name(instruction.op);
 		const uint32_t values[3] = { instruction.a, instruction.b, instruction.c };
 		for (int n = 0; n < 3; n++) {
 			if (shape[n] != '-') {

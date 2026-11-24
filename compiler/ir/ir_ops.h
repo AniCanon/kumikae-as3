@@ -43,7 +43,6 @@ inline bool is_held(Kind p_kind) {
 }
 
 // How an instruction uses its three operands.
-//   T  an owned temporary to clear, with no new value or use of its contents
 //   R  a register          r  a register, or NONE
 //   I  a 32-bit integer    N  an index into the module's numbers     S  into its strings
 //   W  an index into the module's wide numbers (Int64 constants)
@@ -201,9 +200,7 @@ inline bool is_held(Kind p_kind) {
 	X(CallTypedFunction, "rRA") \
 	/* One of Godot's methods bound to the Godot object it is read from, as Godot's own Callable of that \
 	   object and method: out, the object, the method (E). */ \
-	X(HostBindMethod, "RRE") X(Release, "T--") \
-	/* A store that takes the source reference and clears its register. */ \
-	X(TakeMove, "RR-") X(TakeField, "RDR") X(TakeGlobal, "GR-") X(TakeElement, "RRR")
+	X(HostBindMethod, "RRE")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,
@@ -237,27 +234,8 @@ constexpr bool is_godot_class(uint32_t p_code) {
 	return (p_code & 0xC0000000u) == CLASS_GODOT;
 }
 
-// Analyses match a store by what it writes. Dispatch and serialization also need its ownership form.
-struct Opcode {
-	Op execution;
-	Op operation;
-	constexpr Opcode(Op p_op = Op::Stmt) : execution(p_op), operation(base(p_op)) {}
-	constexpr operator Op() const { return operation; }
-
-private:
-	static constexpr Op base(Op p_op) {
-		switch (p_op) {
-			case Op::TakeMove: return Op::Move;
-			case Op::TakeField: return Op::SetField;
-			case Op::TakeGlobal: return Op::SetGlobal;
-			case Op::TakeElement: return Op::VecSet;
-			default: return p_op;
-		}
-	}
-};
-
 struct Instruction {
-	Opcode op;
+	Op op = Op::Stmt;
 	uint32_t a = 0;
 	uint32_t b = 0;
 	uint32_t c = 0;

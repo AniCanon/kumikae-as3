@@ -77,8 +77,6 @@ struct EngineApi {
 	// host built for it, Context::names), where that is a value with parts of the type asked for: in a new
 	// handle, the caller's. Null for anything else (no Dictionary, no such key, a value of another type).
 	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
-	// Replace a private counted-object snapshot, or clear its Variant while retaining the storage.
-	void (*set_ref)(void *p_private, const void *p_source);
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
@@ -197,56 +195,6 @@ inline void store_again(Context *c, Ref &r_register, Ref p_borrowed) {
 	}
 	store(c, r_register, p_borrowed);
 }
-
-// A field read in a loop must count its reference across the call. Keep its private handle
-// storage between reads, clearing the Variant at the last use. Copies out own distinct handles.
-struct FieldRef {
-	Ref storage;
-
-	void clear(Context *c, Ref &r_value) {
-		if (storage.handle && storage.handle == r_value.handle) {
-			r_value = {};
-			c->engine->set_ref(storage.handle, nullptr);
-		} else {
-			put(c, r_value, Ref{});
-		}
-	}
-
-	void read(Context *c, Ref &r_value, Ref p_field) {
-		if (!c->engine || !p_field.handle || r_value.handle) {
-			const Ref copy = shared(c, p_field);
-			clear(c, r_value);
-			r_value = copy;
-			return;
-		}
-		auto *source = head_of(p_field.handle);
-		if (!storage.handle || source->shared != HANDLE_COPIED) {
-			r_value = shared(c, p_field);
-			if (storage.handle || source->shared != HANDLE_COPIED) {
-				return;
-			}
-			storage = r_value;
-			head_of(storage.handle)->shared = HANDLE_COPIED;
-		} else {
-			c->engine->set_ref(storage.handle, p_field.handle);
-			r_value = storage;
-		}
-		// The two Variants now hold the same object. Share its watched identity, never its lifetime.
-		object_of(c, p_field);
-		auto *copy = head_of(storage.handle);
-		copy->object = source->object;
-		copy->seen = source->seen;
-		copy->asked = source->asked;
-		copy->godot_class = source->godot_class;
-	}
-
-	void finish(Context *c, Ref p_value) {
-		if (p_value.handle != storage.handle) {
-			release(c, p_value);
-		}
-		release(c, storage);
-	}
-};
 
 // The script's own Godot object, which a function finds once: it is the same for as long as no script
 // instance has been freed, and is looked up again (null, if it was this one's) when one has.

@@ -78,13 +78,8 @@ inline std::optional<MathConsumer> math_consumer(const Function &p_function, siz
 		return {};
 	}
 	MathConsumer result{ coerce.a, 1 };
-	// On a reused result the getter never wrote its temporary.
-	if (p_pc + 2 < code.size() && code[p_pc + 2].op == Op::Release && code[p_pc + 2].a == source) {
-		result.skip++;
-	}
-	const auto next = p_pc + result.skip + 1;
-	if (p_uses.only_consumer(coerce.a, next)) {
-		const auto &move = code[next];
+	if (p_uses.only_consumer(coerce.a, p_pc + 2)) {
+		const auto &move = code[p_pc + 2];
 		if (move.op == Op::Move && move.b == coerce.a && p_function.registers[move.a] == Kind::Val) {
 			result.target = move.a;
 			result.skip++;
