@@ -70,6 +70,11 @@ package {
 			try { return computedRead(target, 2); }
 			catch (e:Error) { return -e.errorID; }
 		}
+		public function readMethod(target:*, key:String, n:int):Boolean {
+			var method:*;
+			for (var i:int = 0; i < n; ++i) method = target[key];
+			return method();
+		}
 		public function methodKeysRead(target:*, n:int):Boolean {
 			var keys:Vector.<String> = new Vector.<String>();
 			keys.push("isVisibleInTree", "isProcessing");

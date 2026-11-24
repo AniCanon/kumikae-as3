@@ -67,6 +67,7 @@ struct Found {
 struct PropertyKey {
 	std::optional<uint32_t> index;
 	Object *object = nullptr; // Held by the key it came from.
+	Str *string = nullptr; // The original String key can be retained by a bound method.
 	std::string owned_text;
 	std::string_view borrowed; // The string slot is held until this property operation returns.
 	std::string_view name() const { return borrowed.data() ? borrowed : std::string_view(owned_text); }

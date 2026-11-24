@@ -435,7 +435,7 @@ public:
 	// the engine runs meanwhile is carried back to that call, as to an instruction.
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
-	bool read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, void *p_reuse = nullptr);
+	bool read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key = nullptr, void *p_reuse = nullptr);
 	bool access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted = { ir::Kind::Any, {} });
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }

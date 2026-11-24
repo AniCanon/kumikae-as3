@@ -30,10 +30,11 @@ class EngineNamed {
 	void *handle_of(Slot p_holder) const;
 	const NamedMember &member(Slot p_holder, const PropertyKey &p_key) const;
 	bool method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names = nullptr);
+	bool bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value);
 	bool unknown(const PropertyKey &p_key);
 
 public:
-	bool finish_read(NamedRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value);
+	bool finish_read(NamedRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key = nullptr);
 	explicit EngineNamed(Interpreter &p_vm, const Object *p_checked = nullptr) :
 			vm_(p_vm), checked_(p_checked) {}
 

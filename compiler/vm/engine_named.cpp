@@ -56,11 +56,6 @@ const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
 // the lowerer binds one read where the object's type is known (ir/lower_engine_values.cpp).
 bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names) {
-	const ir::Module &module = vm_.module_;
-	if (module.library_function == NONE || module.array_class == NONE) {
-		vm_.raise_unsupported("reading '" + std::string(p_key.name()) + "' of one of Godot's values by its name");
-		return false;
-	}
 	MethodNames local;
 	MethodNames &names = p_names ? *p_names : local;
 	if (!names.as3) {
@@ -69,7 +64,13 @@ bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::str
 	if (names.as3 && !names.godot) {
 		names.godot = vm_.text(p_godot);
 	}
-	if (!names.godot || module.function_class == NONE) {
+	return names.godot && bind_method(p_holder, names.as3, names.godot, r_value);
+}
+
+bool EngineNamed::bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value) {
+	const ir::Module &module = vm_.module_;
+	if (module.function_class == NONE || module.library_function == NONE || module.array_class == NONE) {
+		vm_.raise_unsupported("reading '" + std::string(p_as3->view()) + "' of " + vm_.holder_name(p_holder) + " by its name");
 		return false;
 	}
 	const auto [function, bound] = new_method_storage(module.function_class, slots_of(module.classes[module.function_class]),
@@ -81,10 +82,10 @@ bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::str
 	const bool object = any::tag(p_holder) != AnyTag::Value;
 	void *receiver = vm_.host_.handles.copy(handle_of(p_holder));
 	slots_of(bound)[0] = object ? any::godot_object(receiver) : any::godot_value(receiver);
-	retain(names.as3);
-	retain(names.godot);
-	slots_of(bound)[1] = any::string(names.as3);
-	slots_of(bound)[2] = any::string(names.godot);
+	retain(p_as3);
+	retain(p_godot);
+	slots_of(bound)[1] = any::string(p_as3);
+	slots_of(bound)[2] = any::string(p_godot);
 	own_field(function, ir::FUNCTION_INDEX).i = static_cast<int32_t>(module.library_function);
 	own_field(function, ir::FUNCTION_FIRST).p = bound;
 	*r_value = any::object(function);

@@ -156,7 +156,11 @@ class Runner:
                 allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method allocations ")]
                 self.check(f"{label}: warmed computed method reads allocate only the bound value",
                            status == 0 and (USED in text) == bool(library) and "METHOD true" in text
-                           and len(allocations) == 16 and max(allocations[2:]) <= 1, str(allocations) + text[-600:])
+                           and len(allocations) >= 16 and max(allocations[2:16]) <= 1, str(allocations) + text[-600:])
+
+                self.check(f"{label}: warmed script method reads allocate only the bound value",
+                           "SCRIPT METHOD true" in text and len(allocations) == 32 and max(allocations[17:]) <= 1,
+                           str(allocations[16:]) + text[-600:])
 
     def by_name_reads(self, project, library):
         label = "native" if library else "interpreter"

@@ -21,7 +21,7 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 	return done.has_value();
 }
 
-bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, void *p_reuse) {
+bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key, void *p_reuse) {
 #if defined(KAS3_TEST_COUNTS)
 	ScriptReadAllocations allocations(count_method_read(p_name), "method");
 #endif
@@ -38,7 +38,7 @@ bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_
 	if (read == ScriptRead::Failed) {
 		raise_engine(library_, error);
 	} else if (read == ScriptRead::Method || read == ScriptRead::Missing) {
-		EngineNamed(*this).finish_read({ read, member }, p_holder, p_name, r_value);
+		EngineNamed(*this).finish_read({ read, member }, p_holder, p_name, r_value, p_key);
 	}
 	return !failing_ && !stopped_;
 }
@@ -81,7 +81,7 @@ bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruc
 	void *reuse = any::tag(previous) == AnyTag::Value ? any::pointer(previous) : nullptr;
 	frame.pc++;
 	Slot value = any::undefined();
-	if (read_computed(p_registers[get.b], key->view(), &value, reuse)) {
+	if (read_computed(p_registers[get.b], key->view(), &value, key, reuse)) {
 		if (moved != ir::NONE) {
 			frames_.back().pc++;
 		}
@@ -114,14 +114,14 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	if ((!string_key && !computed) || (list && list->size() > 5)) {
 		return false;
 	}
-	const auto *text = static_cast<const Str *>(computed ? any::pointer(registers[key]) : registers[key].p);
+	auto *text = static_cast<Str *>(computed ? any::pointer(registers[key]) : registers[key].p);
 	InterpreterSite *site = named_sites_.at(frame.function, frame.pc - 1, text, strings_);
 	if (!site) {
 		Slot result = any::undefined();
 		if (write || list || !text || any::tag(registers[holder]) != AnyTag::Godot) {
 			return false;
 		}
-		if (read_computed(registers[holder], text->view(), &result)) {
+		if (read_computed(registers[holder], text->view(), &result, text)) {
 			put(ir::Kind::Any, stack_[base + p_in.a], result);
 		}
 		return true;

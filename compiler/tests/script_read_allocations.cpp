@@ -30,7 +30,7 @@ void count_vm_allocation() {
 
 bool count_method_read(std::string_view p_name) {
 	static const bool enabled = std::getenv("KAS3_METHOD_ALLOCATIONS") != nullptr;
-	return enabled && (p_name == "isVisibleInTree" || p_name == "isProcessing");
+	return enabled && (p_name == "isVisibleInTree" || p_name == "isProcessing" || p_name == "probe_method");
 }
 
 ScriptReadAllocations::ScriptReadAllocations(bool p_report, const char *p_label) : start_(allocations), label_(p_report ? p_label : nullptr) {}

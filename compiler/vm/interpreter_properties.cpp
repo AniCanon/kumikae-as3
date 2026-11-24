@@ -82,6 +82,7 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 	const AnyTag tag = any::tag(p_key);
 	r_key->owned_text.clear();
 	r_key->borrowed = {};
+	r_key->string = nullptr;
 	r_key->index.reset();
 	r_key->object = nullptr;
 	if (klass && klass->element != Kind::Void) {
@@ -104,7 +105,8 @@ bool Interpreter::property_key(Slot p_holder, Slot p_key, PropertyKey *r_key) {
 		return false;
 	}
 	if (tag == AnyTag::String) {
-		r_key->borrowed = static_cast<const Str *>(any::pointer(p_key))->view();
+		r_key->string = static_cast<Str *>(any::pointer(p_key));
+		r_key->borrowed = r_key->string->view();
 		return true;
 	}
 	return any_text(p_key, &r_key->owned_text);

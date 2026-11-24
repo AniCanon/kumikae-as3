@@ -35,7 +35,7 @@ bool listed(const std::array<std::string_view, Count> &p_names, std::string_view
 // does not have is AS3's ReferenceError #1069; one the interpreter can't reach yet says so.
 bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
 	if (any::tag(p_holder) == AnyTag::Godot && !p_key.object) {
-		return read_computed(p_holder, p_key.name(), r_value);
+		return read_computed(p_holder, p_key.name(), r_value, p_key.string);
 	}
 	return ordinary_property(p_holder, p_key, r_value);
 }
@@ -200,14 +200,14 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 	return false;
 }
 
-bool EngineNamed::finish_read(NamedRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value) {
+bool EngineNamed::finish_read(NamedRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key) {
 	PropertyKey key;
 	key.borrowed = p_name;
 	if (p_read.status == ScriptRead::Method) {
 		if (p_read.resolved) {
 			return read(*p_read.resolved, p_holder, key, r_value);
 		}
-		return method_value(p_holder, key, p_name, r_value);
+		return p_key ? bind_method(p_holder, p_key, p_key, r_value) : method_value(p_holder, key, p_name, r_value);
 	}
 	if (listed(OBJECT_METHODS, p_name)) {
 		return vm_.method_value(p_holder, p_name, r_value);
