@@ -97,6 +97,33 @@ func fresh() -> Node2D:
 	node.add_child(child)
 	return child
 
+func sum_positions(source, count: int):
+	var total := 0.0
+	for i in count:
+		var point = source.get(&"position")
+		if not point is Vector2:
+			return null
+		total += point.x
+	return total
+
+func check_positions() -> void:
+	var positions := Positions.new()
+	var reference := Positions.new()
+	reference.set(&"position", Vector2(8, 9))
+	var total = sum_positions(reference, 2)
+	var failed := sum_positions(reference, 3) == null
+	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes],
+			[[int(total) if total == int(total) else total, failed], reference.reads, reference.writes])
+	positions.reads = 0
+	reference.reads = 0
+	var expected := []
+	var keys := ["position"]
+	for i in 5:
+		expected.append(reference[keys[0]])
+	show("computed getter values keep their types and copies", ask("computedPositions", [positions, keys[0]]), expected)
+	reference.free()
+	positions.free()
+
 func writes(o) -> Array:
 	o.position = Vector2(3, 4)
 	o.visible = false
@@ -268,12 +295,7 @@ func _physics_process(_delta: float) -> bool:
 				count += 1
 		expected_methods.append(count)
 	show("computed engine methods", methods, expected_methods)
-	var positions := Positions.new()
-	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes], [[3, true], 5, 1])
-	positions.reads = 0
-	show("computed getter values keep their types and copies", ask("computedPositions", [positions, "position"]),
-			[Vector2(1, 4), Vector2(2, 4), Vector2(3, 4), Vector2(4, 4), "wrong type"])
-	positions.free()
+	check_positions()
 	replaced.free()
 	control.free()
 	foreign.free()
