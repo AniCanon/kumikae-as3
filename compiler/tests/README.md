@@ -274,16 +274,18 @@ Its Vector2 struct has no corresponding by-name operations.
 The Timer control reads a freshly constructed object's wait time. The foreign-only rows read a
 GDScript field and call its method. The computed reads cycle through two or eight GDScript fields,
 or through `position`, `modulate` and `rotation` on a plain Node2D and one carrying GDScript.
-AS3 indexes a String vector and C# indexes the corresponding interned StringNames. Another row
-alternates reads of two engine methods and calls the last bound method.
+AS3 indexes a String vector and C# indexes the corresponding interned StringNames. One row alternates
+two engine method names and calls the last bound method. Another reads one name on alternating bare
+and scripted nodes at the same site. The saved-call row reads a node's rotation method once, calls it
+in a loop and checks the final rotation.
+
 Four rows compare string operations with main. They join three strings, append a piece with and
-without reading the growing length, and join two short strings into a 65,536-byte result.
-The custom getter fixture reads String, Vector2 and Object fields and calls a script helper in the
-same loop. Its call row alternates the helper and a node method. The main build probes each
-operation and reports an unsupported row if AS3 raises the missing-property or missing-method
-error. On macOS the comparison also prints how many of eight distinct program images remain loaded
-after close for each build.
-Run `ctest -R by_name_gate_rules` to exercise the timing rules without timing a run.
+without reading the growing length, and join two short strings into a 65,536-byte result. The custom
+getter fixture reads String, Vector2 and Object fields and calls a script helper in the same loop.
+Its call row alternates the helper and a node method. The main build probes each operation and reports
+an unsupported row if AS3 raises the missing-property or missing-method error. On macOS the comparison
+counts how many of eight distinct program images each build keeps loaded after close. Run
+`ctest -R by_name_gate_rules` to exercise the timing rules without timing a run.
 
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.
