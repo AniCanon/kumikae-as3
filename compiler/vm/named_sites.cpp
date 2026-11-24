@@ -14,30 +14,28 @@ using ir::Op;
 
 static std::atomic<uint64_t> next_generation{ 1 };
 
-NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.size()), vector_targets_(p_module.functions.size()), borrowed_sets_(p_module.functions.size()), generation_(next_generation.fetch_add(1, std::memory_order_relaxed)) {
+NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.size()), move_targets_(p_module.functions.size()), borrowed_sets_(p_module.functions.size()), generation_(next_generation.fetch_add(1, std::memory_order_relaxed)) {
 	for (size_t f = 0; f < p_module.functions.size(); f++) {
 		const auto &fn = p_module.functions[f];
 		std::vector<uint32_t> names;
 		std::optional<ir::AdjacentUses> uses;
 		for (size_t pc = 0; pc < fn.code.size(); pc++) {
 			const auto &in = fn.code[pc];
-			if (pc + 1 < fn.code.size() && (in.op == Op::VecGet || in.op == Op::ToAny)) {
+			if (pc + 1 < fn.code.size() && (in.op == Op::VecGet || in.op == Op::DynGet || in.op == Op::ToAny)) {
 				const auto &next = fn.code[pc + 1];
-				const bool moves = next.op == Op::Move && in.op == Op::VecGet && in.a == next.b;
+				const bool moves = next.op == Op::Move && in.op != Op::ToAny && in.a == next.b;
 				const bool sets = next.op == Op::DynSet && in.op == Op::ToAny && in.a == next.c && fn.registers[in.b] == Kind::Val &&
 						 in.b < fn.engine_types.size() && ir::bare_named(fn.engine_types[in.b]) != ir::Bare::None;
 				if (moves || sets) {
 					if (!uses) {
 						uses.emplace(fn);
 					}
-					if (uses->only_consumer(in.a, pc + 1)) {
-						if (moves) {
-							vector_targets_[f].resize(pc + 1, NONE);
-							vector_targets_[f][pc] = next.a;
-						} else {
-							borrowed_sets_[f].resize(pc + 1);
-							borrowed_sets_[f][pc] = true;
-						}
+					if (const auto target = ir::move_consumer(fn, pc, *uses); moves && target) {
+						move_targets_[f].resize(pc + 1, NONE);
+						move_targets_[f][pc] = *target;
+					} else if (sets && uses->only_consumer(in.a, pc + 1)) {
+						borrowed_sets_[f].resize(pc + 1);
+						borrowed_sets_[f][pc] = true;
 					}
 				}
 			}

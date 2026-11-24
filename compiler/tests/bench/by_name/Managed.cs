@@ -13,6 +13,14 @@ public partial class Managed : Node
 
     public void AddTarget(Node2D value) => targets.Add(value);
 
+    public Variant EngineKeysRead(Node2D target, int n)
+    {
+        StringName[] props = { Node2D.PropertyName.Position, CanvasItem.PropertyName.Modulate, Node2D.PropertyName.Rotation };
+        Variant value = default;
+        for (int i = 0; i < n; ++i) value = target.Get(props[i % 3]);
+        return value;
+    }
+
     public double Measure(string kind, string op, Node2D target, int n)
     {
         if (kind == "configure" || kind == "configureTyped")

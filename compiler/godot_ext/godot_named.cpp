@@ -291,7 +291,7 @@ const vm::NamedMember &GodotHost::script_getter(void *p_receiver, std::string_vi
 	return delegates_script(p_receiver, p_name) ? script_binding(p_name, false) : script_member(p_receiver, p_name);
 }
 
-// Only a name outside both native name tables may go directly to a foreign getter.
+// Read an engine property by its Godot spelling, or a foreign field by the script's spelling.
 const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested) {
 
 #if defined(KAS3_RUNTIME_ONLY)
@@ -318,15 +318,22 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	if (value.get_type() != Variant::OBJECT) {
 		return nullptr;
 	}
-	const auto id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
-	void *owner = gdextension_interface::object_get_instance_from_id(id);
+	void *owner = live_handle_object(p_receiver);
 	StringName klass;
-	if (!owner || script_on_live_handle(owner, value) || !gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr()) ||
-			named_on_class(Variant::OBJECT, klass, p_name, vm::NameSource::Computed).what != vm::NamedMember::What::Missing || !attached_script(owner).value_or(0)) {
+	if (!owner || script_on_live_handle(owner, value) || !gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
 		return nullptr;
 	}
-	StringName key(to_godot(p_name));
-	if (native_member(klass, key)) {
+	const auto &member = named_on_class(Variant::OBJECT, klass, p_name, vm::NameSource::Computed);
+	StringName key;
+	if (member.what == vm::NamedMember::What::Property && member.read && member.invoke &&
+			static_cast<const Worked *>(member.invoke)->what == Worked::What::Getter) {
+		key = static_cast<const Worked *>(member.invoke)->dynamic_name;
+	} else if (member.what == vm::NamedMember::What::Missing && attached_script(owner).value_or(0)) {
+		key = StringName(to_godot(p_name));
+		if (native_member(klass, key)) {
+			return nullptr;
+		}
+	} else {
 		return nullptr;
 	}
 	*r_owner = owner;

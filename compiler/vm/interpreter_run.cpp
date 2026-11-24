@@ -560,7 +560,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				if (function.registers[in.a] == Kind::Str && indexed_read(function, in, r)) {
 					break;
 				}
-				const uint32_t target = named_sites_.vector_target(frame.function, frame.pc - 1);
+				const uint32_t target = named_sites_.move_target(frame.function, frame.pc - 1);
 				if (target == NONE) {
 					vector_op(function, in, r);
 				} else {

@@ -34,6 +34,8 @@ func measure() -> void:
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
+	var engine_keys := {"engineKeys": node, "scriptEngineKeys": foreign}
+	cases.merge(engine_keys)
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
 	for kind: String in inferred:
@@ -50,7 +52,7 @@ func measure() -> void:
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
-				if kind == "computed" and op != "read":
+				if (kind == "computed" or kind in engine_keys) and op != "read":
 					continue
 				if kind in pieces and (op != "read" or managed):
 					continue
@@ -77,7 +79,7 @@ func measure() -> void:
 			if probe == (-1069 if op == "read" else -1006):
 				windows[row] = []
 				continue
-		var family: String = {"inherited": "node", "gdscript": "node", "foreign": "script", "custom": "custom" if op == "call" else "script"}.get(kind, kind)
+		var family: String = {"scriptEngineKeys": "engineKeys", "inherited": "node", "gdscript": "node", "foreign": "script", "custom": "custom" if op == "call" else "script"}.get(kind, kind)
 		var method := StringName(family + op.capitalize())
 		# Accumulate measured batches so short native rows outlast the clock resolution
 		# and both controls reach steady state before their recorded work begins.
@@ -92,7 +94,9 @@ func measure() -> void:
 			script.set("score", 7)
 			var start := Time.get_ticks_usec()
 			var result
-			if managed:
+			if managed and kind in engine_keys:
+				result = cs.call("EngineKeysRead", target, rounds)
+			elif managed:
 				result = cs.call("Measure", kind, op, target, rounds)
 			elif args[0] == "self" and kind == "script":
 				result = script.call("self" + op.capitalize(), rounds)
@@ -101,7 +105,9 @@ func measure() -> void:
 			var elapsed := Time.get_ticks_usec() - start
 			var own := kind in ["script", "foreign", "custom"]
 			var valid := true
-			if kind == "computed":
+			if kind in engine_keys:
+				valid = is_same(result, [target.position, target.modulate, target.rotation][(rounds - 1) % 3])
+			elif kind == "computed":
 				valid = result == 8 * rounds - rounds % 2
 			elif kind == "joinThree":
 				valid = result == rounds * 18

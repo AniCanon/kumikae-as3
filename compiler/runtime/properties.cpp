@@ -26,8 +26,12 @@ vm::NamedResult named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Sl
 	const uint32_t carries = host.interpreter->carries();
 	std::optional<vm::NamedCall> call;
 	const vm::Wanted wanted{ static_cast<ir::Op>(p_op) == ir::Op::DynSet ? ir::Kind::Void : ir::Kind::Any, p_type ? p_type : "", p_reuse };
-	bool done = !p_site ? p_key && host.interpreter->read_computed(p_holder, p_key->view(), r_result) :
-			host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result, &call, wanted);
+	bool done = p_key != nullptr;
+	if (!p_site && p_key) {
+		host.interpreter->read_computed(p_holder, p_key->view(), r_result);
+	} else if (p_site) {
+		done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result, &call, wanted);
+	}
 	if (call) {
 		retain(c, call->receiver);
 		done = call_resolved(c, call->function, call->receiver, p_args, p_count, r_result);

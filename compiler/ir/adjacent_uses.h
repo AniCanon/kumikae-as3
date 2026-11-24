@@ -51,6 +51,17 @@ public:
 	}
 };
 
+inline std::optional<uint32_t> move_consumer(const Function &p_function, size_t p_pc, const AdjacentUses &p_uses) {
+	const auto &source = p_function.code[p_pc];
+	if (p_uses.only_consumer(source.a, p_pc + 1)) {
+		const auto &move = p_function.code[p_pc + 1];
+		if (move.op == Op::Move && move.b == source.a) {
+			return move.a;
+		}
+	}
+	return std::nullopt;
+}
+
 struct MathConsumer {
 	uint32_t target;
 	uint32_t skip = 0;

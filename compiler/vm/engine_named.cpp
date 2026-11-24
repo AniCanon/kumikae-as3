@@ -94,16 +94,6 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	if (!handle) {
 		return std::nullopt;
 	}
-	if (!checked_ && any::tag(p_holder) == AnyTag::Godot) {
-		std::string error;
-		switch (vm_.host_.handles.read_script(handle, nullptr, p_key.name(), nullptr, { Kind::Any, {} }, r_value, &error)) {
-			case ScriptRead::Value: return true;
-			case ScriptRead::Missing: return std::nullopt;
-			case ScriptRead::Method: return method_value(handle, p_key, p_key.name(), r_value);
-			case ScriptRead::Failed: raise_engine(vm_.library_, error); return false;
-			case ScriptRead::Declined: break;
-		}
-	}
 	const NamedMember &found = member(p_holder, p_key);
 	switch (found.what) {
 		case NamedMember::What::Missing:

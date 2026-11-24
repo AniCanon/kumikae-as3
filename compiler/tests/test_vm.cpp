@@ -3660,11 +3660,11 @@ static void test_vector_move_targets() {
 	auto &fn = module.functions.emplace_back();
 	fn.registers = { Kind::Obj, Kind::I32, Kind::Any, Kind::Any };
 	fn.code = { { Op::VecGet, 2, 0, 1 }, { Op::Move, 3, 2 }, { Op::Return, 3 } };
-	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), 3u);
+	CHECK_EQ(vm::NamedSites(module).move_target(0, 0), 3u);
 	fn.code.push_back({ Op::Jump, 1 });
-	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
+	CHECK_EQ(vm::NamedSites(module).move_target(0, 0), ir::NONE);
 	fn.code.back() = { Op::Return, 2 };
-	CHECK_EQ(vm::NamedSites(module).vector_target(0, 0), ir::NONE);
+	CHECK_EQ(vm::NamedSites(module).move_target(0, 0), ir::NONE);
 }
 
 // Both paths return the second handle. The fused read owns one fewer copy of it.

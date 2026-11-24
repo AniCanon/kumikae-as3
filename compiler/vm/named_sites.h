@@ -41,7 +41,7 @@ class NamedSites {
 	};
 	std::vector<std::vector<Place>> places_;
 	std::vector<InterpreterSite> sites_;
-	std::vector<std::vector<uint32_t>> vector_targets_;
+	std::vector<std::vector<uint32_t>> move_targets_;
 	std::vector<std::vector<bool>> borrowed_sets_;
 	// Overflow shapes share resolution across sites. Foreign scripts dispatch through Godot and
 	// share its class metadata. Only AS3 field and method slots depend on a script class.
@@ -51,8 +51,8 @@ class NamedSites {
 		std::string_view p_name, bool p_read);
 public:
 	explicit NamedSites(const ir::Module &p_module);
-	uint32_t vector_target(uint32_t p_function, uint32_t p_pc) const {
-		const auto &targets = vector_targets_[p_function];
+	uint32_t move_target(uint32_t p_function, uint32_t p_pc) const {
+		const auto &targets = move_targets_[p_function];
 		return p_pc < targets.size() ? targets[p_pc] : ir::NONE;
 	}
 	bool borrows_set(uint32_t p_function, uint32_t p_pc) const {

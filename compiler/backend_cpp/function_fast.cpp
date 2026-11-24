@@ -73,7 +73,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			line("\t" + reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(static_cast<Vector *>(" + reg(p_in.b) + ")->length);");
 			break;
 		case Op::VecGet:
-			if (!whole(p_in.c)) {
+			if (!whole(p_in.c) && !(kind(p_in.c) == Kind::F64 && kind(p_in.a) == Kind::Str)) {
 				return false;
 			}
 			if (kind(p_in.a) == Kind::U8) {

@@ -34,6 +34,13 @@ bool listed(const std::array<std::string_view, Count> &p_names, std::string_view
 // holder[key] as an untyped value with a reference of its own. False if it raised: a name a sealed object
 // does not have is AS3's ReferenceError #1069; one the interpreter can't reach yet says so.
 bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
+	if (any::tag(p_holder) == AnyTag::Godot && !p_key.object) {
+		return read_computed(p_holder, p_key.name(), r_value);
+	}
+	return ordinary_property(p_holder, p_key, r_value);
+}
+
+bool Interpreter::ordinary_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
 	*r_value = any::undefined();
 	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;

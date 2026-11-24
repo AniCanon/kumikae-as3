@@ -59,7 +59,18 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 		line("if (handled == kas3::vm::NamedResult::Reused) goto L" + std::to_string(after) + ";");
 	}
 	if (!write && p_in.a != ir::NONE) {
-		put(p_in.a, "w");
+		std::optional<uint32_t> moved;
+		if (!literal && pc_ + 2 < function_.code.size() && kept_.empty() && twice_.empty()) {
+			if (!adjacent_) {
+				adjacent_.emplace(function_);
+			}
+			moved = ir::move_consumer(function_, pc_, *adjacent_);
+		}
+		put(moved.value_or(p_in.a), "w");
+		if (moved) {
+			targets_[pc_ + 2] = true;
+			line("goto L" + std::to_string(pc_ + 2) + ";");
+		}
 	} else {
 		line("release(c, w);");
 	}

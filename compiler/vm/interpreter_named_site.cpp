@@ -20,12 +20,17 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value) {
 	std::string error;
 	const auto read = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {} }, r_value, &error);
+	if (read == ScriptRead::Declined) {
+		PropertyKey key;
+		key.borrowed = p_name;
+		return ordinary_property(p_holder, key, r_value);
+	}
 	if (read == ScriptRead::Failed) {
 		raise_engine(library_, error);
 	} else if (read == ScriptRead::Method || read == ScriptRead::Missing) {
 		EngineNamed(*this).finish_read(read, p_holder, p_name, r_value);
 	}
-	return read != ScriptRead::Declined;
+	return !failing_ && !stopped_;
 }
 
 // Keep a vector's String element in its register across a getter that can reenter AS3.
@@ -60,13 +65,14 @@ bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruc
 		}
 	}
 	const size_t base = frame.base;
+	const uint32_t moved = named_sites_.move_target(frame.function, frame.pc);
 	frame.pc++;
 	Slot value = any::undefined();
-	if (!read_computed(p_registers[get.b], key->view(), &value)) {
-		// The vector read succeeded. Dispatch the ordinary property read next.
-		--frames_.back().pc;
-	} else if (!failing_) {
-		Slot &destination = stack_[base + get.a];
+	if (read_computed(p_registers[get.b], key->view(), &value)) {
+		if (moved != ir::NONE) {
+			frames_.back().pc++;
+		}
+		Slot &destination = stack_[base + (moved == ir::NONE ? get.a : moved)];
 		if (any::holds(destination)) {
 			put(ir::Kind::Any, destination, value);
 		} else {
@@ -96,10 +102,10 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	InterpreterSite *site = named_sites_.at(frame.function, frame.pc - 1, text, strings_);
 	if (!site) {
 		Slot result = any::undefined();
-		if (write || list || !text || any::tag(registers[holder]) != AnyTag::Godot || !read_computed(registers[holder], text->view(), &result)) {
+		if (write || list || !text || any::tag(registers[holder]) != AnyTag::Godot) {
 			return false;
 		}
-		if (!failing_) {
+		if (read_computed(registers[holder], text->view(), &result)) {
 			put(ir::Kind::Any, stack_[base + p_in.a], result);
 		}
 		return true;

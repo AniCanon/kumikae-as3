@@ -277,6 +277,7 @@ private:
 	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
 	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix = {}) const;
+	bool ordinary_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
 	bool sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
