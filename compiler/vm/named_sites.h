@@ -2,6 +2,7 @@
 #pragma once
 
 #include "adjacent_uses.h"
+#include "cache_eviction.h"
 #include "engine_handles.h"
 #include "named_site.h"
 
@@ -16,7 +17,7 @@ struct InterpreterSite : NamedSite {
 
 // A literal name is interned once on overflow. Subsequent dispatch uses just the class identities.
 struct NamedOverflow {
-	static constexpr size_t CAPACITY = 64;
+	static constexpr size_t CAPACITY = CacheEviction::CAPACITY;
 	struct Shape {
 		uintptr_t type;
 		std::optional<uint32_t> klass;
@@ -27,10 +28,10 @@ struct NamedOverflow {
 		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (std::hash<std::optional<uint32_t>>{}(p_shape.klass) << 1) ^ std::hash<std::optional<uint64_t>>{}(p_shape.script); }
 	};
 	std::unordered_map<Shape, NamedSite::Entry, Hash> entries;
-	void make_room();
+	void make_room() { eviction_.make_room(entries); }
 
 private:
-	uint32_t random_ = 1;
+	CacheEviction eviction_;
 };
 
 class NamedSites {

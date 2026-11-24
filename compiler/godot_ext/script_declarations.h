@@ -1,6 +1,8 @@
 // Resolved foreign declarations are independent of the receiver carrying the script.
 #pragma once
 
+#include "../vm/cache_eviction.h"
+
 #include <cstdint>
 #include <map>
 #include <string>
@@ -18,9 +20,7 @@ public:
 	Member lookup(uint64_t p_script, std::string_view p_name, Reflect p_reflect) {
 		auto at = scripts_.find(p_script);
 		if (at == scripts_.end()) {
-			if (scripts_.size() == 64) {
-				scripts_.clear();
-			}
+			eviction_.make_room(scripts_);
 			Names names;
 			p_reflect(names);
 			at = scripts_.emplace(p_script, std::move(names)).first;
@@ -36,6 +36,7 @@ public:
 	}
 
 private:
+	vm::CacheEviction eviction_;
 	std::unordered_map<uint64_t, Names> scripts_;
 };
 

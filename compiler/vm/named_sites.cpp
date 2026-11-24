@@ -125,16 +125,6 @@ static bool scalar_field(const ir::Class &p_class, Object *p_object, uint32_t p_
 	return false;
 }
 
-void NamedOverflow::make_room() {
-	if (entries.size() < CAPACITY) {
-		return;
-	}
-	// Pick a single victim on a miss. FIFO and LRU both miss on every
-	// access when a sequential rotation is one entry larger than the table.
-	random_ = random_ * 1664525u + 1013904223u;
-	entries.erase(std::next(entries.begin(), (random_ >> 16) % CAPACITY));
-}
-
 const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
 		std::string_view p_name, bool p_read, const NamedSite::Entry *p_delegated) {
 	const std::optional<uint32_t> klass = p_shape.instance ? std::optional<uint32_t>(p_shape.instance->klass) : std::nullopt;
