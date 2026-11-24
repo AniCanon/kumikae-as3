@@ -7,6 +7,7 @@ public partial class Managed : Node
     private static readonly StringName Current = "current";
     private static readonly StringName Caption = "caption";
     private static readonly StringName Heading = "heading";
+    private static readonly StringName Peer = "peer";
     private readonly List<Node2D> targets = new();
 
     public void AddTarget(Node2D value) => targets.Add(value);
@@ -57,6 +58,18 @@ public partial class Managed : Node
             if (op == "call") result = fresh.Rotation;
             fresh.Free();
             return result;
+        }
+        if (kind == "customFields")
+        {
+            double total = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var caption = target.Get(Caption).AsString();
+                var heading = target.Get(Heading).AsVector2();
+                var peer = target.Get(Peer).AsGodotObject();
+                total += caption.Length + heading.X + peer.Call(Current).AsInt32();
+            }
+            return total;
         }
         if (kind == "customString" || kind == "customVector" || (kind == "custom" && op == "call"))
         {

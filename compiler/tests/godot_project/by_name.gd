@@ -6,6 +6,7 @@ class Intercept extends Node2D:
 	var reads := 0
 	var writes := 0
 	var stored := true
+	var allocation_probe := 7
 
 	func script_score() -> int:
 		return 41
@@ -26,11 +27,8 @@ class Intercept extends Node2D:
 class SchemaEditor extends RefCounted:
 	func replace_schema(receiver: Node2D) -> void:
 		var script: GDScript = receiver.get_script()
-		var previous := script.source_code
 		script.source_code = receiver.get_meta("next")
 		assert(script.reload(true) == OK)
-		# The compiled schema changed even when the caller sees the original source again.
-		script.source_code = previous
 
 class VirtualOnly extends Node2D:
 	var reads := 0
@@ -145,29 +143,50 @@ func _physics_process(_delta: float) -> bool:
 	var foreign := Intercept.new()
 	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
 		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
-	var changing := Node2D.new()
-	changing.set_script(Intercept)
-	var declared = ask("readStored", [changing])
-	changing.set_script(VirtualOnly)
-	var removed = ask("readStored", [changing])
-	show("foreign declaration after replacement", [declared, removed, changing.get("reads")], [true, 1069, 0])
-	changing.free()
-	var live := GDScript.new()
-	var next := "extends Node2D\nvar reads := 0\nfunc _get(key):\n if key == &'stored':\n  reads += 1\n  return 'virtual'\n return null\n"
-	live.source_code = next + "var stored := true\n"
-	assert(live.reload() == OK)
-	var edited := Node2D.new()
-	edited.set_script(live)
-	edited.set_meta("next", next)
-	var observed = ask("readAcrossReload", [edited, "stored", SchemaEditor.new()])
-	show("foreign declaration after in-place reload", [observed, edited.get("reads")], [[true, true, 1069, false], 0])
-	live.source_code = next + "var stored := true\n"
-	assert(live.reload(true) == OK)
-	edited.set("stored", true)
-	live.source_code = next
-	var typed_reload = ask("readAcrossTypedReload", [edited, "stored", live])
-	show("typed reload after staging source", [typed_reload, edited.get("reads")], [[true, true, 1069, false], 0])
-	edited.free()
+	show("warmed script field", ask("readMany", [foreign]), 112)
+	var controls := {}
+	for managed in [false, true]:
+		var changing := Node2D.new()
+		changing.set_script(Intercept)
+		var declared = ask("readStored", [changing]) if managed else changing.get("stored")
+		changing.set_script(VirtualOnly)
+		var removed = ask("readStored", [changing]) if managed else changing.get("stored")
+		var replacement := [declared, removed, changing.get("reads")]
+		changing.free()
+		var live := GDScript.new()
+		var next := "extends Node2D\nvar reads := 0\nfunc _get(key):\n if key == &'stored':\n  reads += 1\n  return 'virtual'\n return null\n"
+		for typed in [false, true]:
+			live.source_code = next + "var stored := true\n"
+			assert(live.reload() == OK)
+			var edited := Node2D.new()
+			edited.set_script(live)
+			edited.set_meta("next", next)
+			var observed
+			if typed:
+				live.source_code = next
+			if managed:
+				observed = ask("readAcrossTypedReload" if typed else "readAcrossReload",
+						[edited, "stored", live if typed else SchemaEditor.new()])
+			else:
+				var before = edited.get("stored")
+				var had := live.get_script_property_list().any(func(p): return p.name == "stored")
+				if typed:
+					assert(live.reload(true) == OK)
+				else:
+					SchemaEditor.new().replace_schema(edited)
+				observed = [before, had, edited.get("stored"),
+						live.get_script_property_list().any(func(p): return p.name == "stored")]
+			var label := "typed reload after staging source" if typed else "foreign declaration after in-place reload"
+			var result := [observed, edited.get("reads")]
+			if managed:
+				show(label, result, controls[label])
+			else:
+				controls[label] = result
+			edited.free()
+		if managed:
+			show("foreign declaration after replacement", replacement, controls.replacement)
+		else:
+			controls.replacement = replacement
 	var reference := Intercept.new()
 	reference.set("visible", false)
 	var expected = [reference.get("visible"), reference.reads, reference.writes]

@@ -51,6 +51,9 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+	Name computed_name_;
+	godot::StringName computed_class_;
+	bool can_delegate_ = false;
 #if !defined(KAS3_RUNTIME_ONLY)
 	// Godot 4 stores the interned name pointer in its opaque StringName. Keep the name alive as the key.
 	static uintptr_t handle_class(void *p_receiver, void *p_raw);
@@ -110,9 +113,8 @@ public:
 	struct Worked;
 	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
 	void new_program();
-	// Any handoff capable of executing foreign code ends this declaration snapshot.
-	void script_effect() { declarations_current.store(false, std::memory_order_relaxed); }
-	std::atomic<bool> declarations_current{ false };
+	void script_entry() { ++declaration_epoch_; }
+	uint64_t &declaration_epoch() { return declaration_epoch_; }
 	// The programs made before the last are gone: what was worked out for a call at its own place and
 	// is not the last program's is let go of.
 	void release_unused();
@@ -124,9 +126,8 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
 	std::vector<std::unique_ptr<Worked>> named_bindings_;
 	ScriptDeclarations declarations_;
-	std::string_view read_name_;
-	const void *read_owner_ = nullptr;
-	const vm::Prepared *read_binding_ = nullptr;
+	uint64_t declaration_epoch_ = 1;
+	uint64_t reflected_epoch_ = 0;
 	std::map<std::string, std::array<vm::NamedMember, 2>, std::less<>> script_members_;
 	const vm::NamedMember &script_binding(std::string_view p_name, bool p_method);
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
@@ -176,6 +177,10 @@ public:
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	bool delegates_script(void *p_receiver, std::string_view p_name) override;
+	const vm::NamedMember &script_getter(void *p_receiver, std::string_view p_name) override;
+	bool script_has(void *p_receiver, std::string_view p_name) override;
+	vm::ScriptRead read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
 	const vm::NamedMember &script_member(void *p_receiver, std::string_view p_name) override;
 	static std::optional<vm::NamedShape> shape_of(void *p_receiver, uintptr_t p_delegated = 0);
 	std::optional<vm::NamedShape> named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }

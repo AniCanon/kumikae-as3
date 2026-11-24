@@ -163,7 +163,6 @@ const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::
 
 bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
-	script_effect();
 	const Utility *function = utility(p_signature, r_error);
 	return function && call_utility(*function, p_arguments, p_count, p_result, r_result, r_error);
 }
@@ -196,7 +195,6 @@ public:
 
 bool GodotHost::call_utility(const Utility &p_function, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 		std::string *r_error) {
-	script_effect();
 	const Utility *function = &p_function;
 	if (p_count < function->parameters.size() || (!function->any_number && p_count > function->parameters.size())) {
 		const size_t wanted = function->parameters.size();

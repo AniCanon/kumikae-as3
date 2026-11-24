@@ -295,7 +295,6 @@ bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Vector 
 } // namespace
 
 void *GodotHost::collection(std::string_view p_type, const ir::Class &p_class, const vm::Vector *p_vector, std::string *r_error) {
-	script_effect();
 	const ir::Kind p_kind = p_class.element;
 	Variant made;
 	bool ok = true;

@@ -193,6 +193,19 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 	return false;
 }
 
+bool EngineNamed::finish_read(ScriptRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value) {
+	PropertyKey key;
+	key.borrowed = p_name;
+	if (p_read == ScriptRead::Method) {
+		return method_value(handle_of(p_holder), key, p_name, r_value);
+	}
+	if (listed(OBJECT_METHODS, p_name)) {
+		return vm_.method_value(p_holder, p_name, r_value);
+	}
+	vm_.raise_not_found(key, p_holder);
+	return false;
+}
+
 // key in holder (p_prototype: what its prototype has counts), or holder.hasOwnProperty(key).
 bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has) {
 	Object *object = property_object(host_.handles, p_holder);

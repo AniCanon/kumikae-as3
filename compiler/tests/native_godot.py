@@ -186,10 +186,12 @@ class Runner:
             self.check("native: a literal miss is cached", "nothing" in cached, str(sorted(cached)))
             self.check("native: computed misses stay out of the literal cache",
                        cached.isdisjoint(f"slot{i}" for i in range(256)), str(sorted(cached)))
-            self.check("native: a replacement script checks the current declaration",
-                       "VALUE foreign declaration after replacement=[true, 1069, 0]|[true, 1069, 0]" in text and
-                       "VALUE typed reload after staging source=[[true, true, 1069, false], 0]|[[true, true, 1069, false], 0]" in text and
-                       "VALUE foreign declaration after in-place reload=[[true, true, 1069, false], 0]|[[true, true, 1069, false], 0]" in text, text[-2200:])
+            allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: field allocations ")]
+            self.check("native: warmed scalar field lookup allocates nothing", allocations[1:] == [0] * 15, str(allocations))
+            self.check("native: reloaded fields use the current getter",
+                       "VALUE foreign declaration after replacement=[true, \"virtual\", 1]|[true, \"virtual\", 1]" in text and
+                       "VALUE typed reload after staging source=[[true, true, \"virtual\", false], 1]|[[true, true, \"virtual\", false], 1]" in text and
+                       "VALUE foreign declaration after in-place reload=[[true, true, \"virtual\", false], 1]|[[true, true, \"virtual\", false], 1]" in text, text[-2200:])
             self.check("native: attaching a script ends the fresh Timer proof",
                        "VALUE fresh timer after attaching a script=8.5|8.5" in text, text[-2000:])
             self.check("native: foreign script declarations support literal and computed names",

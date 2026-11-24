@@ -77,7 +77,7 @@ InterpreterSite *NamedSites::at(uint32_t p_function, uint32_t p_pc, const Str *p
 	return place.site != NONE && p_key == p_strings[place.name] ? &sites_[place.site] : nullptr;
 }
 
-static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle, std::string_view p_name) {
+static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle, std::string_view p_name, bool p_read) {
 	NamedSite::Entry entry{};
 	entry.type = p_shape.type;
 	entry.script = p_shape.script;
@@ -102,7 +102,7 @@ static NamedSite::Entry resolve(EngineHandles &p_engine, const ir::Module &p_mod
 	}
 	entry.engine = &p_engine.named(p_handle, p_name, NameSource::Literal);
 	if (entry.engine->what == NamedMember::What::Missing && p_shape.script && !p_shape.instance) {
-		entry.engine = &p_engine.script_member(p_handle, p_name);
+		entry.engine = p_read ? &p_engine.script_getter(p_handle, p_name) : &p_engine.script_member(p_handle, p_name);
 	}
 	return entry;
 }
@@ -136,7 +136,7 @@ void NamedOverflow::make_room() {
 }
 
 const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
-		std::string_view p_name, const NamedSite::Entry *p_delegated) {
+		std::string_view p_name, bool p_read, const NamedSite::Entry *p_delegated) {
 	const std::optional<uint32_t> klass = p_shape.instance ? std::optional<uint32_t>(p_shape.instance->klass) : std::nullopt;
 	const NamedSite::Entry *entry = p_shape.delegate ? p_delegated : nullptr;
 	for (size_t i = 0; !entry && i < p_site.used; i++) {
@@ -148,7 +148,7 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 	}
 	if (!entry && p_site.used < p_site.entries.size()) {
 		auto &next = p_site.entries[p_site.used];
-		next = resolve(p_engine, p_module, p_shape, p_handle, p_name);
+		next = resolve(p_engine, p_module, p_shape, p_handle, p_name, p_read);
 		if (p_shape.script && !p_shape.instance && next.engine && !next.engine->godot.empty() &&
 				(!next.engine->script_only || p_engine.delegates_script(p_handle, p_name))) {
 			p_site.delegated = p_site.used;
@@ -157,9 +157,9 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 		p_site.used++;
 	} else if (!entry) {
 		if (!p_site.overflow) {
-			auto found = shared_.find(p_name);
-			if (found == shared_.end()) {
-				found = shared_.try_emplace(std::string(p_name)).first;
+			auto found = shared_[p_read].find(p_name);
+			if (found == shared_[p_read].end()) {
+				found = shared_[p_read].try_emplace(std::string(p_name)).first;
 			}
 			p_site.overflow = &found->second;
 		}
@@ -168,7 +168,7 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 		auto at = entries.find(key);
 		if (at == entries.end()) {
 			p_site.overflow->make_room();
-			at = entries.emplace(key, resolve(p_engine, p_module, p_shape, p_handle, p_name)).first;
+			at = entries.emplace(key, resolve(p_engine, p_module, p_shape, p_handle, p_name, p_read)).first;
 		}
 		entry = &at->second;
 	}
@@ -176,7 +176,7 @@ const NamedSite::Entry &NamedSites::binding(NamedSite &p_site, EngineHandles &p_
 }
 
 std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, const Wanted &wanted) {
+		const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, ScriptRead *r_read, const Wanted &wanted) {
 	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
@@ -193,7 +193,7 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 		return std::nullopt;
 	}
 	const NamedShape &shape = *checked;
-	const auto &entry = binding(p_site, p_engine, p_module, shape, handle, p_name, delegated);
+	const auto &entry = binding(p_site, p_engine, p_module, shape, handle, p_name, p_op == Op::DynGet, delegated);
 	if (entry.field) {
 		return scalar_field(p_module.classes[shape.instance->klass], shape.instance, *entry.field, p_op, p_arguments, r_result) ?
 				std::optional<bool>(true) : std::nullopt;
@@ -222,6 +222,10 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 	if (member->script_only) {
 		if (!bind || write) {
 			return std::nullopt;
+		}
+		if (!call) {
+			*r_read = p_engine.read_script(handle, shape.owner, name, bind, wanted, r_result, r_error);
+			return *r_read == ScriptRead::Declined ? std::nullopt : std::optional<bool>(*r_read != ScriptRead::Failed);
 		}
 		return p_engine.run_script(shape, *bind, operands, p_count + 1, wanted, r_result, r_error);
 	}

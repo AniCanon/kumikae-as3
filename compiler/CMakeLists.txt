@@ -157,7 +157,7 @@ if(KAS3_GODOT_CPP)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/godot/runtime_names.py
             ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${runtime_names}
         DEPENDS godot/runtime_names.py godot/godot_names.txt)
-    set(export_sources godot_ext/program.cpp godot_ext/native_program.cpp godot_ext/godot_utility.cpp)
+    set(export_sources godot_ext/godot_named.cpp godot_ext/program.cpp godot_ext/native_program.cpp godot_ext/godot_utility.cpp)
     foreach(source IN LISTS export_sources)
         list(REMOVE_ITEM KAS3_GODOT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
     endforeach()
@@ -196,7 +196,7 @@ if(KAS3_GODOT_CPP)
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
     if(KAS3_HAS_PLAY_BACKEND)
-        add_library(kas3_godot_counts SHARED ${export_sources} $<TARGET_OBJECTS:kas3_counted_host>)
+        add_library(kas3_godot_counts SHARED tests/script_read_allocations.cpp ${export_sources} $<TARGET_OBJECTS:kas3_counted_host>)
         target_link_libraries(kas3_godot_counts PRIVATE kas3_godot_common)
         target_compile_definitions(kas3_godot_counts PRIVATE KAS3_TEST_COUNTS)
         set_target_properties(kas3_godot_counts PROPERTIES OUTPUT_NAME kas3_godot

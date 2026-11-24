@@ -30,7 +30,7 @@ func measure() -> void:
 		script.call("addTarget", child)
 		if managed:
 			cs.call("AddTarget", child)
-	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "custom": custom, "customString": custom, "customVector": custom, "script": script,
+	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
@@ -50,7 +50,7 @@ func measure() -> void:
 			for op in ["read", "write", "call"]:
 				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
 					continue
-				if (kind == "foreign" and op == "write") or (kind == "custom" and op == "write") or (kind in ["customString", "customVector"] and op != "read"):
+				if (kind == "foreign" and op == "write") or (kind == "custom" and op == "write") or (kind in ["customString", "customVector", "customFields"] and op != "read"):
 					continue
 				if kind == "detached" and op != "call":
 					continue
@@ -95,8 +95,8 @@ func measure() -> void:
 			var elapsed := Time.get_ticks_usec() - start
 			var own := kind in ["script", "foreign", "custom"]
 			var valid := true
-			if kind in ["customString", "customVector"]:
-				valid = result == rounds * (12 if kind == "customString" else 10)
+			if kind in ["customString", "customVector", "customFields"]:
+				valid = result == rounds * {"customString": 12, "customVector": 10, "customFields": 15}[kind]
 			elif op == "read" or (op == "call" and (own or kind == "value")):
 				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))
 			elif kind in ["proven", "typed"] and op == "call":

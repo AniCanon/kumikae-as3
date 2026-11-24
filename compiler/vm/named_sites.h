@@ -44,10 +44,10 @@ class NamedSites {
 	std::vector<std::vector<bool>> borrowed_sets_;
 	// Overflow shapes share resolution across sites. Foreign scripts dispatch through Godot and
 	// share its class metadata. Only AS3 field and method slots depend on a script class.
-	std::map<std::string, NamedOverflow, std::less<>> shared_;
+	std::array<std::map<std::string, NamedOverflow, std::less<>>, 2> shared_;
 	uint64_t generation_;
 	const NamedSite::Entry &binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
-		std::string_view p_name, const NamedSite::Entry *p_delegated);
+		std::string_view p_name, bool p_read, const NamedSite::Entry *p_delegated);
 public:
 	explicit NamedSites(const ir::Module &p_module);
 	uint32_t vector_target(uint32_t p_function, uint32_t p_pc) const {
@@ -60,7 +60,7 @@ public:
 	}
 	InterpreterSite *at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings);
 	std::optional<bool> access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, ir::Op p_op, Slot p_holder,
-			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, const Wanted &p_wanted);
+			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, ScriptRead *r_read, const Wanted &p_wanted);
 };
 
 } // namespace kas3::vm

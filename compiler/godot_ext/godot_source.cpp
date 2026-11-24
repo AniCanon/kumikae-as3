@@ -57,7 +57,6 @@ void forget_defaults() {
 }
 
 const Variant *GodotHost::evaluated(std::string_view p_expression, std::string *r_error) {
-	script_effect();
 	Evaluated &entry = evaluated_[Place{ p_expression.data(), p_expression.size() }];
 	if (entry.value && entry.text == p_expression) {
 		return entry.value;
@@ -134,7 +133,6 @@ bool GodotHost::constant(std::string_view p_class, std::string_view p_name, cons
 
 bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
-	script_effect();
 	if (p_class.empty()) {
 		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
 	}
@@ -175,7 +173,6 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 }
 
 void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {
-	script_effect();
 	const std::optional<int> type = value_type(p_type);
 	if (!type) {
 		// Not a value type: one of Godot's classes, made as `ClassName.new()` makes it.

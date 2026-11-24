@@ -102,6 +102,11 @@ package {
 			timer.free();
 			return before + after;
 		}
+		public function readMany(o:*):int {
+			var sum:int = 0;
+			for (var i:int = 0; i < 16; i++) sum += int(o.allocation_probe);
+			return sum;
+		}
 		public function readStored(o:*):* {
 			try { return o.stored; }
 			catch (e:ReferenceError) { return e.errorID; }

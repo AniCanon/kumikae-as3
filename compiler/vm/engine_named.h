@@ -33,6 +33,7 @@ class EngineNamed {
 	bool unknown(const PropertyKey &p_key);
 
 public:
+	bool finish_read(ScriptRead p_read, Slot p_holder, std::string_view p_name, Slot *r_value);
 	explicit EngineNamed(Interpreter &p_vm, const Object *p_checked = nullptr) :
 			vm_(p_vm), checked_(p_checked) {}
 

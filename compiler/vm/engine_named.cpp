@@ -90,8 +90,23 @@ bool EngineNamed::unknown(const PropertyKey &p_key) {
 }
 
 std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
-	const NamedMember &found = member(p_holder, p_key);
-	void *handle = handle_of(p_holder);
+	void *handle = p_key.object ? nullptr : handle_of(p_holder);
+	if (!handle) {
+		return std::nullopt;
+	}
+	const NamedMember *lookup = &vm_.host_.handles.named(handle, p_key.name(), NameSource::Computed);
+	if (lookup->what == NamedMember::What::Missing && !checked_) {
+		std::string error;
+		switch (vm_.host_.handles.read_script(handle, nullptr, p_key.name(), nullptr, { Kind::Any, {} }, r_value, &error)) {
+			case ScriptRead::Value: return true;
+			case ScriptRead::Missing: return std::nullopt;
+			case ScriptRead::Method: return method_value(handle, p_key, p_key.name(), r_value);
+			case ScriptRead::Failed: raise_engine(vm_.library_, error); return false;
+			case ScriptRead::Declined: break;
+		}
+		lookup = &vm_.host_.handles.script_member(handle, p_key.name());
+	}
+	const NamedMember &found = *lookup;
 	switch (found.what) {
 		case NamedMember::What::Missing:
 			return std::nullopt;
@@ -247,7 +262,9 @@ void *EngineNamed::callable(Object *p_function) {
 }
 
 bool EngineNamed::has(Slot p_holder, const PropertyKey &p_key) const {
-	return member(p_holder, p_key).what != NamedMember::What::Missing;
+	void *handle = p_key.object ? nullptr : handle_of(p_holder);
+	return handle && (vm_.host_.handles.named(handle, p_key.name()).what != NamedMember::What::Missing ||
+			(!checked_ && vm_.host_.handles.script_has(handle, p_key.name())));
 }
 
 } // namespace vm

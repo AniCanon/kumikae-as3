@@ -11,7 +11,7 @@ namespace kas3 {
 
 class ScriptDeclarations {
 public:
-	enum class Member { Missing, Field, Scalar, Method };
+	enum class Member { Missing, Field, Method };
 	using Names = std::map<std::string, Member, std::less<>>;
 
 	template <class Reflect>

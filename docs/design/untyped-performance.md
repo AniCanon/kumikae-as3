@@ -116,13 +116,12 @@ replaces one randomly chosen entry in a full table. An interpreter owns its side
 from the immutable module, so warming a site cannot change the module fingerprint. The host retains
 resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
 value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
-foreign script can declare a property or method absent from the engine table. The host reflects the
-member names of the attached script and its bases into a bounded cache. A call, setter, possible
-getter, or transfer of control to Godot invalidates the snapshot. This also covers in-place GDScript
-reloads, which can keep the same resource and emit no change signal. A declared scalar field on a
-GDScript with no possible zero-argument getter can be read again without reflection until such an
-operation or a return to Godot. A warmed site dispatches the read or call through Godot with an
-interned name. Generated C++ keeps a cache at each site and checks its program generation before
+foreign script can declare a property or method absent from the engine table. A foreign field read asks Godot for the named value. After a script
+reload removes a field, its current `_get` can supply the value. A method read produces a bound
+method. When Godot declines a read, the host checks reflected declarations to distinguish a missing
+name from a declared field that failed. It caches these decisions by script identity until Godot
+enters AS3 again or AS3 reloads or changes a script resource. Explicit membership tests check the
+current declarations without invoking a getter. Generated C++ keeps a cache at each site and checks its program generation before
 using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
 refused before it enters AS3, and a worker free is queued for the main thread. The instance lookup,
 host bindings and interpreter overflow table follow the same thread contract. A native site uses

@@ -76,7 +76,6 @@ bool GodotHost::keep(vm::Object *p_object) {
 	if (!instance->holding) {
 		return true; // Godot holds it.
 	}
-	script_effect();
 	instance->holding = false;
 	RefCounted *counted = Object::cast_to<RefCounted>(instance->owner);
 	if (!counted || !counted->unreference()) {

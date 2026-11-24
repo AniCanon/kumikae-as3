@@ -62,11 +62,9 @@ public:
 	// its object, and a result is the caller's to give up. False if it failed: the error has been reported,
 	// or is carried to the script's own call of the engine that led here.
 	[[nodiscard]] bool call_function(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
-		host_.script_effect();
-		const bool ok = native_ ? native_->call(p_function, p_arguments, p_count, r_result)
+		host_.script_entry();
+		return native_ ? native_->call(p_function, p_arguments, p_count, r_result)
 					   : interpreter_->call_function(p_function, p_arguments, p_count, r_result);
-		host_.script_effect();
-		return ok;
 	}
 	bool native_caller(const vm::Object **r_object, uint32_t *r_class) const {
 		return native_ && native_->caller(r_object, r_class);

@@ -28,6 +28,8 @@ struct Prepared {
 // a property (a signal and a part of a value too) or a method of the value's class or of one it extends,
 // and Godot's name for it, which the host keeps for as long as it lives. Unknown: a host that has no table
 // of Godot's names can't say.
+enum class ScriptRead { Value, Method, Missing, Failed, Declined };
+
 enum class NameSource { Computed, Literal };
 
 struct NamedMember {
@@ -95,6 +97,10 @@ struct EngineHandles {
 	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view, NameSource = NameSource::Computed) { return MISSING_MEMBER; }
 	// A site holds the declaration miss for a literal. A foreign script can still supply the name.
 	virtual const NamedMember &script_member(void *, std::string_view) { return MISSING_MEMBER; }
+	// A literal read keeps its interned name even if the script changes what the name means.
+	virtual const NamedMember &script_getter(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name); }
+	virtual ScriptRead read_script(void *, void *, std::string_view, const Prepared *, const Wanted &, Slot *, std::string *) { return ScriptRead::Declined; }
+	virtual bool script_has(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name).what != NamedMember::What::Missing; }
 	// Validates a receiver for a site hit. A host without stable shape identities declines.
 	virtual std::optional<NamedShape> named_shape(void *, uintptr_t) { return {}; }
 	virtual bool delegates_script(void *, std::string_view) { return false; }

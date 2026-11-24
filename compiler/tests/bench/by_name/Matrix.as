@@ -49,6 +49,16 @@ package {
 			}
 			return sum;
 		}
+		public function customFieldsRead(target:*, n:int):Number {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var caption:String = target.caption;
+				var heading:Vector2 = target.heading;
+				var peer:* = target.peer;
+				sum += caption.length + heading.x + int(peer.current());
+			}
+			return sum;
+		}
 		public function customCall(target:*, n:int):int {
 			var sum = 0;
 			for (var i:int = 0; i < n; i++) {
