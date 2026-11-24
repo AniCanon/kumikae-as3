@@ -30,7 +30,9 @@ func batch(row: String, target: Variant, rounds: int, mode: String, targets: Arr
 	var elapsed := Time.get_ticks_usec() - start
 	var own := kind in ["script", "foreign", "custom"]
 	var valid := true
-	if kind == "methodKeys":
+	if kind == "mixedMethods":
+		valid = result != null and bool(result) == bool(rounds % 2)
+	elif kind == "methodKeys":
 		var expected: bool = target.is_visible_in_tree() if rounds % 2 else target.is_processing()
 		valid = result != null and int(result) == int(expected)
 	elif kind in ["engineKeys", "scriptEngineKeys"]:
@@ -127,7 +129,9 @@ func measure() -> void:
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "saved": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
-	var engine_keys := {"methodKeys": node, "engineKeys": node, "scriptEngineKeys": foreign}
+	foreign.set_process(true)
+	node.set_process(false)
+	var engine_keys := {"mixedMethods": node, "methodKeys": node, "engineKeys": node, "scriptEngineKeys": foreign}
 	cases.merge(engine_keys)
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}

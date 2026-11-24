@@ -128,8 +128,8 @@ read asks Godot for the named value.
 
 The host keeps up to 32 computed names keyed by native class and AS3 spelling. Each entry holds
 the translated Godot name and, for a method, the resolved declaration used to bind the receiver.
-Each read validates the receiver. Once a method entry sees a foreign script, it uses one named
-get even if the script changes or detaches. A full cache replaces the least recently used name.
+Each read validates the receiver. A method entry delegates to Godot when the current receiver
+carries a foreign script. A bare receiver binds the engine method directly. A full cache replaces the least recently used name.
 Nested getters can use cached names and hold new names on the stack.
 
 After a script reload removes a field, its current `_get` can supply the value. A method read

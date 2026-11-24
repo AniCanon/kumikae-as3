@@ -3,6 +3,7 @@ package {
 
 	public class Matrix extends Node2D {
 		[Export] public var score:int = 7;
+		public var methodKey:String = "isProcessing";
 		private var targets:Array = [];
 		public function current():int { return score; }
 		public function addTarget(value:*):void { targets.push(value); }
@@ -73,6 +74,16 @@ package {
 		public function readMethod(target:*, key:String, n:int):Boolean {
 			var method:*;
 			for (var i:int = 0; i < n; ++i) method = target[key];
+			return method();
+		}
+		public function mixedMethodsRead(target:*, n:int):Boolean {
+			var scripted:* = targets[6];
+			var key:String = methodKey;
+			var method:*;
+			for (var i:int = 0; i < n; ++i) {
+				var receiver:* = (i & 1) ? target : scripted;
+				method = receiver[key];
+			}
 			return method();
 		}
 		public function savedCall(target:*, n:int):void {

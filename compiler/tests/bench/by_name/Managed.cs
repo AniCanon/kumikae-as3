@@ -69,6 +69,14 @@ public partial class Managed : Node
             fresh.Free();
             return result;
         }
+        if (kind == "mixedMethods")
+        {
+            var scripted = targets[6];
+            var key = Node.MethodName.IsProcessing;
+            Variant method = default;
+            for (int i = 0; i < n; ++i) method = ((i & 1) != 0 ? target : scripted).Get(key);
+            return method.AsCallable().Call().AsBool() ? 1 : 0;
+        }
         if (kind == "saved")
         {
             var rotate = target.Get(Node2D.MethodName.Rotate).AsCallable();

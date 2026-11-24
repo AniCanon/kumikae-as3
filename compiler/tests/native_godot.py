@@ -159,8 +159,12 @@ class Runner:
                            and len(allocations) >= 16 and max(allocations[2:16]) <= 1, str(allocations) + text[-600:])
 
                 self.check(f"{label}: warmed script method reads allocate only the bound value",
-                           "SCRIPT METHOD true" in text and len(allocations) == 32 and max(allocations[17:]) <= 1,
+                           "SCRIPT METHOD true" in text and len(allocations) == 48 and max(allocations[17:32]) <= 1,
                            str(allocations[16:]) + text[-600:])
+
+                gets = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: method named gets ")]
+                self.check(f"{label}: only the scripted receiver delegates at a mixed computed site",
+                           "MIXED true" in text and gets[32:] == [1, 0] * 8, str(gets[32:]))
 
     def by_name_reads(self, project, library):
         label = "native" if library else "interpreter"

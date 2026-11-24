@@ -327,13 +327,9 @@ GodotHost::ReadKey &GodotHost::keep_read_key(ReadKey p_key) {
 	return *victim;
 }
 
-const StringName *GodotHost::getter_for(ReadKey &p_entry, void *p_owner) {
-	if (p_entry.member && !p_entry.delegates) {
-		if (p_entry.key == StringName() || !attached_script(p_owner).value_or(0)) {
-			return nullptr;
-		}
-		// Named get remains valid on this class if the script is replaced or detached.
-		p_entry.delegates = true;
+const StringName *GodotHost::getter_for(const ReadKey &p_entry, void *p_owner) {
+	if (p_entry.member && (p_entry.key == StringName() || !attached_script(p_owner).value_or(0))) {
+		return nullptr;
 	}
 	return &p_entry.key;
 }
@@ -420,6 +416,9 @@ vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::strin
 	GDExtensionBool valid = false;
 	Variant value;
 	++active_reads_;
+#if defined(KAS3_TEST_COUNTS)
+	count_named_get();
+#endif
 	gdextension_interface::variant_get_named(static_cast<const Variant *>(p_receiver)->_native_ptr(), key->_native_ptr(), value._native_ptr(), &valid);
 	--active_reads_;
 	if (!valid) {
