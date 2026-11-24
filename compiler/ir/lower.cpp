@@ -1,5 +1,5 @@
 #include "lower_bodies.h"
-#include "temporary_releases.h"
+#include "last_use.h"
 #include "lower_classes.h"
 #include "lower_members.h"
 
@@ -309,17 +309,13 @@ bool Lowerer::run(LowerMode p_mode) {
 	return !failed_;
 }
 
-bool lower_holding_temporaries(Compilation &p_compilation, Module *r_module, LowerMode p_mode) {
-	return Lowerer(p_compilation, *r_module).run(p_mode);
-}
-
 bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode) {
-	if (!lower_holding_temporaries(p_compilation, r_module, p_mode)) {
+	Lowerer lowerer(p_compilation, *r_module);
+	if (!lowerer.run(p_mode)) {
 		return false;
 	}
-	TemporaryReleases releases;
 	for (auto &fn : r_module->functions) {
-		releases.insert(fn);
+		release_temporaries(fn);
 	}
 	return true;
 }

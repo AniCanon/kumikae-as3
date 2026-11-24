@@ -10,7 +10,7 @@
 #include "reload.h"
 #include "table.h"
 #include "lower.h"
-#include "temporary_releases.h"
+#include "last_use.h"
 #include "names.h"
 #include "numeric_dispatch.h"
 #include "counted_loops.h"
@@ -3660,7 +3660,7 @@ static void test_stripped_temporary_ownership() {
 		for (auto &in : fn.code) {
 			in.op = static_cast<ir::Op>(in.op);
 		}
-		ir::TemporaryReleases().insert(fn, true);
+		ir::release_temporaries(fn, true);
 		for (size_t pc = 0; pc < fn.code.size(); ++pc) {
 			const auto &in = fn.code[pc];
 			if (in.op == ir::Op::Move && (in.a == owner || in.b == owner)) {

@@ -2,7 +2,7 @@
 // takes, it writes whole. (Whole programs are held to the interpreter's output by tests/run_native.py.)
 #include "check.h"
 #include "generate.h"
-#include "temporary_releases.h"
+#include "last_use.h"
 
 using namespace kas3;
 
@@ -267,7 +267,7 @@ void an_object_stored_in_a_place_last_is_handed_over() {
 		module.functions[0].parameters = 1;
 		module.functions[0].required = 1;
 		module.functions[0].parameter_classes = { 2 };
-		ir::TemporaryReleases().insert(module.functions[0]);
+		ir::release_temporaries(module.functions[0]);
 		const backend_cpp::Generated made = backend_cpp::generate(module);
 		CHECK_EQ(made.unsupported, std::string());
 		const std::string *text = file_named(made, "program.cpp");

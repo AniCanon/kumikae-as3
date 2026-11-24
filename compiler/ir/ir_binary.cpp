@@ -1,5 +1,5 @@
 #include "ir_binary.h"
-#include "temporary_releases.h"
+#include "last_use.h"
 #include "ir_binary_check.h"
 
 #include <cstring>
@@ -681,11 +681,10 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	if (!binary_references_valid(module)) {
 		return std::string("invalid reference in binary IR module");
 	}
-	TemporaryReleases releases;
 	for (auto &fn : module.functions) {
 		fn.bound_engine_method = fn.bound_engine_method || stripped_forwarder(fn, module);
 		if (version == 1) {
-			releases.insert(fn, true);
+			release_temporaries(fn, true);
 		}
 	}
 	*r_module = std::move(module);

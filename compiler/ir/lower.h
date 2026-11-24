@@ -17,9 +17,6 @@ enum class LowerMode {
 };
 
 [[nodiscard]] bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode = LowerMode::Program);
-// The same, with every temporary still held when its function ends: what release_temporaries is given.
-// For a test or a measurement of that pass alone.
-[[nodiscard]] bool lower_holding_temporaries(Compilation &p_compilation, Module *r_module, LowerMode p_mode = LowerMode::Program);
 
 } // namespace ir
 } // namespace kas3

@@ -2,8 +2,6 @@
 
 #include "ir.h"
 #include "last_use.h"
-#include "liveness.h"
-#include "temporary_releases.h"
 
 #include <cstring>
 #include <string>
@@ -130,117 +128,12 @@ static void test_release_edges() {
 	fn.code = { { Op::Call, 2, 0, 0 }, { Op::JumpIfNot, 1, 4 }, { Op::Call, NONE, 0, 1 },
 		{ Op::ReturnVoid }, { Op::Stmt }, { Op::ReturnVoid }, { Op::Stmt }, { Op::ReturnVoid } };
 	fn.handlers.push_back({ 2, 3, 6, 3 });
-	TemporaryReleases().insert(fn);
+	release_temporaries(fn);
 	const auto &branch = fn.code[1];
 	CHECK(branch.op == Op::JumpIfNot);
 	CHECK(fn.code[branch.b].op == Op::Release && fn.code[branch.b].a == 2);
 	const auto &caught = fn.code[fn.handlers[0].target];
 	CHECK(caught.op == Op::Release && caught.a == 2);
-}
-
-// By instruction: the tracked registers it uses for the last time, in order.
-static std::vector<std::vector<uint32_t>> endings(Liveness &r_live, const Function &p_fn) {
-	std::vector<std::vector<uint32_t>> ending(p_fn.code.size());
-	r_live.each_instruction([&](uint32_t p_pc, const std::vector<uint32_t> &p_ending) {
-		ending[p_pc] = p_ending;
-		std::sort(ending[p_pc].begin(), ending[p_pc].end());
-	});
-	return ending;
-}
-
-// A register read at the head of a loop stays live around the jump back, and ends only on the way out.
-// One written and read inside a block ends at its read, and takes no part in what blocks hand each other.
-static void test_liveness_around_a_loop() {
-	Function fn;
-	fn.registers = { Kind::Bool, Kind::Any, Kind::Any };
-	fn.argument_lists = { {}, { 1 }, { 2 } };
-	fn.code = { { Op::Call, 1, 0, 0 }, { Op::Call, NONE, 0, 1 }, { Op::Call, 2, 0, 0 }, { Op::Call, NONE, 0, 2 },
-		{ Op::JumpIf, 0, 1 }, { Op::ReturnVoid } };
-	Liveness live;
-	live.solve(fn, { false, true, true });
-	const auto ending = endings(live, fn);
-	for (size_t pc = 0; pc < fn.code.size(); ++pc) {
-		CHECK(ending[pc] == (pc == 3 ? std::vector<uint32_t>{ 2 } : std::vector<uint32_t>{}));
-	}
-	std::vector<uint32_t> leaving, repeating;
-	live.each_instruction([&](uint32_t p_pc, const std::vector<uint32_t> &) {
-		if (p_pc == 4) {
-			live.dying_into(5, leaving);
-			live.dying_into(1, repeating);
-		}
-	});
-	CHECK(leaving == std::vector<uint32_t>{ 1 });
-	CHECK(repeating.empty());
-	CHECK(!live.entered_once(1)); // From above and from the branch.
-	CHECK(live.entered_once(2));
-	CHECK(live.entered_once(5));
-	CHECK(!live.entered_once(0));
-}
-
-// An instruction in a try range may throw before it writes, so a register the handler reads stays live
-// through a write in the range. What the range holds and the handler does not read is left to it.
-static void test_liveness_into_a_handler() {
-	Function fn;
-	fn.registers = { Kind::Any, Kind::Any, Kind::Any };
-	fn.argument_lists = { {}, { 1 }, { 2 } };
-	fn.code = { { Op::Call, 2, 0, 0 }, { Op::Stmt }, { Op::Call, 2, 0, 0 }, { Op::Call, 1, 0, 0 }, { Op::ReturnVoid },
-		{ Op::Call, NONE, 0, 2 }, { Op::ReturnVoid } };
-	Liveness live;
-	live.solve(fn, { false, true, true });
-	CHECK(endings(live, fn)[0] == std::vector<uint32_t>{ 2 }); // The write at 2 replaces it unread.
-	fn.handlers.push_back({ 2, 4, 5, 0 });
-	live.solve(fn, { false, true, true });
-	const auto ending = endings(live, fn);
-	CHECK(ending[0].empty() && ending[2].empty());
-	CHECK(ending[3] == std::vector<uint32_t>{ 1 });
-	CHECK(ending[5] == std::vector<uint32_t>{ 2 });
-	std::vector<uint32_t> past_the_range;
-	live.each_instruction([&](uint32_t p_pc, const std::vector<uint32_t> &) {
-		if (p_pc == 3) {
-			live.dying_into(4, past_the_range);
-		}
-	});
-	CHECK(past_the_range == std::vector<uint32_t>{ 2 });
-	CHECK(!live.entered_once(5));
-	std::vector<std::vector<uint32_t>> abandoned;
-	live.abandoned_to_handlers(abandoned);
-	CHECK(abandoned.size() == 1 && abandoned[0] == std::vector<uint32_t>{ 1 });
-	// The same storage serves a function with nothing to track.
-	live.solve(fn, { false, false, false });
-	CHECK(endings(live, fn)[0].empty());
-	live.abandoned_to_handlers(abandoned);
-	CHECK(abandoned.size() == 1 && abandoned[0].empty());
-}
-
-// A register an instruction both reads and writes ends there only if the new value is never read.
-static void test_liveness_of_a_register_read_and_written() {
-	Function fn;
-	fn.registers = { Kind::Str, Kind::Str };
-	fn.parameters = 1;
-	fn.code = { { Op::Concat, 1, 0, 0 }, { Op::Concat, 1, 1, 0 }, { Op::Concat, 1, 1, 0 }, { Op::ReturnVoid } };
-	Liveness live;
-	live.solve(fn, { false, true });
-	const auto ending = endings(live, fn);
-	CHECK(ending[0].empty() && ending[1].empty());
-	CHECK(ending[2] == (std::vector<uint32_t>{ 1, 1 }));
-}
-
-// Handlers one inside another: each is left what its own range holds, the inner range's among it.
-static void test_liveness_nested_handlers() {
-	Function fn;
-	fn.registers = { Kind::Any, Kind::Any, Kind::Any, Kind::Any };
-	fn.argument_lists = { {}, { 3 } };
-	fn.code = { { Op::Call, 1, 0, 0 }, { Op::Call, 2, 0, 0 }, { Op::Call, 3, 0, 0 }, { Op::ReturnVoid },
-		{ Op::ReturnVoid }, { Op::Call, NONE, 0, 1 }, { Op::ReturnVoid } };
-	fn.handlers.push_back({ 1, 2, 4, 0 });
-	fn.handlers.push_back({ 0, 3, 5, 0 });
-	Liveness live;
-	live.solve(fn, { false, true, true, true });
-	std::vector<std::vector<uint32_t>> abandoned;
-	live.abandoned_to_handlers(abandoned);
-	// r3 is live on entry to the inner range because the outer handler reads it.
-	CHECK(abandoned[0] == (std::vector<uint32_t>{ 2, 3 }));
-	CHECK(abandoned[1] == (std::vector<uint32_t>{ 1, 2 }));
 }
 
 static void test_store_live_on_another_path() {
@@ -258,10 +151,6 @@ static void test_store_live_on_another_path() {
 }
 
 int main() {
-	test_liveness_around_a_loop();
-	test_liveness_into_a_handler();
-	test_liveness_of_a_register_read_and_written();
-	test_liveness_nested_handlers();
 	test_store_live_on_another_path();
 	test_release_edges();
 	test_ops();

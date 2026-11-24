@@ -33,7 +33,6 @@ python3 compiler/tests/run_programs.py compiler/build/kas3c compiler/tests
 | `godot_project/`, `godot_native/` | AS3 inside Godot. See [Tests inside Godot](#tests-inside-godot) | `godot_extension` |
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program: arguments, exit codes, and the language server's framing | `cli`, `lsp_stdio` |
 | `test_generated.py` | The shape of the C++ that `kas3c cpp` writes, where the shape is its speed | `generated` |
-| `test_release_reference.cpp` | Where temporaries are released: every function of every test program, against the pass's definition worked out one instruction at a time | `test_release_reference` |
 | `../godot/test_*.py` | The generator of Godot's API | `godot` |
 | `../tools/check_style.py` | The size limits | `style`, `style_self_test` |
 | `bench/` | Timings, not pass or fail. See [Benchmarks](#benchmarks) | |
