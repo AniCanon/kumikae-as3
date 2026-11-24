@@ -26,8 +26,11 @@ class Intercept extends Node2D:
 class SchemaEditor extends RefCounted:
 	func replace_schema(receiver: Node2D) -> void:
 		var script: GDScript = receiver.get_script()
+		var previous := script.source_code
 		script.source_code = receiver.get_meta("next")
 		assert(script.reload(true) == OK)
+		# The compiled schema changed even when the caller sees the original source again.
+		script.source_code = previous
 
 class VirtualOnly extends Node2D:
 	var reads := 0

@@ -5,6 +5,8 @@ public partial class Managed : Node
 {
     private static readonly StringName Score = "score";
     private static readonly StringName Current = "current";
+    private static readonly StringName Caption = "caption";
+    private static readonly StringName Heading = "heading";
     private readonly List<Node2D> targets = new();
 
     public void AddTarget(Node2D value) => targets.Add(value);
@@ -55,6 +57,20 @@ public partial class Managed : Node
             if (op == "call") result = fresh.Rotation;
             fresh.Free();
             return result;
+        }
+        if (kind == "customString" || kind == "customVector" || (kind == "custom" && op == "call"))
+        {
+            double total = 0;
+            if (kind == "customString")
+                for (int i = 0; i < n; i++)
+                    total += target.Get(Caption).AsString().Length + target.Call(Current).AsInt32();
+            else if (kind == "customVector")
+                for (int i = 0; i < n; i++)
+                    total += target.Get(Heading).AsVector2().X + target.Call(Current).AsInt32();
+            else
+                for (int i = 0; i < n; i++)
+                    total += target.Call(Current).AsInt32() + target.Call(Node.MethodName.GetChildCount).AsInt32();
+            return total;
         }
         bool mixed = kind == "mixed";
         bool script = kind == "script" || kind == "foreign" || kind == "custom";

@@ -33,6 +33,30 @@ package {
 			for (var i:int = 0; i < n; i++) sum += int(target.current());
 			return sum;
 		}
+		public function customStringRead(target:*, n:int):int {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var caption:String = target.caption;
+				sum += caption.length + int(target.current());
+			}
+			return sum;
+		}
+		public function customVectorRead(target:*, n:int):Number {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				var heading:Vector2 = target.heading;
+				sum += heading.x + int(target.current());
+			}
+			return sum;
+		}
+		public function customCall(target:*, n:int):int {
+			var sum = 0;
+			for (var i:int = 0; i < n; i++) {
+				sum += int(target.current());
+				sum += int(target.getChildCount());
+			}
+			return sum;
+		}
 		public function valueRead(target:*, n:int):Number {
 			var sum = 0;
 			for (var i:int = 0; i < n; i++) sum += Number(target.x);
