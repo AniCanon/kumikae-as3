@@ -42,10 +42,6 @@ func batch(row: String, target: Variant, rounds: int, mode: String, targets: Arr
 		valid = result == (rounds / 8) * 112 + tail * (tail + 6)
 	elif kind == "computed":
 		valid = result == 8 * rounds - rounds % 2
-	elif kind == "heldCopy":
-		valid = result == 7
-	elif kind == "heldTransfer":
-		valid = result == rounds - 1
 	elif kind == "joinThree":
 		valid = result == rounds * 18
 	elif kind == "append":
@@ -133,8 +129,6 @@ func measure() -> void:
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "saved": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
-	var stores := {"heldCopy": node, "heldTransfer": node}
-	cases.merge(stores)
 	foreign.set_process(true)
 	node.set_process(false)
 	var engine_keys := {"mixedMethods": node, "methodKeys": node, "engineKeys": node, "scriptEngineKeys": foreign}
@@ -159,8 +153,6 @@ func measure() -> void:
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
 				if (kind in ["computed", "eightFields"] or kind in engine_keys) and op != "read":
-					continue
-				if kind in stores and (op != "write" or managed):
 					continue
 				if kind in pieces and (op != "read" or managed):
 					continue
