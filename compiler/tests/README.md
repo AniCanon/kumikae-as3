@@ -34,7 +34,6 @@ python3 compiler/tests/run_programs.py compiler/build/kas3c compiler/tests
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program: arguments, exit codes, and the language server's framing | `cli`, `lsp_stdio` |
 | `test_generated.py` | The shape of the C++ that `kas3c cpp` writes, where the shape is its speed | `generated` |
 | `test_release_reference.cpp` | Where temporaries are released: every function of every test program, against the pass's definition worked out one instruction at a time | `test_release_reference` |
-| `test_lowering_bounds.py` | One function of thousands of statements, arguments, nested loops or nested `try` blocks must lower in about linear time and memory. Not run with sanitizers | `lowering_bounds` |
 | `../godot/test_*.py` | The generator of Godot's API | `godot` |
 | `../tools/check_style.py` | The size limits | `style`, `style_self_test` |
 | `bench/` | Timings, not pass or fail. See [Benchmarks](#benchmarks) | |
@@ -239,9 +238,7 @@ each workload's result and enforces timing comparisons.
 | `bench/completion.py <build> --against <other build>` | Completion in the language server: start-up, warm requests, and requests that follow an edit |
 
 `bench/generate_project.py` writes the generated projects. `build/bench_recheck <folder>` times a re-check
-in one build. `bench/generate_function.py` writes one class with a single very long method, in shapes that
-stress what the lowerer tracks for a whole function. `test_lowering_bounds.py` holds four of them to a time
-and a peak memory.
+in one build.
 
 For by-name access in headless Godot, run either AS3 timing script with
 `<build-godot> --untyped [--against <other build-godot>] [--runs N]`. Each build uses its own

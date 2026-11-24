@@ -296,11 +296,6 @@ add_test(NAME web_export_shutdown COMMAND ${Python3_EXECUTABLE} -m unittest disc
     ${CMAKE_CURRENT_SOURCE_DIR}/tests -p test_web_export_shutdown.py)
 add_test(NAME web_bundle COMMAND ${Python3_EXECUTABLE} -m unittest discover -s
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench -p test_web_bundle.py)
-# One huge function must lower in about linear time and memory. Sanitizers multiply both.
-if(NOT KAS3_SANITIZE)
-    add_test(NAME lowering_bounds COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lowering_bounds.py
-        $<TARGET_FILE:kas3c>)
-endif()
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

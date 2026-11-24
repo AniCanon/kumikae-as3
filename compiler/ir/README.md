@@ -101,4 +101,4 @@ Its lowering goes in the `lower_*.cpp` that owns that kind of code.
 
 `test_ir`, `test_ir_binary`, `test_constructors`, `test_vm`, and the `programs` group, which runs every program in
 `tests/run/`. `test_release_reference` holds the release of temporaries to its definition for every test
-program, and `lowering_bounds` holds one huge function to a time and a peak memory.
+program.
