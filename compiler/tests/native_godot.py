@@ -158,6 +158,15 @@ class Runner:
                            status == 0 and (USED in text) == bool(library) and "METHOD true" in text
                            and len(allocations) == 16 and max(allocations[2:]) <= 1, str(allocations) + text[-600:])
 
+    def by_name_reads(self, project, library):
+        label = "native" if library else "interpreter"
+        status, text = self.run(project, "by_name.gd", library, extra_env={"KAS3_TRACE_COMPUTED_NAME": "isProcessingInput"})
+        self.check(f"{label}: counted method reads run in the requested mode",
+                   status == 0 and (USED in text) == bool(library) and "SCRIPT ERROR" not in text, text[-1200:])
+        lookups = text.count("kas3: resolved computed name isProcessingInput")
+        self.check(f"{label}: a computed method resolves once on each engine class", lookups == 2, str(lookups))
+        return status, text
+
     def probe(self):
         """The probe by the interpreter and as native code: what each run prints of it."""
         if not self.able("the native probe"):
@@ -194,9 +203,8 @@ class Runner:
                            "PROBE freed after warmup=warmed/1009" in said[label], text[-1200:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
-            status, text = self.run(project, "by_name.gd", program, extra_env={"KAS3_TRACE_COMPUTED_NAME": "isProcessingInput"})
-            lookups = text.count("kas3: resolved computed name isProcessingInput")
-            self.check("native: a computed method resolves once on each engine class", lookups == 2, str(lookups))
+            self.by_name_reads(project, None)
+            status, text = self.by_name_reads(project, program)
             for name in ("Callable field", "method value", "foreign engine reads", "computed engine methods",
                          "computed getter values keep their types and copies", "parameter alias respects position overrides"):
                 pairs = [line.partition("=")[2].split("|") for line in text.splitlines() if line.startswith(f"VALUE {name}=")]
