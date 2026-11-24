@@ -237,6 +237,11 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 }
 
 const vm::NamedMember &GodotHost::named_on_class(Variant::Type p_type, const StringName &p_class, std::string_view p_name, vm::NameSource p_source) {
+#if defined(KAS3_TEST_COUNTS)
+	if (p_source == vm::NameSource::Computed) {
+		report_computed_lookup(p_name);
+	}
+#endif
 	Members &members = p_type == Variant::OBJECT ? class_members_[p_class] : value_members_[p_type];
 	if (const auto known = members.known.find(p_name); known != members.known.end()) {
 		return known->second;
@@ -311,43 +316,48 @@ GodotHost::ReadKey *GodotHost::find_read_key(uintptr_t p_type, std::string_view 
 	return &entry;
 }
 
-const StringName *GodotHost::keep_read_key(uintptr_t p_type, std::string_view p_name, const StringName &p_key) {
+const StringName *GodotHost::keep_read_key(uintptr_t p_type, std::string_view p_name, const StringName &p_key, const vm::NamedMember *p_member) {
 	auto victim = std::min_element(read_keys_.begin(), read_keys_.end(), [](const ReadKey &a, const ReadKey &b) { return a.used < b.used; });
-	*victim = { p_type, std::string(p_name), p_key, ++read_clock_ };
+	*victim = { p_type, std::string(p_name), p_key, p_member, ++read_clock_ };
 	read_keys_[last_read_key_].next = static_cast<uint8_t>(victim - read_keys_.begin());
 	last_read_key_ = read_keys_[last_read_key_].next;
-	return &victim->key;
+	return p_member ? nullptr : &victim->key;
 }
 #endif
 
 // Read an engine property by its Godot spelling, or a foreign field by the script's spelling.
-const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested) {
+const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested, const vm::NamedMember **r_member) {
 
 #if defined(KAS3_RUNTIME_ONLY)
 	(void)p_receiver;
 	(void)p_name;
 	(void)r_owner;
 	(void)r_nested;
+	(void)r_member;
 	return nullptr;
 #else
 	if (!p_receiver) {
 		return nullptr;
-	}
-	const auto type = rt::head_of(p_receiver)->godot_class;
-	if (type) {
-		if (const auto *entry = find_read_key(type, p_name)) {
-			*r_owner = live_handle_object(p_receiver);
-			const auto &value = *static_cast<const Variant *>(p_receiver);
-			return *r_owner && !script_on_live_handle(*r_owner, value) ? &entry->key : nullptr;
-		}
 	}
 	const auto &value = *static_cast<const Variant *>(p_receiver);
 	if (value.get_type() != Variant::OBJECT) {
 		return nullptr;
 	}
 	void *owner = live_handle_object(p_receiver);
+	if (!owner || script_on_live_handle(owner, value)) {
+		return nullptr;
+	}
+	*r_owner = owner;
+	const auto identity = handle_class(p_receiver, owner);
+	if (!identity) {
+		return nullptr;
+	}
+	if (const auto *entry = find_read_key(identity, p_name)) {
+		*r_member = entry->member;
+		return entry->member ? nullptr : &entry->key;
+	}
 	StringName klass;
-	if (!owner || script_on_live_handle(owner, value) || !gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
+	if (!gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
 		return nullptr;
 	}
 	const auto &member = named_on_class(Variant::OBJECT, klass, p_name, vm::NameSource::Computed);
@@ -360,29 +370,29 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 		if (native_member(klass, key)) {
 			return nullptr;
 		}
+	} else if (member.what != vm::NamedMember::What::Missing) {
+		*r_member = &member;
 	} else {
 		return nullptr;
 	}
-	*r_owner = owner;
 	// A reentrant getter can use a warmed name. A new key must leave the outer name alive.
 	if (active_reads_) {
-		return &r_nested.emplace(key);
+		return *r_member ? nullptr : &r_nested.emplace(key);
 	}
-	const auto identity = class_identity(klass);
-	rt::head_of(p_receiver)->godot_class = identity;
-	return keep_read_key(identity, p_name, key);
+	return keep_read_key(identity, p_name, key, *r_member);
 #endif
 }
 
-vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
+vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
 #if defined(KAS3_TEST_COUNTS)
 	ScriptReadAllocations allocations(p_name.substr(0, 16) == "allocation_probe");
 #endif
+	const vm::NamedMember *member = nullptr;
 	std::optional<StringName> nested;
-	const StringName *key = p_binding ? &static_cast<const Worked *>(p_binding)->dynamic_name : computed_getter(p_receiver, p_name, &p_owner, nested);
+	const StringName *key = p_binding ? &static_cast<const Worked *>(p_binding)->dynamic_name : computed_getter(p_receiver, p_name, &p_owner, nested, &member);
 	if (!key) {
-		return vm::ScriptRead::Declined;
+		return { vm::ScriptRead::Declined, member };
 	}
 	GDExtensionBool valid = false;
 	Variant value;
@@ -392,18 +402,18 @@ vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::stri
 	if (!valid) {
 		const auto &declared = reflected_member(p_receiver, p_name, true);
 		if (declared.what == vm::NamedMember::What::Method) {
-			return vm::ScriptRead::Method;
+			return { vm::ScriptRead::Method };
 		}
 		if (declared.what == vm::NamedMember::What::Missing) {
-			return vm::ScriptRead::Missing;
+			return { vm::ScriptRead::Missing };
 		}
 		*r_error = "Godot has no '" + std::string(p_name) + "' on this value";
-		return vm::ScriptRead::Failed;
+		return { vm::ScriptRead::Failed };
 	}
 	const auto type = value.get_type();
 	if (type == Variant::CALLABLE && live_handle_object(p_receiver) == p_owner &&
 			gdextension_interface::object_has_script_method(p_owner, key->_native_ptr())) {
-		return vm::ScriptRead::Method;
+		return { vm::ScriptRead::Method };
 	}
 	if (p_result.kind == ir::Kind::Any && p_result.type.empty() && r_value) {
 		if (type >= Variant::VECTOR2 && type <= Variant::COLOR) {
@@ -413,20 +423,20 @@ vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::stri
 				if (previous >= Variant::VECTOR2 && previous <= Variant::COLOR) {
 					*held = std::move(value);
 					*r_value = vm::any::godot_value(held);
-					return vm::ScriptRead::Value;
+					return { vm::ScriptRead::Value };
 				}
 			}
 			*r_value = vm::any::godot_value(make_handle(std::move(value)));
-			return vm::ScriptRead::Value;
+			return { vm::ScriptRead::Value };
 		}
 		if (auto result = untyped_from_variant(value, type)) {
 			*r_value = *result;
-			return vm::ScriptRead::Value;
+			return { vm::ScriptRead::Value };
 		}
 		*r_error = std::string(vm::OUT_OF_MEMORY);
-		return vm::ScriptRead::Failed;
+		return { vm::ScriptRead::Failed };
 	}
-	return take(p_result, value, p_name, r_value, r_error) ? vm::ScriptRead::Value : vm::ScriptRead::Failed;
+	return { take(p_result, value, p_name, r_value, r_error) ? vm::ScriptRead::Value : vm::ScriptRead::Failed };
 }
 
 std::optional<bool> GodotHost::run_script(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,

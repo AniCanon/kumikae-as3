@@ -31,3 +31,10 @@ ScriptReadAllocations::~ScriptReadAllocations() {
 		std::fprintf(stderr, "kas3: field allocations %zu\n", allocations - start_);
 	}
 }
+
+void report_computed_lookup(std::string_view p_name) {
+	static const char *watched = std::getenv("KAS3_TRACE_COMPUTED_NAME");
+	if (watched && p_name == watched) {
+		std::fprintf(stderr, "kas3: resolved computed name %s\n", watched);
+	}
+}

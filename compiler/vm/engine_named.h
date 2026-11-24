@@ -46,6 +46,7 @@ public:
 	// nothing where Godot has no member of that name: the caller goes on as it does for any value. An
 	// answer of false has raised.
 	std::optional<bool> get(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool read(const NamedMember &p_member, Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	std::optional<bool> set(Slot p_holder, const PropertyKey &p_key, Slot p_value);
 	std::optional<bool> call(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool has(Slot p_holder, const PropertyKey &p_key) const;

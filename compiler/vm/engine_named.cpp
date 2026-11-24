@@ -90,22 +90,26 @@ bool EngineNamed::unknown(const PropertyKey &p_key) {
 }
 
 std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
-	void *handle = p_key.object ? nullptr : handle_of(p_holder);
-	if (!handle) {
+	const NamedMember &found = member(p_holder, p_key);
+	if (found.what == NamedMember::What::Missing) {
 		return std::nullopt;
 	}
-	const NamedMember &found = member(p_holder, p_key);
-	switch (found.what) {
+	return read(found, p_holder, p_key, r_value);
+}
+
+bool EngineNamed::read(const NamedMember &p_member, Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
+	void *handle = handle_of(p_holder);
+	switch (p_member.what) {
 		case NamedMember::What::Missing:
-			return std::nullopt;
+			return false;
 		case NamedMember::What::Unknown:
 			return unknown(p_key);
 		case NamedMember::What::Method:
-			return method_value(handle, p_key, found.godot, r_value);
+			return method_value(handle, p_key, p_member.godot, r_value);
 		case NamedMember::What::Property:
 			break;
 	}
-	if (!found.read) {
+	if (!p_member.read) {
 		vm_.raise(vm_.module_.reference_error_class != NONE ? vm_.module_.reference_error_class : vm_.module_.error_class,
 				"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + vm_.holder_name(p_holder) + ".");
 		return false;
@@ -114,8 +118,8 @@ std::optional<bool> EngineNamed::get(Slot p_holder, const PropertyKey &p_key, Sl
 	wanted.kind = Kind::Any;
 	std::string error;
 	const Argument operand = receiver(p_holder, handle);
-	const auto done = prepared(vm_.host_.handles, checked_, found.script_only ? nullptr : found.invoke, &operand, 1, wanted, r_value, &error);
-	if (!(done ? *done : vm_.host_.handles.get(handle, found.godot, wanted, r_value, &error))) {
+	const auto done = prepared(vm_.host_.handles, checked_, p_member.script_only ? nullptr : p_member.invoke, &operand, 1, wanted, r_value, &error);
+	if (!(done ? *done : vm_.host_.handles.get(handle, p_member.godot, wanted, r_value, &error))) {
 		raise_engine(vm_.library_, error);
 		return false;
 	}

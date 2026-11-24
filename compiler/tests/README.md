@@ -274,7 +274,8 @@ an AS3 wrapper that passes `this`. Current builds receive the scripted node from
 The Timer control reads a freshly constructed object's wait time. The foreign-only rows read a
 GDScript field and call its method. The computed reads cycle through two or eight GDScript fields, or through
 `position`, `modulate` and `rotation` on a plain Node2D and one carrying GDScript. AS3 indexes
-a String vector and C# indexes the corresponding interned StringNames. Four rows compare string operations
+a String vector and C# indexes the corresponding interned StringNames. Another row alternates
+reads of two engine methods and calls the last bound method. Four rows compare string operations
 with main. They join three strings, append a piece with and without reading the growing length,
 and join two short strings into a 65,536-byte result. The custom getter fixture reads String,
 Vector2 and Object fields and calls a script helper in the same loop. Its call row alternates the

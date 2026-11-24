@@ -69,6 +69,13 @@ public partial class Managed : Node
             fresh.Free();
             return result;
         }
+        if (kind == "methodKeys")
+        {
+            StringName[] keys = { CanvasItem.MethodName.IsVisibleInTree, Node.MethodName.IsProcessing };
+            Variant method = default;
+            for (int i = 0; i < n; ++i) method = target.Get(keys[i % 2]);
+            return method.AsCallable().Call().AsBool() ? 1 : 0;
+        }
         if (kind == "eightFields")
         {
             int total = 0;

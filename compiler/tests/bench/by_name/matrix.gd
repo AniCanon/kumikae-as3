@@ -30,7 +30,10 @@ func batch(row: String, target: Variant, rounds: int, mode: String, targets: Arr
 	var elapsed := Time.get_ticks_usec() - start
 	var own := kind in ["script", "foreign", "custom"]
 	var valid := true
-	if kind in ["engineKeys", "scriptEngineKeys"]:
+	if kind == "methodKeys":
+		var expected: bool = target.is_visible_in_tree() if rounds % 2 else target.is_processing()
+		valid = result != null and int(result) == int(expected)
+	elif kind in ["engineKeys", "scriptEngineKeys"]:
 		valid = is_same(result, [target.position, target.modulate, target.rotation][(rounds - 1) % 3])
 	elif kind == "eightFields":
 		var tail := rounds % 8
@@ -124,7 +127,7 @@ func measure() -> void:
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
-	var engine_keys := {"engineKeys": node, "scriptEngineKeys": foreign}
+	var engine_keys := {"methodKeys": node, "engineKeys": node, "scriptEngineKeys": foreign}
 	cases.merge(engine_keys)
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}

@@ -45,6 +45,12 @@ struct NamedMember {
 
 inline constexpr NamedMember MISSING_MEMBER{};
 
+struct NamedRead {
+	ScriptRead status;
+	// A computed key can name an engine member that needs the VM's ordinary read.
+	const NamedMember *resolved = nullptr;
+};
+
 struct EngineHandles {
 	virtual ~EngineHandles() {}
 	// Asked once for each engine instruction when a program is loaded, before any of it runs: what the host
@@ -99,7 +105,7 @@ struct EngineHandles {
 	virtual const NamedMember &script_member(void *, std::string_view) { return MISSING_MEMBER; }
 	// A literal read keeps its interned name even if the script changes what the name means.
 	virtual const NamedMember &script_getter(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name); }
-	virtual ScriptRead read_script(void *, void *, std::string_view, const Prepared *, const Wanted &, Slot *, std::string *) { return ScriptRead::Declined; }
+	virtual NamedRead read_script(void *, void *, std::string_view, const Prepared *, const Wanted &, Slot *, std::string *) { return { ScriptRead::Declined }; }
 	virtual bool script_has(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name).what != NamedMember::What::Missing; }
 	// Validates a receiver for a site hit. A host without stable shape identities declines.
 	virtual std::optional<NamedShape> named_shape(void *, uintptr_t) { return {}; }

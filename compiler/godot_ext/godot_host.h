@@ -55,6 +55,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		uintptr_t type = 0;
 		std::string text;
 		godot::StringName key;
+		const vm::NamedMember *member = nullptr;
 		uint64_t used = 0;
 		uint8_t next = 0;
 	};
@@ -62,9 +63,9 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	uint8_t last_read_key_ = 0;
 	uint64_t read_clock_ = 0;
 	ReadKey *find_read_key(uintptr_t p_type, std::string_view p_name);
-	const godot::StringName *keep_read_key(uintptr_t p_type, std::string_view p_name, const godot::StringName &p_key);
+	const godot::StringName *keep_read_key(uintptr_t p_type, std::string_view p_name, const godot::StringName &p_key, const vm::NamedMember *p_member);
 	unsigned active_reads_ = 0;
-	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested);
+	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested, const vm::NamedMember **r_member);
 	Name computed_name_;
 	godot::StringName computed_class_;
 	bool can_delegate_ = false;
@@ -195,7 +196,7 @@ public:
 	bool delegates_script(void *p_receiver, std::string_view p_name) override;
 	const vm::NamedMember &script_getter(void *p_receiver, std::string_view p_name) override;
 	bool script_has(void *p_receiver, std::string_view p_name) override;
-	vm::ScriptRead read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
+	vm::NamedRead read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
 			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
 	const vm::NamedMember &script_member(void *p_receiver, std::string_view p_name) override;
 	static std::optional<vm::NamedShape> shape_of(void *p_receiver, uintptr_t p_delegated = 0);

@@ -19,10 +19,13 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 
 bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, void *p_reuse) {
 	std::string error;
-	const auto read = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse }, r_value, &error);
+	const auto [read, member] = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse }, r_value, &error);
 	if (read == ScriptRead::Declined) {
 		PropertyKey key;
 		key.borrowed = p_name;
+		if (member) {
+			return EngineNamed(*this).read(*member, p_holder, key, r_value);
+		}
 		return any_null_check(p_holder) && ordinary_property(p_holder, key, r_value);
 	}
 	if (read == ScriptRead::Failed) {

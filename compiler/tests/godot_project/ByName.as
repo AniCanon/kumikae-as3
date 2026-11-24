@@ -225,5 +225,12 @@ package {
 			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }
 			return "read";
 		}
+		public function countMethodReads(target:*, key:String):int {
+			var count:int = 0;
+			for (var i:int = 0; i < 5; ++i) {
+				if (target[key] is Function) ++count;
+			}
+			return count;
+		}
 	}
 }

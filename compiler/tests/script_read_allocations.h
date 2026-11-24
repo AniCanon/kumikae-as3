@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string_view>
 
 class ScriptReadAllocations {
 	size_t start_;
@@ -11,3 +12,5 @@ public:
 	explicit ScriptReadAllocations(bool p_report);
 	~ScriptReadAllocations();
 };
+
+void report_computed_lookup(std::string_view p_name);

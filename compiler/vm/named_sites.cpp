@@ -219,7 +219,7 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 			return std::nullopt;
 		}
 		if (!call) {
-			*r_read = p_engine.read_script(handle, shape.owner, name, bind, wanted, r_result, r_error);
+			*r_read = p_engine.read_script(handle, shape.owner, name, bind, wanted, r_result, r_error).status;
 			return *r_read == ScriptRead::Declined ? std::nullopt : std::optional<bool>(*r_read != ScriptRead::Failed);
 		}
 		return p_engine.run_script(shape, *bind, operands, p_count + 1, wanted, r_result, r_error);

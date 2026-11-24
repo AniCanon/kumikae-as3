@@ -70,6 +70,13 @@ package {
 			try { return computedRead(target, 2); }
 			catch (e:Error) { return -e.errorID; }
 		}
+		public function methodKeysRead(target:*, n:int):Boolean {
+			var keys:Vector.<String> = new Vector.<String>();
+			keys.push("isVisibleInTree", "isProcessing");
+			var method:*;
+			for (var i:int = 0; i < n; ++i) method = target[keys[i % 2]];
+			return method();
+		}
 		public function engineKeysRead(target:*, n:int):* {
 			var props:Vector.<String> = new Vector.<String>();
 			props.push("position", "modulate", "rotation");

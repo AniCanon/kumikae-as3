@@ -258,6 +258,16 @@ func _physics_process(_delta: float) -> bool:
 			[false, 1, 1])
 	show("computed misses", ask("missingKeys", [control, 256]), 0)
 	show("null math receivers", ask("nullParts"), [1009, 1009])
+	var methods := []
+	var expected_methods := []
+	for receiver in [control, foreign, control, foreign]:
+		methods.append(ask("countMethodReads", [receiver, "isProcessingInput"]))
+		var count := 0
+		for i in 5:
+			if receiver["is_processing_input"] is Callable:
+				count += 1
+		expected_methods.append(count)
+	show("computed engine methods", methods, expected_methods)
 	var positions := Positions.new()
 	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes], [[3, true], 5, 1])
 	positions.reads = 0

@@ -120,8 +120,8 @@ class Runner:
         self.check("native: the C++ of %s builds without a warning" % label, built.returncode == 0, built.stderr[-900:])
         return program if built.returncode == 0 else None
 
-    def run(self, project, script, library, arguments=(), flags=()):
-        environment = dict(os.environ, KAS3_NATIVE_COUNTS="1")
+    def run(self, project, script, library, arguments=(), flags=(), extra_env=None):
+        environment = dict(os.environ, KAS3_NATIVE_COUNTS="1", **(extra_env or {}))
         environment.pop("KAS3_PROGRAM_LIBRARY", None)
         if library:
             environment["KAS3_PROGRAM_LIBRARY"] = library
@@ -178,8 +178,10 @@ class Runner:
                            "PROBE freed after warmup=warmed/1009" in said[label], text[-1200:])
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
-            status, text = self.run(project, "by_name.gd", program)
-            for name in ("Callable field", "method value"):
+            status, text = self.run(project, "by_name.gd", program, extra_env={"KAS3_TRACE_COMPUTED_NAME": "isProcessingInput"})
+            lookups = text.count("kas3: resolved computed name isProcessingInput")
+            self.check("native: a computed method resolves once on each engine class", lookups == 2, str(lookups))
+            for name in ("Callable field", "method value", "computed engine methods"):
                 pairs = [line.partition("=")[2].split("|") for line in text.splitlines() if line.startswith(f"VALUE {name}=")]
                 self.check(f"native: {name} agrees with GDScript", len(pairs) == 1 and len(pairs[0]) == 2 and pairs[0][0] == pairs[0][1], str(pairs))
             for mode in ("callback", "entry", "reload", "source"):

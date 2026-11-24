@@ -17,7 +17,7 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
-ROWS.extend(("foreign/read", "foreign/call", "computed/read", "engineKeys/read", "scriptEngineKeys/read", "eightFields/read", "custom/read", "custom/call", "customString/read", "customVector/read", "customFields/read", "detached/call"))
+ROWS.extend(("foreign/read", "foreign/call", "computed/read", "methodKeys/read", "engineKeys/read", "scriptEngineKeys/read", "eightFields/read", "custom/read", "custom/call", "customString/read", "customVector/read", "customFields/read", "detached/call"))
 
 STRING_ROWS = ("joinThree/read", "append/read", "appendLength/read", "joinLong/read")
 ROWS.extend(STRING_ROWS)
