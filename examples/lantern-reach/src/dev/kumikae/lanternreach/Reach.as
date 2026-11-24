@@ -1,0 +1,49 @@
+package dev.kumikae.lanternreach {
+    import dev.kumikae.lanternreach.sim.*;
+    import godot.Node2D;
+    import godot.Time;
+
+    public class Reach extends Node2D {
+        private var game:Simulation;
+        private var stepper:FixedStep = new FixedStep();
+        private var crowd:Crowd;
+        private var limit:int;
+        private var checks:Array = [];
+        private var total:Number = 0;
+        private var presentation:Number = 0;
+
+        private function milliseconds():Number {
+            return Number(Time.getTicksUsec()) / 1000;
+        }
+
+        override public function _ready():void {
+            var bench:String = Launch.option("--bench", "");
+            var scenario:Scenario = new Scenario(bench == "" ? "calm" : bench, milliseconds);
+            game = scenario.simulation;
+            limit = bench == "" ? 0 : int(Launch.option("--ticks", String(scenario.ticks)));
+            crowd = new Crowd();
+            addChild(crowd);
+        }
+
+        override public function _process(delta:Number):void {
+            var start:Number = milliseconds();
+            var steps:int = stepper.advance(limit > 0 ? 1.0 / 60 : delta);
+            for (var i:int = 0; i < steps; i++) game.step();
+            var drawn:Number = milliseconds();
+            crowd.present(game.pool);
+            var end:Number = milliseconds();
+            presentation += end - drawn;
+            total += end - start;
+            if (limit == 0) return;
+            if (game.tick % 60 == 0 || game.tick == limit) checks.push(game.checksum());
+            if (game.tick < limit) return;
+            var names:Array = ["input", "spawn", "flow", "ai", "movement", "spatial"];
+            var systems:Object = {};
+            for (var n:int = 0; n < names.length; n++) systems[names[n]] = game.elapsed[n];
+            trace(JSON.stringify({total_ms:total, systems_ms:systems, presentation_ms:presentation,
+                                  peak:game.pool.peak, allocations:null, checksums:checks}));
+            setProcess(false);
+            getTree().quit();
+        }
+    }
+}
