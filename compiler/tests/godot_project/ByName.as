@@ -181,6 +181,17 @@ package {
 			}
 			return sum;
 		}
+		public function computedPositions(target:*, key:String):Array {
+			var keys:Vector.<String> = new Vector.<String>();
+			keys.push(key);
+			var values:Array = [];
+			var value:*;
+			for (var i:int = 0; i < 5; ++i) {
+				value = target[keys[0]];
+				values.push(value);
+			}
+			return values;
+		}
 		public function aliasPositions(source:Node2D):Array {
 			var target:* = source;
 			target.position = new Vector2(8, 9);

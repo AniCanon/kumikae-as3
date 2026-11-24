@@ -207,6 +207,9 @@ class Runner:
                        "VALUE foreign declarations=[true, 41, true, 41]|[true, 41, true, 41]" in text, text[-1800:])
             self.check("native: nullable math member reads raise the null-reference error",
                        "VALUE null math receivers=[1009, 1009]|[1009, 1009]" in text, text[-1600:])
+            positions = '[(1.0, 4.0), (2.0, 4.0), (3.0, 4.0), (4.0, 4.0), "wrong type"]'
+            self.check("native: computed getter values keep their types and copies",
+                       f"VALUE computed getter values keep their types and copies={positions}|{positions}" in text, text[-3600:])
             expected = "VALUE parameter alias respects position overrides=[[3, true], 5, 1]|[[3, true], 5, 1]"
             self.check("native: a foreign getter can change its result type", status == 0 and USED in text and expected in text
                        and "SCRIPT ERROR" not in text, text[-1200:])

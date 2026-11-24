@@ -12,6 +12,7 @@
 #include "lower.h"
 #include "names.h"
 #include "numeric_dispatch.h"
+#include "counted_loops.h"
 
 #include <algorithm>
 #include <map>
@@ -3635,6 +3636,35 @@ static void test_numeric_tails() {
 	CHECK_EQ(values[2].d, values[1].d);
 }
 
+static void test_counted_loop_steps() {
+	using ir::Op;
+	ir::Module module;
+	module.numbers = { 1 };
+	ir::Function fn;
+	fn.registers = { ir::Kind::I32, ir::Kind::I32, ir::Kind::F64, ir::Kind::F64, ir::Kind::Bool,
+		ir::Kind::F64, ir::Kind::F64, ir::Kind::F64, ir::Kind::I32 };
+	fn.code = { { Op::Stmt }, { Op::I32ToF64, 2, 0 }, { Op::I32ToF64, 3, 1 }, { Op::LtF64, 4, 2, 3 },
+		{ Op::JumpIfNot, 4, 12 }, { Op::Stmt }, { Op::I32ToF64, 5, 0 }, { Op::ConstF64, 6, 0 },
+		{ Op::AddF64, 7, 5, 6 }, { Op::F64ToI32, 8, 7 }, { Op::Move, 0, 8 }, { Op::Jump, 0 }, { Op::Return, 0 } };
+	module.functions.push_back(fn);
+	vm::CountedLoops loops(module);
+	const auto *step = loops.at(0, 6);
+	CHECK(step != nullptr);
+	if (step) {
+		vm::Slot regs[12]{};
+		regs[0].i = INT32_MAX;
+		regs[1].i = INT32_MIN + 1;
+		CHECK_EQ(step->advance(regs), 5u);
+		CHECK_EQ(regs[0].i, INT32_MIN);
+		CHECK_EQ(step->advance(regs), 12u);
+	}
+	for (const auto &[pc, reader] : { std::pair<int, int>{ 1, 7 }, { 8, 4 }, { 9, 5 }, { 10, 3 } }) {
+		module.functions[0] = fn;
+		module.functions[0].code[pc].b = reader;
+		CHECK(vm::CountedLoops(module).at(0, 6) == nullptr);
+	}
+}
+
 static void test_remainder_tail() {
 	using ir::Op;
 	ir::Function fn;
@@ -4821,6 +4851,7 @@ int main() {
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_numeric_tails();
+	test_counted_loop_steps();
 	test_remainder_tail();
 	test_vector_move_targets();
 	test_vector_move_execution();

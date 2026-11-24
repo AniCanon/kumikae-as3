@@ -4,6 +4,7 @@
 // checker finds a member of a typed value: nothing is worked out backward from the AS3 name. What is found
 // is kept by class and name, so that a name is looked for once.
 #include "godot_calls.h"
+#include "handles.h"
 #include "program.h"
 #include "handles.h"
 
@@ -404,7 +405,20 @@ vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::stri
 			gdextension_interface::object_has_script_method(p_owner, key->_native_ptr())) {
 		return vm::ScriptRead::Method;
 	}
-	if (p_result.kind == ir::Kind::Any && !p_result.reuse && r_value) {
+	if (p_result.kind == ir::Kind::Any && p_result.type.empty() && r_value) {
+		if (type >= Variant::VECTOR2 && type <= Variant::COLOR) {
+			auto *held = static_cast<Variant *>(p_result.reuse);
+			if (held) {
+				const auto previous = held->get_type();
+				if (previous >= Variant::VECTOR2 && previous <= Variant::COLOR) {
+					*held = std::move(value);
+					*r_value = vm::any::godot_value(held);
+					return vm::ScriptRead::Value;
+				}
+			}
+			*r_value = vm::any::godot_value(make_handle(std::move(value)));
+			return vm::ScriptRead::Value;
+		}
 		if (auto result = untyped_from_variant(value, type)) {
 			*r_value = *result;
 			return vm::ScriptRead::Value;

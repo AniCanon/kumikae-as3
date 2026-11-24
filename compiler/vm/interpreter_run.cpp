@@ -108,6 +108,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			}
 			case Op::I32ToF64:
+				if (!hook_ && countdown_ > 1 && frame.pc < function.code.size() && function.code[frame.pc].op == Op::ConstF64) {
+					if (const auto *loop = loops_.at(frame.function, frame.pc - 1)) {
+						--countdown_;
+						frame.pc = loop->advance(r);
+						goto dispatch;
+					}
+				}
 				r[in.a].d = r[in.b].i;
 				numeric_tail(module_, function, frame.pc, r);
 				goto dispatch;

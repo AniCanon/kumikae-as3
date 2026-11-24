@@ -17,9 +17,9 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 	return done.has_value();
 }
 
-bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value) {
+bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, void *p_reuse) {
 	std::string error;
-	const auto read = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {} }, r_value, &error);
+	const auto read = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse }, r_value, &error);
 	if (read == ScriptRead::Declined) {
 		PropertyKey key;
 		key.borrowed = p_name;
@@ -66,13 +66,19 @@ bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruc
 	}
 	const size_t base = frame.base;
 	const uint32_t moved = named_sites_.move_target(frame.function, frame.pc);
+	const uint32_t target = moved == ir::NONE ? get.a : moved;
+	const Slot previous = p_registers[target];
+	void *reuse = any::tag(previous) == AnyTag::Value ? any::pointer(previous) : nullptr;
 	frame.pc++;
 	Slot value = any::undefined();
-	if (read_computed(p_registers[get.b], key->view(), &value)) {
+	if (read_computed(p_registers[get.b], key->view(), &value, reuse)) {
 		if (moved != ir::NONE) {
 			frames_.back().pc++;
 		}
-		Slot &destination = stack_[base + (moved == ir::NONE ? get.a : moved)];
+		Slot &destination = stack_[base + target];
+		if (reuse && previous.bits == value.bits) {
+			return true;
+		}
 		if (any::holds(destination)) {
 			put(ir::Kind::Any, destination, value);
 		} else {

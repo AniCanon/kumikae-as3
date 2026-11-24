@@ -260,6 +260,9 @@ func _physics_process(_delta: float) -> bool:
 	show("null math receivers", ask("nullParts"), [1009, 1009])
 	var positions := Positions.new()
 	show("parameter alias respects position overrides", [ask("aliasPositions", [positions]), positions.reads, positions.writes], [[3, true], 5, 1])
+	positions.reads = 0
+	show("computed getter values keep their types and copies", ask("computedPositions", [positions, "position"]),
+			[Vector2(1, 4), Vector2(2, 4), Vector2(3, 4), Vector2(4, 4), "wrong type"])
 	positions.free()
 	replaced.free()
 	control.free()
