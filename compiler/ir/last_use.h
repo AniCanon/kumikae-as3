@@ -1,12 +1,10 @@
 // Register ownership at a store shared by both execution modes.
 #pragma once
 
-#include "ir.h"
+#include "register_uses.h"
 
 namespace kas3::ir {
 
-// Whether the operation's first operand, a register, is read and not written (VecSet's vector).
-bool first_is_read(ir::Op p_op);
 // The register an instruction reads and also changes where it is: a loop's cursor, and one of Godot's
 // values that Godot changes in place (a part of it set, a method called on it). NONE for the rest. The
 // library works on a copy of what it is handed, so such a register is handed back.
