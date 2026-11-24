@@ -36,69 +36,6 @@ void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	}
 }
 
-// A call: the function named, or for a virtual call the one the object's own class has in that slot.
-// The arguments are copied out of their registers first, since the new frame may move the stack.
-void Interpreter::enter(const Function &p_function, const Instruction &p_in, const Slot *p_registers) {
-	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	uint32_t target = p_in.b;
-	if (p_in.op == Op::CallVirtual) {
-		const Object *object = list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p);
-		if (!object) {
-			raise_null();
-			return;
-		}
-		target = module_.classes[object->klass].methods[p_in.b];
-	} else if (p_in.op == Op::CallInterface) {
-		target = interface_function(list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p), p_in.b);
-		if (target == NONE) {
-			return;
-		}
-	}
-	Slot few[16];
-	std::vector<Slot> many;
-	Slot *values = few;
-	if (list.size() > 16) {
-		many.resize(list.size());
-		values = many.data();
-	}
-	for (size_t i = 0; i < list.size(); i++) {
-		values[i] = p_registers[list[i]];
-	}
-	push(target, values, list.size(), p_in.a);
-}
-
-// A function is done. Its value, if it gives one, goes to the caller's register, or to whoever called in
-// from outside, or nowhere.
-void Interpreter::leave(const Function &p_function, const Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result) {
-	Slot value;
-	value.bits = 0;
-	const Kind kind = p_function.result;
-	const bool gives = p_in.op == Op::Return;
-	if (gives) {
-		value = share(kind, p_registers[p_in.a]);
-	}
-	const uint32_t result = frames_.back().result;
-	if (frames_.back().constructs) {
-		constructions_->constructed(static_cast<Object *>(stack_[frames_.back().base].p));
-	}
-	pop();
-	if (gives && result != NONE && frames_.size() > p_depth) {
-		const Frame &caller = frames_.back();
-		const Kind wanted = module_.functions[caller.function].registers[result];
-		if (wanted == Kind::Any && kind != Kind::Any) {
-			// Called through a function value: what it gives is untyped.
-			Slot typed = value;
-			value = to_any(kind, typed);
-			drop(kind, typed);
-		}
-		put(wanted, stack_[caller.base + result], value);
-	} else if (gives && frames_.size() == p_depth && r_result) {
-		*r_result = value; // The caller from outside takes it, with its reference.
-	} else if (gives && held(kind)) {
-		drop(kind, value); // Nobody wants it.
-	}
-}
-
 void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_registers) {
 	std::string line;
 	for (size_t i = 0; i < p_list.size(); i++) {

@@ -9,7 +9,7 @@
 #include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
-#include "library.h"
+#include "interpreter_library.h"
 #include "native_code.h"
 #include "named_sites.h"
 #include "runtime.h"
@@ -30,6 +30,7 @@ struct Program;
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
+	friend class InterpreterLibrary;
 	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
 	friend class EngineNamed; // Godot's classes and members an untyped value reaches by name (vm/engine_named.h).
 
@@ -61,26 +62,7 @@ private:
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	// What each object was constructed with, while a host asks for it to be remembered: none otherwise.
 	std::unique_ptr<Constructions> constructions_;
-	// What the library's functions of plain values ask of whoever runs the program (vm/library.h), answered
-	// by this interpreter.
-	struct Asked final : Runner, Unmoved {
-		Interpreter &vm;
-		explicit Asked(Interpreter &p_vm) :
-				vm(p_vm) {}
-		void raise(uint32_t p_class, const std::string &p_message) override { vm.raise(p_class, p_message); }
-		void out_of_memory() override { vm.out_of_memory(); }
-		bool failing() const override { return vm.failing_ || vm.stopped_; }
-		bool run(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
-			return vm.call_within(p_function, p_arguments, p_count, r_result);
-		}
-		uint32_t carries() const override { return vm.carries_; }
-		// What is still the interpreter's own (vm/interpreter_library.cpp).
-		bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) override;
-		bool engine_is(Slot p_value, uint32_t p_class) override;
-		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
-		bool array_number_set(Vector *p_array, double p_number, Slot p_value) override;
-		bool sort_field(Slot p_element, Str *p_name, Slot *r_value) override;
-	} asked_{ *this };
+	InterpreterLibrary asked_{ *this };
 	Library library_{ heap_, asked_, asked_ };
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
@@ -456,13 +438,7 @@ public:
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
 	// p_timed: the host keeps the call's time itself, and knows it began (native code's, for the engine).
-	void entered(bool p_timed = false) {
-		// The clock is started by the first call from outside alone: one made inside another asks nothing.
-		if (entries_ == 0 && !p_timed) {
-			entering();
-		}
-		entries_++;
-	}
+	void entered(bool p_timed = false);
 	void left() { entries_--; }
 	bool in_call() const { return entries_ > 0; } // A call from outside is in progress, the interpreter's or native code's.
 	void report_native(NativeError p_error);

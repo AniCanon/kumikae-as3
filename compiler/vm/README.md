@@ -34,6 +34,7 @@ A constant member name can keep four resolved receiver shapes at its instruction
 | Files | Job |
 |---|---|
 | `interpreter.h`, `interpreter.cpp`, `interpreter_records.h` | Frames, calls, and the public entry points |
+| `interpreter_library` | The standard library’s callbacks into the interpreter |
 | `interpreter_run.cpp` | The loop: one case for each operation |
 | `interpreter_errors.cpp`, `interpreter_time_limit.cpp` | Raising and catching errors, stack traces, and the time limit (Error #1502) |
 | `interpreter_host.cpp`, `interpreter_godot_refuses.cpp` | Requests to the engine, and the checks made before one |

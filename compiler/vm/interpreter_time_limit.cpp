@@ -35,6 +35,14 @@ void Interpreter::look_at_clock() {
 	stopped_ = true;
 }
 
+void Interpreter::entered(bool p_timed) {
+	// The clock is started by the first call from outside alone: one made inside another asks nothing.
+	if (entries_ == 0 && !p_timed) {
+		entering();
+	}
+	entries_++;
+}
+
 void Interpreter::entering() {
 	if (entries_ == 0 && native_) {
 		native_->call_began();
