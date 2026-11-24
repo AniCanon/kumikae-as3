@@ -3,6 +3,7 @@
 #include "adjacent_uses.h"
 #include "any.h"
 #include "fields.h"
+#include "repeated_read.h"
 
 #include <atomic>
 
@@ -17,6 +18,7 @@ static std::atomic<uint64_t> next_generation{ 1 };
 NamedSites::NamedSites(const ir::Module &p_module) : places_(p_module.functions.size()), move_targets_(p_module.functions.size()), borrowed_sets_(p_module.functions.size()), generation_(next_generation.fetch_add(1, std::memory_order_relaxed)) {
 	for (size_t f = 0; f < p_module.functions.size(); f++) {
 		const auto &fn = p_module.functions[f];
+		repeated_reads_.push_back(ir::repeated_method_read(fn));
 		std::vector<uint32_t> names;
 		std::optional<ir::AdjacentUses> uses;
 		for (size_t pc = 0; pc < fn.code.size(); pc++) {

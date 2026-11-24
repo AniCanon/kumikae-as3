@@ -64,6 +64,9 @@ static std::optional<uint64_t> attached_script(void *p_raw) {
 		return std::nullopt;
 	}
 	Variant script;
+#if defined(KAS3_TEST_COUNTS)
+	count_script_query();
+#endif
 	gdextension_interface::object_method_bind_ptrcall(get_script, p_raw, nullptr, script._native_ptr());
 	return script.get_type() == Variant::OBJECT ? gdextension_interface::variant_get_object_instance_id(script._native_ptr()) : 0;
 }
@@ -327,25 +330,35 @@ GodotHost::ReadKey &GodotHost::keep_read_key(ReadKey p_key) {
 	return *victim;
 }
 
-const StringName *GodotHost::getter_for(const ReadKey &p_entry, void *p_owner) {
-	if (p_entry.member && (p_entry.key == StringName() || !attached_script(p_owner).value_or(0))) {
-		return nullptr;
+const StringName *GodotHost::getter_for(const ReadKey &p_entry, void *p_owner, void *p_receiver, uint8_t *p_guard, uint8_t p_previous) {
+	if (p_entry.member) {
+		if (p_entry.key == StringName()) {
+			return nullptr;
+		}
+		if (p_previous == 2 || !attached_script(p_owner).value_or(0)) {
+			if (p_guard && p_entry.member->what == vm::NamedMember::What::Method && shares(p_receiver)) {
+				*p_guard = p_previous ? 2 : 1;
+			}
+			return nullptr;
+		}
 	}
 	return &p_entry.key;
 }
 #endif
 
 // Read an engine property by its Godot spelling, or a foreign field by the script's spelling.
-const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested, const vm::NamedMember **r_member) {
+const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested, const vm::NamedMember **r_member, uint8_t *p_guard) {
 
 #if defined(KAS3_RUNTIME_ONLY)
 	(void)p_receiver;
 	(void)p_name;
 	(void)r_owner;
+	(void)p_guard;
 	(void)r_nested;
 	(void)r_member;
 	return nullptr;
 #else
+	const uint8_t previous = p_guard ? std::exchange(*p_guard, 0) : 0;
 	if (!p_receiver) {
 		return nullptr;
 	}
@@ -364,7 +377,7 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	}
 	if (auto *entry = find_read_key(identity, p_name)) {
 		*r_member = entry->member;
-		return getter_for(*entry, owner);
+		return getter_for(*entry, owner, p_receiver, p_guard, previous);
 	}
 	StringName klass;
 	if (!gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
@@ -391,9 +404,9 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	// A reentrant getter can use a warmed name. A new key must leave the outer name alive.
 	ReadKey entry{ identity, std::string(p_name), key, *r_member };
 	if (active_reads_) {
-		return getter_for(entry, owner) ? &r_nested.emplace(key) : nullptr;
+		return getter_for(entry, owner, p_receiver, p_guard, previous) ? &r_nested.emplace(key) : nullptr;
 	}
-	return getter_for(keep_read_key(std::move(entry)), owner);
+	return getter_for(keep_read_key(std::move(entry)), owner, p_receiver, p_guard, previous);
 #endif
 }
 
@@ -408,7 +421,7 @@ vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::strin
 	if (p_binding) {
 		key = p_binding->invoke ? &static_cast<const Worked *>(p_binding->invoke)->dynamic_name : &name(p_binding->godot);
 	} else {
-		key = computed_getter(p_receiver, p_name, &p_owner, nested, &member);
+		key = computed_getter(p_receiver, p_name, &p_owner, nested, &member, p_result.bare_reads);
 	}
 	if (!key) {
 		return { vm::ScriptRead::Declined, member };

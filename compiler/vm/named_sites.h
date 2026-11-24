@@ -41,6 +41,7 @@ class NamedSites {
 	};
 	std::vector<std::vector<Place>> places_;
 	std::vector<InterpreterSite> sites_;
+	std::vector<std::optional<size_t>> repeated_reads_;
 	std::vector<std::vector<uint32_t>> move_targets_;
 	std::vector<std::vector<bool>> borrowed_sets_;
 	// Overflow shapes share resolution across sites. Foreign scripts dispatch through Godot and
@@ -51,6 +52,7 @@ class NamedSites {
 		std::string_view p_name, bool p_read);
 public:
 	explicit NamedSites(const ir::Module &p_module);
+	bool repeats_read(uint32_t p_function, size_t p_pc) const { return repeated_reads_[p_function] == p_pc; }
 	uint32_t move_target(uint32_t p_function, uint32_t p_pc) const {
 		const auto &targets = move_targets_[p_function];
 		return p_pc < targets.size() ? targets[p_pc] : ir::NONE;

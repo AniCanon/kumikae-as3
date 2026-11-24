@@ -13,6 +13,7 @@ void Interpreter::at_statement() {
 	if (!hook_) {
 		return;
 	}
+	frames_.back().bare_reads = 0;
 	frames_.back().pc--; // The hook sees the statement about to run.
 	const bool carry_on = hook_(*this, hook_data_);
 	frames_.back().pc++;

@@ -21,14 +21,17 @@ Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
 }
 
-vm::NamedResult named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, Slot *r_result) {
+vm::NamedResult named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, uint8_t *p_bare_reads, Slot *r_result) {
 	Host &host = *c->host;
 	const uint32_t carries = host.interpreter->carries();
 	std::optional<vm::NamedCall> call;
 	const vm::Wanted wanted{ static_cast<ir::Op>(p_op) == ir::Op::DynSet ? ir::Kind::Void : ir::Kind::Any, p_type ? p_type : "", p_reuse };
 	bool done = p_key != nullptr;
+	if (!p_key && p_bare_reads) {
+		*p_bare_reads = 0;
+	}
 	if (!p_site && p_key) {
-		host.interpreter->read_computed(p_holder, p_key->view(), r_result, p_key);
+		host.interpreter->read_computed(p_holder, p_key->view(), r_result, p_key, nullptr, p_bare_reads);
 	} else if (p_site) {
 		done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result, &call, wanted);
 	}

@@ -48,6 +48,7 @@ class FunctionWriter {
 	std::string told() const; // What tells the host of a construction, in a constructor that does.
 	const Facts *const facts_; // Null while the facts themselves are being found: nothing is known of any callee.
 	std::string body_;
+	std::optional<size_t> repeated_read_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
 	std::vector<bool> written_; // Per register: an instruction writes it.
 	// The handlers an instruction's error is offered to, innermost first, as numbers of

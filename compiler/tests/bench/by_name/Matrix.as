@@ -71,6 +71,19 @@ package {
 			try { return computedRead(target, 2); }
 			catch (e:Error) { return -e.errorID; }
 		}
+		public function changedRead(target:*, key:String, changer:*):* {
+			var method:*;
+			for (var i:int = 0; i < 5; ++i) {
+				if (i == 3) changer.replace(target, true);
+				method = target[key];
+			}
+			return method;
+		}
+		public function changedCall(target:*, changer:*):int {
+			var method:* = target.getChildCount;
+			changer.replace(target, false);
+			return int(method());
+		}
 		public function readMethod(target:*, key:String, n:int):Boolean {
 			var method:*;
 			for (var i:int = 0; i < n; ++i) method = target[key];

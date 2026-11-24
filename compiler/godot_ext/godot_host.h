@@ -64,9 +64,9 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	uint64_t read_clock_ = 0;
 	ReadKey *find_read_key(uintptr_t p_type, std::string_view p_name);
 	ReadKey &keep_read_key(ReadKey p_key);
-	static const godot::StringName *getter_for(const ReadKey &p_entry, void *p_owner);
+	const godot::StringName *getter_for(const ReadKey &p_entry, void *p_owner, void *p_receiver, uint8_t *p_guard, uint8_t p_previous);
 	unsigned active_reads_ = 0;
-	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested, const vm::NamedMember **r_member);
+	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested, const vm::NamedMember **r_member, uint8_t *p_guard);
 	Name computed_name_;
 	godot::StringName computed_class_;
 	bool can_delegate_ = false;

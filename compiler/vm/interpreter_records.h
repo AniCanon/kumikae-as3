@@ -26,6 +26,7 @@ struct Frame {
 	bool traced = false; // Its line is already in the trace of the error on its way out.
 	// An object's own constructor, whose arguments are remembered: its return is told (vm/constructions.h).
 	bool constructs = false;
+	uint8_t bare_reads = 0; // Consecutive bare method reads in the frame's effect-free loop.
 };
 
 // Where an error was thrown, as the trace's first line says it.

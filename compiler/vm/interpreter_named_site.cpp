@@ -21,12 +21,12 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 	return done.has_value();
 }
 
-bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key, void *p_reuse) {
+bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key, void *p_reuse, uint8_t *p_bare_reads) {
 #if defined(KAS3_TEST_COUNTS)
 	ScriptReadAllocations allocations(count_method_read(p_name), "method");
 #endif
 	std::string error;
-	const auto [read, member] = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse }, r_value, &error);
+	const auto [read, member] = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse, p_bare_reads }, r_value, &error);
 	if (read == ScriptRead::Declined) {
 		PropertyKey key;
 		key.borrowed = p_name;
@@ -79,9 +79,12 @@ bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruc
 	const uint32_t target = moved == ir::NONE ? get.a : moved;
 	const Slot previous = p_registers[target];
 	void *reuse = any::tag(previous) == AnyTag::Value ? any::pointer(previous) : nullptr;
+	uint8_t prior = frame.bare_reads;
+	uint8_t *guard = !hook_ && named_sites_.repeats_read(frame.function, frame.pc) ? &prior : nullptr;
 	frame.pc++;
 	Slot value = any::undefined();
-	if (read_computed(p_registers[get.b], key->view(), &value, key, reuse)) {
+	if (read_computed(p_registers[get.b], key->view(), &value, key, reuse, guard)) {
+		frames_.back().bare_reads = guard ? prior : 0;
 		if (moved != ir::NONE) {
 			frames_.back().pc++;
 		}
@@ -101,7 +104,7 @@ bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruc
 bool Interpreter::cached_property(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_borrow) {
 	const bool write = p_in.op == ir::Op::DynSet;
 	const uint32_t holder = write ? p_in.a : p_in.b;
-	const Frame &frame = frames_.back();
+	Frame &frame = frames_.back();
 	const size_t base = frame.base;
 	const Slot *registers = stack_.data() + base;
 	if (p_function.registers[holder] != ir::Kind::Any || !any::is_engine(registers[holder])) {
@@ -119,13 +122,18 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	if (!site) {
 		Slot result = any::undefined();
 		if (write || list || !text || any::tag(registers[holder]) != AnyTag::Godot) {
+			frame.bare_reads = 0;
 			return false;
 		}
-		if (read_computed(registers[holder], text->view(), &result, text)) {
+		uint8_t prior = frame.bare_reads;
+		uint8_t *guard = !hook_ && named_sites_.repeats_read(frame.function, frame.pc - 1) ? &prior : nullptr;
+		if (read_computed(registers[holder], text->view(), &result, text, nullptr, guard)) {
+			frames_.back().bare_reads = guard ? prior : 0;
 			put(ir::Kind::Any, stack_[base + p_in.a], result);
 		}
 		return true;
 	}
+	frame.bare_reads = 0;
 	if (p_borrow) {
 		// The adjacent ToAny supplied the setter's sole argument. It lives across a reentrant setter.
 		Slot result = any::undefined();

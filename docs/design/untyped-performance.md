@@ -132,6 +132,14 @@ Each read validates the receiver. A method entry delegates to Godot when the cur
 carries a foreign script. A bare receiver binds the engine method directly. A full cache replaces the least recently used name.
 Nested getters can use cached names and hold new names on the stack.
 
+Both execution modes can reuse the bare-receiver check in a loop with a single computed read.
+The receiver stays in the same register. Between reads the loop may branch, calculate with
+scalars and index a vector of strings. A getter, call, debugger hook or change of receiver
+requires a fresh check. Two consecutive engine method reads on a shared object establish that
+overwriting the preceding result can only release another bound method on that object. The
+guard belongs to the current function call. A saved engine method also checks the receiver at
+call time so a newly attached script can supply the implementation.
+
 After a script reload removes a field, its current `_get` can supply the value. A method read
 produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
 the host refreshes that script's declarations before choosing the error. Other declaration
@@ -238,5 +246,5 @@ Once either operand has a count, the join measures the other operand once and ke
 When an append replaces its uniquely owned short prefix, native code can grow that allocation.
 Other references keep their original string. Joining surrogate halves preserves both UTF-16 units.
 
-Rebuild generated native libraries for runtime layout `0x4b4153330000001b`.
+Rebuild generated native libraries for runtime layout `0x4b4153330000001c`.
 The loader checks the layout before using a site's runtime entry points.

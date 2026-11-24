@@ -7,6 +7,7 @@
 namespace {
 thread_local size_t allocations = 0;
 thread_local size_t named_gets = 0;
+thread_local size_t script_queries = 0;
 }
 
 void *operator new(size_t p_size) {
@@ -25,6 +26,10 @@ void operator delete(void *p_memory, size_t) noexcept {
 	std::free(p_memory);
 }
 
+void count_script_query() {
+	++script_queries;
+}
+
 void count_named_get() {
 	++named_gets;
 }
@@ -38,11 +43,12 @@ bool count_method_read(std::string_view p_name) {
 	return enabled && (p_name == "isVisibleInTree" || p_name == "isProcessing" || p_name == "probe_method");
 }
 
-ScriptReadAllocations::ScriptReadAllocations(bool p_report, const char *p_label) : start_(allocations), gets_(named_gets), label_(p_report ? p_label : nullptr) {}
+ScriptReadAllocations::ScriptReadAllocations(bool p_report, const char *p_label) : start_(allocations), gets_(named_gets), queries_(script_queries), label_(p_report ? p_label : nullptr) {}
 
 ScriptReadAllocations::~ScriptReadAllocations() {
 	if (label_) {
 		if (std::string_view(label_) == "method") {
+			std::fprintf(stderr, "kas3: method script queries %zu\n", script_queries - queries_);
 			std::fprintf(stderr, "kas3: method named gets %zu\n", named_gets - gets_);
 		}
 		std::fprintf(stderr, "kas3: %s allocations %zu\n", label_, allocations - start_);

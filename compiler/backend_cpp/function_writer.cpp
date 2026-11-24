@@ -1,4 +1,5 @@
 #include "function_writer.h"
+#include "repeated_read.h"
 
 #include "library_entries.h"
 #include "names.h"
@@ -88,6 +89,7 @@ void FunctionWriter::analyse() {
 	shadow_.assign(function_.registers.size(), std::string());
 	borrowed_.assign(function_.registers.size(), NONE);
 	lent_.assign(function_.registers.size(), false);
+	repeated_read_ = ir::repeated_method_read(function_);
 	find_classes();
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
@@ -365,6 +367,9 @@ std::string FunctionWriter::prologue() const {
 	for (const uint32_t use : loop_binds_) {
 		const std::string index = std::to_string(use);
 		add("void *const bind" + index + " = c->resolved ? c->resolved[" + index + "].bind : nullptr;");
+	}
+	if (repeated_read_) {
+		add("[[maybe_unused]] uint8_t bare_reads = 0;");
 	}
 	std::string unused = "(void)c;";
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {

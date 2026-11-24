@@ -7,6 +7,7 @@
 class ScriptReadAllocations {
 	size_t start_;
 	size_t gets_;
+	size_t queries_;
 	const char *label_;
 
 public:
@@ -16,5 +17,6 @@ public:
 
 void count_vm_allocation();
 void count_named_get();
+void count_script_query();
 bool count_method_read(std::string_view p_name);
 void report_computed_lookup(std::string_view p_name);
