@@ -60,9 +60,6 @@ private:
 	const ir::Module &module_;
 	Host host_;
 	NamedSites named_sites_;
-	std::vector<std::vector<bool>> transfers_;
-	bool transfers_source() const;
-	Slot store_source(ir::Kind p_kind, Slot &p_source);
 	CountedLoops loops_{ module_ };
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	// What each object was constructed with, while a host asks for it to be remembered: none otherwise.

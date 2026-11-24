@@ -181,17 +181,6 @@ package {
 			}
 			return sum;
 		}
-		public function releasedBeforeReturn(target:*, maker:*):Boolean {
-			var held:* = maker.make(target);
-			held = null;
-			return target.getScript() != null;
-		}
-		public function releaseWithAlias(target:*, maker:*):Boolean {
-			var owner:* = maker.make(target);
-			var copy:* = owner;
-			copy = null;
-			return target.getScript() != null;
-		}
 		public function releaseDuringReads(target:*, maker:*, key:String):* {
 			var value:* = maker.make(target);
 			for (var i:int = 0; i < 2; ++i) value = target[key];

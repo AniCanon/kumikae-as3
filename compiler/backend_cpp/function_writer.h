@@ -157,6 +157,7 @@ class FunctionWriter {
 	// Per instruction: it copies a register that nothing reads afterwards, so the reference is handed over
 	// and not shared (a Move, or a field or static field set).
 	std::vector<bool> hands_over_;
+	void find_last_uses();
 	// Stores a register's value where the instruction says; the register gives up its reference if this
 	// is its last use.
 	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);

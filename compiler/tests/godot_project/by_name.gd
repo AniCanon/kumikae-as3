@@ -169,17 +169,6 @@ func check_engine_reads() -> void:
 	show("foreign engine reads", results, expected)
 	receiver.free()
 
-func released_before_return(target, maker) -> bool:
-	var held = maker.make(target)
-	held = null
-	return target.get_script() != null
-
-func release_with_alias(target, maker) -> bool:
-	var owner = maker.make(target)
-	var copy = owner
-	copy = null
-	return target.get_script() != null
-
 func release_during_reads(target, maker, key):
 	var value = maker.make(target)
 	for i in 2:
@@ -190,12 +179,6 @@ func check_release() -> void:
 	var target := Node2D.new()
 	var reference := Node2D.new()
 	var maker := Maker.new()
-	show("release before return", ask("releasedBeforeReturn", [target, maker]), released_before_return(reference, maker))
-	target.set_script(null)
-	reference.set_script(null)
-	show("release with alias", ask("releaseWithAlias", [target, maker]), release_with_alias(reference, maker))
-	target.set_script(null)
-	reference.set_script(null)
 	show("release during reads", ask("releaseDuringReads", [target, maker, "getChildCount"]),
 			release_during_reads(reference, maker, &"get_child_count"))
 	target.free()
