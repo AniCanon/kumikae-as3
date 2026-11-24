@@ -111,6 +111,27 @@ package {
 			try { return o.stored; }
 			catch (e:ReferenceError) { return e.errorID; }
 		}
+		public function writeKey(o:*, key:String):int {
+			try { o[key] = 17; return int(o[key]); }
+			catch (e:Error) { return -e.errorID; }
+		}
+		public function removedDuringCall(o:*, key:String, editor:*):Array {
+			var before:int = writeKey(o, key);
+			editor.replace_schema(o);
+			try { return [before, o[key]]; }
+			catch (e:ReferenceError) { return [before, e.errorID]; }
+			catch (other:Error) { return [before, other.message]; }
+		}
+		public function writeAcrossReload(o:*, key:String, script:Script, editor:*, source:String):Array {
+			var before:int = writeKey(o, key);
+			if (source == null) {
+				script.reload(true);
+			} else {
+				script.sourceCode = source;
+				editor.replace_schema(o);
+			}
+			return [before, writeKey(o, "added")];
+		}
 		public function readAcrossReload(o:*, key:String, editor:*):Array {
 			var before:* = readStored(o);
 			var had:Boolean = key in o;

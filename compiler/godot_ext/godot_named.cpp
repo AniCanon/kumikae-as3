@@ -333,7 +333,7 @@ vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::stri
 	gdextension_interface::variant_get_named(static_cast<const Variant *>(p_receiver)->_native_ptr(), key->_native_ptr(), value._native_ptr(), &valid);
 	--active_reads_;
 	if (!valid) {
-		const auto &declared = script_member(p_receiver, p_name);
+		const auto &declared = reflected_member(p_receiver, p_name, true);
 		if (declared.what == vm::NamedMember::What::Method) {
 			return vm::ScriptRead::Method;
 		}

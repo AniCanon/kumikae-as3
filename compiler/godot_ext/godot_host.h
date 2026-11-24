@@ -138,6 +138,7 @@ private:
 	uint64_t declaration_epoch_ = 1;
 	uint64_t reflected_epoch_ = 0;
 	std::map<std::string, std::array<vm::NamedMember, 2>, std::less<>> script_members_;
+	const vm::NamedMember &reflected_member(void *p_receiver, std::string_view p_name, bool p_refresh);
 	const vm::NamedMember &script_binding(std::string_view p_name, bool p_method);
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
 	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.

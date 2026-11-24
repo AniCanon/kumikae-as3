@@ -179,6 +179,9 @@ class Runner:
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
             status, text = self.run(project, "by_name.gd", program)
+            for mode in ("callback", "entry", "reload", "source"):
+                pair = "[17, 1069]" if mode == "callback" else "[17, 17]"
+                self.check(f"native: reload classification {mode}", f"VALUE reload classification {mode}={pair}|{pair}" in text, text[-2400:])
             self.check("native: computed keys report missing properties",
                        "VALUE computed misses=0|0" in text, text[-1200:])
             cached = {line.removeprefix("kas3: cached miss ") for line in text.splitlines()

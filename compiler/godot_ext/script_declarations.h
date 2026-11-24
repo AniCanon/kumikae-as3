@@ -29,6 +29,8 @@ public:
 		return member == at->second.end() ? Member::Missing : member->second;
 	}
 
+	void forget(uint64_t p_script) { scripts_.erase(p_script); }
+
 	void clear() {
 		if (!scripts_.empty()) {
 			scripts_.clear();

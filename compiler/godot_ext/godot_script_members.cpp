@@ -35,6 +35,10 @@ bool GodotHost::script_has(void *p_receiver, std::string_view p_name) {
 
 // Only names declared by the attached script supplement the engine's AS3 declaration table.
 const vm::NamedMember &GodotHost::script_member(void *p_receiver, std::string_view p_name) {
+	return reflected_member(p_receiver, p_name, false);
+}
+
+const vm::NamedMember &GodotHost::reflected_member(void *p_receiver, std::string_view p_name, bool p_refresh) {
 	const Variant &value = *static_cast<const Variant *>(p_receiver);
 	Object *object = value.get_type() == Variant::OBJECT ? value.get_validated_object() : nullptr;
 	if (!object || script_object_by_id(object->get_instance_id())) {
@@ -47,6 +51,9 @@ const vm::NamedMember &GodotHost::script_member(void *p_receiver, std::string_vi
 	if (reflected_epoch_ != declaration_epoch_) {
 		reflected_epoch_ = declaration_epoch_;
 		declarations_.clear();
+	} else if (p_refresh) {
+		// A foreign callback may have reloaded this script without entering AS3 again.
+		declarations_.forget(script->get_instance_id());
 	}
 	const auto reflect = [&](ScriptDeclarations::Names &r_names) {
 		static const StringName name("name");

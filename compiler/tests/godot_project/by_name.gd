@@ -103,6 +103,32 @@ func of_value() -> Array:
 	var color = Color(1, 0.5, 0)
 	return [v.x, v.y, v.length(), v.normalized().y, color.g, color.lightened(0.5).r, v is Vector2, "a copy"]
 
+func check_removed_field() -> void:
+	var next := "extends Node2D\nvar added := 9\n"
+	for mode in ["callback", "entry", "reload", "source"]:
+		var live := GDScript.new()
+		live.source_code = "extends Node2D\nvar stored := 4\n"
+		assert(live.reload() == OK)
+		var receiver := Node2D.new()
+		receiver.set_script(live)
+		receiver.set_meta("next", next)
+		var editor := SchemaEditor.new()
+		var result
+		if mode == "callback":
+			result = ask("removedDuringCall", [receiver, "stored", editor])
+		elif mode == "entry":
+			var before = ask("writeKey", [receiver, "stored"])
+			editor.replace_schema(receiver)
+			result = [before, ask("writeKey", [receiver, "added"])]
+		else:
+			live.source_code = next
+			result = ask("writeAcrossReload", [receiver, "stored", live, editor, next if mode == "source" else null])
+		if mode != "callback":
+			receiver.set("added", 17)
+		var current = receiver.get("stored" if mode == "callback" else "added")
+		show("reload classification " + mode, result, [17, 1069 if mode == "callback" and current == null else current])
+		receiver.free()
+
 func _initialize() -> void:
 	node = Node2D.new()
 	node.set_script(load("res://ByName.as"))
@@ -144,6 +170,7 @@ func _physics_process(_delta: float) -> bool:
 	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
 		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
 	show("warmed script field", ask("readMany", [foreign]), 112)
+	check_removed_field()
 	var controls := {}
 	for managed in [false, true]:
 		var changing := Node2D.new()
