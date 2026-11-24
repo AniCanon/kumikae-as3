@@ -228,7 +228,10 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
 // The function and its three captures have independent counts and collector list entries.
-std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions, uint32_t p_array, Object *p_arrays);
+struct Prepared;
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions,
+		uint32_t p_array, Object *p_arrays, const Prepared *p_binding = nullptr);
+const Prepared *method_binding(const Vector *p_bound);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
 
 // The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as

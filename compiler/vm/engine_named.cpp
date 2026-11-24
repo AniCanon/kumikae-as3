@@ -55,26 +55,27 @@ const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) 
 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
 // the lowerer binds one read where the object's type is known (ir/lower_engine_values.cpp).
-bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names) {
+bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, const NamedMember *p_member) {
 	MethodNames local;
-	MethodNames &names = p_names ? *p_names : local;
+	MethodNames &names = p_member && p_member->names ? *p_member->names : local;
 	if (!names.as3) {
 		names.as3 = vm_.text(p_key.name());
 	}
 	if (names.as3 && !names.godot) {
 		names.godot = vm_.text(p_godot);
 	}
-	return names.godot && bind_method(p_holder, names.as3, names.godot, r_value);
+	const Prepared *binding = p_member && !p_member->script_only ? p_member->invoke : nullptr;
+	return names.godot && bind_method(p_holder, names.as3, names.godot, r_value, binding);
 }
 
-bool EngineNamed::bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value) {
+bool EngineNamed::bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value, const Prepared *p_binding) {
 	const ir::Module &module = vm_.module_;
 	if (module.function_class == NONE || module.library_function == NONE || module.array_class == NONE) {
 		vm_.raise_unsupported("reading '" + std::string(p_as3->view()) + "' of " + vm_.holder_name(p_holder) + " by its name");
 		return false;
 	}
 	const auto [function, bound] = new_method_storage(module.function_class, slots_of(module.classes[module.function_class]),
-			vm_.heap_.list_for(module.function_class), module.array_class, vm_.heap_.list_for(module.array_class));
+			vm_.heap_.list_for(module.function_class), module.array_class, vm_.heap_.list_for(module.array_class), p_binding);
 	if (!function) {
 		vm_.out_of_memory();
 		return false;
@@ -114,7 +115,7 @@ bool EngineNamed::read(const NamedMember &p_member, Slot p_holder, const Propert
 		case NamedMember::What::Unknown:
 			return unknown(p_key);
 		case NamedMember::What::Method:
-			return method_value(p_holder, p_key, p_member.godot, r_value, p_member.names);
+			return method_value(p_holder, p_key, p_member.godot, r_value, &p_member);
 		case NamedMember::What::Property:
 			break;
 	}

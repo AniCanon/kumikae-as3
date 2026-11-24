@@ -3,6 +3,7 @@
 #include "check.h"
 
 #include "any.h"
+#include "engine_handles.h"
 #include "fields.h"
 #include "json_text.h"
 #include "number_text.h"
@@ -172,9 +173,13 @@ static void test_method_storage() {
 	const size_t before = live_objects();
 	Object list{};
 	list_init(&list);
+	Prepared binding;
+	Vector ordinary{};
+	CHECK(!method_binding(&ordinary));
 	for (bool function_first : { false, true }) {
-		auto [function, captures] = new_method_storage(3, 2, &list, 4, &list);
+		auto [function, captures] = new_method_storage(3, 2, &list, 4, &list, &binding);
 		CHECK(function && captures);
+		CHECK_EQ(method_binding(captures), &binding);
 		CHECK_EQ(any::pointer(any::object(function)), function);
 		CHECK_EQ(live_objects(), before + 2);
 		slots_of(captures)[2].i = 17;
@@ -182,6 +187,7 @@ static void test_method_storage() {
 		if (function_first) {
 			free_object(function);
 			CHECK_EQ(slots_of(captures)[2].i, 17);
+			CHECK_EQ(method_binding(captures), &binding);
 			free_vector(captures);
 		} else {
 			free_vector(captures);

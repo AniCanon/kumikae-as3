@@ -226,14 +226,19 @@ Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list) {
 }
 
 // The capture array precedes the function. The collector may release them in either order.
-struct alignas(16) MethodCaptures {
-	Vector array;
+struct alignas(16) MethodCaptures : Vector {
 	Slot values[3];
+	const Prepared *binding;
 };
 static constexpr size_t METHOD_OFFSET = sizeof(MethodCaptures);
 static_assert(METHOD_OFFSET % alignof(Object) == 0);
 
-std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions, uint32_t p_array, Object *p_arrays) {
+const Prepared *method_binding(const Vector *p_bound) {
+	return p_bound->paired ? static_cast<const MethodCaptures *>(p_bound)->binding : nullptr;
+}
+
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions,
+		uint32_t p_array, Object *p_arrays, const Prepared *p_binding) {
 	if (p_fields > (SIZE_MAX - METHOD_OFFSET - sizeof(Object)) / sizeof(Slot) || allocation_fails()) {
 		return {};
 	}
@@ -241,8 +246,9 @@ std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_f
 	if (!block) {
 		return {};
 	}
-	auto *array = new (block) Vector();
-	array->places = array + 1;
+	auto *array = new (block) MethodCaptures();
+	array->places = array->values;
+	array->binding = p_binding;
 	array->inline_places = true;
 	array->fixed = true;
 	array->length = array->capacity = 3;

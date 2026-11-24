@@ -147,11 +147,6 @@ Object *function_in(Library &p_library, Kind p_kind, Slot p_value) {
 	return object;
 }
 
-const Prepared *saved_binding(EngineHandles &p_handles, Slot p_holder, std::string_view p_as3, std::string_view p_godot) {
-	const auto &member = p_handles.named(any::pointer(p_holder), p_as3);
-	return member.what == NamedMember::What::Method && !member.script_only && member.godot == p_godot ? member.invoke : nullptr;
-}
-
 std::optional<bool> call_saved_method(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	const auto &module = p_library.module();
 	if (static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i) != module.library_function || p_count > USUAL_ARGUMENTS) {
@@ -176,8 +171,7 @@ std::optional<bool> call_saved_method(Library &p_library, Object *p_function, co
 	}
 	auto &handles = p_library.heap.handles;
 	const auto godot = static_cast<Str *>(any::pointer(slots[2]))->view();
-	const auto as3 = static_cast<Str *>(any::pointer(slots[1]))->view();
-	const auto *bind = saved_binding(handles, slots[0], as3, godot);
+	const auto *bind = method_binding(bound);
 	std::string error;
 	const Wanted wanted{ Kind::Any, {} };
 	const auto done = bind ? handles.run(*bind, args, p_count + 1, wanted, r_result, &error) : std::nullopt;

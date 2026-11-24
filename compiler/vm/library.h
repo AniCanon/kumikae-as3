@@ -241,7 +241,6 @@ bool engine_method(const ir::Module &p_module, const Object *p_function, void **
 // A saved by-name engine method with arguments Godot can take directly. Declines before the call
 // for other functions and for script objects that need the VM's conversion.
 std::optional<bool> call_saved_method(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result);
-const Prepared *saved_binding(EngineHandles &p_handles, Slot p_holder, std::string_view p_as3, std::string_view p_godot);
 // What the engine's side said of a request it refused, raised: AS3's TypeError or RangeError where the
 // words start with its name (engine_handles.h), an Error otherwise.
 void raise_engine(Library &p_library, const std::string &p_error);

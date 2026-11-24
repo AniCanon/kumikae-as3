@@ -29,8 +29,8 @@ class EngineNamed {
 	// The handle the value reaches Godot by: its own, or the Godot object a script object is attached to.
 	void *handle_of(Slot p_holder) const;
 	const NamedMember &member(Slot p_holder, const PropertyKey &p_key) const;
-	bool method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names = nullptr);
-	bool bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value);
+	bool method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, const NamedMember *p_member = nullptr);
+	bool bind_method(Slot p_holder, Str *p_as3, Str *p_godot, Slot *r_value, const Prepared *p_binding = nullptr);
 	bool unknown(const PropertyKey &p_key);
 
 public:
