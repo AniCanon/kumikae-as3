@@ -2,15 +2,18 @@
 """Times the compiler and the interpreter, to compare before and after a change.
 
     python3 run_bench.py <build dir> [--godot <tests dir>] [--runs N]
-    python3 run_bench.py <build dir> --against <other build dir> [--runs N]
+    python3 run_bench.py <build dir> --against <other build dir> [--runs N] [--gate]
 
-With --against, `check` and `run` are timed for both builds turn and turn about, which is the only way
-to see a difference of a few per cent: runs made one build after the other drift by more than that.
+With --against, `check`, `pack` and `run` are timed for both builds turn and turn about, which is the
+only way to see a difference of a few per cent: runs made one build after the other drift by more than
+that. With --gate as well, the other build is main's, and the exit status is 1 if `pack` takes longer
+than main's by more than PACK_TOLERANCE.
 
 Prints one line per benchmark: the median of the runs in milliseconds, and the spread between the
 fastest and the slowest. A change is slower only if its median moved by more than the spread.
 
   check     a full `kas3c check` of a generated project of about 100,000 lines
+  pack      `kas3c pack --godot` of that project: the check, the lowering to IR and the module written
   recheck   the language server checking that project again after a method's parameters change (bench_recheck's
             median for the whole program; tests/bench/recheck.py times every kind of edit, for two builds)
   run       `kas3c run` of loop.as: arithmetic, calls and fields in a loop
@@ -35,6 +38,19 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# How much longer than main `pack` may take. Main keeps every temporary until its function ends. A build
+# that releases each at its last use works out where that is and writes about a sixth more instructions,
+# which took a tenth longer when this was set. A lowering pass that grows faster than the code does costs
+# several times that.
+PACK_TOLERANCE = 0.15
+
+
+def over_tolerance(name, candidate, reference):
+    """Why a gated row fails, or None."""
+    if name == "pack" and candidate > reference * (1 + PACK_TOLERANCE):
+        return "pack: %.1f ms against main's %.1f ms, over %.0f%%" % (candidate, reference, PACK_TOLERANCE * 100)
+    return None
+
 
 def timed(command, cwd=None):
     start = time.perf_counter()
@@ -53,17 +69,20 @@ PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as
             ("append", "string_append.as"), ("join", "string_join.as"))
 
 
-def against(build, other, runs):
-    """`check` and `run` for two builds, one run of each in turn."""
+def against(build, other, runs, gate=False):
+    """`check`, `pack` and `run` for two builds, one run of each in turn."""
+    misses = []
     with tempfile.TemporaryDirectory() as project:
         subprocess.run([sys.executable, os.path.join(HERE, "generate_project.py"), project, "100000"], check=True,
                        capture_output=True)
         files = sorted(glob.glob(os.path.join(project, "**", "*.as"), recursive=True))
-        timings = [("check", ["check", *files], None)] + [(name, ["run", program], HERE) for name, program in PROGRAMS]
+        packed = os.path.join(project, "packed.kas3")
+        timings = ([("check", ["check", *files], None), ("pack", ["pack", "--godot", *files, "-o", packed], None)] +
+                   [(name, ["run", program], HERE) for name, program in PROGRAMS])
         for name, command, cwd in timings:
             samples = {build: [], other: []}
-            for _ in range(runs):
-                for which in (build, other):
+            for turn in range(runs):
+                for which in ((build, other) if turn % 2 == 0 else (other, build)):
                     elapsed, done = timed([os.path.join(which, "kas3c"), *command], cwd=cwd)
                     if done.returncode != 0:
                         sys.exit("%s failed:\n%s" % (name, done.stderr[-600:]))
@@ -72,6 +91,12 @@ def against(build, other, runs):
                 report("%s %s" % (name, os.path.relpath(which)), samples[which])
             first, second = statistics.median(samples[build]), statistics.median(samples[other])
             print("%-8s the first is %+.1f%% against the second" % (name, (first - second) / second * 100.0))
+            miss = over_tolerance(name, first, second) if gate else None
+            if miss:
+                misses.append(miss)
+    for miss in misses:
+        print("FAIL " + miss)
+    return not misses
 
 
 def main():
@@ -85,7 +110,8 @@ def main():
     build = os.path.abspath(arguments[0])
     if "--against" in arguments:
         runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 21
-        against(build, os.path.abspath(arguments[arguments.index("--against") + 1]), runs)
+        if not against(build, os.path.abspath(arguments[arguments.index("--against") + 1]), runs, "--gate" in arguments):
+            sys.exit(1)
         return
     runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 7
     godot_tests = os.path.abspath(arguments[arguments.index("--godot") + 1]) if "--godot" in arguments else None

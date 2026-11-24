@@ -229,9 +229,19 @@ Set `MAIN_BUILD` to main's compiler build directory. Each row reports the median
 difference between its fastest and slowest run. The headless by-name gate below also checks
 each workload's result and enforces timing comparisons.
 
+Add `--gate` to hold compile time to main's. The `pack` row checks, lowers and writes a generated
+project of 100,000 lines, and the command fails if it takes over 15% longer than main does. Main holds
+every temporary until its function ends, so the allowance covers working out each one's last use and
+writing the releases, which is about a tenth. `ctest -R bench_gate_rules` exercises the rule without
+timing a run.
+
+```sh
+nice -n 19 python3 compiler/tests/bench/run_bench.py compiler/build --against "$MAIN_BUILD" --gate
+```
+
 | Script | Measures |
 |---|---|
-| `bench/run_bench.py <build> [--against <other build>]` | Compiler checking and VM workloads, including strings, vectors and objects |
+| `bench/run_bench.py <build> [--against <other build>] [--gate]` | Compiler checking, lowering and VM workloads, including strings, vectors and objects |
 | `bench/web_bundle.py <export> [--against <other export>] [--brotli]` | Raw and compressed bytes for each file and the complete Web export |
 | `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter, or two native builds with `--against` |
 | `bench/languages/run.py` | The same workloads in Godot, in C#, GDScript and AS3. See [Performance](../../docs/performance.md#measure-it-yourself) |
