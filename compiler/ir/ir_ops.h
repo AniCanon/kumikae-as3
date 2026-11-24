@@ -218,7 +218,15 @@ inline constexpr uint8_t OP_COUNT = 0
 ;
 
 const char *op_name(Op p_op);
-const char *op_shape(Op p_op); // Three letters from the table above.
+inline constexpr const char *OP_SHAPES[] = {
+#define X(name, shape) shape,
+	KAS3_IR_OPS(X)
+#undef X
+};
+// Three letters from the table above. Every pass over code asks this of every instruction.
+inline const char *op_shape(Op p_op) {
+	return static_cast<uint8_t>(p_op) < OP_COUNT ? OP_SHAPES[static_cast<uint8_t>(p_op)] : "---";
+}
 
 const uint32_t NONE = 0xFFFFFFFFu;
 // AnyIs with a type that is not a class: what AS3 asks of the value itself.

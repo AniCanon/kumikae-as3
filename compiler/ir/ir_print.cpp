@@ -49,17 +49,6 @@ const char *op_name(Op p_op) {
 	return "?";
 }
 
-const char *op_shape(Op p_op) {
-	switch (p_op) {
-#define X(name, shape) \
-	case Op::name: \
-		return shape;
-		KAS3_IR_OPS(X)
-#undef X
-	}
-	return "---";
-}
-
 namespace {
 
 std::string quoted(std::string_view p_text) {
