@@ -32,10 +32,13 @@ struct Counted {
 
 // Most strings fit both their byte size and UTF-16 length in one word.
 struct Str : Counted {
-	uint16_t short_size;
-	mutable uint16_t units = UINT16_MAX;
+	// Low half: byte size or UINT16_MAX for LongStr. High half: cached units plus one
+	// (one for a measured LongStr). An unmeasured short header is just its byte size.
+	mutable uint32_t sizes;
+	bool is_long() const { return static_cast<uint16_t>(sizes) == UINT16_MAX; }
+	bool measured() const { return (sizes >> 16) != 0; }
 	uint32_t size() const;
-	int32_t length() const { return units == UINT16_MAX ? measure_length() : units; }
+	int32_t length() const { return measured() && !is_long() ? static_cast<int32_t>((sizes >> 16) - 1) : measure_length(); }
 	char *data() { return const_cast<char *>(static_cast<const Str *>(this)->data()); }
 	const char *data() const;
 	std::string_view view() const { return std::string_view(data(), size()); }
@@ -50,11 +53,11 @@ struct LongStr : Str {
 };
 
 inline uint32_t Str::size() const {
-	return short_size == UINT16_MAX ? static_cast<const LongStr *>(this)->byte_size : short_size;
+	return is_long() ? static_cast<const LongStr *>(this)->byte_size : static_cast<uint16_t>(sizes);
 }
 
 inline const char *Str::data() const {
-	return reinterpret_cast<const char *>(this) + (short_size == UINT16_MAX ? sizeof(LongStr) : sizeof(Str));
+	return reinterpret_cast<const char *>(this) + (is_long() ? sizeof(LongStr) : sizeof(Str));
 }
 
 struct Object : Counted {
@@ -205,6 +208,9 @@ struct JoinOperand {
 	explicit JoinOperand(std::string_view p_ascii) : bytes(p_ascii) {}
 	JoinOperand(const Str *p_string) : bytes(p_string ? p_string->view() : std::string_view("null")), string(p_string) {}
 };
+// A unique prefix may give its allocation to the result. Failure leaves it in place.
+Str *append_string(Str **r_prefix, const Str *p_piece);
+Str *join_strings(const Str *p_first, const Str *p_second);
 Str *join_strings(JoinOperand p_first, JoinOperand p_second);
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);

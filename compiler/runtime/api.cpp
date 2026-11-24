@@ -11,6 +11,10 @@ void free_string(Context *, Str *p_string) {
 	vm::free_string(p_string);
 }
 
+Str *append_text_owned(Context *, Str **r_prefix, const Str *p_piece) {
+	return vm::append_string(r_prefix, p_piece);
+}
+
 Str *join_text(Context *, const Str *p_first, const Str *p_second) {
 	return vm::join_strings(p_first, p_second);
 }

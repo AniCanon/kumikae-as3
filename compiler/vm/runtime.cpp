@@ -40,73 +40,121 @@ size_t live_objects() {
 	return objects_alive;
 }
 
-Str *join_strings(std::string_view p_first, std::string_view p_second) {
-	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
-	// Two halves of a character that meet are joined into its four bytes (vm/text_units.h).
-	const size_t saved = joined_halves(p_first, p_second);
-	const uint64_t size = (uint64_t)p_first.size() + p_second.size() - saved;
-	const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
-	void *memory = size > UINT32_MAX || size >= SIZE_MAX - header || allocation_fails() ? nullptr : std::malloc(header + size + 1);
+static Str *allocate_string(uint64_t p_size, size_t p_header) {
+	if (p_size > UINT32_MAX || p_size >= SIZE_MAX - p_header || allocation_fails()) {
+		return nullptr;
+	}
+	void *memory = std::malloc(p_header + p_size + 1);
 	if (!memory) {
 		return nullptr;
 	}
-	Str *string;
-	if (size < UINT16_MAX) {
-		string = new (memory) Str();
-		string->short_size = static_cast<uint16_t>(size);
-	} else {
-		auto *large = new (memory) LongStr();
-		large->short_size = UINT16_MAX;
-		large->byte_size = static_cast<uint32_t>(size);
-		string = large;
+	++strings_alive;
+	const uint32_t size = static_cast<uint32_t>(p_size);
+	return size < UINT16_MAX ? new (memory) Str{ { 1 }, size } : new (memory) LongStr{ { { 1 }, UINT16_MAX }, size, -1 };
+}
+
+Str *join_strings(std::string_view p_first, std::string_view p_second) {
+	const size_t saved = joined_halves(p_first, p_second);
+	const uint64_t size = static_cast<uint64_t>(p_first.size()) + p_second.size() - saved;
+	const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
+	Str *string = allocate_string(size, header);
+	if (!string) {
+		return nullptr;
 	}
-	string->references = 1;
+	char *bytes = reinterpret_cast<char *>(string) + header;
 	if (saved) {
-		write_joined(p_first, p_second, string->data() + p_first.size() - 3);
+		write_joined(p_first, p_second, bytes + p_first.size() - 3);
 		p_first.remove_suffix(3);
 		p_second.remove_prefix(3);
 	}
 	if (!p_first.empty()) {
-		std::memcpy(string->data(), p_first.data(), p_first.size());
+		std::memcpy(bytes, p_first.data(), p_first.size());
 	}
 	if (!p_second.empty()) {
-		std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
+		std::memcpy(bytes + size - p_second.size(), p_second.data(), p_second.size());
 	}
-	string->data()[size] = 0;
-	strings_alive++;
+	bytes[size] = 0;
 	return string;
 }
 
-static bool known_length(JoinOperand p_operand) {
-	const Str *s = p_operand.string;
-	return !s || s->units != UINT16_MAX || (s->short_size == UINT16_MAX && static_cast<const LongStr *>(s)->full_units != -1);
+Str *join_strings(const Str *p_first, const Str *p_second) {
+	if (p_first && p_second) {
+		const uint32_t left = p_first->sizes;
+		const uint32_t right = p_second->sizes;
+		if ((left | right) < UINT16_MAX) {
+			const auto *first = reinterpret_cast<const char *>(p_first + 1);
+			const auto *second = reinterpret_cast<const char *>(p_second + 1);
+			// Only a trailing high half and a leading low half can change the byte size.
+			if (left < 3 || right < 3 || static_cast<unsigned char>(second[0]) != 0xED ||
+					!joined_halves({ first, left }, { second, right })) {
+				const uint32_t size = left + right;
+				const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
+				Str *joined = allocate_string(size, header);
+				if (!joined) {
+					return nullptr;
+				}
+				char *bytes = reinterpret_cast<char *>(joined) + header;
+				std::memcpy(bytes, first, left);
+				std::memcpy(bytes + left, second, right + 1);
+				return joined;
+			}
+		}
+	}
+	return join_strings(JoinOperand(p_first), JoinOperand(p_second));
+}
+
+Str *append_string(Str **r_prefix, const Str *p_piece) {
+	Str *prefix = *r_prefix;
+	if (!prefix || !p_piece || prefix == p_piece || prefix->references != 1 || prefix->is_long() || p_piece->is_long()) {
+		return join_strings(prefix, p_piece);
+	}
+	const auto left = prefix->view(), right = p_piece->view();
+	const size_t size = left.size() + right.size();
+	if (size >= UINT16_MAX || joined_halves(left, right)) {
+		return join_strings(prefix, p_piece);
+	}
+	uint32_t sizes = static_cast<uint32_t>(size);
+	if (prefix->measured() || p_piece->measured()) {
+		sizes |= static_cast<uint32_t>(prefix->length() + p_piece->length() + 1) << 16;
+	}
+	void *memory = allocation_fails() ? nullptr : std::realloc(prefix, sizeof(Str) + size + 1);
+	if (!memory) {
+		return nullptr;
+	}
+	Str *joined = new (memory) Str{ { 1 }, sizes };
+	std::memcpy(reinterpret_cast<char *>(joined + 1) + left.size(), right.data(), right.size() + 1);
+	*r_prefix = nullptr;
+	return joined;
 }
 
 Str *join_strings(JoinOperand p_first, JoinOperand p_second) {
 	Str *joined = join_strings(p_first.bytes, p_second.bytes);
-	if (joined && (known_length(p_first) || known_length(p_second))) {
+	if (joined && (!p_first.string || !p_second.string || p_first.string->measured() || p_second.string->measured())) {
 		// A newly encountered piece is measured once. Joining two surrogate halves changes the
 		// byte count but preserves both UTF-16 units.
 		const auto units = [](JoinOperand p_part) -> uint32_t {
 			return p_part.string ? static_cast<uint32_t>(p_part.string->length()) : static_cast<uint32_t>(p_part.bytes.size());
 		};
 		const uint32_t length = units(p_first) + units(p_second);
-		if (joined->short_size == UINT16_MAX) {
+		if (joined->is_long()) {
+			joined->sizes |= 1u << 16;
 			static_cast<LongStr *>(joined)->full_units = static_cast<int32_t>(length);
 		} else {
-			joined->units = static_cast<uint16_t>(length);
+			joined->sizes |= (length + 1) << 16;
 		}
 	}
 	return joined;
 }
 
 int32_t Str::measure_length() const {
-	if (short_size != UINT16_MAX) {
-		units = static_cast<uint16_t>(utf16_length(view()));
-		return units;
+	if (!is_long()) {
+		const uint32_t count = utf16_length(view());
+		sizes |= (count + 1) << 16;
+		return static_cast<int32_t>(count);
 	}
 	const auto *large = static_cast<const LongStr *>(this);
-	if (large->full_units == -1) {
+	if (!measured()) {
+		sizes |= 1u << 16;
 		large->full_units = utf16_length(view());
 	}
 	return large->full_units;

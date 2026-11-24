@@ -95,6 +95,7 @@ enum class Kind : uint8_t;
 	/* The interpreter's own values and numbers (vm/any.h, vm/runtime.h, vm/numeric.h), which a program \
 	   library reaches here too. join_text reads a missing String as "null"; compare_text orders two \
 	   Strings by their UTF-16 units; text_length counts them (0 for none); text_to_number is 0 for none. */ \
+	X(append_text_owned, Str *, (Context *c, Str **r_prefix, const Str *p_piece), (c, r_prefix, p_piece)) \
 	X(join_text, Str *, (Context *c, const Str *p_first, const Str *p_second), (c, p_first, p_second)) \
 	X(compare_text, int, (Context *c, const Str *p_a, const Str *p_b), (c, p_a, p_b)) \
 	X(text_length, int32_t, (Context *c, const Str *p_text), (c, p_text)) \

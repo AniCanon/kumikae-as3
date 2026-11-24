@@ -415,9 +415,9 @@ static void test_text_units() {
 	}
 	Str *whole = join_strings("a" + high, low + "b");
 	CHECK(whole && whole->view() == face);
-	CHECK(whole && whole->units == UINT16_MAX);
+	CHECK(whole && !whole->measured());
 	CHECK(whole && whole->length() == 4);
-	CHECK(whole && whole->units == 4);
+	CHECK(whole && whole->measured());
 	free_string(whole);
 	for (size_t prefix : { 4, 65532, 65536 }) {
 		Str *built = new_string(std::string(prefix, 'a') + high);
@@ -427,8 +427,7 @@ static void test_text_units() {
 			Str *next = join_strings(built, piece);
 			free_string(built);
 			built = next;
-			const int32_t cached = next->short_size == UINT16_MAX ? static_cast<LongStr *>(next)->full_units : next->units;
-			CHECK_EQ(cached, static_cast<int32_t>(prefix + 2 + append));
+			CHECK(next->measured());
 			CHECK_EQ(next->length(), static_cast<int32_t>(prefix + 2 + append));
 		}
 		free_string(built);

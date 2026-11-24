@@ -154,10 +154,26 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 
 bool FunctionWriter::fast_text(const Instruction &p_in) {
 	switch (p_in.op) {
-		case Op::Concat:
-			line("if (Str *const s = join(c, " + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+		case Op::Concat: {
+			// When the next move replaces the prefix, the join can take its unique allocation.
+			const auto &code = function_.code;
+			bool append = false;
+			if (pc_ + 1 < code.size() && code[pc_ + 1].op == Op::Move && code[pc_ + 1].a == p_in.b &&
+					code[pc_ + 1].b == p_in.a && p_in.a != p_in.b && owns(p_in.b)) {
+				if (!adjacent_) {
+					adjacent_.emplace(function_);
+				}
+				append = adjacent_->only_consumer(p_in.a, pc_ + 1);
+			}
+			const std::string join = append ? "append_text_owned(c, &" : "join(c, ";
+			line("if (Str *const s = " + join + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
 			put(p_in.a, "s");
-			break;
+			line("} else {");
+			mark();
+			line("out_of_memory(c); " + fail());
+			line("}");
+			return true;
+		}
 		case Op::I32ToStr:
 		case Op::U32ToStr:
 		case Op::F64ToStr:

@@ -32,6 +32,8 @@ func measure() -> void:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
+	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
+	cases.merge(pieces)
 	var inferred := {"configure": node, "timer": node, "number": node, "boolean": node, "string": node, "as3Class": node,
 			"vector": Vector2(3, 0), "color": Color(0, 3, 0)}
 	for kind: String in inferred:
@@ -48,6 +50,8 @@ func measure() -> void:
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
+				if kind in pieces and (op != "read" or managed):
+					continue
 				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
 					continue
 				if (kind == "foreign" and op == "write") or (kind == "custom" and op == "write") or (kind in ["customString", "customVector", "customFields"] and op != "read"):
@@ -95,7 +99,16 @@ func measure() -> void:
 			var elapsed := Time.get_ticks_usec() - start
 			var own := kind in ["script", "foreign", "custom"]
 			var valid := true
-			if kind in ["customString", "customVector", "customFields"]:
+			if kind == "joinThree":
+				valid = result == rounds * 18
+			elif kind == "append":
+				valid = result == rounds * 7
+			elif kind == "appendLength":
+				var tail := rounds % 512
+				valid = result == 7 * ((rounds / 512) * 512 * 513 + tail * (tail + 1)) / 2
+			elif kind == "joinLong":
+				valid = result == target + target
+			elif kind in ["customString", "customVector", "customFields"]:
 				valid = result == rounds * {"customString": 12, "customVector": 10, "customFields": 15}[kind]
 			elif op == "read" or (op == "call" and (own or kind == "value")):
 				valid = result == rounds * (7 if own else (5 if op == "call" else (2.5 if kind.begins_with("configure") else 1 if kind.begins_with("timer") else 3)))

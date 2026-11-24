@@ -16,6 +16,39 @@ package {
 			}
 		}
 
+		public function joinThreeRead(piece:String, n:int):int {
+			var total:int = 0;
+			for (var i:int = 0; i < n; ++i) {
+				var s:String = "start/" + piece + "/end";
+				total += s.length;
+			}
+			return total;
+		}
+		public function appendRead(piece:String, n:int):int {
+			var total:int = 0;
+			var s:String = "";
+			for (var i:int = 0; i < n; ++i) {
+				s += piece;
+				if ((i & 511) == 511) { total += s.length; s = ""; }
+			}
+			return total + s.length;
+		}
+		public function appendLengthRead(piece:String, n:int):Number {
+			var total:Number = 0;
+			var s:String = "";
+			for (var i:int = 0; i < n; ++i) {
+				s += piece;
+				total += s.length;
+				if ((i & 511) == 511) s = "";
+			}
+			return total;
+		}
+		public function joinLongRead(piece:String, n:int):String {
+			var s:String = "";
+			for (var i:int = 0; i < n; ++i) s = piece + piece;
+			return s;
+		}
+
 		public function selfRead(n:int):int { return scriptRead(this, n); }
 		public function selfWrite(n:int):void { scriptWrite(this, n); }
 		public function selfCall(n:int):int { return scriptCall(this, n); }
