@@ -24,7 +24,20 @@ class Intercept extends Node2D:
 			return true
 		return false
 
+class CallableField extends Node2D:
+	var action: Callable = offset.bind(3)
+
+	func offset(n: int, extra: int) -> int:
+		return n + extra
+
+class CallableMethod extends Node2D:
+	func action(n: int) -> int:
+		return n * 2
+
 class SchemaEditor extends RefCounted:
+	func invoke(cb: Callable) -> int:
+		return cb.call(7)
+
 	func replace_schema(receiver: Node2D) -> void:
 		var script: GDScript = receiver.get_script()
 		script.source_code = receiver.get_meta("next")
@@ -170,6 +183,12 @@ func _physics_process(_delta: float) -> bool:
 	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
 		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
 	show("warmed script field", ask("readMany", [foreign]), 112)
+	for receiver in [CallableField.new(), CallableMethod.new()]:
+		var is_method: bool = receiver.has_method("action")
+		var sink := SchemaEditor.new()
+		show("method value" if is_method else "Callable field", ask("actionValues", [receiver, "action", sink]),
+				[is_method, is_method, sink.invoke(receiver.get("action")), sink.invoke(receiver["action"])])
+		receiver.free()
 	check_removed_field()
 	var controls := {}
 	for managed in [false, true]:

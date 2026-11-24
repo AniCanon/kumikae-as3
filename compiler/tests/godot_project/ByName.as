@@ -102,6 +102,11 @@ package {
 			timer.free();
 			return before + after;
 		}
+		public function actionValues(o:*, key:String, sink:*):Array {
+			var literal:* = o.action;
+			var computed:* = o[key];
+			return [literal is Function, computed is Function, sink.invoke(literal), sink.invoke(computed)];
+		}
 		public function readMany(o:*):int {
 			var sum:int = 0;
 			for (var i:int = 0; i < 16; i++) sum += int(o.allocation_probe);

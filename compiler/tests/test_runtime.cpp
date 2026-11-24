@@ -378,6 +378,30 @@ static void test_any() {
 	}
 }
 
+static void test_join_across_short_limit() {
+	const std::string left(32768, 'a');
+	for (size_t size : { 65534, 65535, 65536 }) {
+		std::string right(size - left.size() - 4, 'b');
+		right += "\xf0\x9f\x98\x80";
+		for (bool measured : { false, true }) {
+			Str *a = new_string(left), *b = new_string(right);
+			CHECK(!a->is_long() && !b->is_long());
+			if (measured) {
+				CHECK_EQ(b->length(), static_cast<int32_t>(right.size() - 2));
+			}
+			Str *joined = join_strings(a, b);
+			CHECK_EQ(joined->is_long(), size >= UINT16_MAX);
+			CHECK(joined->view() == left + right);
+			CHECK_EQ(joined->data()[size], '\0');
+			CHECK_EQ(joined->measured(), measured);
+			CHECK_EQ(joined->length(), static_cast<int32_t>(size - 2));
+			free_string(joined);
+			free_string(b);
+			free_string(a);
+		}
+	}
+}
+
 // Text by UTF-16 unit. A character past U+FFFF is two units; a half held alone is three bytes.
 static void test_text_units() {
 	const std::string face = "a\xF0\x9F\x98\x80" "b"; // a, U+1F600, b
@@ -846,6 +870,7 @@ int main() {
 	test_regex_matches();
 	test_regex_limits();
 	test_text_units();
+	test_join_across_short_limit();
 	test_number_methods();
 	test_tagged_addresses();
 	test_long_text();

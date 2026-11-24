@@ -179,6 +179,9 @@ class Runner:
                 if library:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
             status, text = self.run(project, "by_name.gd", program)
+            for name in ("Callable field", "method value"):
+                pairs = [line.partition("=")[2].split("|") for line in text.splitlines() if line.startswith(f"VALUE {name}=")]
+                self.check(f"native: {name} agrees with GDScript", len(pairs) == 1 and len(pairs[0]) == 2 and pairs[0][0] == pairs[0][1], str(pairs))
             for mode in ("callback", "entry", "reload", "source"):
                 pair = "[17, 1069]" if mode == "callback" else "[17, 17]"
                 self.check(f"native: reload classification {mode}", f"VALUE reload classification {mode}={pair}|{pair}" in text, text[-2400:])
