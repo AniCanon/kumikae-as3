@@ -279,6 +279,10 @@ two engine method names and calls the last bound method. Another reads one name 
 and scripted nodes at the same site. The saved-call row reads a node's rotation method once, calls it
 in a loop and checks the final rotation.
 
+The counted extension checks these paths in headless Godot in both modes. Sixteen reads alternating
+a scripted and a bare Node2D must issue a named get on each scripted receiver and skip it on each
+bare receiver. A warmed computed read of a script-declared method allocates only its bound value.
+
 Four rows compare string operations with main. They join three strings, append a piece with and
 without reading the growing length, and join two short strings into a 65,536-byte result. The custom
 getter fixture reads String, Vector2 and Object fields and calls a script helper in the same loop.
