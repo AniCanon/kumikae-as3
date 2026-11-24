@@ -44,7 +44,11 @@ Variant untyped_to_variant(const vm::Slot &p_slot) {
 
 // What Godot gives, as an untyped value: an integer that fits an `int` as one, a larger one as an Int64.
 std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
-	switch (p_value.get_type()) {
+	return untyped_from_variant(p_value, p_value.get_type());
+}
+
+std::optional<vm::Slot> untyped_from_variant(const Variant &p_value, Variant::Type p_type) {
+	switch (p_type) {
 		case Variant::NIL:
 			return vm::any::null();
 		case Variant::BOOL:

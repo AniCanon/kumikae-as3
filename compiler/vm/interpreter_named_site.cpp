@@ -1,4 +1,5 @@
 #include "engine_named.h"
+#include "vector_calls.h"
 
 namespace kas3::vm {
 
@@ -16,6 +17,65 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 	return done.has_value();
 }
 
+bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value) {
+	std::string error;
+	const auto read = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {} }, r_value, &error);
+	if (read == ScriptRead::Failed) {
+		raise_engine(library_, error);
+	} else if (read == ScriptRead::Method || read == ScriptRead::Missing) {
+		EngineNamed(*this).finish_read(read, p_holder, p_name, r_value);
+	}
+	return read != ScriptRead::Declined;
+}
+
+// Keep a vector's String element in its register across a getter that can reenter AS3.
+bool Interpreter::indexed_read(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers) {
+	Frame &frame = frames_.back();
+	if (frame.pc == p_function.code.size()) {
+		return false;
+	}
+	const auto &get = p_function.code[frame.pc];
+	if (get.op != ir::Op::DynGet || get.c != p_in.a || p_function.registers[get.b] != ir::Kind::Any ||
+			any::tag(p_registers[get.b]) != AnyTag::Godot) {
+		return false;
+	}
+	const auto *vector = static_cast<const Vector *>(p_registers[p_in.b].p);
+	if (!vector) {
+		return false;
+	}
+	const auto at = element_index(p_function.registers[p_in.c], p_registers[p_in.c], vector->length);
+	if (!at) {
+		return false;
+	}
+	auto *key = static_cast<Str *>(slots_of(vector)[*at].p);
+	if (!key) {
+		return false;
+	}
+	auto *old = static_cast<Str *>(p_registers[p_in.a].p);
+	if (key != old) {
+		retain(key);
+		p_registers[p_in.a].p = key;
+		if (release(old)) {
+			free_string(old);
+		}
+	}
+	const size_t base = frame.base;
+	frame.pc++;
+	Slot value = any::undefined();
+	if (!read_computed(p_registers[get.b], key->view(), &value)) {
+		// The vector read succeeded. Dispatch the ordinary property read next.
+		--frames_.back().pc;
+	} else if (!failing_) {
+		Slot &destination = stack_[base + get.a];
+		if (any::holds(destination)) {
+			put(ir::Kind::Any, destination, value);
+		} else {
+			destination = value;
+		}
+	}
+	return true;
+}
+
 bool Interpreter::cached_property(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_borrow) {
 	const bool write = p_in.op == ir::Op::DynSet;
 	const uint32_t holder = write ? p_in.a : p_in.b;
@@ -27,13 +87,22 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	}
 	const auto *list = p_in.op == ir::Op::DynCall ? &p_function.argument_lists[p_in.c] : nullptr;
 	const uint32_t key = list ? (*list)[0] : write ? p_in.b : p_in.c;
-	if (p_function.registers[key] != ir::Kind::Str || (list && list->size() > 5)) {
+	const bool string_key = p_function.registers[key] == ir::Kind::Str;
+	const bool computed = !write && !list && p_function.registers[key] == ir::Kind::Any && any::tag(registers[key]) == AnyTag::String;
+	if ((!string_key && !computed) || (list && list->size() > 5)) {
 		return false;
 	}
-	const auto *text = static_cast<const Str *>(registers[key].p);
+	const auto *text = static_cast<const Str *>(computed ? any::pointer(registers[key]) : registers[key].p);
 	InterpreterSite *site = named_sites_.at(frame.function, frame.pc - 1, text, strings_);
 	if (!site) {
-		return false;
+		Slot result = any::undefined();
+		if (write || list || !text || any::tag(registers[holder]) != AnyTag::Godot || !read_computed(registers[holder], text->view(), &result)) {
+			return false;
+		}
+		if (!failing_) {
+			put(ir::Kind::Any, stack_[base + p_in.a], result);
+		}
+		return true;
 	}
 	Slot args[4];
 	size_t count = 0;

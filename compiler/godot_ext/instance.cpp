@@ -41,6 +41,7 @@ class InstanceOwners {
 		ScriptInstance *instance = nullptr;
 	};
 	std::array<Entry, 64> recent_{};
+	void *last_foreign_ = nullptr;
 	std::unordered_map<uint64_t, ScriptInstance *> all_;
 public:
 	ScriptInstance *get(uint64_t p_id) {
@@ -51,7 +52,18 @@ public:
 		}
 		return entry.instance;
 	}
+	vm::Object *script_on(void *p_live, const Variant &p_handle) {
+		if (p_live == last_foreign_) {
+			return nullptr;
+		}
+		const auto *instance = get(gdextension_interface::variant_get_object_instance_id(p_handle._native_ptr()));
+		if (!instance) {
+			last_foreign_ = p_live;
+		}
+		return instance ? instance->object : nullptr;
+	}
 	void add(ScriptInstance *p_instance) {
+		last_foreign_ = nullptr;
 		const uint64_t id = p_instance->owner_id;
 		all_[id] = p_instance;
 		recent_[id % recent_.size()] = { id, p_instance };
@@ -73,6 +85,10 @@ static InstanceOwners &instances_on() {
 
 vm::Object *kas3::script_object(const Object *p_owner) {
 	return p_owner ? script_object_by_id(p_owner->get_instance_id()) : nullptr;
+}
+
+vm::Object *kas3::script_on_live_handle(void *p_live, const Variant &p_handle) {
+	return instances_on().script_on(p_live, p_handle);
 }
 
 vm::Object *kas3::script_object_by_id(uint64_t p_id) {

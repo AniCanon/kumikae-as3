@@ -30,7 +30,7 @@ func measure() -> void:
 		script.call("addTarget", child)
 		if managed:
 			cs.call("AddTarget", child)
-	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
+	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "computed": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
@@ -50,6 +50,8 @@ func measure() -> void:
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
+				if kind == "computed" and op != "read":
+					continue
 				if kind in pieces and (op != "read" or managed):
 					continue
 				if kind.trim_suffix("Typed") in inferred and (op != "read" or (managed and kind.trim_suffix("Typed") not in ["timer", "configure"])):
@@ -70,8 +72,8 @@ func measure() -> void:
 		var kind := row.get_slice("/", 0)
 		var op := row.get_slice("/", 1)
 		var target = cases[kind]
-		if (kind == "foreign" or kind.begins_with("custom")) and args[0] == "main":
-			var probe = script.call("probeForeign", target, op == "read")
+		if (kind in ["foreign", "computed"] or kind.begins_with("custom")) and args[0] == "main":
+			var probe = script.call("probeComputed", target) if kind == "computed" else script.call("probeForeign", target, op == "read")
 			if probe == (-1069 if op == "read" else -1006):
 				windows[row] = []
 				continue
@@ -99,7 +101,9 @@ func measure() -> void:
 			var elapsed := Time.get_ticks_usec() - start
 			var own := kind in ["script", "foreign", "custom"]
 			var valid := true
-			if kind == "joinThree":
+			if kind == "computed":
+				valid = result == 8 * rounds - rounds % 2
+			elif kind == "joinThree":
 				valid = result == rounds * 18
 			elif kind == "append":
 				valid = result == rounds * 7

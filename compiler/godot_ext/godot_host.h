@@ -51,6 +51,15 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+	struct ReadKey {
+		uintptr_t type = 0;
+		std::string text;
+		godot::StringName key;
+	};
+	std::array<ReadKey, 4> read_keys_;
+	size_t next_read_key_ = 0;
+	unsigned active_reads_ = 0;
+	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested);
 	Name computed_name_;
 	godot::StringName computed_class_;
 	bool can_delegate_ = false;
@@ -220,6 +229,7 @@ godot::Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot);
 std::optional<vm::Slot> from_variant(ir::Kind p_kind, const godot::Variant &p_value);
 godot::Variant untyped_to_variant(const vm::Slot &p_slot);
 std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
+std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value, godot::Variant::Type p_type);
 // Whether a value arriving from Godot may be taken as this kind, and for an engine value as the type of
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.

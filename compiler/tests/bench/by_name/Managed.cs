@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 public partial class Managed : Node
 {
+    private static readonly StringName Bonus = "bonus";
     private static readonly StringName Score = "score";
     private static readonly StringName Current = "current";
     private static readonly StringName Caption = "caption";
@@ -58,6 +59,13 @@ public partial class Managed : Node
             if (op == "call") result = fresh.Rotation;
             fresh.Free();
             return result;
+        }
+        if (kind == "computed")
+        {
+            StringName[] keys = { Score, Bonus };
+            int total = 0;
+            for (int i = 0; i < n; i++) total += target.Get(keys[i % 2]).AsInt32();
+            return total;
         }
         if (kind == "customFields")
         {

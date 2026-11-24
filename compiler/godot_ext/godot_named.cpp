@@ -94,8 +94,7 @@ std::optional<vm::NamedShape> GodotHost::shape_of(void *p_receiver, uintptr_t p_
 	if (!type_id) {
 		return {};
 	}
-	const uint64_t owner_id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
-	if (vm::Object *instance = script_object_by_id(owner_id)) {
+	if (vm::Object *instance = script_on_live_handle(raw, value)) {
 		return vm::NamedShape{ type_id, uint64_t(instance->klass) + 1, instance, raw };
 	}
 	// This binding goes through Godot's named dispatch, so a different foreign script or a
@@ -288,24 +287,51 @@ const vm::NamedMember &GodotHost::script_getter(void *p_receiver, std::string_vi
 	return delegates_script(p_receiver, p_name) ? script_binding(p_name, false) : script_member(p_receiver, p_name);
 }
 
+// Only a name outside both native name tables may go directly to a foreign getter.
+const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested) {
+	if (!p_receiver) {
+		return nullptr;
+	}
+	const auto type = rt::head_of(p_receiver)->godot_class;
+	if (type) {
+		for (const auto &entry : read_keys_) {
+			if (entry.type == type && entry.text == p_name) {
+				*r_owner = live_handle_object(p_receiver);
+				const auto &value = *static_cast<const Variant *>(p_receiver);
+				return *r_owner && !script_on_live_handle(*r_owner, value) ? &entry.key : nullptr;
+			}
+		}
+	}
+	const auto shape = shape_of(p_receiver);
+	if (!shape || !shape->script || shape->instance || named(p_receiver, p_name, vm::NameSource::Computed).what != vm::NamedMember::What::Missing ||
+			!delegates_script(p_receiver, p_name)) {
+		return nullptr;
+	}
+	*r_owner = shape->owner;
+	// A reentrant getter can use a warmed name. A new key must leave the outer name alive.
+	if (active_reads_) {
+		return &r_nested.emplace(computed_name_.godot);
+	}
+	auto &entry = read_keys_[next_read_key_++ % read_keys_.size()];
+	entry = { shape->type, std::string(p_name), computed_name_.godot };
+	return &entry.key;
+}
+
 vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
 #if defined(KAS3_TEST_COUNTS)
 	ScriptReadAllocations allocations(p_name == "allocation_probe");
 #endif
-	std::optional<StringName> computed;
-	if (!p_binding) {
-		const auto shape = shape_of(p_receiver);
-		if (!shape || !shape->script || shape->instance || !delegates_script(p_receiver, p_name)) {
-			return vm::ScriptRead::Declined;
-		}
-		p_owner = shape->owner;
-		computed.emplace(computed_name_.godot);
+	std::optional<StringName> nested;
+	const StringName *key = p_binding ? &static_cast<const Worked *>(p_binding)->dynamic_name : computed_getter(p_receiver, p_name, &p_owner, nested);
+	if (!key) {
+		return vm::ScriptRead::Declined;
 	}
-	const StringName &key = p_binding ? static_cast<const Worked *>(p_binding)->dynamic_name : *computed;
 	GDExtensionBool valid = false;
 	Variant value;
-	gdextension_interface::variant_get_named(static_cast<const Variant *>(p_receiver)->_native_ptr(), key._native_ptr(), value._native_ptr(), &valid);
+	++active_reads_;
+	gdextension_interface::variant_get_named(static_cast<const Variant *>(p_receiver)->_native_ptr(), key->_native_ptr(), value._native_ptr(), &valid);
+	--active_reads_;
 	if (!valid) {
 		const auto &declared = script_member(p_receiver, p_name);
 		if (declared.what == vm::NamedMember::What::Method) {
@@ -317,12 +343,13 @@ vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::stri
 		*r_error = "Godot has no '" + std::string(p_name) + "' on this value";
 		return vm::ScriptRead::Failed;
 	}
-	if (value.get_type() == Variant::CALLABLE && live_handle_object(p_receiver) == p_owner &&
-			gdextension_interface::object_has_script_method(p_owner, key._native_ptr())) {
+	const auto type = value.get_type();
+	if (type == Variant::CALLABLE && live_handle_object(p_receiver) == p_owner &&
+			gdextension_interface::object_has_script_method(p_owner, key->_native_ptr())) {
 		return vm::ScriptRead::Method;
 	}
 	if (p_result.kind == ir::Kind::Any && !p_result.reuse && r_value) {
-		if (auto result = untyped_from_variant(value)) {
+		if (auto result = untyped_from_variant(value, type)) {
 			*r_value = *result;
 			return vm::ScriptRead::Value;
 		}

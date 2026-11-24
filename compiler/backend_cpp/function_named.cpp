@@ -1,4 +1,4 @@
-// A literal AS3 member name has its own cache. Computed names keep their ordinary lookup.
+// A literal uses its own site. The host bounds its cache for computed foreign reads.
 #include "function_writer.h"
 
 #include "names.h"
@@ -15,7 +15,9 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	const uint32_t holder = write ? p_in.a : p_in.b;
 	const auto *list = p_in.op == Op::DynCall ? &function_.argument_lists[p_in.c] : nullptr;
 	const uint32_t key = list ? (*list)[0] : write ? p_in.b : p_in.c;
-	if (kind(holder) != Kind::Any || kind(key) != Kind::Str || text_[key] == ir::NONE || !text_exact_[key] || (list && list->size() > 5)) {
+	const bool literal = kind(key) == Kind::Str && text_[key] != ir::NONE && text_exact_[key];
+	if (kind(holder) != Kind::Any || (!literal && (p_in.op != Op::DynGet || (kind(key) != Kind::Str && kind(key) != Kind::Any))) ||
+			(list && list->size() > 5)) {
 		return false;
 	}
 	std::string given = write ? reg(p_in.c) : "";
@@ -24,14 +26,16 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 	}
 	const size_t count = list ? list->size() - 1 : write ? 1 : 0;
 	line("{");
-	line("static kas3::vm::NamedSite site{};");
+	if (literal) {
+		line("static kas3::vm::NamedSite site{};");
+	}
 	if (count) {
 		line("const Slot args[] = { " + given + " };");
 	}
 	mark();
 	line("Slot w = empty();");
 	std::optional<ir::MathConsumer> math;
-	if (p_in.op == Op::DynGet && kept_.empty() && twice_.empty()) {
+	if (literal && p_in.op == Op::DynGet && kept_.empty() && twice_.empty()) {
 		if (!adjacent_) {
 			adjacent_.emplace(function_);
 		}
@@ -42,10 +46,11 @@ bool FunctionWriter::fast_named(const ir::Instruction &p_in) {
 		}
 	}
 	const std::string reuse = math ? "\"" + function_.engine_types[math->target] + "\", " + reg(math->target) + ".handle" : "nullptr, nullptr";
-	const std::string guard = "!kas3::vm::any::is_engine(" + reg(holder) + ") ? kas3::vm::NamedResult::Declined : ";
+	const std::string guard = (literal ? "!kas3::vm::any::is_engine(" + reg(holder) + ")" :
+			"kas3::vm::any::tag(" + reg(holder) + ") != kas3::vm::AnyTag::Godot") + " ? kas3::vm::NamedResult::Declined : ";
 	const std::string receiver = reg(holder);
-	line("const auto handled = " + guard + "named_access(c, &site, " + std::to_string(static_cast<unsigned>(p_in.op)) +
-			", " + receiver + ", " + reg(key) + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", " + reuse + ", &w);");
+	line("const auto handled = " + guard + "named_access(c, " + (literal ? "&site, " : "nullptr, ") + std::to_string(static_cast<unsigned>(p_in.op)) +
+			", " + receiver + ", " + (literal ? reg(key) : "key_of(c, " + reg(key) + ")") + ", " + (count ? "args" : "nullptr") + ", " + std::to_string(count) + ", " + reuse + ", &w);");
 	line("if (handled != kas3::vm::NamedResult::Declined) {");
 	check();
 	if (math) {

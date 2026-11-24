@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <map>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -3610,6 +3611,30 @@ static void test_numeric_tails() {
 	CHECK_EQ(values[1].d, 7.0);
 	CHECK_EQ(values[2].d, 2147483652.0);
 	CHECK_EQ(values[5].i, -2147483644);
+	fn.code = { { Op::AddF64, 2, 1, 2 }, { Op::Move, 1, 2 } };
+	pc = 0;
+	vm::numeric_tail(module, fn, pc, values);
+	CHECK_EQ(pc, 2u);
+	CHECK_EQ(values[1].d, 2147483659.0);
+	CHECK_EQ(values[2].d, values[1].d);
+}
+
+static void test_remainder_tail() {
+	using ir::Op;
+	ir::Function fn;
+	fn.code = { { Op::I32ToF64, 2, 0 }, { Op::I32ToF64, 3, 1 }, { Op::ModF64, 4, 2, 3 } };
+	vm::Slot values[5]{};
+	for (const auto &[left, right] : { std::pair<int32_t, int32_t>{ INT32_MIN, -1 }, { -7, 2 }, { 9, -4 }, { 1, 0 } }) {
+		values[0].i = left;
+		values[1].i = right;
+		values[2].d = left;
+		uint32_t pc = 1;
+		vm::numeric_tail({}, fn, pc, values);
+		CHECK_EQ(pc, 3u);
+		CHECK_EQ(values[3].d, static_cast<double>(right));
+		const double expected = std::fmod(left, right);
+		CHECK(std::isnan(expected) ? std::isnan(values[4].d) : values[4].d == expected && std::signbit(values[4].d) == std::signbit(expected));
+	}
 }
 
 static void test_vector_move_targets() {
@@ -4780,6 +4805,7 @@ int main() {
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_numeric_tails();
+	test_remainder_tail();
 	test_vector_move_targets();
 	test_vector_move_execution();
 	test_literal_dispatch();
