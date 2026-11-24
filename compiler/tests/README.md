@@ -278,11 +278,11 @@ AS3 indexes a String vector and C# indexes the corresponding interned StringName
 alternates reads of two engine methods and calls the last bound method.
 Four rows compare string operations with main. They join three strings, append a piece with and
 without reading the growing length, and join two short strings into a 65,536-byte result.
-The custom getter fixture reads String,
-Vector2 and Object fields and calls a script helper in the same loop. Its call row alternates the
-helper and a node method. The main build probes each operation and reports an unsupported row if
-AS3 raises the missing-property or missing-method error. On macOS the comparison also prints how
-many of eight distinct program images remain loaded after close for each build.
+The custom getter fixture reads String, Vector2 and Object fields and calls a script helper in the
+same loop. Its call row alternates the helper and a node method. The main build probes each
+operation and reports an unsupported row if AS3 raises the missing-property or missing-method
+error. On macOS the comparison also prints how many of eight distinct program images remain loaded
+after close for each build.
 Run `ctest -R by_name_gate_rules` to exercise the timing rules without timing a run.
 
 The tests also hold the benchmarks to the number of times native code falls back to the library
