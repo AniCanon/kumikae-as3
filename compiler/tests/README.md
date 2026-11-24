@@ -290,9 +290,6 @@ The counted extension checks these paths in headless Godot in both modes. Sixtee
 a scripted and a bare Node2D must issue a named get on each scripted receiver and skip it on each
 bare receiver. A warmed computed read of a script-declared method allocates only its bound value.
 
-Three store rows compare each AS3 mode with main. They copy two live objects into five fields,
-transfer a fresh object to a field, and assign a named local to a field just before returning.
-
 Four rows compare string operations with main. They join three strings, append a piece with and
 without reading the growing length, and join two short strings into a 65,536-byte result. The custom
 getter fixture reads String, Vector2 and Object fields and calls a script helper in the same loop.

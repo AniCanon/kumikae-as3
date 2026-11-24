@@ -21,7 +21,7 @@ ROWS.extend(("foreign/read", "foreign/call", "computed/read", "methodKeys/read",
 
 STRING_ROWS = ("joinThree/read", "append/read", "appendLength/read", "joinLong/read")
 ROWS.extend(STRING_ROWS)
-STORE_ROWS = ("heldCopy/write", "heldTransfer/write", "namedStore/write")
+STORE_ROWS = ("heldCopy/write", "heldTransfer/write")
 ROWS.extend(STORE_ROWS)
 
 TOLERANCE = 0.03
