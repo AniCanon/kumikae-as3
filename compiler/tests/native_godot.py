@@ -224,7 +224,7 @@ class Runner:
                     self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
             self.by_name_reads(project, None)
             status, text = self.by_name_reads(project, program)
-            for name in ("Callable field", "method value", "release before return", "release with alias", "foreign engine reads", "computed engine methods",
+            for name in ("Callable field", "method value", "release before return", "release with alias", "release during reads", "foreign engine reads", "computed engine methods",
                          "computed getter values keep their types and copies", "parameter alias respects position overrides"):
                 pairs = [line.partition("=")[2].split("|") for line in text.splitlines() if line.startswith(f"VALUE {name}=")]
                 self.check(f"native: {name} agrees with GDScript", len(pairs) == 1 and len(pairs[0]) == 2 and pairs[0][0] == pairs[0][1], str(pairs))

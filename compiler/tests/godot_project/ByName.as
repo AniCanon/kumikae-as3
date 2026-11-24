@@ -192,6 +192,11 @@ package {
 			copy = null;
 			return target.getScript() != null;
 		}
+		public function releaseDuringReads(target:*, maker:*, key:String):* {
+			var value:* = maker.make(target);
+			for (var i:int = 0; i < 2; ++i) value = target[key];
+			return value is Function ? "bound method" : value;
+		}
 		public function computedPositions(target:*, key:String):Array {
 			var keys:Vector.<String> = new Vector.<String>();
 			keys.push(key);

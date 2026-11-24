@@ -62,6 +62,8 @@ class InterceptTimer extends Timer:
 
 class MethodGetter extends Node2D:
 	func _get(property: StringName):
+		if property == &"get_child_count":
+			return 19
 		if property == &"is_processing":
 			return 99
 		if property == &"position":
@@ -178,6 +180,12 @@ func release_with_alias(target, maker) -> bool:
 	copy = null
 	return target.get_script() != null
 
+func release_during_reads(target, maker, key):
+	var value = maker.make(target)
+	for i in 2:
+		value = target[key]
+	return "bound method" if value is Callable else value
+
 func check_release() -> void:
 	var target := Node2D.new()
 	var reference := Node2D.new()
@@ -186,6 +194,10 @@ func check_release() -> void:
 	target.set_script(null)
 	reference.set_script(null)
 	show("release with alias", ask("releaseWithAlias", [target, maker]), release_with_alias(reference, maker))
+	target.set_script(null)
+	reference.set_script(null)
+	show("release during reads", ask("releaseDuringReads", [target, maker, "getChildCount"]),
+			release_during_reads(reference, maker, &"get_child_count"))
 	target.free()
 	reference.free()
 
