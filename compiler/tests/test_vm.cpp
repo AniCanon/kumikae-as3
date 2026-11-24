@@ -73,6 +73,13 @@ static bool on_statement(vm::Interpreter &p_interpreter, void *p_data) {
 	return ++steps->count < steps->limit;
 }
 
+struct Stepping : Recorder, vm::Clock {
+	double at = 0;
+	double now() override { return 0; }
+	double local_offset(double) override { return 0; }
+	double elapsed() override { return at += 10; }
+};
+
 // A run that goes on too long is stopped with Flash's Error #1502, which no catch stops; the limit is for
 // each call from outside, with what it calls.
 static void test_time_limit() {
@@ -99,12 +106,6 @@ static void test_time_limit() {
 	{
 		// The time a run has taken is the host's clock's to say: this one moves on ten milliseconds each
 		// time it is asked, so how long the machine really takes changes nothing here.
-		struct Stepping : Recorder, vm::Clock {
-			double at = 0;
-			double now() override { return 0; }
-			double local_offset(double) override { return 0; }
-			double elapsed() override { return at += 10; }
-		};
 		Stepping host;
 		vm::Interpreter interpreter(module, host);
 		interpreter.set_time_limit(50);
@@ -3636,6 +3637,52 @@ static void test_numeric_tails() {
 	CHECK_EQ(values[2].d, values[1].d);
 }
 
+static void test_lowered_counted_loop() {
+	ir::Module module;
+	compile("package { public class Counter {\n"
+			"public function loop(n:int):int {\n"
+			"for (var i:int = 0; i < n; ++i) {}\n"
+			"return i; } } }", &module);
+	Stepping host;
+	vm::Interpreter interpreter(module, host);
+	CHECK(interpreter.start());
+	const auto klass = class_named(module, "Counter");
+	const auto method = interpreter.find_method(klass, "loop");
+	CHECK(method != ir::NONE);
+	if (method == ir::NONE) {
+		return;
+	}
+	vm::CountedLoops loops(module);
+	size_t matches = 0;
+	for (size_t pc = 0; pc < module.functions[method].code.size(); ++pc) {
+		if (loops.at(method, pc)) {
+			const auto &code = module.functions[method].code;
+			CHECK(code[pc].op == ir::Op::I32ToF64);
+			CHECK(pc + 5 < code.size() && code[pc + 5].op == ir::Op::Jump);
+			++matches;
+		}
+	}
+	CHECK_EQ(matches, size_t(1));
+
+	auto *object = interpreter.construct(klass);
+	vm::Slot bound{}, result{};
+	bound.i = 3;
+	Steps steps;
+	interpreter.set_statement_hook(on_statement, &steps);
+	CHECK(interpreter.call_method(object, "loop", &bound, 1, &result));
+	CHECK_EQ(result.i, 3);
+	// Initialization, four condition checks (including the exit), then the return.
+	CHECK_EQ(steps.seen, std::string("Counter/loop:3 Counter/loop:3 Counter/loop:3 Counter/loop:3 Counter/loop:3 Counter/loop:4 "));
+
+	interpreter.set_statement_hook(nullptr, nullptr);
+	interpreter.set_time_limit(1);
+	bound.i = 20000;
+	CHECK(!interpreter.call_method(object, "loop", &bound, 1, &result));
+	CHECK(host.errors.find("Error #1502") != std::string::npos);
+	CHECK(host.errors.find("Counter/loop()") != std::string::npos);
+	interpreter.release_object(object);
+}
+
 static void test_counted_loop_steps() {
 	using ir::Op;
 	ir::Module module;
@@ -4851,6 +4898,7 @@ int main() {
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_numeric_tails();
+	test_lowered_counted_loop();
 	test_counted_loop_steps();
 	test_remainder_tail();
 	test_vector_move_targets();
