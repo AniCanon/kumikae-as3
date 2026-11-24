@@ -111,6 +111,9 @@ void *object_behind(void *p_handle) {
 	void *const object = gdextension_interface::object_get_instance_from_id(gdextension_interface::variant_get_object_instance_id(held->_native_ptr()));
 	rt::HandleHead *const head = rt::head_of(p_handle);
 	if (!object) {
+		// The fallback after a failed site guard checks the same handle for null.
+		head->object = nullptr;
+		head->seen = before;
 		return nullptr;
 	}
 	if (!head->asked) {

@@ -23,7 +23,7 @@ bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_
 	if (read == ScriptRead::Declined) {
 		PropertyKey key;
 		key.borrowed = p_name;
-		return ordinary_property(p_holder, key, r_value);
+		return any_null_check(p_holder) && ordinary_property(p_holder, key, r_value);
 	}
 	if (read == ScriptRead::Failed) {
 		raise_engine(library_, error);
