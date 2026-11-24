@@ -1,6 +1,7 @@
 // The types pass: the static type of every expression, and what `a.b` refers to.
 #include "check.h"
 #include "names.h"
+#include "proof_dependencies.h"
 
 #include <initializer_list>
 #include <string>
@@ -482,7 +483,47 @@ static void test_withdrawal_chain() {
 	std::printf("Withdrawal chain: %zu uses visited for %zu locals\n", unit->inference_use_visits, count);
 }
 
+static void test_withdrawal_fan() {
+	constexpr size_t width = 256;
+	for (bool withdraw : { false, true }) {
+		std::string body = "var source = 0; var sink = 0;\n";
+		for (size_t i = 0; i < width; ++i) {
+			const std::string name = "arm" + std::to_string(i);
+			body += "var " + name + " = 0; " + name + " += source; sink += " + name + ";\n";
+		}
+		body += withdraw ? "source += any;" : "source += 1;";
+		Compilation compilation;
+		compilation.add("godot.as", GODOT_STUB, true);
+		Unit *unit = compilation.add("Main.as", fixture(body));
+		compilation.check();
+		CHECK_EQ(compilation.format_diagnostics(false), std::string());
+		size_t inferred = 0;
+		for (const auto &symbol : unit->body_symbols) {
+			if (symbol.kind == SymbolKind::Local && symbol.storage) {
+				++inferred;
+			}
+		}
+		CHECK_EQ(inferred, withdraw ? size_t(0) : width + 2);
+		CHECK(unit->inference_use_visits <= 12 * width);
+		std::printf("Fan %s: %zu uses visited, %zu inferred\n", withdraw ? "withdrawal" : "control", unit->inference_use_visits, inferred);
+	}
+}
+
+static void test_replaced_proof_dependencies() {
+	Name left{}, right{};
+	ProofDependencies graph(3);
+	graph.replace(0, { &left, &right });
+	graph.replace(1, { &left });
+	graph.replace(2, { &left });
+	graph.replace(0, { &right });
+	graph.replace(1, {});
+	CHECK(graph.withdraw(&left) == std::unordered_set<size_t>{ 2 });
+	CHECK(graph.withdraw(&right) == std::unordered_set<size_t>{ 0 });
+}
+
 int main() {
+	test_replaced_proof_dependencies();
+	test_withdrawal_fan();
 	test_withdrawal_chain();
 	test_literals_and_names();
 	test_operators();

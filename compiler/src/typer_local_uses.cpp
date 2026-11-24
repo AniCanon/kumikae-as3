@@ -1,4 +1,5 @@
 // A local can use its initial type only when every use has the same meaning with that type.
+#include "proof_dependencies.h"
 #include "ast_walk.h"
 #include "typer.h"
 
@@ -406,7 +407,7 @@ std::vector<LocalProof> fixed_point(Block *p_body, Package *p_godot, const std::
 		const Uses &p_uses, Facts &r_assumptions, const Consumers &p_consumers) {
 	// An assumption belongs to its receiver local. Keep the readers of each
 	// expression so losing a field or operand wakes only proofs that used it.
-	std::unordered_map<Expr *, std::vector<size_t>> dependents;
+	ProofDependencies dependents(p_locals.size());
 	std::vector<LocalProof> proofs(p_locals.size());
 	std::vector<size_t> pending;
 	std::vector<bool> queued(p_locals.size(), true);
@@ -417,13 +418,10 @@ std::vector<LocalProof> fixed_point(Block *p_body, Package *p_godot, const std::
 		if (!r_assumptions.erase(p_expr)) {
 			return;
 		}
-		auto readers = dependents.extract(p_expr);
-		if (!readers.empty()) {
-			for (size_t i : readers.mapped()) {
-				if (!queued[i]) {
-					queued[i] = true;
-					pending.push_back(i);
-				}
+		for (size_t i : dependents.withdraw(p_expr)) {
+			if (!queued[i]) {
+				queued[i] = true;
+				pending.push_back(i);
 			}
 		}
 	};
@@ -438,11 +436,10 @@ std::vector<LocalProof> fixed_point(Block *p_body, Package *p_godot, const std::
 		consumers.reads = &reads;
 		auto &proof = proofs[i];
 		proof = check_uses(p_body, local.initial, local.type, local.fresh, p_godot, uses, consumers, local.numeric);
-		if (proof.storage || !proof.bindings.empty()) {
-			for (Expr *expr : reads) {
-				dependents[expr].push_back(i);
-			}
+		if (!proof.storage && proof.bindings.empty()) {
+			reads.clear();
 		}
+		dependents.replace(i, reads);
 		std::unordered_set<Expr *> bound;
 		for (const Binding &binding : proof.bindings) {
 			bound.insert(binding.access);
