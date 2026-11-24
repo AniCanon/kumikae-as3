@@ -98,7 +98,11 @@ void FunctionWriter::analyse() {
 	find_borrowed();
 	find_still();
 	find_kept();
-	find_last_uses();
+	std::vector<bool> owned(function_.registers.size());
+	for (size_t reg = 0; reg < owned.size(); ++reg) {
+		owned[reg] = owns(reg);
+	}
+	hands_over_ = ir::last_use_stores(function_, owned);
 	find_twice();
 	find_counted();
 }

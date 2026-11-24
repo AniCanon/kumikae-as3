@@ -103,7 +103,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			if (at && vector->narrow) {
 				set_place(vector, *at, r[p_in.c]);
 			} else if (at && !vector->bare) {
-				put(kind, slots_of(vector)[*at], share(kind, r[p_in.c]));
+				put(kind, slots_of(vector)[*at], held(kind) ? store_source(kind, r[p_in.c]) : r[p_in.c]);
 			} else {
 				vm::vector_set(library_, vector, index, r[p_in.b], r[p_in.c]);
 			}

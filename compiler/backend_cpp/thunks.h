@@ -3,7 +3,7 @@
 // everything but their registers' numbers are one thunk.
 #pragma once
 
-#include "ir.h"
+#include "last_use.h"
 
 #include <map>
 #include <string>
@@ -34,13 +34,6 @@ struct ThunkUse {
 	uint32_t result = ir::NONE; // The function's register the result goes to.
 	uint32_t updated = ir::NONE; // The function's register that is moved on.
 };
-
-// Whether the operation's first operand, a register, is read and not written (VecSet's vector).
-bool first_is_read(ir::Op p_op);
-// The register an instruction reads and also changes where it is: a loop's cursor, and one of Godot's
-// values that Godot changes in place (a part of it set, a method called on it). NONE for the rest. The
-// library works on a copy of what it is handed, so such a register is handed back.
-uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in);
 
 class ThunkTable {
 	std::map<Thunk, uint32_t> numbers_;

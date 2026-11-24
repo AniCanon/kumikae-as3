@@ -17,44 +17,6 @@ bool Thunk::operator<(const Thunk &p_other) const {
 	return key(*this) < key(p_other);
 }
 
-bool first_is_read(Op p_op) {
-	switch (p_op) {
-		case Op::VecSet:
-		case Op::VecSetLength:
-		case Op::VecSetFixed:
-		case Op::DynSet:
-		case Op::NullCheck:
-		case Op::AnyNullCheck:
-		case Op::Throw:
-		case Op::Rethrow:
-		case Op::CallbackThis:
-		case Op::SetField:
-		case Op::HostSet:
-		case Op::HostIndexSet:
-		case Op::Return:
-		case Op::JumpIf:
-		case Op::JumpIfNot:
-			return true;
-		default:
-			return false;
-	}
-}
-
-uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in) {
-	const auto value = [&](uint32_t p_register) { return p_function.registers[p_register] == ir::Kind::Val ? p_register : NONE; };
-	switch (p_in.op) {
-		case Op::DynNext:
-			return p_in.b;
-		case Op::HostSet:
-		case Op::HostIndexSet:
-			return value(p_in.a);
-		case Op::HostCall:
-			return p_function.argument_lists[p_in.c].empty() ? NONE : value(p_function.argument_lists[p_in.c][0]);
-		default:
-			return NONE;
-	}
-}
-
 ThunkUse ThunkTable::use(const ir::Function &p_function, const ir::Instruction &p_in) {
 	Thunk thunk;
 	ThunkUse use;

@@ -68,6 +68,21 @@ class MethodGetter extends Node2D:
 			return Vector2(4, 7)
 		return null
 
+class OnRelease extends RefCounted:
+	var target: Node2D
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE:
+			target.set_block_signals(true)
+			target.set_script(MethodGetter)
+			target.set_block_signals(false)
+
+class Maker extends RefCounted:
+	func make(target: Node2D) -> RefCounted:
+		var held := OnRelease.new()
+		held.target = target
+		return held
+
 class CallableGetter extends Node2D:
 	func answer(value: int) -> int:
 		return value
@@ -151,6 +166,28 @@ func check_engine_reads() -> void:
 		results.append(returned.map(observed))
 	show("foreign engine reads", results, expected)
 	receiver.free()
+
+func released_before_return(target, maker) -> bool:
+	var held = maker.make(target)
+	held = null
+	return target.get_script() != null
+
+func release_with_alias(target, maker) -> bool:
+	var owner = maker.make(target)
+	var copy = owner
+	copy = null
+	return target.get_script() != null
+
+func check_release() -> void:
+	var target := Node2D.new()
+	var reference := Node2D.new()
+	var maker := Maker.new()
+	show("release before return", ask("releasedBeforeReturn", [target, maker]), released_before_return(reference, maker))
+	target.set_script(null)
+	reference.set_script(null)
+	show("release with alias", ask("releaseWithAlias", [target, maker]), release_with_alias(reference, maker))
+	target.free()
+	reference.free()
 
 func check_positions() -> void:
 	var positions := Positions.new()
@@ -340,6 +377,7 @@ func _physics_process(_delta: float) -> bool:
 			expected_methods.append(receiver.get(&"is_processing_input"))
 	show("computed engine methods", ask("callReadMethods"), expected_methods.map(observed))
 	check_engine_reads()
+	check_release()
 	check_positions()
 	replaced.free()
 	control.free()

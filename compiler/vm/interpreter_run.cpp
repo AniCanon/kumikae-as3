@@ -101,6 +101,10 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					r[in.a] = r[in.b];
 					goto dispatch;
 				}
+				if (transfers_source()) {
+					put(kind, r[in.a], std::exchange(r[in.b], any::undefined()));
+					break;
+				}
 				if (kind == Kind::Val && r[in.a].p && r[in.b].p && host_.handles.assign(r[in.a].p, r[in.b].p)) {
 					break;
 				}
@@ -468,7 +472,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				const ir::Class &klass = module_.classes[object->klass];
 				Kind kind = klass.fields[in.b].kind;
-				put(kind, field(klass, object, in.b), share(kind, r[in.c]));
+				put(kind, field(klass, object, in.b), held(kind) ? store_source(kind, r[in.c]) : r[in.c]);
 				break;
 			}
 			case Op::GetGlobal: {
@@ -478,7 +482,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			}
 			case Op::SetGlobal: {
 				Kind kind = module_.globals[in.a].kind;
-				put(kind, globals_[in.a], share(kind, r[in.b]));
+				put(kind, globals_[in.a], held(kind) ? store_source(kind, r[in.b]) : r[in.b]);
 				break;
 			}
 			case Op::ArgMissing:

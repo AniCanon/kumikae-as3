@@ -29,6 +29,10 @@ or an absent binding sends the request by name. A failure after invocation raise
 
 A constant member name can keep four resolved receiver shapes at its instruction. Additional shapes share a table per literal name. At 64 entries, a new shape replaces one randomly chosen entry. Each access checks the receiver is alive. A reload replaces the interpreter table and invalidates the caches in native code.
 
+At load time the interpreter finds stores that can take ownership of a temporary on its last use.
+A local that receives a call result can release the last reference when you reassign it. Another named
+local holding the same object keeps its own reference.
+
 ## Files
 
 | Files | Job |

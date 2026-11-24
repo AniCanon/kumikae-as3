@@ -158,12 +158,14 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	Slot result = any::undefined();
 	std::optional<NamedCall> call;
 	Wanted wanted{ write ? ir::Kind::Void : ir::Kind::Any, {} };
+	const uint32_t moved = p_in.op == ir::Op::DynGet ? named_sites_.move_target(frame.function, frame.pc - 1) : ir::NONE;
+	const uint32_t target = moved == ir::NONE ? p_in.a : moved;
 	if (site->math) {
 		const uint32_t type = p_function.code[frame.pc].c;
 		wanted.type = type == ir::NONE ? std::string_view{} : std::string_view(module_.engine_names[type].name);
 		wanted.reuse = registers[site->math->target].p;
-	} else if (p_in.op == ir::Op::DynGet && any::tag(registers[p_in.a]) == AnyTag::Value) {
-		wanted.reuse = any::pointer(registers[p_in.a]);
+	} else if (p_in.op == ir::Op::DynGet && any::tag(registers[target]) == AnyTag::Value) {
+		wanted.reuse = any::pointer(registers[target]);
 	}
 	if (!access_named(*site, p_in.op, registers[holder], text->view(), args, count, &result, &call, wanted)) {
 		if (!call || count || module_.functions[call->function].parameters != 1 || module_.functions[call->function].rest) {
@@ -182,8 +184,11 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 	if (!write && p_in.a != ir::NONE && !failing_) {
 		if (site->math && wanted.reuse && any::tag(result) == AnyTag::Value && any::pointer(result) == wanted.reuse) {
 			frames_.back().pc += site->math->skip;
-		} else if (site->math || !wanted.reuse || result.bits != stack_[base + p_in.a].bits) {
-			put(ir::Kind::Any, stack_[base + p_in.a], result);
+		} else if (site->math || !wanted.reuse || result.bits != stack_[base + target].bits) {
+			put(ir::Kind::Any, stack_[base + target], result);
+		}
+		if (moved != ir::NONE) {
+			frames_.back().pc++;
 		}
 	} else if (!wanted.reuse || any::tag(result) != AnyTag::Value || any::pointer(result) != wanted.reuse) {
 		drop_any(result);
