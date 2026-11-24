@@ -69,6 +69,35 @@ func batch(row: String, target: Variant, rounds: int, mode: String, targets: Arr
 		return -1
 	return elapsed
 
+func sample_window(group: Array, rounds: Dictionary, pilot: bool, cases: Dictionary, mode: String, targets: Array, script: Node, cs: Node) -> Dictionary:
+	var batches := {}
+	var totals := {}
+	for row: String in group:
+		batches[row] = []
+		totals[row] = 0
+	# Both members warm up together, then take turns in ABBA order until both windows are full.
+	var warming := true
+	while true:
+		var ready := true
+		for row: String in group:
+			var elapsed := batch(row, cases[row.get_slice("/", 0)], rounds[row], mode, targets, script, cs)
+			if elapsed < 0:
+				return {}
+			totals[row] += elapsed
+			if warming:
+				ready = ready and totals[row] >= (1000 if pilot else 20000)
+			else:
+				batches[row].append(elapsed)
+				ready = ready and (batches[row].size() >= 3 if pilot else totals[row] >= 40000)
+		group.reverse()
+		if ready:
+			if not warming:
+				break
+			warming = false
+			for row: String in group:
+				totals[row] = 0
+	return batches
+
 func measure() -> void:
 	var args := OS.get_cmdline_user_args()
 	var managed := args[0] == "cs"
@@ -153,34 +182,12 @@ func measure() -> void:
 				group.append(partners[first])
 				visited[partners[first]] = true
 			var rounds := {}
-			var batches := {}
-			var totals := {}
 			for row: String in group:
 				rounds[row] = sizes.get(row, maxi(1, n / 100) if row.begins_with("configure") else n)
-				batches[row] = []
-				totals[row] = 0
-			# Both members warm up together, then take turns in ABBA order until both windows are full.
-			var warming := true
-			while true:
-				var ready := true
-				for row: String in group:
-					var elapsed := batch(row, cases[row.get_slice("/", 0)], rounds[row], args[0], targets, script, cs)
-					if elapsed < 0:
-						quit(1)
-						return
-					totals[row] += elapsed
-					if warming:
-						ready = ready and totals[row] >= (1000 if pilot else 20000)
-					else:
-						batches[row].append(elapsed)
-						ready = ready and (batches[row].size() >= 3 if pilot else totals[row] >= 40000)
-				group.reverse()
-				if ready:
-					if not warming:
-						break
-					warming = false
-					for row: String in group:
-						totals[row] = 0
+			var batches := sample_window(group, rounds, pilot, cases, args[0], targets, script, cs)
+			if batches.is_empty():
+				quit(1)
+				return
 			for row: String in group:
 				var duration := median(batches[row])
 				if not pilot and duration < 500:

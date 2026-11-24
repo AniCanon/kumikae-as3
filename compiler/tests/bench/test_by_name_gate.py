@@ -1,4 +1,7 @@
+import os
+import shutil
 import subprocess
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -39,12 +42,32 @@ class GateTests(unittest.TestCase):
         pilots = {"timer/read": [0.021], "timerTyped/read": [0.020]}
         counts = batch_sizes(pilots)
         self.assertEqual(short_pairs(pilots), [("timer/read", "timerTyped/read")])
+        godot = os.getenv("KAS3_GODOT") or shutil.which("godot")
+        if not godot:
+            self.skipTest("set KAS3_GODOT to run the headless batch control")
+        here = Path(__file__).parent
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "project.godot").write_text("config_version=5\n")
+            shutil.copy(here / "by_name/matrix.gd", project)
+            shutil.copy(here / "paired_window_test.gd", project)
+            run = subprocess.run([godot, "--headless", "--path", temp, "--log-file", str(project / "godot.log"),
+                                  "-s", "paired_window_test.gd", "--", *map(str, counts.values())],
+                                 capture_output=True, text=True, timeout=20)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        orders = [line.split()[1] for line in run.stdout.splitlines() if line.startswith("ORDER ")]
+        self.assertEqual(len(orders), 2)
+        for order in orders:
+            self.assertGreaterEqual(len(order), 4)
+            self.assertEqual(order, ("ABBA" * len(order))[:len(order)])
         times = {}
-        for row, (cost,) in pilots.items():
-            batches = [cost * counts[row] / 20000 * factor for factor in (1.1, 0.9)]
+        for row in pilots:
+            batches = [float(line.split()[2]) / 1000 for line in run.stdout.splitlines()
+                       if line.startswith(f"SAMPLE {row} ")]
+            self.assertEqual(len(batches), 2)
             self.assertGreater(min(batches), 0.5)
             cost = layout_mean(*batches) * 20000 / counts[row]
-            times[row] = {"native": [cost] * 7}
+            times[row] = {"native": [cost]}
         self.assertEqual(failures(times, None), [
             "timer/read: native slower than typed (0.021 vs 0.020 ms, tolerance 3%)"])
 
