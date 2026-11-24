@@ -95,6 +95,10 @@ std::vector<bool> last_use_stores(const Function &p_function, const std::vector<
 			continue;
 		}
 		const uint32_t made = written_at[from];
+		// In a stripped module a Move destination may be a local whose name was omitted.
+		if (p_function.locals.empty() && p_function.code[made].op == Op::Move) {
+			continue;
+		}
 		if (in.op == Op::Move && (in.a == in.b || !p_owned[in.a])) {
 			continue;
 		}
