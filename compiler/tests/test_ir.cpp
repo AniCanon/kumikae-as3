@@ -136,22 +136,7 @@ static void test_release_edges() {
 	CHECK(caught.op == Op::Release && caught.a == 2);
 }
 
-static void test_store_live_on_another_path() {
-	Function fn;
-	fn.registers = { Kind::Obj, Kind::Obj, Kind::Bool, Kind::Any };
-	fn.code = { { Op::SetField, 0, 0, 1 }, { Op::JumpIf, 2, 0 }, { Op::ReturnVoid },
-		{ Op::NullCheck, 1 }, { Op::ReturnVoid } };
-	std::vector<bool> fields(fn.code.size());
-	fields[0] = true;
-	CHECK(!last_stores(fn, fields)[0]); // The next iteration reads the source again.
-	fn.code[1] = { Op::Stmt };
-	CHECK(last_stores(fn, fields)[0]);
-	fn.handlers.push_back({ 0, 1, 3, 3 });
-	CHECK(!last_stores(fn, fields)[0]); // The catch block still sees the local.
-}
-
 int main() {
-	test_store_live_on_another_path();
 	test_release_edges();
 	test_ops();
 	test_print();

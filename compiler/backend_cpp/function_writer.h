@@ -161,7 +161,7 @@ class FunctionWriter {
 	std::vector<bool> hands_over_;
 	// Stores a register's value where the instruction says; the register gives up its reference if this
 	// is its last use.
-	bool can_give_field(const ir::Instruction &p_in) const;
+	bool final_field_store(uint32_t p_pc) const;
 	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
 	// function_loops.cpp: a loop over vectors of numbers, or of objects it only reads, written twice.
 	struct Twice {

@@ -12,9 +12,6 @@ bool first_is_read(ir::Op p_op);
 // library works on a copy of what it is handed, so such a register is handed back.
 uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in);
 
-// Of the candidate stores, select those whose source value is dead on every successor.
-std::vector<bool> last_stores(const Function &p_function, const std::vector<bool> &p_candidate);
-
 // Insert releases on completion of the instruction that last uses an owned temporary.
 void release_temporaries(Function &r_function, bool p_stripped = false);
 

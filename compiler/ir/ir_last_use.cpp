@@ -269,26 +269,6 @@ uint32_t cleanup(std::vector<Instruction> &r_code, uint32_t p_target, const std:
 
 } // namespace
 
-std::vector<bool> last_stores(const Function &p_function, const std::vector<bool> &p_candidate) {
-	auto last = p_candidate;
-	if (std::none_of(last.begin(), last.end(), [](bool p_value) { return p_value; })) {
-		return last;
-	}
-	std::vector<bool> sources(p_function.registers.size());
-	for (size_t pc = 0; pc < last.size(); ++pc) {
-		if (last[pc]) {
-			sources[stored(p_function.code[pc])] = true;
-		}
-	}
-	const auto live = liveness(uses_of(p_function), sources);
-	for (size_t pc = 0; pc < last.size(); ++pc) {
-		if (last[pc]) {
-			last[pc] = !live.after[pc].count(stored(p_function.code[pc]));
-		}
-	}
-	return last;
-}
-
 void release_temporaries(Function &r_function, bool p_stripped) {
 	std::vector<bool> held;
 	for (Kind kind : r_function.registers) {

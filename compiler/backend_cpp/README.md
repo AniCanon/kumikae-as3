@@ -86,7 +86,7 @@ to give a wrong answer if the proof were wrong.
 | Loops over vectors | A loop that reads and writes vectors of numbers is written twice. The first copy keeps each vector's length and elements in locals. An index out of range jumps to the second copy, which is the loop as written. | `tests/run/vector_loops.as` |
 | Narrow vector elements | An element of a `Vector.<int>` is read and written as four bytes. | `tests/run/vector_narrow.as` |
 | Borrowed elements | A variable given an element of a vector counts no reference when nothing in between could release the object. | `tests/run/element_lent.as` |
-| Handing over the last use | A field can take a named local when no successor reads it and its class and subclasses can release no observable references. The IR identifies stores that take ownership and the last use of other temporaries. Generated code releases each owned reference there. | `tests/run/last_use.as` |
+| Handing over the last use | A final store into a field can also take a named local when dropping the previous value and cleaning up earlier registers cannot run code. The IR identifies stores that take ownership and the last use of other temporaries. Generated code releases each owned reference there. | `tests/run/last_use.as` |
 | Objects that end alone | Releasing an object that holds only numbers, Booleans and strings runs no other code. | `tests/run/last_use.as` |
 | Recycled objects | `new` of such a class takes a block the host kept when one was released. | [runtime](../runtime/README.md) |
 | 32-bit integer sums | A sum of `int`s stored back into an `int` is computed in 32 bits, which is exact. | |

@@ -659,10 +659,10 @@ void nullable_math_local_reuses_its_handle() {
 	CHECK(text && text->find("copy_parts<Vector2>(c, r1, r0)") != std::string::npos);
 }
 
-void last_field_store_takes_an_owned_local() {
+void final_field_store_takes_an_owned_local() {
 	using ir::Op;
 	using ir::Kind;
-	ir::Module module = module_of({ Kind::Obj, Kind::Obj, Kind::I32 }, { { Op::New, 1, 0 }, { Op::SetField, 0, 0, 1 }, { Op::ConstI32, 2, 7 } });
+	ir::Module module = module_of({ Kind::Obj, Kind::Obj }, { { Op::New, 1, 0 }, { Op::SetField, 0, 0, 1 } });
 	add_points(module);
 	ir::Class holder;
 	holder.name = "Holder";
@@ -684,7 +684,7 @@ void last_field_store_takes_an_owned_local() {
 }
 
 int main() {
-	last_field_store_takes_an_owned_local();
+	final_field_store_takes_an_owned_local();
 	loop_getter_keeps_its_bind();
 	nullable_math_local_reuses_its_handle();
 	engine_handles_box_once();
