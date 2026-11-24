@@ -78,6 +78,7 @@ class CallableGetter extends Node2D:
 		return null
 
 class MethodOverride extends MethodGetter:
+	@rpc
 	@warning_ignore("native_method_override")
 	func is_processing() -> bool:
 		return true
@@ -129,7 +130,9 @@ func sum_positions(source, count: int):
 	return total
 
 func observed(value):
-	return value.call() if value is Callable else value
+	if value is Callable:
+		return [value.get_method(), value.call()] if value.is_custom() else value.call()
+	return value
 
 func check_engine_reads() -> void:
 	var receiver := Node2D.new()
