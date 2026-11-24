@@ -20,6 +20,8 @@ A proven local uses the same registers, bound members and instructions as a loca
 
 ## The IR
 
+A typed loop variable uses the same checked conversion as an assignment when a collection supplies an untyped element.
+
 `CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.
 
 - **Register-based and typed.** An instruction says whether it adds two `Number`s or compares two strings,

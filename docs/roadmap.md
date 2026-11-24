@@ -34,6 +34,7 @@ state of the project changes.
 - **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`
   and `continue`.
 - **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.
+  A typed loop variable can receive rows from a JSON array. Each row is checked as the loop reaches it.
 - **The standard library:** `String`, `Number`, `Math`, `JSON`, `Date`, `RegExp`, and the top-level
   functions.
 - **Opt-in `byte` and `Vector.<byte>`.** Byte vectors store one byte per element and copy directly to Godot's `PackedByteArray`.
