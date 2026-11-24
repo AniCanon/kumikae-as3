@@ -456,7 +456,34 @@ static void test_limits() {
 	check_types({ { chain.c_str(), "*" } });
 }
 
+static void test_withdrawal_chain() {
+	constexpr size_t count = 2000;
+	std::string body;
+	for (size_t i = 0; i < count; ++i) {
+		body += "var a" + std::to_string(i) + " = 0;\n";
+	}
+	for (size_t i = 0; i < count; ++i) {
+		body += "a" + std::to_string(i) + " += " + (i + 1 == count ? "any" : "a" + std::to_string(i + 1)) + ";\n";
+	}
+	Compilation compilation;
+	compilation.add("godot.as", GODOT_STUB, true);
+	Unit *unit = compilation.add("Main.as", fixture(body));
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	size_t dynamic = 0;
+	for (const Symbol &local : unit->body_symbols) {
+		if (local.kind == SymbolKind::Local && !local.storage) {
+			++dynamic;
+		}
+	}
+	CHECK_EQ(dynamic, count);
+	CHECK(unit->inference_use_visits >= count);
+	CHECK(unit->inference_use_visits <= 8 * count);
+	std::printf("Withdrawal chain: %zu uses visited for %zu locals\n", unit->inference_use_visits, count);
+}
+
 int main() {
+	test_withdrawal_chain();
 	test_literals_and_names();
 	test_operators();
 	test_calls_and_new();

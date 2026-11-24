@@ -73,6 +73,7 @@ struct Unit {
 	// signature pass, for the functions that write any.
 	std::unordered_map<const FunctionDecl *, ImportScope> function_imports;
 	std::vector<Import *> signature_imports; // The imports that are.
+	size_t inference_use_visits = 0; // Local uses examined during storage inference.
 	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
 	uint32_t rank = 0; // Its place among the files: of two definitions of one name, the first file's wins.
 	uint32_t id = 0; // Its place in the compilation's storage, which it keeps when files join or leave.

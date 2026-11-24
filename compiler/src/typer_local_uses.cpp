@@ -84,13 +84,18 @@ struct Consumers {
 	const Type *number;
 	const Type *boolean;
 	const Facts &assumptions;
+	size_t &visits;
 	Facts results;
+	std::vector<Expr *> *reads = nullptr;
 
 	const Type *operand(Expr *p_expr) const {
 		if (p_expr->kind == NodeKind::Binary && static_cast<Binary *>(p_expr)->op == TokenKind::KwAs) {
 			return nullptr; // A failed numeric cast still holds null.
 		}
 		const auto at = assumptions.find(p_expr);
+		if (reads && at != assumptions.end()) {
+			reads->push_back(p_expr);
+		}
 		return at == assumptions.end() ? p_expr->type : at->second;
 	}
 
@@ -363,6 +368,7 @@ LocalProof check_uses(Block *p_body, Expr *p_initial, const Type *p_type, bool p
 	bool safe = true, assigned = false;
 	uint32_t escape = p_body->end;
 	for (Name *name : p_uses) {
+		++p_consumers.visits;
 		Node *use = parent(p_consumers.parents, name);
 		if (!p_fresh && direct_use(p_consumers, name, p_type)) {
 			assigned |= use->kind == NodeKind::Assign && static_cast<Assign *>(use)->target == name;
@@ -398,33 +404,63 @@ struct Local {
 
 std::vector<LocalProof> fixed_point(Block *p_body, Package *p_godot, const std::vector<Local> &p_locals,
 		const Uses &p_uses, Facts &r_assumptions, const Consumers &p_consumers) {
-	// Start with every candidate. Withdraw unsupported assumptions together so that two
-	// independently initialized operands can prove each other, irrespective of visit order.
-	for (;;) {
-		Facts supported;
-		std::vector<LocalProof> proofs;
-		for (const Local &local : p_locals) {
-			Consumers consumers = p_consumers;
-			auto proof = check_uses(p_body, local.initial, local.type, local.fresh, p_godot, p_uses.at(local.symbol), consumers, local.numeric);
-			if (proof.storage) {
-				for (Name *name : p_uses.at(local.symbol)) {
-					supported.emplace(name, local.type);
+	// An assumption belongs to its receiver local. Keep the readers of each
+	// expression so losing a field or operand wakes only proofs that used it.
+	std::unordered_map<Expr *, std::vector<size_t>> dependents;
+	std::vector<LocalProof> proofs(p_locals.size());
+	std::vector<size_t> pending;
+	std::vector<bool> queued(p_locals.size(), true);
+	for (size_t i = 0; i < p_locals.size(); ++i) {
+		pending.push_back(i);
+	}
+	auto withdraw = [&](Expr *p_expr) {
+		if (!r_assumptions.erase(p_expr)) {
+			return;
+		}
+		auto readers = dependents.extract(p_expr);
+		if (!readers.empty()) {
+			for (size_t i : readers.mapped()) {
+				if (!queued[i]) {
+					queued[i] = true;
+					pending.push_back(i);
 				}
 			}
-			for (const Binding &binding : proof.bindings) {
-				supported.emplace(binding.access->object, local.type);
-				supported.emplace(binding.access, binding.result);
+		}
+	};
+	while (!pending.empty()) {
+		const size_t i = pending.back();
+		pending.pop_back();
+		queued[i] = false;
+		const Local &local = p_locals[i];
+		const auto &uses = p_uses.at(local.symbol);
+		Consumers consumers = p_consumers;
+		std::vector<Expr *> reads;
+		consumers.reads = &reads;
+		auto &proof = proofs[i];
+		proof = check_uses(p_body, local.initial, local.type, local.fresh, p_godot, uses, consumers, local.numeric);
+		if (proof.storage || !proof.bindings.empty()) {
+			for (Expr *expr : reads) {
+				dependents[expr].push_back(i);
 			}
-			proofs.push_back(std::move(proof));
 		}
-		const auto before = r_assumptions.size();
-		for (auto it = r_assumptions.begin(); it != r_assumptions.end();) {
-			it = supported.count(it->first) ? std::next(it) : r_assumptions.erase(it);
+		std::unordered_set<Expr *> bound;
+		for (const Binding &binding : proof.bindings) {
+			bound.insert(binding.access);
 		}
-		if (before == r_assumptions.size()) {
-			return proofs;
+		for (Name *name : uses) {
+			Node *use = parent(consumers.parents, name);
+			if (use && use->kind == NodeKind::Member && static_cast<Member *>(use)->object == name) {
+				if (bound.count(static_cast<Member *>(use))) {
+					continue;
+				}
+				withdraw(static_cast<Member *>(use));
+			}
+			if (!proof.storage) {
+				withdraw(name);
+			}
 		}
 	}
+	return proofs;
 }
 
 void apply_storage(const Local &p_local, const LocalProof &p_proof, const std::vector<Name *> &p_uses, const Consumers &p_consumers) {
@@ -495,7 +531,7 @@ void Typer::prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, E
 		}
 	}
 
-	Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, {} };
+	Consumers consumers{ compilation_, parents, returns, number_, boolean_, assumptions, unit_.inference_use_visits, {} };
 	const auto proofs = fixed_point(p_body, godot_, locals, uses, assumptions, consumers);
 	for (size_t i = 0; i < locals.size(); i++) {
 		const Local &local = locals[i];
