@@ -45,13 +45,22 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	// Two halves of a character that meet are joined into its four bytes (vm/text_units.h).
 	const size_t saved = joined_halves(p_first, p_second);
 	const uint64_t size = (uint64_t)p_first.size() + p_second.size() - saved;
-	void *memory = size > UINT32_MAX || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + (size_t)size + 1);
+	const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
+	void *memory = size > UINT32_MAX || size >= SIZE_MAX - header || allocation_fails() ? nullptr : std::malloc(header + size + 1);
 	if (!memory) {
 		return nullptr;
 	}
-	Str *string = new (memory) Str();
+	Str *string;
+	if (size < UINT16_MAX) {
+		string = new (memory) Str();
+		string->short_size = static_cast<uint16_t>(size);
+	} else {
+		auto *large = new (memory) LongStr();
+		large->short_size = UINT16_MAX;
+		large->byte_size = static_cast<uint32_t>(size);
+		string = large;
+	}
 	string->references = 1;
-	string->size = (uint32_t)size;
 	if (saved) {
 		write_joined(p_first, p_second, string->data() + p_first.size() - 3);
 		p_first.remove_suffix(3);
@@ -68,11 +77,16 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	return string;
 }
 
-int32_t Str::length() const {
-	if (units == -1) {
-		units = utf16_length(view());
+int32_t Str::measure_length() const {
+	if (short_size != UINT16_MAX) {
+		units = static_cast<uint16_t>(utf16_length(view()));
+		return units;
 	}
-	return units;
+	const auto *large = static_cast<const LongStr *>(this);
+	if (large->full_units == -1) {
+		large->full_units = utf16_length(view());
+	}
+	return large->full_units;
 }
 
 Str *new_string(std::string_view p_text) {
@@ -336,7 +350,7 @@ double string_to_number(std::string_view p_text) {
 }
 
 int32_t utf16_length(std::string_view p_text) {
-	int32_t count = 0;
+	uint32_t count = 0;
 	for (unsigned char c : p_text) {
 		count += (c & 0xC0) != 0x80; // A character starts here,
 		count += c >= 0xF0; // and one of four bytes is two units.

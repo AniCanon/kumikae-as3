@@ -23,7 +23,7 @@ Variant untyped_to_variant(const vm::Slot &p_slot) {
 		case vm::AnyTag::Wide:
 			return Variant(static_cast<const vm::Wide *>(vm::any::pointer(p_slot))->value);
 		case vm::AnyTag::String:
-			return Variant(String::utf8(static_cast<const vm::Str *>(vm::any::pointer(p_slot))->data(), static_cast<int64_t>(static_cast<const vm::Str *>(vm::any::pointer(p_slot))->size)));
+			return Variant(String::utf8(static_cast<const vm::Str *>(vm::any::pointer(p_slot))->data(), static_cast<int64_t>(static_cast<const vm::Str *>(vm::any::pointer(p_slot))->size())));
 		case vm::AnyTag::Value:
 		case vm::AnyTag::Godot: {
 			vm::Slot handle;

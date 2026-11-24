@@ -139,7 +139,7 @@ bool to_boolean(Slot p_value) {
 		case AnyTag::Int:
 			return to_int_payload(p_value) != 0;
 		case AnyTag::String:
-			return static_cast<Str *>(pointer(p_value))->size != 0;
+			return static_cast<Str *>(pointer(p_value))->size() != 0;
 		case AnyTag::Wide:
 			return static_cast<Wide *>(pointer(p_value))->value != 0;
 		default:

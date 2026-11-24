@@ -30,14 +30,32 @@ struct Counted {
 	uint32_t references;
 };
 
+// Most strings fit both their byte size and UTF-16 length in one word.
 struct Str : Counted {
-	uint32_t size; // In bytes.
-	mutable int32_t units = -1; // Filled on the first request for the UTF-16 length.
-	int32_t length() const;
-	char *data() { return reinterpret_cast<char *>(this + 1); }
-	const char *data() const { return reinterpret_cast<const char *>(this + 1); }
-	std::string_view view() const { return std::string_view(data(), size); }
+	uint16_t short_size;
+	mutable uint16_t units = UINT16_MAX;
+	uint32_t size() const;
+	int32_t length() const { return units == UINT16_MAX ? measure_length() : units; }
+	char *data() { return const_cast<char *>(static_cast<const Str *>(this)->data()); }
+	const char *data() const;
+	std::string_view view() const { return std::string_view(data(), size()); }
+
+private:
+	int32_t measure_length() const;
 };
+
+struct LongStr : Str {
+	uint32_t byte_size;
+	mutable int32_t full_units = -1;
+};
+
+inline uint32_t Str::size() const {
+	return short_size == UINT16_MAX ? static_cast<const LongStr *>(this)->byte_size : short_size;
+}
+
+inline const char *Str::data() const {
+	return reinterpret_cast<const char *>(this) + (short_size == UINT16_MAX ? sizeof(LongStr) : sizeof(Str));
+}
 
 struct Object : Counted {
 	uint32_t klass; // An index into the module's classes.

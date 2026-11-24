@@ -401,10 +401,21 @@ static void test_text_units() {
 	append_unit(&built, 0xD83D);
 	append_unit(&built, 0xDE00);
 	CHECK_EQ(built, std::string("\xF0\x9F\x98\x80"));
-	CHECK(sizeof(Str) <= 3 * sizeof(uint32_t));
+	for (size_t bytes : { 4, 5, 6, 7, 65534, 65535, 65536 }) {
+		std::string text(bytes - 4, 'a');
+		text += "\xF0\x9F\x98\x80";
+		Str *value = new_string(text);
+		CHECK(value && value->view() == text);
+		CHECK_EQ(value->length(), static_cast<int32_t>(bytes - 2));
+		CHECK_EQ(value->data()[bytes], '\0');
+		if (bytes <= 7) {
+			CHECK(value->data() + bytes + 1 - reinterpret_cast<char *>(value) <= 16);
+		}
+		free_string(value);
+	}
 	Str *whole = join_strings("a" + high, low + "b");
 	CHECK(whole && whole->view() == face);
-	CHECK(whole && whole->units == -1);
+	CHECK(whole && whole->units == UINT16_MAX);
 	CHECK(whole && whole->length() == 4);
 	CHECK(whole && whole->units == 4);
 	free_string(whole);

@@ -315,7 +315,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::StrToBool: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				flag(string && string->size > 0);
+				flag(string && string->size() > 0);
 				break;
 			}
 			case Op::ObjToBool:
