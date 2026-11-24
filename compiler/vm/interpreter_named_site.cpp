@@ -9,9 +9,9 @@ namespace kas3::vm {
 
 bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted) {
 	std::string error;
-	ScriptRead read = ScriptRead::Declined;
+	NamedRead read{ ScriptRead::Declined };
 	const auto done = named_sites_.access(p_site, module_, host_.handles, p_op, p_holder, p_name, p_args, p_count, r_value, r_call, &error, &read, p_wanted);
-	if (read == ScriptRead::Method || read == ScriptRead::Missing) {
+	if (read.status == ScriptRead::Method || read.status == ScriptRead::Missing) {
 		EngineNamed(*this).finish_read(read, p_holder, p_name, r_value);
 		return true;
 	}
@@ -38,7 +38,7 @@ bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_
 	if (read == ScriptRead::Failed) {
 		raise_engine(library_, error);
 	} else if (read == ScriptRead::Method || read == ScriptRead::Missing) {
-		EngineNamed(*this).finish_read(read, p_holder, p_name, r_value);
+		EngineNamed(*this).finish_read({ read, member }, p_holder, p_name, r_value);
 	}
 	return !failing_ && !stopped_;
 }

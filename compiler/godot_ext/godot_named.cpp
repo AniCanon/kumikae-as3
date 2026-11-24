@@ -318,12 +318,24 @@ GodotHost::ReadKey *GodotHost::find_read_key(uintptr_t p_type, std::string_view 
 	return &entry;
 }
 
-const StringName *GodotHost::keep_read_key(uintptr_t p_type, std::string_view p_name, const StringName &p_key, const vm::NamedMember *p_member) {
+GodotHost::ReadKey &GodotHost::keep_read_key(ReadKey p_key) {
 	auto victim = std::min_element(read_keys_.begin(), read_keys_.end(), [](const ReadKey &a, const ReadKey &b) { return a.used < b.used; });
-	*victim = { p_type, std::string(p_name), p_key, p_member, ++read_clock_ };
+	*victim = std::move(p_key);
+	victim->used = ++read_clock_;
 	read_keys_[last_read_key_].next = static_cast<uint8_t>(victim - read_keys_.begin());
 	last_read_key_ = read_keys_[last_read_key_].next;
-	return p_member ? nullptr : &victim->key;
+	return *victim;
+}
+
+const StringName *GodotHost::getter_for(ReadKey &p_entry, void *p_owner) {
+	if (p_entry.member && !p_entry.delegates) {
+		if (p_entry.key == StringName() || !attached_script(p_owner).value_or(0)) {
+			return nullptr;
+		}
+		// Named get remains valid on this class if the script is replaced or detached.
+		p_entry.delegates = true;
+	}
+	return &p_entry.key;
 }
 #endif
 
@@ -354,9 +366,9 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	if (!identity) {
 		return nullptr;
 	}
-	if (const auto *entry = find_read_key(identity, p_name)) {
+	if (auto *entry = find_read_key(identity, p_name)) {
 		*r_member = entry->member;
-		return entry->member ? nullptr : &entry->key;
+		return getter_for(*entry, owner);
 	}
 	StringName klass;
 	if (!gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr())) {
@@ -374,25 +386,34 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 		}
 	} else if (member.what != vm::NamedMember::What::Missing) {
 		*r_member = &member;
+		if (!member.godot.empty() && member.godot.front() != '@') {
+			key = name(member.godot);
+		}
 	} else {
 		return nullptr;
 	}
 	// A reentrant getter can use a warmed name. A new key must leave the outer name alive.
+	ReadKey entry{ identity, std::string(p_name), key, *r_member };
 	if (active_reads_) {
-		return *r_member ? nullptr : &r_nested.emplace(key);
+		return getter_for(entry, owner) ? &r_nested.emplace(key) : nullptr;
 	}
-	return keep_read_key(identity, p_name, key, *r_member);
+	return getter_for(keep_read_key(std::move(entry)), owner);
 #endif
 }
 
-vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
+vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::NamedMember *p_binding,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
 #if defined(KAS3_TEST_COUNTS)
 	ScriptReadAllocations allocations(p_name.substr(0, 16) == "allocation_probe");
 #endif
-	const vm::NamedMember *member = nullptr;
+	const vm::NamedMember *member = p_binding;
 	std::optional<StringName> nested;
-	const StringName *key = p_binding ? &static_cast<const Worked *>(p_binding)->dynamic_name : computed_getter(p_receiver, p_name, &p_owner, nested, &member);
+	const StringName *key = nullptr;
+	if (p_binding) {
+		key = p_binding->invoke ? &static_cast<const Worked *>(p_binding->invoke)->dynamic_name : &name(p_binding->godot);
+	} else {
+		key = computed_getter(p_receiver, p_name, &p_owner, nested, &member);
+	}
 	if (!key) {
 		return { vm::ScriptRead::Declined, member };
 	}
@@ -413,7 +434,13 @@ vm::NamedRead GodotHost::read_script(void *p_receiver, void *p_owner, std::strin
 		return { vm::ScriptRead::Failed };
 	}
 	const auto type = value.get_type();
-	if (type == Variant::CALLABLE && live_handle_object(p_receiver) == p_owner &&
+	if (type == Variant::CALLABLE && member && member->what == vm::NamedMember::What::Method && !member->script_only) {
+		const Callable callable = value;
+		if (callable.is_standard() && callable.get_method() == *key &&
+				static_cast<uint64_t>(callable.get_object_id()) == gdextension_interface::variant_get_object_instance_id(static_cast<Variant *>(p_receiver)->_native_ptr())) {
+			return { vm::ScriptRead::Method, member };
+		}
+	} else if (type == Variant::CALLABLE && live_handle_object(p_receiver) == p_owner &&
 			gdextension_interface::object_has_script_method(p_owner, key->_native_ptr())) {
 		return { vm::ScriptRead::Method };
 	}

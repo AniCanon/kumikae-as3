@@ -55,7 +55,7 @@ const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) 
 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
 // the lowerer binds one read where the object's type is known (ir/lower_engine_values.cpp).
-bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names) {
+bool EngineNamed::method_value(Slot p_holder, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names) {
 	const ir::Module &module = vm_.module_;
 	if (module.library_function == NONE || module.array_class == NONE) {
 		vm_.raise_unsupported("reading '" + std::string(p_key.name()) + "' of one of Godot's values by its name");
@@ -78,8 +78,8 @@ bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::st
 		vm_.out_of_memory();
 		return false;
 	}
-	const bool object = vm_.host_.handles.is_class(p_handle, "Object");
-	void *receiver = vm_.host_.handles.copy(p_handle);
+	const bool object = any::tag(p_holder) != AnyTag::Value;
+	void *receiver = vm_.host_.handles.copy(handle_of(p_holder));
 	slots_of(bound)[0] = object ? any::godot_object(receiver) : any::godot_value(receiver);
 	retain(names.as3);
 	retain(names.godot);
@@ -113,7 +113,7 @@ bool EngineNamed::read(const NamedMember &p_member, Slot p_holder, const Propert
 		case NamedMember::What::Unknown:
 			return unknown(p_key);
 		case NamedMember::What::Method:
-			return method_value(handle, p_key, p_member.godot, r_value, p_member.names);
+			return method_value(p_holder, p_key, p_member.godot, r_value, p_member.names);
 		case NamedMember::What::Property:
 			break;
 	}

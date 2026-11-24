@@ -101,6 +101,13 @@ observe the override once per access and raise the conversion error.
 Operations that observe the dynamic tag, including `typeof`, `is`, `as` and `delete`, keep their
 dynamic semantics. Parameters and the `arguments` array keep their declared calling convention.
 
+An untyped read on a receiver with a foreign script uses Godot's named getter. Literal and
+computed reads translate an engine name to its Godot spelling and follow the same order as
+GDScript's `Object.get`. Godot checks the script's declared members, including methods, then
+its `_get`, then the engine class. A getter can therefore return a number for an engine method
+name. A script method that shadows an engine method binds to the current receiver. A receiver
+with an AS3 script resolves its AS3 members first.
+
 A receiver's storage type alone does not prove which script is attached. At a dynamic site the
 runtime validates the live receiver and checks its script before selecting a field or engine
 binding. Scalar fields with matching tags can move directly. A setter, a callable returned by
@@ -121,7 +128,7 @@ read asks Godot for the named value. The host keeps up to 32 computed names keye
 and AS3 spelling.
 It resolves an engine property to its Godot spelling before considering a foreign field. An engine
 member without a named getter keeps its resolved declaration in the same cache. The VM uses that
-declaration directly when it binds a method value. Each read validates the receiver. A property hit
+declaration to bind a method value after checking the current receiver. Each read validates the receiver. A property hit
 calls Godot's named getter once. A full cache replaces the least recently used name. Nested
 getters can use cached names and hold new names on the stack.
 

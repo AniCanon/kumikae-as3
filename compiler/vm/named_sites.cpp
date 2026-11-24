@@ -170,7 +170,7 @@ const NamedSite::Entry &NamedSites::shared_binding(NamedSite &p_site, EngineHand
 }
 
 std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, Op p_op, Slot p_holder, std::string_view p_name,
-		const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, ScriptRead *r_read, const Wanted &wanted) {
+		const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, NamedRead *r_read, const Wanted &wanted) {
 	if (!any::is_engine(p_holder) || p_count > 4) {
 		return std::nullopt;
 	}
@@ -200,6 +200,12 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 	const NamedMember *member = entry.engine;
 	const bool call = p_op == Op::DynCall, write = p_op == Op::DynSet;
 	const std::string_view name = member ? member->godot : std::string_view{};
+	if (member && p_op == Op::DynGet && member->what == NamedMember::What::Method && !member->script_only &&
+			!name.empty() && name.front() != '@' && shape.owner && !shape.instance) {
+		*r_read = shape.delegate || shape.script ? p_engine.read_script(handle, shape.owner, p_name, member, wanted, r_result, r_error)
+												: NamedRead{ ScriptRead::Method, member };
+		return r_read->status == ScriptRead::Declined ? std::nullopt : std::optional<bool>(r_read->status != ScriptRead::Failed);
+	}
 	if (!member || member->what != (call ? NamedMember::What::Method : NamedMember::What::Property) || name.empty() ||
 			name.front() == '@' || (!call && !(write ? member->written : member->read)) || (write && any::tag(p_holder) == AnyTag::Value)) {
 		return std::nullopt;
@@ -219,8 +225,8 @@ std::optional<bool> NamedSites::access(NamedSite &p_site, const ir::Module &p_mo
 			return std::nullopt;
 		}
 		if (!call) {
-			*r_read = p_engine.read_script(handle, shape.owner, name, bind, wanted, r_result, r_error).status;
-			return *r_read == ScriptRead::Declined ? std::nullopt : std::optional<bool>(*r_read != ScriptRead::Failed);
+			*r_read = p_engine.read_script(handle, shape.owner, name, member, wanted, r_result, r_error);
+			return r_read->status == ScriptRead::Declined ? std::nullopt : std::optional<bool>(r_read->status != ScriptRead::Failed);
 		}
 		return p_engine.run_script(shape, *bind, operands, p_count + 1, wanted, r_result, r_error);
 	}

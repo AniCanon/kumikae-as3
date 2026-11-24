@@ -69,7 +69,7 @@ public:
 		return place.site != ir::NONE && p_key == p_strings[place.name] ? &sites_[place.site] : nullptr;
 	}
 	std::optional<bool> access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, ir::Op p_op, Slot p_holder,
-			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, ScriptRead *r_read, const Wanted &p_wanted);
+			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, NamedRead *r_read, const Wanted &p_wanted);
 };
 
 } // namespace kas3::vm

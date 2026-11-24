@@ -60,6 +60,28 @@ class InterceptTimer extends Timer:
 			return 7.5
 		return null
 
+class MethodGetter extends Node2D:
+	func _get(property: StringName):
+		if property == &"is_processing":
+			return 99
+		if property == &"position":
+			return Vector2(4, 7)
+		return null
+
+class CallableGetter extends Node2D:
+	func answer(value: int) -> int:
+		return value
+
+	func _get(property: StringName):
+		if property == &"is_processing":
+			return answer.bind(17)
+		return null
+
+class MethodOverride extends MethodGetter:
+	@warning_ignore("native_method_override")
+	func is_processing() -> bool:
+		return true
+
 class Positions extends Node2D:
 	var reads := 0
 	var writes := 0
@@ -105,6 +127,27 @@ func sum_positions(source, count: int):
 			return null
 		total += point.x
 	return total
+
+func observed(value):
+	return value.call() if value is Callable else value
+
+func check_engine_reads() -> void:
+	var receiver := Node2D.new()
+	node.add_child(receiver)
+	receiver.set_process(false)
+	var results := []
+	var expected := []
+	for script in [null, MethodGetter, CallableGetter, MethodOverride, null]:
+		receiver.set_script(script)
+		receiver.set_process(false)
+		var control := []
+		for key in [&"is_processing", &"is_processing", &"position", &"position", &"is_visible_in_tree", &"is_visible_in_tree"]:
+			control.append(observed(receiver.get(key)))
+		expected.append(control)
+		var returned: Array = ask("engineReads", [receiver, "isProcessing", "position", "isVisibleInTree"])
+		results.append(returned.map(observed))
+	show("foreign engine reads", results, expected)
+	receiver.free()
 
 func check_positions() -> void:
 	var positions := Positions.new()
@@ -295,6 +338,7 @@ func _physics_process(_delta: float) -> bool:
 				count += 1
 		expected_methods.append(count)
 	show("computed engine methods", methods, expected_methods)
+	check_engine_reads()
 	check_positions()
 	replaced.free()
 	control.free()

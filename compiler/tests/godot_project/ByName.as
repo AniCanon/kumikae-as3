@@ -225,6 +225,14 @@ package {
 			try { o.name; } catch (e:TypeError) { return "TypeError " + e.errorID; }
 			return "read";
 		}
+		private function observed(value:*):* {
+			if (value is Function) return value();
+			return value;
+		}
+		public function engineReads(target:*, method:String, property:String, plain:String):Array {
+			return [observed(target.isProcessing), observed(target[method]),
+				target.position, target[property], observed(target.isVisibleInTree), observed(target[plain])];
+		}
 		public function countMethodReads(target:*, key:String):int {
 			var count:int = 0;
 			for (var i:int = 0; i < 5; ++i) {
