@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace kas3 {
 namespace vm {
@@ -67,7 +68,8 @@ struct Object : Counted {
 	Object *gc_previous;
 	Object *gc_next;
 	int32_t gc_count;
-	uint32_t gc_state;
+	uint32_t gc_state : 31;
+	uint32_t paired : 1; // This function and its capture array share one allocation.
 };
 
 // A slot of an object, by its number: they follow the header. Which slot a field is in is not said here:
@@ -225,6 +227,8 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 		bool p_bytes = false, VectorPlaces p_places = VectorPlaces::Separate);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
+// The function and its three captures have independent counts and collector list entries.
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions, uint32_t p_array, Object *p_arrays);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
 
 // The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as

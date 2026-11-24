@@ -196,7 +196,7 @@ if(KAS3_GODOT_CPP)
         LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
     if(KAS3_HAS_PLAY_BACKEND)
-        add_library(kas3_godot_counts SHARED tests/script_read_allocations.cpp ${export_sources} $<TARGET_OBJECTS:kas3_counted_host>)
+        add_library(kas3_godot_counts SHARED vm/runtime.cpp vm/interpreter_named_site.cpp tests/script_read_allocations.cpp ${export_sources} $<TARGET_OBJECTS:kas3_counted_host>)
         target_link_libraries(kas3_godot_counts PRIVATE kas3_godot_common)
         target_compile_definitions(kas3_godot_counts PRIVATE KAS3_TEST_COUNTS)
         set_target_properties(kas3_godot_counts PROPERTIES OUTPUT_NAME kas3_godot

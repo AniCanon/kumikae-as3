@@ -24,11 +24,20 @@ void operator delete(void *p_memory, size_t) noexcept {
 	std::free(p_memory);
 }
 
-ScriptReadAllocations::ScriptReadAllocations(bool p_report) : start_(allocations), report_(p_report) {}
+void count_vm_allocation() {
+	++allocations;
+}
+
+bool count_method_read(std::string_view p_name) {
+	static const bool enabled = std::getenv("KAS3_METHOD_ALLOCATIONS") != nullptr;
+	return enabled && (p_name == "isVisibleInTree" || p_name == "isProcessing");
+}
+
+ScriptReadAllocations::ScriptReadAllocations(bool p_report, const char *p_label) : start_(allocations), label_(p_report ? p_label : nullptr) {}
 
 ScriptReadAllocations::~ScriptReadAllocations() {
-	if (report_) {
-		std::fprintf(stderr, "kas3: field allocations %zu\n", allocations - start_);
+	if (label_) {
+		std::fprintf(stderr, "kas3: %s allocations %zu\n", label_, allocations - start_);
 	}
 }
 

@@ -167,6 +167,35 @@ static void test_counts() {
 	CHECK(!release(nullptr));
 }
 
+// A bound method and its captures share storage, but either can be released first during collection.
+static void test_method_storage() {
+	const size_t before = live_objects();
+	Object list{};
+	list_init(&list);
+	for (bool function_first : { false, true }) {
+		auto [function, captures] = new_method_storage(3, 2, &list, 4, &list);
+		CHECK(function && captures);
+		CHECK_EQ(any::pointer(any::object(function)), function);
+		CHECK_EQ(live_objects(), before + 2);
+		slots_of(captures)[2].i = 17;
+		slot_at(function, 1).p = captures;
+		if (function_first) {
+			free_object(function);
+			CHECK_EQ(slots_of(captures)[2].i, 17);
+			free_vector(captures);
+		} else {
+			free_vector(captures);
+			CHECK_EQ(function->klass, 3u);
+			free_object(function);
+		}
+		CHECK(list_empty(&list));
+		CHECK_EQ(live_objects(), before);
+	}
+	fail_allocations(1);
+	CHECK(!new_method_storage(3, 2, &list, 4, &list).first);
+	CHECK(list_empty(&list));
+}
+
 // Math, where C's library and AS3 differ. Checked against Node: Math.round(-0.5), Math.min(0, -0), ...
 static void test_math() {
 	using kas3::ir::MathFunction;
@@ -882,5 +911,6 @@ int main() {
 	test_number_text();
 	test_text_number();
 	test_counts();
+	test_method_storage();
 	return check::finish();
 }

@@ -84,8 +84,12 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	struct SameClass {
 		bool operator()(const godot::StringName &a, const godot::StringName &b) const { return class_identity(a) == class_identity(b); }
 	};
+	struct Declaration {
+		vm::NamedMember member;
+		vm::MethodNames names;
+	};
 	struct Members {
-		std::unordered_map<std::string_view, vm::NamedMember> known;
+		std::unordered_map<std::string_view, Declaration> known;
 		LiteralMisses misses;
 	};
 	const vm::NamedMember &named_on_class(godot::Variant::Type p_type, const godot::StringName &p_class, std::string_view p_name, vm::NameSource p_source);

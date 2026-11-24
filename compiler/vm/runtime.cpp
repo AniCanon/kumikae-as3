@@ -10,6 +10,10 @@
 #include <limits>
 #include <new>
 
+#if defined(KAS3_TEST_COUNTS)
+#include "../tests/script_read_allocations.h"
+#endif
+
 namespace kas3 {
 namespace vm {
 
@@ -26,6 +30,9 @@ void fail_allocations(uint32_t p_count) {
 }
 
 bool allocation_fails() {
+#if defined(KAS3_TEST_COUNTS)
+	count_vm_allocation();
+#endif
 	if (failing_allocations == 0) {
 		return false;
 	}
@@ -218,10 +225,58 @@ Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list) {
 	return object;
 }
 
+// The capture array precedes the function. The collector may release them in either order.
+struct alignas(16) MethodCaptures {
+	Vector array;
+	Slot values[3];
+};
+static constexpr size_t METHOD_OFFSET = sizeof(MethodCaptures);
+static_assert(METHOD_OFFSET % alignof(Object) == 0);
+
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions, uint32_t p_array, Object *p_arrays) {
+	if (p_fields > (SIZE_MAX - METHOD_OFFSET - sizeof(Object)) / sizeof(Slot) || allocation_fails()) {
+		return {};
+	}
+	auto *block = static_cast<char *>(std::calloc(1, METHOD_OFFSET + sizeof(Object) + p_fields * sizeof(Slot)));
+	if (!block) {
+		return {};
+	}
+	auto *array = new (block) Vector();
+	array->places = array + 1;
+	array->inline_places = true;
+	array->fixed = true;
+	array->length = array->capacity = 3;
+	auto *function = new (block + METHOD_OFFSET) Object();
+	auto initialize = [](Object *p_object, uint32_t p_class, Object *p_list) {
+		p_object->references = 1;
+		p_object->paired = true;
+		p_object->klass = p_class;
+		if (p_list) {
+			list_insert(p_list, p_object);
+		}
+	};
+	initialize(array, p_array, p_arrays);
+	initialize(function, p_function, p_functions);
+	objects_alive += 2;
+	return { function, array };
+}
+
+static void free_method_part(Object *p_object, char *p_block, Object *p_other) {
+	p_object->paired = false;
+	if (!p_other->paired) {
+		std::free(p_block);
+	}
+}
+
 void free_object(Object *p_object) {
 	list_remove(p_object);
 	objects_alive--;
-	std::free(p_object);
+	if (p_object->paired) {
+		char *block = reinterpret_cast<char *>(p_object) - METHOD_OFFSET;
+		free_method_part(p_object, block, reinterpret_cast<Vector *>(block));
+	} else {
+		std::free(p_object);
+	}
 }
 
 Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list,
@@ -296,7 +351,12 @@ void free_vector(Vector *p_vector) {
 		std::free(p_vector->places);
 	}
 	objects_alive--;
-	std::free(p_vector);
+	if (p_vector->paired) {
+		char *block = reinterpret_cast<char *>(p_vector);
+		free_method_part(p_vector, block, reinterpret_cast<Object *>(block + METHOD_OFFSET));
+	} else {
+		std::free(p_vector);
+	}
 }
 
 uint32_t to_uint32(double p_value) {

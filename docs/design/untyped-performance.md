@@ -231,5 +231,5 @@ Once either operand has a count, the join measures the other operand once and ke
 When an append replaces its uniquely owned short prefix, native code can grow that allocation.
 Other references keep their original string. Joining surrogate halves preserves both UTF-16 units.
 
-Rebuild generated native libraries for runtime layout `0x4b4153330000001a`.
+Rebuild generated native libraries for runtime layout `0x4b4153330000001b`.
 The loader checks the layout before using a site's runtime entry points.

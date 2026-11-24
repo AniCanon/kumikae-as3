@@ -1,6 +1,10 @@
 #include "engine_named.h"
 #include "vector_calls.h"
 
+#if defined(KAS3_TEST_COUNTS)
+#include "../tests/script_read_allocations.h"
+#endif
+
 namespace kas3::vm {
 
 bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted) {
@@ -18,6 +22,9 @@ bool Interpreter::access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, st
 }
 
 bool Interpreter::read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, void *p_reuse) {
+#if defined(KAS3_TEST_COUNTS)
+	ScriptReadAllocations allocations(count_method_read(p_name), "method");
+#endif
 	std::string error;
 	const auto [read, member] = host_.handles.read_script(any::pointer(p_holder), nullptr, p_name, nullptr, { ir::Kind::Any, {}, p_reuse }, r_value, &error);
 	if (read == ScriptRead::Declined) {

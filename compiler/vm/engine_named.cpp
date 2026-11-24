@@ -55,32 +55,40 @@ const NamedMember &EngineNamed::member(Slot p_holder, const PropertyKey &p_key) 
 
 // One of Godot's methods read and not called: a function bound to the object, the AS3 name and Godot's, as
 // the lowerer binds one read where the object's type is known (ir/lower_engine_values.cpp).
-bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value) {
+bool EngineNamed::method_value(void *p_handle, const PropertyKey &p_key, std::string_view p_godot, Slot *r_value, MethodNames *p_names) {
 	const ir::Module &module = vm_.module_;
 	if (module.library_function == NONE || module.array_class == NONE) {
 		vm_.raise_unsupported("reading '" + std::string(p_key.name()) + "' of one of Godot's values by its name");
 		return false;
 	}
-	Vector *bound = vm_.fresh_vector(module.array_class, 3);
-	Str *name = bound ? vm_.text(p_key.name()) : nullptr;
-	Str *godot = name ? vm_.text(std::string(p_godot)) : nullptr;
-	if (!godot) {
-		if (name) {
-			free_string(name);
-		}
-		if (bound) {
-			vm_.release_object(bound);
-		}
+	MethodNames local;
+	MethodNames &names = p_names ? *p_names : local;
+	if (!names.as3) {
+		names.as3 = vm_.text(p_key.name());
+	}
+	if (names.as3 && !names.godot) {
+		names.godot = vm_.text(p_godot);
+	}
+	if (!names.godot || module.function_class == NONE) {
+		return false;
+	}
+	const auto [function, bound] = new_method_storage(module.function_class, slots_of(module.classes[module.function_class]),
+			vm_.heap_.list_for(module.function_class), module.array_class, vm_.heap_.list_for(module.array_class));
+	if (!function) {
+		vm_.out_of_memory();
 		return false;
 	}
 	const bool object = vm_.host_.handles.is_class(p_handle, "Object");
-	slots_of(bound)[0] = object ? any::godot_object(vm_.host_.handles.copy(p_handle)) : any::godot_value(vm_.host_.handles.copy(p_handle));
-	slots_of(bound)[1] = any::string(name);
-	slots_of(bound)[2] = any::string(godot);
-	Object *made = vm_.make_function(module.library_function, bound);
-	vm_.release_object(bound); // The function holds it now.
-	*r_value = made ? any::object(made) : any::undefined();
-	return made != nullptr;
+	void *receiver = vm_.host_.handles.copy(p_handle);
+	slots_of(bound)[0] = object ? any::godot_object(receiver) : any::godot_value(receiver);
+	retain(names.as3);
+	retain(names.godot);
+	slots_of(bound)[1] = any::string(names.as3);
+	slots_of(bound)[2] = any::string(names.godot);
+	own_field(function, ir::FUNCTION_INDEX).i = static_cast<int32_t>(module.library_function);
+	own_field(function, ir::FUNCTION_FIRST).p = bound;
+	*r_value = any::object(function);
+	return true;
 }
 
 bool EngineNamed::unknown(const PropertyKey &p_key) {
@@ -105,7 +113,7 @@ bool EngineNamed::read(const NamedMember &p_member, Slot p_holder, const Propert
 		case NamedMember::What::Unknown:
 			return unknown(p_key);
 		case NamedMember::What::Method:
-			return method_value(handle, p_key, p_member.godot, r_value);
+			return method_value(handle, p_key, p_member.godot, r_value, p_member.names);
 		case NamedMember::What::Property:
 			break;
 	}

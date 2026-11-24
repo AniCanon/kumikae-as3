@@ -32,6 +32,22 @@ enum class ScriptRead { Value, Method, Missing, Failed, Declined };
 
 enum class NameSource { Computed, Literal };
 
+// Each resolved method owns one reference to both spellings. Bound functions take their own.
+struct MethodNames {
+	Str *as3 = nullptr;
+	Str *godot = nullptr;
+	MethodNames() = default;
+	MethodNames(const MethodNames &) = delete;
+	MethodNames &operator=(const MethodNames &) = delete;
+	~MethodNames() {
+		for (Str *name : { as3, godot }) {
+			if (release(name)) {
+				free_string(name);
+			}
+		}
+	}
+};
+
 struct NamedMember {
 	enum class What : uint8_t { Missing, Unknown, Property, Method };
 	What what = What::Missing;
@@ -41,6 +57,7 @@ struct NamedMember {
 	const Prepared *invoke = nullptr; // The method or getter, with the receiver as the first operand.
 	const Prepared *setter = nullptr;
 	bool script_only = false;
+	MethodNames *names = nullptr;
 };
 
 inline constexpr NamedMember MISSING_MEMBER{};

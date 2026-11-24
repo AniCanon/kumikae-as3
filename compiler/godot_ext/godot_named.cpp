@@ -243,7 +243,7 @@ const vm::NamedMember &GodotHost::named_on_class(Variant::Type p_type, const Str
 #endif
 	Members &members = p_type == Variant::OBJECT ? class_members_[p_class] : value_members_[p_type];
 	if (const auto known = members.known.find(p_name); known != members.known.end()) {
-		return known->second;
+		return known->second.member;
 	}
 	return *members.misses.lookup(p_name, p_source, [&] { return resolve_member(members, p_class, p_type, p_name); });
 }
@@ -283,7 +283,10 @@ const vm::NamedMember *GodotHost::resolve_member(Members &p_members, StringName 
 			}
 			if (found.what != vm::NamedMember::What::Missing) {
 				// The same constant table the IR uses owns both names, across program reloads.
-				return &p_members.known.emplace(entry.key.substr(entry.key.find('.') + 1), found).first->second;
+				auto &declaration = p_members.known[entry.key.substr(entry.key.find('.') + 1)];
+				declaration.member = found;
+				declaration.member.names = &declaration.names;
+				return &declaration.member;
 			}
 		}
 		p_class = object ? ClassDBSingleton::get_singleton()->get_parent_class(p_class) : StringName();
