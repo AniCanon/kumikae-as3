@@ -107,6 +107,18 @@ package {
 			var computed:* = o[key];
 			return [literal is Function, computed is Function, sink.invoke(literal), sink.invoke(computed)];
 		}
+		public function rotatingKeys(o:*):int {
+			var keys:Vector.<String> = new Vector.<String>();
+			var i:int;
+			var sum:int = 0;
+			for (i = 0; i < 16; ++i) keys.push("allocation_probe_rotating_" + i);
+			for (i = 0; i < 32; ++i) sum += int(o[keys[i % 16]]);
+			for (i = 0; i < 80; ++i) {
+				sum += int(o[keys[0]]);
+				sum += int(o["cold_field_" + i]);
+			}
+			return sum;
+		}
 		public function readMany(o:*):int {
 			var sum:int = 0;
 			for (var i:int = 0; i < 16; i++) sum += int(o.allocation_probe);

@@ -12,6 +12,8 @@ class Intercept extends Node2D:
 		return 41
 
 	func _get(property: StringName):
+		if property.begins_with("allocation_probe_rotating_") or property.begins_with("cold_field_"):
+			return 1
 		if property == &"visible":
 			reads += 1
 			return stored
@@ -183,6 +185,7 @@ func _physics_process(_delta: float) -> bool:
 	show("foreign declarations", ask("foreignDeclarations", [foreign, "stored", "script_score"]),
 		[foreign.stored, foreign.script_score(), foreign.get("stored"), foreign.call("script_score")])
 	show("warmed script field", ask("readMany", [foreign]), 112)
+	show("rotating computed names", ask("rotatingKeys", [foreign]), 192)
 	for receiver in [CallableField.new(), CallableMethod.new()]:
 		var is_method: bool = receiver.has_method("action")
 		var sink := SchemaEditor.new()

@@ -117,9 +117,10 @@ from the immutable module, so warming a site cannot change the module fingerprin
 resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
 value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
 foreign script can declare a property or method absent from the engine table. A foreign field
-read asks Godot for the named value. Four computed keys can keep their interned Godot names and
-native class identities. A warmed read checks the live receiver and calls Godot's named getter
-once. A nested getter can reuse those names while the outer read holds them.
+read asks Godot for the named value. The host keeps up to 32 computed names keyed by native class and AS3 spelling.
+It resolves an engine property to its Godot spelling before considering a foreign field. A warmed
+read validates the receiver and calls Godot's named getter once. A full cache replaces the least
+recently used name. Nested getters can use cached names and hold new names on the stack.
 
 After a script reload removes a field, its current `_get` can supply the value. A method read
 produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
@@ -135,8 +136,9 @@ static storage in the program image so dyld can unload it when Play closes it. R
 generation. A cache hit still checks for a freed object.
 
 For an engine receiver, generated code passes its operands to `named_access`, which calls the host
-interpreter's `access_named` for a literal or `read_computed` for a computed read. A decline
-continues through the ordinary generated dynamic operation and its thunk where needed. A handled
+interpreter's `access_named` for a literal or `read_computed` for a computed read. A computed
+read that the host declines continues through ordinary AS3 property lookup. A declined literal
+continues through the generated dynamic operation and its thunk where needed. A handled
 operation avoids the extra frame, argument copies and result handoff visible in the reference
 samples. The timing gate compares both execution modes for every operation so a change in either
 path is visible.

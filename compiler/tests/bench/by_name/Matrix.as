@@ -84,6 +84,13 @@ package {
 			for (var i:int = 0; i < n; ++i) sum += int(target[keys[i % 2]]);
 			return sum;
 		}
+		public function eightFieldsRead(target:*, n:int):int {
+			var keys:Vector.<String> = new Vector.<String>();
+			keys.push("score", "bonus", "health", "speed", "level", "lives", "energy", "armor");
+			var sum = 0;
+			for (var i:int = 0; i < n; ++i) sum += int(target[keys[i % 8]]);
+			return sum;
+		}
 		public function customStringRead(target:*, n:int):int {
 			var sum = 0;
 			for (var i:int = 0; i < n; i++) {

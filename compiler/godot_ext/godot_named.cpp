@@ -21,6 +21,7 @@
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/script.hpp>
 
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 
@@ -291,6 +292,33 @@ const vm::NamedMember &GodotHost::script_getter(void *p_receiver, std::string_vi
 	return delegates_script(p_receiver, p_name) ? script_binding(p_name, false) : script_member(p_receiver, p_name);
 }
 
+#if !defined(KAS3_RUNTIME_ONLY)
+// Repeated reads often follow the same sequence. Check the previous key's successor first.
+GodotHost::ReadKey *GodotHost::find_read_key(uintptr_t p_type, std::string_view p_name) {
+	auto &hint = read_keys_[last_read_key_].next;
+	auto matches = [&](const ReadKey &p_key) { return p_key.type == p_type && p_key.text == p_name; };
+	if (!matches(read_keys_[hint])) {
+		const auto found = std::find_if(read_keys_.begin(), read_keys_.end(), matches);
+		if (found == read_keys_.end()) {
+			return nullptr;
+		}
+		hint = static_cast<uint8_t>(found - read_keys_.begin());
+	}
+	last_read_key_ = hint;
+	auto &entry = read_keys_[hint];
+	entry.used = ++read_clock_;
+	return &entry;
+}
+
+const StringName *GodotHost::keep_read_key(uintptr_t p_type, std::string_view p_name, const StringName &p_key) {
+	auto victim = std::min_element(read_keys_.begin(), read_keys_.end(), [](const ReadKey &a, const ReadKey &b) { return a.used < b.used; });
+	*victim = { p_type, std::string(p_name), p_key, ++read_clock_ };
+	read_keys_[last_read_key_].next = static_cast<uint8_t>(victim - read_keys_.begin());
+	last_read_key_ = read_keys_[last_read_key_].next;
+	return &victim->key;
+}
+#endif
+
 // Read an engine property by its Godot spelling, or a foreign field by the script's spelling.
 const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested) {
 
@@ -306,12 +334,10 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	}
 	const auto type = rt::head_of(p_receiver)->godot_class;
 	if (type) {
-		for (const auto &entry : read_keys_) {
-			if (entry.type == type && entry.text == p_name) {
-				*r_owner = live_handle_object(p_receiver);
-				const auto &value = *static_cast<const Variant *>(p_receiver);
-				return *r_owner && !script_on_live_handle(*r_owner, value) ? &entry.key : nullptr;
-			}
+		if (const auto *entry = find_read_key(type, p_name)) {
+			*r_owner = live_handle_object(p_receiver);
+			const auto &value = *static_cast<const Variant *>(p_receiver);
+			return *r_owner && !script_on_live_handle(*r_owner, value) ? &entry->key : nullptr;
 		}
 	}
 	const auto &value = *static_cast<const Variant *>(p_receiver);
@@ -341,18 +367,16 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 	if (active_reads_) {
 		return &r_nested.emplace(key);
 	}
-	auto &entry = read_keys_[next_read_key_++ % read_keys_.size()];
 	const auto identity = class_identity(klass);
 	rt::head_of(p_receiver)->godot_class = identity;
-	entry = { identity, std::string(p_name), key };
-	return &entry.key;
+	return keep_read_key(identity, p_name, key);
 #endif
 }
 
 vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
 		const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) {
 #if defined(KAS3_TEST_COUNTS)
-	ScriptReadAllocations allocations(p_name == "allocation_probe");
+	ScriptReadAllocations allocations(p_name.substr(0, 16) == "allocation_probe");
 #endif
 	std::optional<StringName> nested;
 	const StringName *key = p_binding ? &static_cast<const Worked *>(p_binding)->dynamic_name : computed_getter(p_receiver, p_name, &p_owner, nested);

@@ -193,7 +193,10 @@ class Runner:
             self.check("native: computed misses stay out of the literal cache",
                        cached.isdisjoint(f"slot{i}" for i in range(256)), str(sorted(cached)))
             allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: field allocations ")]
-            self.check("native: warmed scalar field lookup allocates nothing", allocations[1:] == [0] * 15, str(allocations))
+            self.check("native: warmed scalar field lookup allocates nothing", allocations[1:16] == [0] * 15, str(allocations))
+            self.check("native: sixteen computed keys stay warm and a hot key survives churn",
+                       "VALUE rotating computed names=192|192" in text and allocations[32:] == [0] * 96,
+                       str(allocations))
             self.check("native: reloaded fields use the current getter",
                        "VALUE foreign declaration after replacement=[true, \"virtual\", 1]|[true, \"virtual\", 1]" in text and
                        "VALUE typed reload after staging source=[[true, true, \"virtual\", false], 1]|[[true, true, \"virtual\", false], 1]" in text and

@@ -55,9 +55,14 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		uintptr_t type = 0;
 		std::string text;
 		godot::StringName key;
+		uint64_t used = 0;
+		uint8_t next = 0;
 	};
-	std::array<ReadKey, 4> read_keys_;
-	size_t next_read_key_ = 0;
+	std::array<ReadKey, 32> read_keys_;
+	uint8_t last_read_key_ = 0;
+	uint64_t read_clock_ = 0;
+	ReadKey *find_read_key(uintptr_t p_type, std::string_view p_name);
+	const godot::StringName *keep_read_key(uintptr_t p_type, std::string_view p_name, const godot::StringName &p_key);
 	unsigned active_reads_ = 0;
 	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested);
 	Name computed_name_;

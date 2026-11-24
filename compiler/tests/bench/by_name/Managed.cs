@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 public partial class Managed : Node
 {
+    private static readonly StringName[] Fields = { "score", "bonus", "health", "speed", "level", "lives", "energy", "armor" };
     private static readonly StringName Bonus = "bonus";
     private static readonly StringName Score = "score";
     private static readonly StringName Current = "current";
@@ -67,6 +68,12 @@ public partial class Managed : Node
             if (op == "call") result = fresh.Rotation;
             fresh.Free();
             return result;
+        }
+        if (kind == "eightFields")
+        {
+            int total = 0;
+            for (int i = 0; i < n; ++i) total += target.Get(Fields[i % 8]).AsInt32();
+            return total;
         }
         if (kind == "computed")
         {

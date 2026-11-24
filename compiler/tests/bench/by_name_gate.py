@@ -17,7 +17,7 @@ ROWS = [f"{kind}/{op}" for kind in ("node", "inherited", "gdscript", "script", "
         for op in ("read", "write", "call") if (kind, op) != ("value", "write")]
 
 
-ROWS.extend(("foreign/read", "foreign/call", "computed/read", "engineKeys/read", "scriptEngineKeys/read", "custom/read", "custom/call", "customString/read", "customVector/read", "customFields/read", "detached/call"))
+ROWS.extend(("foreign/read", "foreign/call", "computed/read", "engineKeys/read", "scriptEngineKeys/read", "eightFields/read", "custom/read", "custom/call", "customString/read", "customVector/read", "customFields/read", "detached/call"))
 
 STRING_ROWS = ("joinThree/read", "append/read", "appendLength/read", "joinLong/read")
 ROWS.extend(STRING_ROWS)
@@ -151,7 +151,7 @@ def measure(godot, project, library, mode, rows, label, sizes=None):
     check(mode, run.returncode == 0 and (USED in output) == (mode == "native")
           and [name for name, _ in found] == wanted and "SCRIPT ERROR" not in output, output)
     for row, value in found:
-        check(row, value != "unsupported" or (label == "main" and mode != "C#" and row.startswith(("foreign/", "computed/", "custom/", "customString/", "customVector/", "customFields/"))), output)
+        check(row, value != "unsupported" or (label == "main" and mode != "C#" and row.startswith(("foreign/", "computed/", "eightFields/", "custom/", "customString/", "customVector/", "customFields/"))), output)
     return {name: None if micros == "unsupported" else float(micros) / 1000 for name, micros in found}
 
 

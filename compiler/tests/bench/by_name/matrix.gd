@@ -30,7 +30,7 @@ func measure() -> void:
 		script.call("addTarget", child)
 		if managed:
 			cs.call("AddTarget", child)
-	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "computed": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
+	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "computed": foreign, "eightFields": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
@@ -52,7 +52,7 @@ func measure() -> void:
 	if rows.is_empty():
 		for kind: String in cases:
 			for op in ["read", "write", "call"]:
-				if (kind == "computed" or kind in engine_keys) and op != "read":
+				if (kind in ["computed", "eightFields"] or kind in engine_keys) and op != "read":
 					continue
 				if kind in pieces and (op != "read" or managed):
 					continue
@@ -74,8 +74,8 @@ func measure() -> void:
 		var kind := row.get_slice("/", 0)
 		var op := row.get_slice("/", 1)
 		var target = cases[kind]
-		if (kind in ["foreign", "computed"] or kind.begins_with("custom")) and args[0] == "main":
-			var probe = script.call("probeComputed", target) if kind == "computed" else script.call("probeForeign", target, op == "read")
+		if (kind in ["foreign", "computed", "eightFields"] or kind.begins_with("custom")) and args[0] == "main":
+			var probe = script.call("probeComputed", target) if kind in ["computed", "eightFields"] else script.call("probeForeign", target, op == "read")
 			if probe == (-1069 if op == "read" else -1006):
 				windows[row] = []
 				continue
@@ -107,6 +107,9 @@ func measure() -> void:
 			var valid := true
 			if kind in engine_keys:
 				valid = is_same(result, [target.position, target.modulate, target.rotation][(rounds - 1) % 3])
+			elif kind == "eightFields":
+				var tail := rounds % 8
+				valid = result == (rounds / 8) * 112 + tail * (tail + 6)
 			elif kind == "computed":
 				valid = result == 8 * rounds - rounds % 2
 			elif kind == "joinThree":
