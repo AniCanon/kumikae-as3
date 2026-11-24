@@ -144,7 +144,7 @@ struct Host final : vm::NativeCode {
 	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
-	// With KAS3_NATIVE_COUNTS set, how many times each thunk ran, and the program's uses of the engine
+	// In the test build with KAS3_NATIVE_COUNTS set, how many times each thunk ran, and the program's uses of the engine
 	// that the host could not work out (each then goes by its thunk): said on standard error as the host
 	// goes, for the tests that hold generated code to its fast paths. Empty, and nothing said, otherwise.
 	// And how many handles on Godot's values and objects generated code asked the host to copy, and how

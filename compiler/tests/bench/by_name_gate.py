@@ -76,6 +76,10 @@ def batch_sizes(pilots):
     return counts
 
 
+def layout_mean(original, swapped):
+    return (original + swapped) / 2
+
+
 def failures(samples, baseline):
     misses = []
     for row, modes in samples.items():
@@ -205,7 +209,7 @@ def main():
                     second = second_layout()
                 for row, time in times.items():
                     if row in second:
-                        time = (time + second[row]) / 2
+                        time = layout_mean(time, second[row])
                     samples.setdefault(label, {}).setdefault(row, {}).setdefault(mode, []).append(time)
         for label, rows in samples.items():
             for row, modes in rows.items():

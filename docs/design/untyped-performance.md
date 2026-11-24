@@ -72,7 +72,8 @@ call parameter. A Boolean or ordinary number can control a branch. Numbers, sign
 32-bit integers support numeric arithmetic and comparisons with another known ordinary number.
 A Boolean can feed a Boolean conjunction or disjunction. An int can also go directly to the
 built-in `trace`. The checker tests candidate operands together and removes unsupported
-types until every remaining use agrees. Both operands can come from untyped locals or their
+types until every remaining use agrees. When a proof loses an operand, the checker revisits the
+locals whose proofs read it. Both operands can come from untyped locals or their
 fields. A numeric compound assignment uses Number storage so an integer initializer can grow
 past the 32-bit limit.
 
@@ -83,12 +84,14 @@ an untyped Godot math value still raises the copy error.
 
 A zero-argument construction of a built-in engine class establishes a fresh receiver. The proof
 tracks its uses up to a call that can run user code, an escape, or an engine operation that may
-publish the receiver. The operation itself can bind before its effects take place. Plain engine property reads and writes can continue within this region. Native value constructors
-and reads of their component fields are recognized from the generated API declarations. A loop
-includes effects on its back edge. Later calls outside the loop cannot alter an earlier read.
-For example, a fresh Timer can read `waitTime` in a loop, free itself, and then call a callback.
-When you pass the Timer to the callback first, subsequent by-name accesses check its current
-script. An unreassigned local keeps its engine reference in a typed register. A later untyped member access boxes that reference and dispatches through the current script.
+publish the receiver. The operation itself can bind before its effects take place. Plain engine
+property reads and writes can continue within this region. Native value constructors and reads of
+their component fields are recognized from the generated API declarations. A loop includes effects
+on its back edge. Later calls outside the loop cannot alter an earlier read. For example, a fresh
+Timer can read `waitTime` in a loop, free itself, and then call a callback. When you pass the Timer
+to the callback first, subsequent by-name accesses check its current script. An unreassigned local
+keeps its engine reference in a typed register. A later untyped member access boxes that reference
+and dispatches through the current script.
 
 A parameter declared as `Node2D` can already carry a foreign script. Its untyped alias must
 dispatch through that script even for a built-in property. The parameter-alias fixture overrides
@@ -106,29 +109,31 @@ the ordinary path. A refusal happens before any observable operation so a setter
 
 ## Site lifetime
 
-Each site has room for four receiver shapes. A shape identifies the Godot class or value type
-and the script class. An entry holds resolution metadata. It takes its receiver and arguments
-from the current operation. Additional shapes share a table with at most 64 entries per literal. A full table discards its entries before resolving a new shape. An interpreter owns
-its side table separately from the immutable module, so warming a site cannot change the module
-fingerprint. The host retains resolved engine declarations. It remembers a declaration miss for a literal
-on the receiver class or value type. A computed key can reuse that answer. Starting a program
-clears the literal misses. A foreign script can declare a property or method absent from the
-engine table. The host reflects the member names of the attached script and its bases into a bounded cache.
-A call, setter, possible getter, or transfer of control to Godot invalidates the snapshot. This
-also covers in-place GDScript reloads, which can keep the same resource and emit no change signal.
-A declared scalar field on a GDScript with no possible zero-argument getter can be read again
-without reflection until such an operation or a return to Godot.
-A warmed site dispatches the read or call through Godot with an interned name. Generated C++ keeps a cache at each site and checks its program generation before
+Each site has room for four receiver shapes. A shape identifies the Godot class or value type and
+the script class. An entry holds resolution metadata. It takes its receiver and arguments from the
+current operation. Additional shapes share a table with at most 64 entries per literal. A new shape
+replaces one randomly chosen entry in a full table. An interpreter owns its side table separately
+from the immutable module, so warming a site cannot change the module fingerprint. The host retains
+resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
+value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
+foreign script can declare a property or method absent from the engine table. The host reflects the
+member names of the attached script and its bases into a bounded cache. A call, setter, possible
+getter, or transfer of control to Godot invalidates the snapshot. This also covers in-place GDScript
+reloads, which can keep the same resource and emit no change signal. A declared scalar field on a
+GDScript with no possible zero-argument getter can be read again without reflection until such an
+operation or a return to Godot. A warmed site dispatches the read or call through Godot with an
+interned name. Generated C++ keeps a cache at each site and checks its program generation before
 using it. AS3 execution and instance registration run on Godot's main thread. A worker call is
-refused before it enters AS3, and a worker free is queued for the main thread. The instance
-lookup, host bindings and interpreter overflow table follow the same thread contract. A native
-site uses static storage in the program image so dyld can unload it when Play closes it.
-Reload gets a fresh generation. A cache hit still checks for a freed object.
+refused before it enters AS3, and a worker free is queued for the main thread. The instance lookup,
+host bindings and interpreter overflow table follow the same thread contract. A native site uses
+static storage in the program image so dyld can unload it when Play closes it. Reload gets a fresh
+generation. A cache hit still checks for a freed object.
 
-For an engine receiver, generated code passes its operands to `named_access`, which calls the host interpreter's `access_named`. A decline continues through
-the ordinary generated dynamic operation and its thunk where needed. A handled operation avoids the extra frame, argument copies
-and result handoff visible in the reference samples. The timing gate compares both execution modes
-for every operation so a change in either path is visible.
+For an engine receiver, generated code passes its operands to `named_access`, which calls the host
+interpreter's `access_named`. A decline continues through the ordinary generated dynamic operation
+and its thunk where needed. A handled operation avoids the extra frame, argument copies and result
+handoff visible in the reference samples. The timing gate compares both execution modes for every
+operation so a change in either path is visible.
 
 ## Cost after a site warms
 
@@ -208,8 +213,9 @@ handle keeps its tag when copied. Ordinary pointers decode inline, while a platf
 restores its saved high byte. Overflow sites look up a binding before allocating a new entry.
 
 An AS3 String holds immutable UTF-8 bytes. The first length read counts UTF-16 units and saves
-the result on that string. Typed, dynamic and generated length reads share it. This avoids scanning
+the result on that string. Below 65,535 bytes, the byte and unit counts share a four-byte word.
+Larger strings use full-width counts. Typed, dynamic and generated length reads share it. This avoids scanning
 the same text for each call in a loop and leaves strings whose length you never read unscanned.
 
-Rebuild generated native libraries for runtime layout `0x4b41533300000013`.
+Rebuild generated native libraries for runtime layout `0x4b41533300000017`.
 The loader checks the layout before using a site's runtime entry points.

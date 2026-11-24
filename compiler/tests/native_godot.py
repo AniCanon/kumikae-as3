@@ -181,6 +181,11 @@ class Runner:
             status, text = self.run(project, "by_name.gd", program)
             self.check("native: computed keys report missing properties",
                        "VALUE computed misses=0|0" in text, text[-1200:])
+            cached = {line.removeprefix("kas3: cached miss ") for line in text.splitlines()
+                      if line.startswith("kas3: cached miss ")}
+            self.check("native: a literal miss is cached", "nothing" in cached, str(sorted(cached)))
+            self.check("native: computed misses stay out of the literal cache",
+                       cached.isdisjoint(f"slot{i}" for i in range(256)), str(sorted(cached)))
             self.check("native: a replacement script checks the current declaration",
                        "VALUE foreign declaration after replacement=[true, 1069, 0]|[true, 1069, 0]" in text and
                        "VALUE typed reload after staging source=[[true, true, 1069, false], 0]|[[true, true, 1069, false], 0]" in text and

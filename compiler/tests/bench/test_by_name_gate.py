@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from by_name_gate import failures, batch_sizes, swap_placement, short_pairs
+from by_name_gate import failures, batch_sizes, swap_placement, short_pairs, layout_mean
 
 
 class GateTests(unittest.TestCase):
@@ -27,6 +27,19 @@ class GateTests(unittest.TestCase):
         self.assertEqual(rounds["timer/read"], rounds["timerTyped/read"])
         self.assertEqual(rounds["node/write"], 20000)
         self.assertEqual(rounds["foreign/call"], 20000)
+
+    def test_short_pair_keeps_a_five_percent_cost_across_layouts(self):
+        pilots = {"timer/read": [0.021], "timerTyped/read": [0.020]}
+        counts = batch_sizes(pilots)
+        self.assertEqual(short_pairs(pilots), [("timer/read", "timerTyped/read")])
+        times = {}
+        for row, (cost,) in pilots.items():
+            batches = [cost * counts[row] / 20000 * factor for factor in (1.1, 0.9)]
+            self.assertGreater(min(batches), 0.5)
+            cost = layout_mean(*batches) * 20000 / counts[row]
+            times[row] = {"native": [cost] * 7}
+        self.assertEqual(failures(times, None), [
+            "timer/read: native slower than typed (0.021 vs 0.020 ms, tolerance 3%)"])
 
     def test_native_uses_medians(self):
         times = {"node/read": {"native": [1, 12, 13], "interpreter": [9, 10, 20]}}

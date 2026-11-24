@@ -22,6 +22,7 @@ public:
 		}
 		return found;
 	}
+	const auto &names() const { return names_; }
 	void clear() { names_.clear(); }
 };
 
