@@ -74,29 +74,30 @@ void TemporaryReleases::plan(const Function &p_function) {
 	release_.resize(code.size());
 	registers_.clear();
 	taken_.clear();
+	const auto listed_from = [&](std::ptrdiff_t p_first) {
+		const auto first = registers_.begin() + p_first;
+		if (registers_.end() - first > 1) {
+			std::sort(first, registers_.end());
+			registers_.erase(std::unique(first, registers_.end()), registers_.end());
+		}
+		return Span{ static_cast<uint32_t>(p_first), static_cast<uint32_t>(registers_.size() - p_first) };
+	};
 	live_.each_instruction([&](uint32_t p_pc, const std::vector<uint32_t> &p_ending) {
 		const auto &in = code[p_pc];
-		// What the instruction uses for the last time, and what is live after it and not where p_next starts.
-		const auto ending_before = [&](uint32_t p_next) {
-			const auto first = static_cast<std::ptrdiff_t>(registers_.size());
-			registers_.insert(registers_.end(), p_ending.begin(), p_ending.end());
-			live_.dying_into(p_next, registers_);
-			const auto ending = registers_.begin() + first;
-			if (registers_.end() - ending > 1) {
-				std::sort(ending, registers_.end());
-				registers_.erase(std::unique(ending, registers_.end()), registers_.end());
-			}
-			return Span{ static_cast<uint32_t>(first), static_cast<uint32_t>(registers_.size() - first) };
-		};
 		if (in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
-			taken_.push_back({ p_pc, ending_before(in.b) });
+			const auto first = static_cast<std::ptrdiff_t>(registers_.size());
+			live_.dying_into(in.b, registers_);
+			taken_.push_back({ p_pc, listed_from(first) });
 		}
 		// A return or a throw hands its operand on, and nothing runs after an instruction that leaves.
 		if (!falls_through(in.op)) {
 			release_[p_pc] = {};
 			return;
 		}
-		Span ending = ending_before(p_pc + 1);
+		const auto first = static_cast<std::ptrdiff_t>(registers_.size());
+		registers_.insert(registers_.end(), p_ending.begin(), p_ending.end());
+		live_.dying_into(p_pc + 1, registers_);
+		Span ending = listed_from(first);
 		if (ending.count != 0 && stored_by(in) != NONE) {
 			const auto found = std::find(registers_.end() - ending.count, registers_.end(), stored_by(in));
 			if (found != registers_.end() && (in.op != Op::Move || (owned_[in.a] && in.a != in.b))) {

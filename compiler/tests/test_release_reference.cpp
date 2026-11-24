@@ -183,7 +183,6 @@ Lifetime lifetimes(const Function &p_function, const std::vector<bool> &p_owned,
 		}
 		consider(uses[pc].written);
 		if (in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
-			result.taken[pc] = release; // What the branch itself last uses ends on both of its edges.
 			edge_deaths(live.after[pc], live.before[in.b], result.taken[pc]);
 		}
 		if (!falls_through(in.op)) {
