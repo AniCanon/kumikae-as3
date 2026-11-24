@@ -28,6 +28,16 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
+namespace {
+
+// The register an instruction writes, or NONE.
+uint32_t written_by(const Instruction &p_in) {
+	const char first = ir::op_shape(p_in.op)[0];
+	return (first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op) ? p_in.a : NONE;
+}
+
+} // namespace
+
 bool FunctionWriter::runs_code(const Instruction &p_in) const {
 	if ((p_in.op == Op::GetField && borrowed_[p_in.a] != NONE) || (p_in.op == Op::Release && !owns(p_in.a))) {
 		return false;

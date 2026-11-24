@@ -5,6 +5,29 @@
 
 namespace kas3::ir {
 
+bool first_is_read(Op p_op) {
+	switch (p_op) {
+		case Op::VecSet:
+		case Op::VecSetLength:
+		case Op::VecSetFixed:
+		case Op::DynSet:
+		case Op::NullCheck:
+		case Op::AnyNullCheck:
+		case Op::Throw:
+		case Op::Rethrow:
+		case Op::CallbackThis:
+		case Op::SetField:
+		case Op::HostSet:
+		case Op::HostIndexSet:
+		case Op::Return:
+		case Op::JumpIf:
+		case Op::JumpIfNot:
+			return true;
+		default:
+			return false;
+	}
+}
+
 uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in) {
 	const auto value = [&](uint32_t p_register) { return p_function.registers[p_register] == ir::Kind::Val ? p_register : NONE; };
 	switch (p_in.op) {

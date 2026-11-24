@@ -31,6 +31,10 @@ struct Signature {
 Signature signature_of(const ir::Function &p_function);
 // Whether callers say how many arguments they give: the function has parameters with defaults.
 bool takes_count(const ir::Function &p_function);
+// Where an instruction jumps to, or NONE.
+inline uint32_t jump_target(const ir::Instruction &p_in) {
+	return p_in.op == ir::Op::Jump ? p_in.a : p_in.op == ir::Op::JumpIf || p_in.op == ir::Op::JumpIfNot ? p_in.b : ir::NONE;
+}
 
 class FunctionWriter {
 	const ir::Module &module_;
