@@ -132,14 +132,19 @@ Each read validates the receiver. A method entry delegates to Godot when the cur
 carries a foreign script. A bare receiver binds the engine method directly. A full cache replaces the least recently used name.
 Nested getters can use cached names and hold new names on the stack.
 
-Both execution modes can reuse the bare-receiver check in a loop with a single computed read.
-The receiver stays in the same register. Between reads the loop may branch, calculate with
-scalars and index a vector of strings. A getter, call, debugger hook or change of receiver
-requires a fresh check. Two consecutive engine method reads on a shared object establish that
-overwriting the preceding result can only release another bound method on that object. The
-guard belongs to the current function call. A saved engine method keeps its prepared binding
-with the captured receiver and names. It checks the receiver at call time so a newly attached
-script can supply the implementation.
+Both execution modes can reuse the bare-receiver check in a loop with one computed read from
+the same untyped receiver. The proof covers the code spanned by all back edges in the function.
+It permits branches, scalar moves and arithmetic, String moves, numeric indexing into a String
+vector and an immediate move of the read result. A second read, a change of receiver, a call,
+a construction, a property write or any other operation outside that set ends the proof. A
+function with an exception handler is ineligible.
+
+The first two consecutive bare method reads on a shared object each check its script. Replacing
+the previous result can release an object whose destructor attaches a script, so reuse starts
+on the third read. A delegated read clears the guard. The interpreter also clears it when a
+debugger hook runs. Each function call starts with a fresh guard. A saved engine method keeps
+its prepared binding with the captured receiver and names. It checks the receiver at call time
+so a newly attached script can supply the implementation.
 
 After a script reload removes a field, its current `_get` can supply the value. A method read
 produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
