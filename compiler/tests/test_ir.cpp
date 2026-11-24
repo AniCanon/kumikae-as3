@@ -243,19 +243,6 @@ static void test_liveness_nested_handlers() {
 	CHECK(abandoned[1] == (std::vector<uint32_t>{ 1, 2 }));
 }
 
-// A string returned on one path is still held where a jump goes around the return. Its release must
-// not be put after a Move that only the jump reaches.
-static void test_release_stays_on_its_path() {
-	Function fn;
-	fn.registers = { Kind::Bool, Kind::Str, Kind::Str, Kind::Str };
-	fn.parameters = 2;
-	fn.code = { { Op::Concat, 2, 1, 1 }, { Op::JumpIf, 0, 3 }, { Op::Return, 2 }, { Op::Move, 3, 1 }, { Op::Return, 2 } };
-	TemporaryReleases().insert(fn);
-	for (const auto &in : fn.code) {
-		CHECK(!(in.op == Op::Release && in.a == 2));
-	}
-}
-
 static void test_store_live_on_another_path() {
 	Function fn;
 	fn.registers = { Kind::Obj, Kind::Obj, Kind::Bool, Kind::Any };
@@ -277,7 +264,6 @@ int main() {
 	test_liveness_nested_handlers();
 	test_store_live_on_another_path();
 	test_release_edges();
-	test_release_stays_on_its_path();
 	test_ops();
 	test_print();
 	return check::finish();

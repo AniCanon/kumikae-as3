@@ -89,14 +89,11 @@ void TemporaryReleases::plan(const Function &p_function) {
 			live_.dying_into(in.b, registers_);
 			taken_.push_back({ p_pc, listed_from(first) });
 		}
-		// A return or a throw hands its operand on, and nothing runs after an instruction that leaves.
-		if (!falls_through(in.op)) {
-			release_[p_pc] = {};
-			return;
-		}
 		const auto first = static_cast<std::ptrdiff_t>(registers_.size());
 		registers_.insert(registers_.end(), p_ending.begin(), p_ending.end());
-		live_.dying_into(p_pc + 1, registers_);
+		if (in.op != Op::Jump) {
+			live_.dying_into(p_pc + 1, registers_);
+		}
 		Span ending = listed_from(first);
 		if (ending.count != 0 && stored_by(in) != NONE) {
 			const auto found = std::find(registers_.end() - ending.count, registers_.end(), stored_by(in));
@@ -142,9 +139,12 @@ void TemporaryReleases::write(const Function &p_function, std::vector<Instructio
 			continue;
 		}
 		const bool before_move = pc + 1 < old.size() && old[pc + 1].op == Op::Move && live_.entered_once(pc + 1);
+		const bool leaves = in.op == Op::Return || in.op == Op::Throw || in.op == Op::Rethrow;
 		const auto release = [&](uint32_t p_reg) {
 			if (before_move && p_function.registers[p_reg] == Kind::Str && p_reg != old[pc + 1].a && p_reg != old[pc + 1].b) {
 				later_.push_back(p_reg);
+			} else if (leaves) {
+				return;
 			} else if (p_reg == in.a && op_shape(in.op)[0] == 'r') {
 				r_code[written].a = NONE;
 			} else {
