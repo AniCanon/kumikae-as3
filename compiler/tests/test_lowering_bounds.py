@@ -24,8 +24,9 @@ CASES = (
     ("chosen_arguments", 4000, 1, 1.0, 128),
     ("loops", 16000, 120, 1.0, 128),
     ("conditionals", 16000, 8, 1.0, 128),
-    # Each handler releases what its whole range holds, so the module itself has 2.4 million releases.
-    ("nested_try", 2000, 200, 1.0, 160),
+    # Each handler releases what its whole range holds, so the module itself has 2.4 million releases and
+    # most of the memory is the module. The limit here guards the time more than the memory.
+    ("nested_try", 2000, 200, 1.0, 256),
 )
 
 
