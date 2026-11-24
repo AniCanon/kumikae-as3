@@ -404,7 +404,9 @@ static void test_text_units() {
 	CHECK(sizeof(Str) <= 3 * sizeof(uint32_t));
 	Str *whole = join_strings("a" + high, low + "b");
 	CHECK(whole && whole->view() == face);
+	CHECK(whole && whole->units == -1);
 	CHECK(whole && whole->length() == 4);
+	CHECK(whole && whole->units == 4);
 	free_string(whole);
 	CHECK_EQ(find_units(face, high, 0), 1);
 	CHECK_EQ(find_units(face, low, 0), 2);

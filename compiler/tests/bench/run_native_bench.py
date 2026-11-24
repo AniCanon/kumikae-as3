@@ -22,7 +22,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILER = os.path.dirname(os.path.dirname(HERE))
-PROGRAMS = ("loop.as", "vectors.as", "values.as", "objects.as")
+PROGRAMS = ("loop.as", "vectors.as", "values.as", "objects.as", "string_append.as", "string_join.as")
 FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops"]
 
 
