@@ -138,6 +138,30 @@ std::string FunctionWriter::kept_read_again(uint32_t p_pc) const {
 	return out;
 }
 
+// A named local lives until the function exits. At a final store its reference can move
+// directly into the field if neither the replaced field nor earlier frame cleanup can run code.
+bool FunctionWriter::final_field_store(uint32_t p_pc) const {
+	const auto &in = function_.code[p_pc];
+	if (!facts_ || in.op != Op::SetField || !is_this(in.a) || !owns(in.c) || !function_.handlers.empty() ||
+			p_pc + 1 >= function_.code.size() || function_.code[p_pc + 1].op != Op::ReturnVoid) {
+		return false;
+	}
+	const auto &fields = module_.classes[function_.owner].fields;
+	if (in.b >= fields.size()) {
+		return false;
+	}
+	const auto &field = fields[in.b];
+	if (field.kind != Kind::Str && !(field.kind == Kind::Obj && field.klass < facts_->ends_alone.size() && facts_->ends_alone[field.klass])) {
+		return false;
+	}
+	for (uint32_t i = 0; i < in.c; ++i) {
+		if (owns(i) && kind(i) != Kind::Str && !ends_alone_[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 void FunctionWriter::keep(const std::string &p_place, uint32_t p_register, bool p_is_slot) {
 	if (!hands_over_[pc_]) {
 		line(std::string(p_is_slot ? "store_slot" : "store") + "(c, " + p_place + ", " + reg(p_register) + ");");

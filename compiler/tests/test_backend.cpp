@@ -2,6 +2,7 @@
 // takes, it writes whole. (Whole programs are held to the interpreter's output by tests/run_native.py.)
 #include "check.h"
 #include "generate.h"
+#include "last_use.h"
 
 using namespace kas3;
 
@@ -266,6 +267,7 @@ void an_object_stored_in_a_place_last_is_handed_over() {
 		module.functions[0].parameters = 1;
 		module.functions[0].required = 1;
 		module.functions[0].parameter_classes = { 2 };
+		ir::release_temporaries(module.functions[0]);
 		const backend_cpp::Generated made = backend_cpp::generate(module);
 		CHECK_EQ(made.unsupported, std::string());
 		const std::string *text = file_named(made, "program.cpp");
@@ -657,7 +659,32 @@ void nullable_math_local_reuses_its_handle() {
 	CHECK(text && text->find("copy_parts<Vector2>(c, r1, r0)") != std::string::npos);
 }
 
+void final_field_store_takes_an_owned_local() {
+	using ir::Op;
+	using ir::Kind;
+	ir::Module module = module_of({ Kind::Obj, Kind::Obj }, { { Op::New, 1, 0 }, { Op::SetField, 0, 0, 1 } });
+	add_points(module);
+	ir::Class holder;
+	holder.name = "Holder";
+	holder.fields.push_back(ir::Field{ "point", Kind::Obj, 0 });
+	module.classes.push_back(holder);
+	auto &fn = module.functions[0];
+	fn.is_static = false;
+	fn.owner = 2;
+	fn.name = "Holder/one";
+	fn.parameters = fn.required = 1;
+	fn.locals.push_back({ "s", 1 });
+	const auto made = backend_cpp::generate(module);
+	const auto *text = file_named(made, "Holder.cpp");
+	CHECK(text && text->find("put(c, static_cast<C2_Holder *>(r0)->f0_point, r1);") != std::string::npos);
+	fn.code.insert(fn.code.end() - 1, { Op::NullCheck, 1 });
+	const auto used_again = backend_cpp::generate(module);
+	text = file_named(used_again, "Holder.cpp");
+	CHECK(text && text->find("store(c, static_cast<C2_Holder *>(r0)->f0_point, r1);") != std::string::npos);
+}
+
 int main() {
+	final_field_store_takes_an_owned_local();
 	loop_getter_keeps_its_bind();
 	nullable_math_local_reuses_its_handle();
 	engine_handles_box_once();

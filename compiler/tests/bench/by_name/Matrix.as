@@ -38,6 +38,16 @@ package {
 			return first.value;
 		}
 
+		private function storeScore(value:int):void {
+			var s:MatrixScore = makeScore(value);
+			first = s;
+		}
+
+		public function namedStoreWrite(target:Node2D, n:int):int {
+			for (var i:int = 0; i < n; ++i) storeScore(i);
+			return first.value;
+		}
+
 		public function probeForeign(target:*, read:Boolean):int {
 			try {
 				if (read) return int(target.score);

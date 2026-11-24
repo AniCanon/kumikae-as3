@@ -44,7 +44,7 @@ func batch(row: String, target: Variant, rounds: int, mode: String, targets: Arr
 		valid = result == 8 * rounds - rounds % 2
 	elif kind == "heldCopy":
 		valid = result == 7
-	elif kind == "heldTransfer":
+	elif kind in ["heldTransfer", "namedStore"]:
 		valid = result == rounds - 1
 	elif kind == "joinThree":
 		valid = result == rounds * 18
@@ -133,7 +133,7 @@ func measure() -> void:
 			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "saved": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
-	var stores := {"heldCopy": node, "heldTransfer": node}
+	var stores := {"heldCopy": node, "heldTransfer": node, "namedStore": node}
 	cases.merge(stores)
 	foreign.set_process(true)
 	node.set_process(false)
