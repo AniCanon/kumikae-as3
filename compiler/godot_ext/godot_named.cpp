@@ -6,7 +6,6 @@
 #include "godot_calls.h"
 #include "handles.h"
 #include "program.h"
-#include "handles.h"
 
 #if !defined(KAS3_RUNTIME_ONLY)
 #include "builtins.h"

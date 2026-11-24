@@ -117,11 +117,13 @@ from the immutable module, so warming a site cannot change the module fingerprin
 resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
 value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
 foreign script can declare a property or method absent from the engine table. A foreign field
-read asks Godot for the named value. The host keeps up to 32 computed names keyed by native class and AS3 spelling.
+read asks Godot for the named value. The host keeps up to 32 computed names keyed by native class
+and AS3 spelling.
 It resolves an engine property to its Godot spelling before considering a foreign field. An engine
 member without a named getter keeps its resolved declaration in the same cache. The VM uses that
-declaration directly when it binds a method value. Each read validates the receiver. A property hit calls Godot's named getter once. A full cache replaces the least
-recently used name. Nested getters can use cached names and hold new names on the stack.
+declaration directly when it binds a method value. Each read validates the receiver. A property hit
+calls Godot's named getter once. A full cache replaces the least recently used name. Nested
+getters can use cached names and hold new names on the stack.
 
 After a script reload removes a field, its current `_get` can supply the value. A method read
 produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,

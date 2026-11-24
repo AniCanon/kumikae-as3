@@ -254,8 +254,8 @@ window below half a millisecond is rejected. If a native control pair takes less
 per 20,000 operations in the pilot, the gate builds a second image with the two functions in
 opposite positions. Each round averages their times across both layouts. Longer rows keep the
 original single-layout comparison. The gate checks the result of every batch. Each process
-times four windows per row, twice in each
-direction. Short native control pairs alternate individual batches in ABBA order within each window.
+times four windows per row, twice in each direction. Short native control pairs alternate
+individual batches in ABBA order within each window.
 Each window warms for at least 20 ms and collects at least 40 ms of timed batches.
 The process takes the median batch time in each window, then the median of the four windows,
 normalized to 20,000 operations. The report gives the median and range across seven rounds.
@@ -264,20 +264,21 @@ reference median by more than 3%. Each AS3 mode compares with the same row and m
 Native compares with the interpreter, each untyped row compares with C# by name where
 the API exists, and each inferred row compares with its explicitly typed control. The controls cover
 a fresh Node2D and Timer, Number, Boolean, String, an AS3 class, Vector2 and Color.
-The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node. Timing stays
-outside CTest. The report prints main timings only when you pass its build with
-`--against <main-build-godot>`. Add `--before-script <build-godot>` to interleave another
-build for the script members. Its script enters through
-an AS3 wrapper that passes `this`. Current builds receive the scripted node from Godot. C# uses
-`Get`, `Set` and `Call`. Its Vector2 struct has no corresponding by-name operations.
+The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node.
+Timing stays outside CTest. The report prints main timings only when you pass its build
+with `--against <main-build-godot>`. Add `--before-script <build-godot>` to interleave another
+build for the script members. Its script enters through an AS3 wrapper that passes `this`.
+Current builds receive the scripted node from Godot. C# uses `Get`, `Set` and `Call`.
+Its Vector2 struct has no corresponding by-name operations.
 
 The Timer control reads a freshly constructed object's wait time. The foreign-only rows read a
-GDScript field and call its method. The computed reads cycle through two or eight GDScript fields, or through
-`position`, `modulate` and `rotation` on a plain Node2D and one carrying GDScript. AS3 indexes
-a String vector and C# indexes the corresponding interned StringNames. Another row alternates
-reads of two engine methods and calls the last bound method. Four rows compare string operations
-with main. They join three strings, append a piece with and without reading the growing length,
-and join two short strings into a 65,536-byte result. The custom getter fixture reads String,
+GDScript field and call its method. The computed reads cycle through two or eight GDScript fields,
+or through `position`, `modulate` and `rotation` on a plain Node2D and one carrying GDScript.
+AS3 indexes a String vector and C# indexes the corresponding interned StringNames. Another row
+alternates reads of two engine methods and calls the last bound method.
+Four rows compare string operations with main. They join three strings, append a piece with and
+without reading the growing length, and join two short strings into a 65,536-byte result.
+The custom getter fixture reads String,
 Vector2 and Object fields and calls a script helper in the same loop. Its call row alternates the
 helper and a node method. The main build probes each operation and reports an unsupported row if
 AS3 raises the missing-property or missing-method error. On macOS the comparison also prints how
