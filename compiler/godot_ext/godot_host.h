@@ -82,6 +82,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		std::unordered_map<std::string_view, vm::NamedMember> known;
 		LiteralMisses misses;
 	};
+	const vm::NamedMember &named_on_class(godot::Variant::Type p_type, const godot::StringName &p_class, std::string_view p_name, vm::NameSource p_source);
 	const vm::NamedMember *resolve_member(Members &p_members, godot::StringName p_class, godot::Variant::Type p_type, std::string_view p_name);
 	std::unordered_map<godot::StringName, Members, ClassHash, SameClass> class_members_;
 	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;

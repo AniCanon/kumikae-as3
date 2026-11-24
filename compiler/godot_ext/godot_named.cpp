@@ -231,11 +231,15 @@ const vm::NamedMember &GodotHost::named(void *p_receiver, std::string_view p_nam
 			return vm::MISSING_MEMBER;
 		}
 	}
-	Members &members = object ? class_members_[klass] : value_members_[type];
+	return named_on_class(type, klass, p_name, p_source);
+}
+
+const vm::NamedMember &GodotHost::named_on_class(Variant::Type p_type, const StringName &p_class, std::string_view p_name, vm::NameSource p_source) {
+	Members &members = p_type == Variant::OBJECT ? class_members_[p_class] : value_members_[p_type];
 	if (const auto known = members.known.find(p_name); known != members.known.end()) {
 		return known->second;
 	}
-	return *members.misses.lookup(p_name, p_source, [&] { return resolve_member(members, klass, type, p_name); });
+	return *members.misses.lookup(p_name, p_source, [&] { return resolve_member(members, p_class, p_type, p_name); });
 }
 
 const vm::NamedMember *GodotHost::resolve_member(Members &p_members, StringName p_class, Variant::Type p_type, std::string_view p_name) {
@@ -289,6 +293,14 @@ const vm::NamedMember &GodotHost::script_getter(void *p_receiver, std::string_vi
 
 // Only a name outside both native name tables may go directly to a foreign getter.
 const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<StringName> &r_nested) {
+
+#if defined(KAS3_RUNTIME_ONLY)
+	(void)p_receiver;
+	(void)p_name;
+	(void)r_owner;
+	(void)r_nested;
+	return nullptr;
+#else
 	if (!p_receiver) {
 		return nullptr;
 	}
@@ -302,19 +314,32 @@ const StringName *GodotHost::computed_getter(void *p_receiver, std::string_view 
 			}
 		}
 	}
-	const auto shape = shape_of(p_receiver);
-	if (!shape || !shape->script || shape->instance || named(p_receiver, p_name, vm::NameSource::Computed).what != vm::NamedMember::What::Missing ||
-			!delegates_script(p_receiver, p_name)) {
+	const auto &value = *static_cast<const Variant *>(p_receiver);
+	if (value.get_type() != Variant::OBJECT) {
 		return nullptr;
 	}
-	*r_owner = shape->owner;
+	const auto id = gdextension_interface::variant_get_object_instance_id(value._native_ptr());
+	void *owner = gdextension_interface::object_get_instance_from_id(id);
+	StringName klass;
+	if (!owner || script_on_live_handle(owner, value) || !gdextension_interface::object_get_class_name(owner, gdextension_interface::library, klass._native_ptr()) ||
+			named_on_class(Variant::OBJECT, klass, p_name, vm::NameSource::Computed).what != vm::NamedMember::What::Missing || !attached_script(owner).value_or(0)) {
+		return nullptr;
+	}
+	StringName key(to_godot(p_name));
+	if (native_member(klass, key)) {
+		return nullptr;
+	}
+	*r_owner = owner;
 	// A reentrant getter can use a warmed name. A new key must leave the outer name alive.
 	if (active_reads_) {
-		return &r_nested.emplace(computed_name_.godot);
+		return &r_nested.emplace(key);
 	}
 	auto &entry = read_keys_[next_read_key_++ % read_keys_.size()];
-	entry = { shape->type, std::string(p_name), computed_name_.godot };
+	const auto identity = class_identity(klass);
+	rt::head_of(p_receiver)->godot_class = identity;
+	entry = { identity, std::string(p_name), key };
 	return &entry.key;
+#endif
 }
 
 vm::ScriptRead GodotHost::read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::Prepared *p_binding,
