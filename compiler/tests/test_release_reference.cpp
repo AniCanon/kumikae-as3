@@ -185,9 +185,11 @@ Lifetime lifetimes(const Function &p_function, const std::vector<bool> &p_owned,
 		if (in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
 			edge_deaths(live.after[pc], live.before[in.b], result.taken[pc]);
 		}
-		if (in.op != Op::Jump) {
-			edge_deaths(live.after[pc], live.before[pc + 1], release);
+		if (!falls_through(in.op)) {
+			release.clear(); // A return or a throw hands its operand on, and nothing runs after it.
+			continue;
 		}
+		edge_deaths(live.after[pc], live.before[pc + 1], release);
 		const uint32_t from = stored(in);
 		const auto found = std::find(release.begin(), release.end(), from);
 		if (found != release.end() && (in.op != Op::Move || (p_owned[in.a] && in.a != in.b))) {
@@ -280,9 +282,6 @@ void reference_release_temporaries(Function &r_function, bool p_stripped) {
 				case Op::VecSet: code.back().op = Op::TakeElement; break;
 				default: break;
 			}
-		}
-		if (in.op == Op::Return || in.op == Op::Throw || in.op == Op::Rethrow) {
-			continue;
 		}
 		const auto written = positions.back();
 		for (auto reg : plan.release[pc]) {
