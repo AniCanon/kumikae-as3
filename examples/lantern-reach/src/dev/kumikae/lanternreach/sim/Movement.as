@@ -13,13 +13,14 @@ package dev.kumikae.lanternreach.sim {
                 var actor:Creature = pool.slots[i];
                 if (!actor.active) continue;
                 var length:Number = Math.sqrt(actor.steerX * actor.steerX + actor.steerY * actor.steerY);
-                var scale:Number = (grid.marsh[grid.cell(actor.x, actor.y)] ? 0.025 : 0.05) / Math.max(1, length);
+                var scale:Number = actor.speed * (grid.marsh[grid.cell(actor.x, actor.y)] && actor.kind != Creature.WISP ? 0.5 : 1)
+                    * (actor.lit ? 0.8 : 1) * (actor.slow > 0 ? 0.5 : 1) * (actor.buff > 0 ? 1.4 : 1) / Math.max(1, length);
                 actor.vx = actor.steerX * scale;
                 actor.vy = actor.steerY * scale;
                 var px:Number = Math.max(0, Math.min(grid.width - 0.001, actor.x + actor.vx));
                 var py:Number = Math.max(0, Math.min(grid.height - 0.001, actor.y + actor.vy));
-                if (!grid.walls[grid.cell(px, actor.y)]) actor.x = px;
-                if (!grid.walls[grid.cell(actor.x, py)]) actor.y = py;
+                if (actor.kind == Creature.WISP || !grid.walls[grid.cell(px, actor.y)]) actor.x = px;
+                if (actor.kind == Creature.WISP || !grid.walls[grid.cell(actor.x, py)]) actor.y = py;
             }
         }
     }

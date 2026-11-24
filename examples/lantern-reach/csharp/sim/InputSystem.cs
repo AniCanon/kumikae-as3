@@ -7,40 +7,63 @@ public sealed class InputSystem {
     private TownGrid grid;
     private Keeper keeper;
     private CommandQueue commands;
-    private FlowField flow;
+    private Buildings town;
+    private LevelUps levels;
+    private Rules rules;
 
-    public InputSystem(TownGrid map, Keeper player, CommandQueue queue, FlowField paths) {
+    public InputSystem(TownGrid map, Keeper player, CommandQueue queue, Buildings buildings, LevelUps upgrades, Rules defs) {
         grid = map;
         keeper = player;
         commands = queue;
-        flow = paths;
+        town = buildings;
+        levels = upgrades;
+        rules = defs;
     }
 
     public void update(int tick) {
         TickCommand command = commands.take(tick);
         while (command != null) {
-            if (command.action == "move") {
+            apply(command);
+            command = commands.take(tick);
+        }
+    }
+
+    private void apply(TickCommand command) {
+        int cell = grid.cell(command.x, command.y);
+        switch (command.action) {
+            case "move":
                 keeper.dx = command.x;
                 keeper.dy = command.y;
-            }
-            if (command.action == "wall") {
-                int id = grid.cell(command.x, command.y);
-                if (!grid.walls[id] && keeper.salvage >= 4) {
-                    grid.walls[id] = true;
-                    grid.revision++;
-                    keeper.salvage -= 4;
+                break;
+            case "aim":
+                keeper.aimX = command.x;
+                keeper.aimY = command.y;
+                break;
+            case "fire":
+                keeper.firing = command.x != 0;
+                break;
+            case "dash":
+                if (keeper.recharge == 0) {
+                    keeper.dash = 12;
+                    keeper.recharge = 60;
                 }
-            }
-            if (command.action == "sell") {
-                int sold = grid.cell(command.x, command.y);
-                if (grid.walls[sold]) {
-                    grid.walls[sold] = false;
-                    grid.revision++;
-                    flow.opened(sold);
-                    keeper.salvage += 2;
+                break;
+            case "sell":
+                town.remove(cell, true);
+                break;
+            case "upgrade":
+            case "branchA":
+            case "branchB":
+                town.improve(cell, command.action == "branchA" ? 1 : command.action == "branchB" ? 2 : 0);
+                break;
+            case "choose":
+                levels.choose((int)(command.x));
+                break;
+            default:
+                for (int i = 0; i < rules.structures.Count; i++) {
+                    if (rules.structures[i].key == command.action) town.build(cell, i);
                 }
-            }
-            command = commands.take(tick);
+                break;
         }
     }
 }

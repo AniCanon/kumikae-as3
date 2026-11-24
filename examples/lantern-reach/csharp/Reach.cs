@@ -35,6 +35,11 @@ public partial class Reach : Node2D
         AddChild(crowd);
     }
 
+    public override void _ExitTree()
+    {
+        if (game != null) game.stats.close(game.events);
+    }
+
     public override void _Process(double delta)
     {
         long before = GC.GetAllocatedBytesForCurrentThread();
@@ -50,11 +55,12 @@ public partial class Reach : Node2D
         if (limit == 0) return;
         if (game.tick % 60 == 0 || game.tick == limit) checks.Add(game.checksum());
         if (game.tick < limit) return;
-        string[] names = { "input", "spawn", "flow", "ai", "movement", "spatial" };
+        string[] names = { "input", "spawn", "flow", "ai", "movement", "spatial", "collision", "combat", "status", "pickups", "light", "economy", "events" };
         var systems = new Dictionary<string, double>();
         for (int n = 0; n < names.Length; n++) systems[names[n]] = game.elapsed[n];
         GD.Print(JsonSerializer.Serialize(new { total_ms = total, systems_ms = systems,
-            presentation_ms = presentation, peak = game.pool.peak, allocations = allocated, checksums = checks }));
+            presentation_ms = presentation, peak = game.pool.peak, built = game.stats.built, destroyed = game.stats.destroyed,
+            deaths = game.stats.deaths, allocations = allocated, checksums = checks }));
         SetProcess(false);
         GetTree().Quit();
     }

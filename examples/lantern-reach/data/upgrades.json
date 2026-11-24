@@ -1,0 +1,9 @@
+[
+  {"key":"wick","stat":"damage","amount":2,"weight":6},
+  {"key":"boots","stat":"speed","amount":0.12,"weight":5},
+  {"key":"magnet","stat":"pull","amount":1,"weight":5},
+  {"key":"lens","stat":"range","amount":1,"weight":4},
+  {"key":"spark","stat":"spark","amount":1,"weight":2},
+  {"key":"orbit","stat":"orbit","amount":1,"weight":2},
+  {"key":"bellows","stat":"haste","amount":1,"weight":3}
+]

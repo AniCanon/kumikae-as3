@@ -1,11 +1,21 @@
 package dev.kumikae.lanternreach.sim {
     public final class SwarmSteering {
+        private var senses:EnemySenses;
+        private var states:Vector.<IEnemyState> = new Vector.<IEnemyState>();
         private var grid:TownGrid;
         private var pool:CreaturePool;
         private var index:SpatialIndex;
         private var flow:FlowField;
 
-        public function SwarmSteering(map:TownGrid, creatures:CreaturePool, space:SpatialIndex, paths:FlowField) {
+        public function SwarmSteering(map:TownGrid, creatures:CreaturePool, space:SpatialIndex, paths:FlowField, perception:EnemySenses) {
+            senses = perception;
+            states.push(new SeekBeacon());
+            states.push(new BreakWall());
+            states.push(new Fly());
+            states.push(new SeekBeacon());
+            states.push(new HuntDark());
+            states.push(new CallTide());
+            states.push(new UndertowState());
             grid = map;
             pool = creatures;
             index = space;
@@ -13,9 +23,13 @@ package dev.kumikae.lanternreach.sim {
         }
 
         public function update():void {
-            for (var i:int = 0; i < pool.slots.length; i++) {
+            var end:int = pool.slots.length;
+            for (var i:int = 0; i < end; i++) {
                 var actor:Creature = pool.slots[i];
-                if (actor.active) steer(actor);
+                if (!actor.active) continue;
+                if (actor.cooldown > 0) actor.cooldown--;
+                steer(actor);
+                states[actor.kind].think(actor, senses);
             }
         }
 
@@ -29,7 +43,7 @@ package dev.kumikae.lanternreach.sim {
             var centreX:Number = 0;
             var centreY:Number = 0;
             var count:int = 0;
-            for (var y:int = Math.max(0, cy - 1); y <= Math.min(grid.height - 1, cy + 1); y++) {
+            for (var y:int = Math.max(0, cy - 1); actor.kind == Creature.SWARMER && y <= Math.min(grid.height - 1, cy + 1); y++) {
                 for (var x:int = Math.max(0, cx - 1); x <= Math.min(grid.width - 1, cx + 1); x++) {
                     var id:int = index.head[y * grid.width + x];
                     while (id >= 0) {

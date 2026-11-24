@@ -90,6 +90,8 @@ def main():
                 for mode in (MODES if turn % 2 == 0 else MODES[::-1]):
                     result = measure(godot, project, library, mode, scenario, ticks)
                     sequence = result["checksums"]
+                    detail = (f"peak {result['peak']}, built {result['built']}, "
+                              f"destroyed {result['destroyed']}, deaths {result['deaths']}")
                     if expected is None:
                         expected = sequence
                     check(f"{scenario} {mode} checksums", sequence == expected,
@@ -103,7 +105,7 @@ def main():
                     times = samples[mode][key]
                     cells.append(f"{statistics.median(times):.3f} [{min(times):.3f}, {max(times):.3f}]")
                 print(f"| {scenario} | {key} | " + " | ".join(cells) + " |", flush=True)
-            print(f"{scenario}: {len(expected)} matching checkpoints, final {expected[-1]}", flush=True)
+            print(f"{scenario}: {len(expected)} matching checkpoints, final {expected[-1]}; {detail}", flush=True)
 
 
 if __name__ == "__main__":

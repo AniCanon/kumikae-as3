@@ -25,6 +25,10 @@ package dev.kumikae.lanternreach {
             addChild(crowd);
         }
 
+        override public function _exitTree():void {
+            if (game != null) game.stats.close(game.events);
+        }
+
         override public function _process(delta:Number):void {
             var start:Number = milliseconds();
             var steps:int = stepper.advance(limit > 0 ? 1.0 / 60 : delta);
@@ -37,11 +41,12 @@ package dev.kumikae.lanternreach {
             if (limit == 0) return;
             if (game.tick % 60 == 0 || game.tick == limit) checks.push(game.checksum());
             if (game.tick < limit) return;
-            var names:Array = ["input", "spawn", "flow", "ai", "movement", "spatial"];
+            var names:Array = ["input", "spawn", "flow", "ai", "movement", "spatial", "collision", "combat", "status", "pickups", "light", "economy", "events"];
             var systems:Object = {};
             for (var n:int = 0; n < names.length; n++) systems[names[n]] = game.elapsed[n];
             trace(JSON.stringify({total_ms:total, systems_ms:systems, presentation_ms:presentation,
-                                  peak:game.pool.peak, allocations:null, checksums:checks}));
+                                  peak:game.pool.peak, built:game.stats.built, destroyed:game.stats.destroyed,
+                                  deaths:game.stats.deaths, allocations:null, checksums:checks}));
             setProcess(false);
             getTree().quit();
         }

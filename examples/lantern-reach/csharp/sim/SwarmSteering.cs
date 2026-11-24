@@ -4,12 +4,22 @@ using System.Collections.Generic;
 namespace Kumikae.LanternReach;
 
 public sealed class SwarmSteering {
+    private EnemySenses senses;
+    private List<IEnemyState> states = new List<IEnemyState>();
     private TownGrid grid;
     private CreaturePool pool;
     private SpatialIndex index;
     private FlowField flow;
 
-    public SwarmSteering(TownGrid map, CreaturePool creatures, SpatialIndex space, FlowField paths) {
+    public SwarmSteering(TownGrid map, CreaturePool creatures, SpatialIndex space, FlowField paths, EnemySenses perception) {
+        senses = perception;
+        states.Add(new SeekBeacon());
+        states.Add(new BreakWall());
+        states.Add(new Fly());
+        states.Add(new SeekBeacon());
+        states.Add(new HuntDark());
+        states.Add(new CallTide());
+        states.Add(new UndertowState());
         grid = map;
         pool = creatures;
         index = space;
@@ -17,9 +27,13 @@ public sealed class SwarmSteering {
     }
 
     public void update() {
-        for (int i = 0; i < pool.slots.Count; i++) {
+        int end = pool.slots.Count;
+        for (int i = 0; i < end; i++) {
             Creature actor = pool.slots[i];
-            if (actor.active) steer(actor);
+            if (!actor.active) continue;
+            if (actor.cooldown > 0) actor.cooldown--;
+            steer(actor);
+            states[actor.kind].think(actor, senses);
         }
     }
 
@@ -33,7 +47,7 @@ public sealed class SwarmSteering {
         double centreX = 0;
         double centreY = 0;
         int count = 0;
-        for (int y = Math.Max(0, cy - 1); y <= Math.Min(grid.height - 1, cy + 1); y++) {
+        for (int y = Math.Max(0, cy - 1); actor.kind == Creature.SWARMER && y <= Math.Min(grid.height - 1, cy + 1); y++) {
             for (int x = Math.Max(0, cx - 1); x <= Math.Min(grid.width - 1, cx + 1); x++) {
                 int id = index.head[y * grid.width + x];
                 while (id >= 0) {
