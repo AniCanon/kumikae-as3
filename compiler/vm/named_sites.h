@@ -47,8 +47,8 @@ class NamedSites {
 	// share its class metadata. Only AS3 field and method slots depend on a script class.
 	std::array<std::map<std::string, NamedOverflow, std::less<>>, 2> shared_;
 	uint64_t generation_;
-	const NamedSite::Entry &binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
-		std::string_view p_name, bool p_read, const NamedSite::Entry *p_delegated);
+	const NamedSite::Entry &shared_binding(NamedSite &p_site, EngineHandles &p_engine, const ir::Module &p_module, const NamedShape &p_shape, void *p_handle,
+		std::string_view p_name, bool p_read);
 public:
 	explicit NamedSites(const ir::Module &p_module);
 	uint32_t vector_target(uint32_t p_function, uint32_t p_pc) const {
@@ -59,7 +59,15 @@ public:
 		const auto &sets = borrowed_sets_[p_function];
 		return p_pc < sets.size() && sets[p_pc];
 	}
-	InterpreterSite *at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings);
+	InterpreterSite *at(uint32_t p_function, uint32_t p_pc, const Str *p_key, const std::vector<Str *> &p_strings) {
+		const auto &places = places_[p_function];
+		if (p_pc >= places.size()) {
+			return nullptr;
+		}
+		const Place &place = places[p_pc];
+		// Even a jump or a later write to the key register must present the exact module string.
+		return place.site != ir::NONE && p_key == p_strings[place.name] ? &sites_[place.site] : nullptr;
+	}
 	std::optional<bool> access(NamedSite &p_site, const ir::Module &p_module, EngineHandles &p_engine, ir::Op p_op, Slot p_holder,
 			std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result, std::optional<NamedCall> *r_call, std::string *r_error, ScriptRead *r_read, const Wanted &p_wanted);
 };

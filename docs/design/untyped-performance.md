@@ -148,11 +148,11 @@ has 824, and mixed write has 809. The six-category breakdowns are 51 / 0 / 4 / 1
 60 / 0 / 12 / 19 / 8 / 0 and 52 / 0 / 16 / 10 / 22 / 0 respectively. The additional conversion
 work on reads includes copying the getter result into a typed local.
 
-The mixed fixture passes eight receivers from six engine classes through one instruction. For
-each of read, write and call, counters record four inline fills and four overflow fills during
-warmup. The next 20,000 accesses divide evenly between the inline cache and the shared table.
-They create zero entries and zero name strings. Each overflowing site keeps the address of its
-shared table and probes it with numeric identities.
+The mixed fixture passes eight receivers from six engine classes through one instruction. Four
+shapes fit inline. When a foreign binding first appears in the shared table, the site can move
+it into an inline slot. The host can then dispatch the current script on that engine class after
+checking that the receiver is live and has no AS3 instance. Other shapes still use the shared
+table. Warm hits create no entries or name strings.
 
 The interpreter keeps the current frame and register base across scalar instructions. A named
 math read followed by a single-use conversion can write directly into the typed destination

@@ -104,10 +104,19 @@ bool Interpreter::cached_property(const ir::Function &p_function, const ir::Inst
 		}
 		return true;
 	}
+	if (p_borrow) {
+		// The adjacent ToAny supplied the setter's sole argument. It lives across a reentrant setter.
+		Slot result = any::undefined();
+		const bool done = access_named(*site, p_in.op, registers[holder], text->view(), p_borrow, 1, &result, nullptr, { ir::Kind::Void, {} });
+		if (any::holds(result)) {
+			drop_any(result);
+		}
+		return done;
+	}
 	Slot args[4];
 	size_t count = 0;
 	if (write) {
-		args[count++] = p_borrow ? *p_borrow : registers[p_in.c];
+		args[count++] = registers[p_in.c];
 	} else if (list) {
 		for (size_t i = 1; i < list->size(); i++) {
 			args[count++] = registers[(*list)[i]];

@@ -1301,12 +1301,17 @@ static void test_engine_members_by_name() {
 			int lookups = 0;
 			uintptr_t receiver_type = 1;
 			uint64_t foreign_script = 0;
-			std::optional<vm::NamedShape> named_shape(void *p_handle, uintptr_t) override {
+			int delegated_hits = 0;
+			std::optional<vm::NamedShape> named_shape(void *p_handle, uintptr_t p_delegated) override {
 				CHECK(p_handle != nullptr);
 				if (!p_handle) {
 					return {};
 				}
 				vm::Object *script = script_of(p_handle, ir::NONE, false);
+				if (!script && p_delegated == receiver_type) {
+					delegated_hits++;
+					return vm::NamedShape{ receiver_type, 0, nullptr, p_handle, true };
+				}
 				return vm::NamedShape{ receiver_type, script ? 2u : foreign_script, script, p_handle };
 			}
 			bool fail_after_call = false;
@@ -1415,6 +1420,17 @@ static void test_engine_members_by_name() {
 			CHECK_EQ(site.used, 4u);
 		}
 		CHECK_EQ(engine.lookups - before_shapes, 12);
+		// A foreign receiver first seen after the inline cache fills can still delegate future reads.
+		engine.receiver_type = 8;
+		engine.foreign_script = 1;
+		for (int i = 0; i < 2; i++) {
+			vm::Slot value{};
+			CHECK(interpreter.access_named(by_shape[0], ir::Op::DynGet, given[0], "name", nullptr, 0, &value, &method));
+			interpreter.discard(ir::Kind::Any, value);
+			engine.foreign_script++;
+		}
+		CHECK_EQ(engine.delegated_hits, 1);
+
 		engine.receiver_type = 1;
 		vm::NamedSite churn;
 		for (engine.foreign_script = 1; engine.foreign_script <= 1000; ++engine.foreign_script) {

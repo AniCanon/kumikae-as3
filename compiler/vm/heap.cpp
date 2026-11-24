@@ -147,6 +147,13 @@ Slot Heap::share(Kind p_kind, Slot p_value) {
 	return p_value;
 }
 
+void Heap::copy_any(Slot &r_target, Slot p_value) {
+	const Slot owned = share(Kind::Any, p_value);
+	const Slot old = r_target;
+	r_target = owned;
+	drop_any(old);
+}
+
 void Heap::put(Kind p_kind, Slot &p_target, Slot p_owned) {
 	Slot old = p_target;
 	p_target = p_owned;
