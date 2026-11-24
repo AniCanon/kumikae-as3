@@ -3637,6 +3637,35 @@ static void test_numeric_tails() {
 	CHECK_EQ(values[2].d, values[1].d);
 }
 
+static void test_repeated_read_with_call() {
+	for (bool calls : { false, true }) {
+		ir::Module module;
+		const std::string source = std::string("package { public class Reads { private function touch():void {} ") +
+				"public function loop(target:*, key:String):* { var value:*; " +
+				"for (var i:int = 0; i < 2; ++i) { value = target[key]; " + (calls ? "touch();" : "") +
+				"} return value; } } }";
+		compile(source.c_str(), &module, "Reads.as");
+		vm::NamedSites sites(module);
+		size_t reads = 0;
+		bool saw_call = false;
+		for (size_t f = 0; f < module.functions.size(); ++f) {
+			const auto &fn = module.functions[f];
+			if (fn.name != "Reads/loop") {
+				continue;
+			}
+			for (size_t pc = 0; pc < fn.code.size(); ++pc) {
+				saw_call |= fn.code[pc].op == ir::Op::Call;
+				if (fn.code[pc].op == ir::Op::DynGet) {
+					++reads;
+					CHECK(sites.repeats_read(f, pc) == !calls);
+				}
+			}
+		}
+		CHECK_EQ(reads, size_t(1));
+		CHECK(saw_call == calls);
+	}
+}
+
 static void test_lowered_counted_loop() {
 	ir::Module module;
 	compile("package { public class Counter {\n"
@@ -4899,6 +4928,7 @@ int main() {
 	test_failed_static_initializer();
 	test_numeric_tails();
 	test_lowered_counted_loop();
+	test_repeated_read_with_call();
 	test_counted_loop_steps();
 	test_remainder_tail();
 	test_vector_move_targets();
