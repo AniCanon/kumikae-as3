@@ -21,6 +21,8 @@ ROWS.extend(("foreign/read", "foreign/call", "computed/read", "methodKeys/read",
 
 STRING_ROWS = ("joinThree/read", "append/read", "appendLength/read", "joinLong/read")
 ROWS.extend(STRING_ROWS)
+STORE_ROWS = ("heldCopy/write", "heldTransfer/write")
+ROWS.extend(STORE_ROWS)
 
 TOLERANCE = 0.03
 
@@ -148,7 +150,7 @@ def measure(godot, project, library, mode, rows, label, sizes=None, pairs=()):
     if mode == "native":
         env["KAS3_PROGRAM_LIBRARY"] = library
     wanted = [row for row in rows if mode != "C#" or row.startswith(("timer/", "timerTyped/", "configure/", "configureTyped/"))
-              or (row not in STRING_ROWS and row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value"))]
+              or (row not in STRING_ROWS + STORE_ROWS and row.split("/")[0].removesuffix("Typed") not in (*INFERRED, "value"))]
     cmd = [godot, "--headless", "--path", project, "-s", "matrix.gd", "--",
            "cs" if mode == "C#" else "self" if label == "pre54" else "main" if label == "main" else "as", str(OPERATIONS),
            "timed" if sizes else "pilot", *row_arguments(wanted, sizes, pairs)]

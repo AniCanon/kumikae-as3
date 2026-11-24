@@ -8,6 +8,36 @@ package {
 		public function current():int { return score; }
 		public function addTarget(value:*):void { targets.push(value); }
 
+		private var first:MatrixScore;
+		private var second:MatrixScore;
+		private var third:MatrixScore;
+		private var fourth:MatrixScore;
+		private var fifth:MatrixScore;
+
+		private function makeScore(value:int):MatrixScore {
+			var item:MatrixScore = new MatrixScore();
+			item.value = value;
+			return item;
+		}
+
+		public function heldCopyWrite(target:Node2D, n:int):int {
+			var a:MatrixScore = makeScore(1);
+			var b:MatrixScore = makeScore(2);
+			for (var i:int = 0; i < n; ++i) {
+				first = a;
+				second = b;
+				third = a;
+				fourth = b;
+				fifth = a;
+			}
+			return first.value + second.value + third.value + fourth.value + fifth.value;
+		}
+
+		public function heldTransferWrite(target:Node2D, n:int):int {
+			for (var i:int = 0; i < n; ++i) first = makeScore(i);
+			return first.value;
+		}
+
 		public function probeForeign(target:*, read:Boolean):int {
 			try {
 				if (read) return int(target.score);
