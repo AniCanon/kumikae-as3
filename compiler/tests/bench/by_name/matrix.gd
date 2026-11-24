@@ -124,7 +124,7 @@ func measure() -> void:
 		if managed:
 			cs.call("AddTarget", child)
 	var cases := {"node": node, "inherited": script, "gdscript": foreign, "foreign": foreign, "computed": foreign, "eightFields": foreign, "custom": custom, "customString": custom, "customVector": custom, "customFields": custom, "script": script,
-			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "mixed": node}
+			"value": Vector2(3, 4), "alias": node, "aliasTyped": node, "proven": node, "typed": node, "detached": node, "saved": node, "mixed": node}
 	var pieces := {"joinThree": "middle😀", "append": "abcdé😀", "appendLength": "abcdé😀", "joinLong": "ab".repeat(16384)}
 	cases.merge(pieces)
 	var engine_keys := {"methodKeys": node, "engineKeys": node, "scriptEngineKeys": foreign}
@@ -156,7 +156,7 @@ func measure() -> void:
 					continue
 				if (kind == "foreign" and op == "write") or (kind == "custom" and op == "write") or (kind in ["customString", "customVector", "customFields"] and op != "read"):
 					continue
-				if kind == "detached" and op != "call":
+				if kind in ["detached", "saved"] and op != "call":
 					continue
 				if kind == "value" and (op == "write" or managed):
 					continue

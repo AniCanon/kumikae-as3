@@ -147,12 +147,56 @@ Object *function_in(Library &p_library, Kind p_kind, Slot p_value) {
 	return object;
 }
 
+const Prepared *saved_binding(EngineHandles &p_handles, Slot p_holder, std::string_view p_as3, std::string_view p_godot) {
+	const auto &member = p_handles.named(any::pointer(p_holder), p_as3);
+	return member.what == NamedMember::What::Method && !member.script_only && member.godot == p_godot ? member.invoke : nullptr;
+}
+
+std::optional<bool> call_saved_method(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	const auto &module = p_library.module();
+	if (static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i) != module.library_function || p_count > USUAL_ARGUMENTS) {
+		return std::nullopt;
+	}
+	const auto *bound = bound_pair(module, p_function);
+	if (!bound || bound->length < 3) {
+		return std::nullopt;
+	}
+	const auto *slots = slots_of(bound);
+	if (any::tag(slots[0]) != AnyTag::Godot || any::tag(slots[2]) != AnyTag::String) {
+		return std::nullopt;
+	}
+	Argument args[USUAL_ARGUMENTS + 1];
+	args[0] = { Kind::Ref, {} };
+	args[0].slot.p = any::pointer(slots[0]);
+	for (size_t i = 0; i < p_count; ++i) {
+		if (any::tag(p_arguments[i]) == AnyTag::Object) {
+			return std::nullopt;
+		}
+		args[i + 1] = { Kind::Any, p_arguments[i] };
+	}
+	auto &handles = p_library.heap.handles;
+	const auto godot = static_cast<Str *>(any::pointer(slots[2]))->view();
+	const auto as3 = static_cast<Str *>(any::pointer(slots[1]))->view();
+	const auto *bind = saved_binding(handles, slots[0], as3, godot);
+	std::string error;
+	const Wanted wanted{ Kind::Any, {} };
+	const auto done = bind ? handles.run(*bind, args, p_count + 1, wanted, r_result, &error) : std::nullopt;
+	const bool ok = done ? *done : handles.call(args[0].slot.p, godot, args + 1, p_count, wanted, r_result, &error);
+	if (!ok) {
+		raise_engine(p_library, error);
+	}
+	return ok;
+}
+
 bool function_call(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	const ir::Module &module = p_library.module();
 	if (!function_in(p_library, Kind::Obj, of_object(p_function))) {
 		return false;
 	}
 	const uint32_t target = static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i);
+	if (auto done = call_saved_method(p_library, p_function, p_arguments, p_count, r_result)) {
+		return *done;
+	}
 	const Function &callee = module.functions[target];
 	Slot usual[USUAL_ARGUMENTS + 1];
 	std::vector<Slot> many;

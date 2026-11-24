@@ -61,7 +61,9 @@ void Interpreter::call_library(const ir::Instruction &p_in) {
 	PropertyKey key;
 	if (bound->length >= 3 && any::is_engine(holder) && any::tag(slots_of(bound)[2]) == AnyTag::String) {
 		const auto *godot = static_cast<const Str *>(any::pointer(slots_of(bound)[2]));
-		EngineNamed(*this).call_bound(holder, godot->view(), nullptr, *given, p_in.a);
+		const auto *as3 = static_cast<const Str *>(any::pointer(name));
+		const auto *bind = saved_binding(host_.handles, holder, as3->view(), godot->view());
+		EngineNamed(*this).call_bound(holder, godot->view(), bind, *given, p_in.a);
 	} else if (property_key(holder, name, &key)) {
 		call_named(holder, key, *given, p_in.a);
 	}

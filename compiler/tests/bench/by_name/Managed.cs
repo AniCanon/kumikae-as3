@@ -69,6 +69,12 @@ public partial class Managed : Node
             fresh.Free();
             return result;
         }
+        if (kind == "saved")
+        {
+            var rotate = target.Get(Node2D.MethodName.Rotate).AsCallable();
+            for (int i = 0; i < n; ++i) rotate.Call(0.0001);
+            return 0;
+        }
         if (kind == "methodKeys")
         {
             StringName[] keys = { CanvasItem.MethodName.IsVisibleInTree, Node.MethodName.IsProcessing };

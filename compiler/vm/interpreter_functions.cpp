@@ -227,6 +227,16 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	for (const uint32_t each : list) {
 		given->push_back(r[each]);
 	}
+	const size_t base = frames_.back().base;
+	Slot result = any::undefined();
+	if (const auto done = call_saved_method(library_, value, given->data(), given->size(), &result)) {
+		if (*done && !failing_ && p_in.a != NONE) {
+			put(Kind::Any, stack_[base + p_in.a], result);
+		} else {
+			drop_any(result);
+		}
+		return;
+	}
 	SpareSlots values(spare_slots_);
 	if (!function_arguments(value, given->size(), given->data(), &*values)) {
 		return;

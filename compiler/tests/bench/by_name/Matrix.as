@@ -75,6 +75,10 @@ package {
 			for (var i:int = 0; i < n; ++i) method = target[key];
 			return method();
 		}
+		public function savedCall(target:*, n:int):void {
+			var rotate:* = target.rotate;
+			for (var i:int = 0; i < n; ++i) rotate(0.0001);
+		}
 		public function methodKeysRead(target:*, n:int):Boolean {
 			var keys:Vector.<String> = new Vector.<String>();
 			keys.push("isVisibleInTree", "isProcessing");
