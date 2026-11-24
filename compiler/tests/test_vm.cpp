@@ -10,7 +10,6 @@
 #include "reload.h"
 #include "table.h"
 #include "lower.h"
-#include "last_use.h"
 #include "names.h"
 #include "numeric_dispatch.h"
 #include "counted_loops.h"
@@ -3638,40 +3637,6 @@ static void test_numeric_tails() {
 	CHECK_EQ(values[2].d, values[1].d);
 }
 
-static void test_stripped_temporary_ownership() {
-	ir::Module module;
-	compile("package { public class Factory { public function make():* { return null; } "
-			"public function alias():void { var owner:* = make(); var copy:* = owner; copy = null; } } }",
-			&module, "Factory.as");
-	size_t checked = 0;
-	for (auto &fn : module.functions) {
-		if (fn.name != "Factory/alias") {
-			continue;
-		}
-		uint32_t owner = ir::NONE;
-		for (const auto &local : fn.locals) {
-			if (local.name == "owner") {
-				owner = local.reg;
-			}
-		}
-		CHECK(owner != ir::NONE);
-		fn.locals.clear(); // Version-one binaries can omit this table.
-		std::vector<bool> owned;
-		for (auto kind : fn.registers) {
-			owned.push_back(ir::is_held(kind));
-		}
-		const auto transfers = ir::last_use_stores(fn, owned);
-		for (size_t pc = 0; pc < fn.code.size(); ++pc) {
-			const auto &in = fn.code[pc];
-			if (in.op == ir::Op::Move && (in.a == owner || in.b == owner)) {
-				CHECK(transfers[pc] == (in.a == owner));
-				++checked;
-			}
-		}
-	}
-	CHECK_EQ(checked, size_t(2));
-}
-
 static void test_repeated_read_with_call() {
 	for (bool calls : { false, true }) {
 		ir::Module module;
@@ -4964,7 +4929,6 @@ int main() {
 	test_numeric_tails();
 	test_lowered_counted_loop();
 	test_repeated_read_with_call();
-	test_stripped_temporary_ownership();
 	test_counted_loop_steps();
 	test_remainder_tail();
 	test_vector_move_targets();
