@@ -93,13 +93,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				goto dispatch;
 			case Op::Release:
-				put(function.registers[in.a], r[in.a], Slot{});
+				put(function.registers[in.a], r[in.a], any::of_bits(0));
 				break;
 			case Op::ConstNull:
 				drop(function.registers[in.a], r[in.a]);
 				break;
 			case Op::TakeMove:
-				put(function.registers[in.a], r[in.a], std::exchange(r[in.b], Slot{}));
+				put(function.registers[in.a], r[in.a], std::exchange(r[in.b], any::of_bits(0)));
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
@@ -473,7 +473,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					break;
 				}
 				const auto &klass = module_.classes[object->klass];
-				put(klass.fields[in.b].kind, field(klass, object, in.b), std::exchange(r[in.c], Slot{}));
+				put(klass.fields[in.b].kind, field(klass, object, in.b), std::exchange(r[in.c], any::of_bits(0)));
 				break;
 			}
 			case Op::SetField: {
@@ -493,7 +493,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			}
 			case Op::TakeGlobal:
-				put(module_.globals[in.a].kind, globals_[in.a], std::exchange(r[in.b], Slot{}));
+				put(module_.globals[in.a].kind, globals_[in.a], std::exchange(r[in.b], any::of_bits(0)));
 				break;
 			case Op::SetGlobal: {
 				Kind kind = module_.globals[in.a].kind;
