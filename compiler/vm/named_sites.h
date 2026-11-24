@@ -27,6 +27,10 @@ struct NamedOverflow {
 		size_t operator()(const Shape &p_shape) const { return std::hash<uintptr_t>{}(p_shape.type) ^ (std::hash<std::optional<uint32_t>>{}(p_shape.klass) << 1) ^ std::hash<std::optional<uint64_t>>{}(p_shape.script); }
 	};
 	std::unordered_map<Shape, NamedSite::Entry, Hash> entries;
+	void make_room();
+
+private:
+	uint32_t random_ = 1;
 };
 
 class NamedSites {

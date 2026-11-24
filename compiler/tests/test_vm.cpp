@@ -1420,6 +1420,15 @@ static void test_engine_members_by_name() {
 			CHECK(!interpreter.access_named(churn, ir::Op::DynGet, given[0], "undeclared", nullptr, 0, &result, &method));
 		}
 		CHECK(churn.overflow && churn.overflow->entries.size() <= vm::NamedOverflow::CAPACITY);
+		const int before_rotation = engine.lookups;
+		for (int round = 0; round < 100; ++round) {
+			for (engine.foreign_script = 1001; engine.foreign_script <= 1065; ++engine.foreign_script) {
+				CHECK(!interpreter.access_named(churn, ir::Op::DynGet, given[0], "undeclared", nullptr, 0, &result, &method));
+			}
+		}
+		const int misses = engine.lookups - before_rotation;
+		std::printf("65 overflow shapes: %d hits in 6500 accesses\n", 6500 - misses);
+		CHECK(misses < 650);
 		engine.foreign_script = 0;
 		engine.return_math = true;
 		CHECK(interpreter.call_method(object, "repeated", given, 1, nullptr));
