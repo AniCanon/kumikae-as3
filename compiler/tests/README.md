@@ -216,15 +216,22 @@ fails. Errors don't, because these projects use Flash's library, namespaces and 
 
 ## Benchmarks
 
-Benchmarks print timings and don't pass or fail. A change made for speed comes with numbers measured
-before and after, in alternating runs: `--against` runs two builds in turn so that load on the machine
-hits both.
+Compare two builds on the same machine. For the standard compiler and VM measurements, run seven
+alternating rounds from the repository root.
+
+```sh
+nice -n 19 python3 compiler/tests/bench/run_bench.py compiler/build --against "$MAIN_BUILD" --runs 7
+```
+
+Set `MAIN_BUILD` to main's compiler build directory. Each row reports the median and the
+difference between its fastest and slowest run. The headless by-name gate below also checks
+each workload's result and enforces timing comparisons.
 
 | Script | Measures |
 |---|---|
-| `bench/run_bench.py <build> [--against <other build>]` | The interpreter on the programs in `bench/` |
+| `bench/run_bench.py <build> [--against <other build>]` | Compiler checking and VM workloads, including strings, vectors and objects |
 | `bench/web_bundle.py <export> [--against <other export>] [--brotli]` | Raw and compressed bytes for each file and the complete Web export |
-| `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter |
+| `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter, or two native builds with `--against` |
 | `bench/languages/run.py` | The same workloads in Godot, in C#, GDScript and AS3. See [Performance](../../docs/performance.md#measure-it-yourself) |
 | `bench/recheck.py <build> --against <other build>` | A re-check after an edit, in generated projects of 100,000 and 1,000,000 lines |
 | `bench/completion.py <build> --against <other build>` | Completion in the language server: start-up, warm requests, and requests that follow an edit |
