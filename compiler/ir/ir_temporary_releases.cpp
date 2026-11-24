@@ -114,6 +114,12 @@ void TemporaryReleases::plan(const Function &p_function) {
 void TemporaryReleases::write(const Function &p_function, std::vector<Instruction> &r_code) {
 	const auto &old = p_function.code;
 	positions_.clear();
+	// Every listed register may become a Release, and each branch or handler with a list gains a Jump.
+	size_t added = registers_.size() + taken_.size() + caught_.size();
+	for (const auto &registers : caught_) {
+		added += registers.size();
+	}
+	r_code.reserve(old.size() + added);
 	// A string has no destructor that can run user code. Its release waits until after a Move that
 	// follows its producer, so both back ends can write the result straight into the destination.
 	waiting_.clear();
