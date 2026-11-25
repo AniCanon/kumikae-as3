@@ -155,6 +155,8 @@ class Runner:
             "DIRECT default [X: (1.0, 0.0), Y: (0.0, 1.0), O: (0.0, 0.0)]",
             "DIRECT null value Error 0 Godot rejected argument 2 of 'canvas_item_add_texture_rect_region'",
             "DIRECT tile (1, 1)",
+            "DIRECT alternating 1 2",
+            "DIRECT runs 3 4",
             "DIRECT shelf 2 0",
         ]
         with tempfile.TemporaryDirectory() as where:

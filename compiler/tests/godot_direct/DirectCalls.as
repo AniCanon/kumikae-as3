@@ -36,6 +36,19 @@ package {
 			}
 		}
 
+		// Each object read from a vector, whether the next read gives another or the same, gets its own value:
+		// a register that keeps its handle keeps it only for the object it was given.
+		private function marked():void {
+			for (var i:int = 0; i < 4; ++i) {
+				batches[i & 1].instanceCount = (i & 1) + 1;
+			}
+			trace("DIRECT alternating " + batches[0].instanceCount + " " + batches[1].instanceCount);
+			for (var k:int = 0; k < 16; ++k) {
+				batches[k >> 3].instanceCount = (k >> 3) + 3;
+			}
+			trace("DIRECT runs " + batches[0].instanceCount + " " + batches[1].instanceCount);
+		}
+
 		// A listener empties the vector while Godot runs a method of the element read from it: the register
 		// read last holds the object still.
 		private function shelved():void {
@@ -117,6 +130,7 @@ package {
 				each.useCustomData = true;
 				each.instanceCount = 1;
 			}
+			marked();
 			shelved();
 		}
 	}
