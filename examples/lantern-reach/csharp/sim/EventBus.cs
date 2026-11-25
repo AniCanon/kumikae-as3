@@ -28,11 +28,12 @@ public sealed class EventBus {
     public void dispatch() {
         if (pending.Count == 0) return;
         List<Subscription> snapshot = new List<Subscription>(listeners);
-        foreach (WorldEvent item in pending) {
+        var batch = pending;
+        pending = new List<WorldEvent>();
+        foreach (WorldEvent item in batch) {
             foreach (Subscription slot in snapshot) {
                 if (slot.active) slot.notify(item);
             }
         }
-        pending.Clear();
     }
 }

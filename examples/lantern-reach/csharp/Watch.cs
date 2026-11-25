@@ -26,7 +26,7 @@ public partial class Watch : Node {
         marsh = view;
         station = music;
         tides = new Tides(game);
-        book = new Register(game, "user://lantern-register.json");
+        book = new Register(game, ProjectSettings.GetSetting("lantern/register", "user://lantern-register.json").AsString());
         station.volume = book.volume;
         shake = book.shake;
         marsh.shake = shake;

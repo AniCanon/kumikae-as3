@@ -1,6 +1,7 @@
 package dev.kumikae.lanternreach {
     import dev.kumikae.lanternreach.sim.*;
     import godot.Node;
+    import godot.ProjectSettings;
     import godot.Input;
 
     public class Watch extends Node {
@@ -25,7 +26,7 @@ package dev.kumikae.lanternreach {
             marsh = view;
             station = music;
             tides = new Tides(game);
-            book = new Register(game, "user://lantern-register.json");
+            book = new Register(game, String(ProjectSettings.getSetting("lantern/register", "user://lantern-register.json")));
             station.volume = book.volume;
             shake = book.shake;
             marsh.shake = shake;

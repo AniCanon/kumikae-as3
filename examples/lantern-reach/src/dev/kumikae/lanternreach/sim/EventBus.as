@@ -24,12 +24,13 @@ package dev.kumikae.lanternreach.sim {
         public function dispatch():void {
             if (pending.length == 0) return;
             var snapshot:Vector.<Subscription> = listeners.slice();
-            for each (var event:WorldEvent in pending) {
+            var batch:Vector.<WorldEvent> = pending;
+            pending = new Vector.<WorldEvent>();
+            for each (var event:WorldEvent in batch) {
                 for each (var slot:Subscription in snapshot) {
                     if (slot.active) slot.notify(event);
                 }
             }
-            pending.length = 0;
         }
     }
 }

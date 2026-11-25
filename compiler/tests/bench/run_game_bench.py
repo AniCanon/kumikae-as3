@@ -25,7 +25,7 @@ def check(label, condition, detail):
         raise SystemExit(f"{label}: {detail}")
 
 
-def prepare(build, godot, folder):
+def stage_project(build, godot, folder):
     project = folder / "project"
     shutil.copytree(GAME, project, ignore=shutil.ignore_patterns(".godot", ".idea", "bin", "obj"))
     extension = build.parent / "tests/godot_project"
@@ -47,7 +47,12 @@ def prepare(build, godot, folder):
                               capture_output=True, text=True, timeout=180)
     report = imported.stdout + imported.stderr
     check("asset import", imported.returncode == 0 and not re.search(r"(ERROR|WARNING):", report), report[-6000:])
-    runner = Runner(godot, extension, HERE.parent, build / "kas3c", check)
+    return project
+
+
+def prepare(build, godot, folder):
+    project = stage_project(build, godot, folder)
+    runner = Runner(godot, build.parent / "tests/godot_project", HERE.parent, build / "kas3c", check)
     scripts = sorted(path.relative_to(project) for path in (project / "src").rglob("*.as"))
     library = runner.library("Lantern Reach", project, scripts, folder)
     return project, library
