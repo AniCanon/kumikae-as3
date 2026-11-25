@@ -181,6 +181,26 @@ String build_android_library(std::vector<std::string> p_scripts, const fs::path 
 	return build_program_library(std::move(p_scripts), p_stage, p_debug, target, r_library);
 }
 
+// For the preset's architectures in one file, at the oldest macOS the preset runs on. Clang raises an
+// arm64 slice to that architecture's own first macOS.
+String build_macos_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, const String &p_architecture,
+		const String &p_minimum, String *r_library) {
+	LibraryTarget target;
+	target.compiler = "/usr/bin/xcrun";
+	target.before = PackedStringArray({ "--sdk", "macosx", "clang++" });
+	for (const char *arch : { "arm64", "x86_64" }) {
+		if (p_architecture == "universal" || p_architecture == arch) {
+			target.before.append_array(PackedStringArray({ "-arch", arch }));
+		}
+	}
+	if (!p_minimum.is_empty()) {
+		target.before.push_back("-mmacosx-version-min=" + p_minimum);
+	}
+	target.after = PackedStringArray({ "-shared" });
+	target.file = "libkas3_program.dylib";
+	return build_program_library(std::move(p_scripts), p_stage, p_debug, target, r_library);
+}
+
 } // namespace
 
 bool AS3IOSExport::_supports_platform(const Ref<EditorExportPlatform> &p_platform) const {
@@ -189,7 +209,7 @@ bool AS3IOSExport::_supports_platform(const Ref<EditorExportPlatform> &p_platfor
 	}
 	const String os = p_platform->get_os_name();
 #if defined(MACOS_ENABLED)
-	return os == "iOS" || os == "Android" || os == "Web";
+	return os == "iOS" || os == "Android" || os == "Web" || os == "macOS";
 #else
 	return os == "Android" || os == "Web";
 #endif
@@ -214,20 +234,21 @@ TypedArray<Dictionary> AS3IOSExport::_get_export_options(const Ref<EditorExportP
 void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_debug, const String &, uint32_t) {
 	ios_ = p_features.has("ios");
 	android_ = p_features.has("android");
+	macos_ = p_features.has("macos");
 	web_ = p_features.has("web");
 	enabled_ = false;
-	if (ios_ || android_) {
+	if (ios_ || android_ || macos_) {
 		// Values 0 and 1 also preserve the choices saved by the old boolean option.
 		const int mode = get_option(OPTION);
 		enabled_ = mode == 1 || (mode == 2 && !p_debug);
 	}
 	debug_ = p_debug;
 	scripts_.clear();
-	android_temp_.unref();
+	library_temp_.unref();
 }
 
 void AS3IOSExport::_export_file(const String &p_path, const String &, const PackedStringArray &) {
-	if ((!web_ && !((ios_ || android_) && enabled_)) || !p_path.ends_with(".as") || p_path.contains("/.") ||
+	if ((!web_ && !((ios_ || android_ || macos_) && enabled_)) || !p_path.ends_with(".as") || p_path.contains("/.") ||
 			kas3::excluded_script(p_path.utf8().get_data())) {
 		return;
 	}
@@ -252,30 +273,15 @@ void AS3IOSExport::_export_file(const String &p_path, const String &, const Pack
 // Godot flushes added files and shared objects after scene customization ends. At this point _export_file
 // has seen exactly the paths chosen by the preset, including its include/exclude filters and dependencies.
 bool AS3IOSExport::_begin_customize_scenes(const Ref<EditorExportPlatform> &, const PackedStringArray &) const {
-	return web_ || (android_ && enabled_);
+	return web_ || ((android_ || macos_) && enabled_);
 }
 
 void AS3IOSExport::_end_customize_scenes() {
 	if (scripts_.empty()) {
 		return;
 	}
-	if (android_ && enabled_) {
-		android_temp_ = DirAccess::create_temp("kas3-android");
-		if (android_temp_.is_null()) {
-			get_export_platform()->add_message(
-					EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Could not create a temporary folder for Android native sources.");
-			return;
-		}
-		const fs::path stage(android_temp_->get_current_dir().utf8().get_data());
-		String library;
-		const String error = build_android_library(std::move(scripts_), stage, debug_, &library);
-		if (!error.is_empty()) {
-			get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", error);
-		} else if (!library.is_empty()) {
-			add_shared_object(library, PackedStringArray({ "arm64-v8a" }), "");
-			get_export_platform()->add_message(
-					EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Built native scripts for Android ARM64.");
-		}
+	if ((android_ || macos_) && enabled_) {
+		build_library();
 		return;
 	}
 	if (!web_) {
@@ -296,6 +302,34 @@ void AS3IOSExport::_end_customize_scenes() {
 	std::memcpy(bytes.ptrw(), encoded.data(), encoded.size());
 	add_file(kas3::PRECOMPILED_MODULE, bytes, false);
 	get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript", "Packed precompiled AS3 module for Web.");
+}
+
+// Android's library goes into the package for arm64-v8a; macOS's into the app's Frameworks, beside the
+// extension, where Godot signs it as it signs the extension.
+void AS3IOSExport::build_library() {
+	library_temp_ = DirAccess::create_temp("kas3-native");
+	if (library_temp_.is_null()) {
+		get_export_platform()->add_message(
+				EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", "Could not create a temporary folder for the native sources.");
+		return;
+	}
+	const fs::path stage(library_temp_->get_current_dir().utf8().get_data());
+	String library;
+	String error;
+	if (android_) {
+		error = build_android_library(std::move(scripts_), stage, debug_, &library);
+	} else {
+		const String architecture = get_option("binary_format/architecture");
+		const String minimum = get_option(architecture == "arm64" ? "application/min_macos_version_arm64" : "application/min_macos_version_x86_64");
+		error = build_macos_library(std::move(scripts_), stage, debug_, architecture, minimum, &library);
+	}
+	if (!error.is_empty()) {
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, "Native AS3", error);
+	} else if (!library.is_empty()) {
+		add_shared_object(library, android_ ? PackedStringArray({ "arm64-v8a" }) : PackedStringArray(), "");
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, "ActionScript",
+				android_ ? "Built native scripts for Android ARM64." : "Built native scripts for macOS.");
+	}
 }
 
 void AS3IOSExport::_end_generate_apple_embedded_project(const String &p_path, bool) {
@@ -319,10 +353,11 @@ void AS3IOSExport::_end_generate_apple_embedded_project(const String &p_path, bo
 
 void AS3IOSExport::_export_end() {
 	scripts_.clear();
-	android_temp_.unref();
+	library_temp_.unref();
 	enabled_ = false;
 	ios_ = false;
 	android_ = false;
+	macos_ = false;
 	web_ = false;
 }
 
