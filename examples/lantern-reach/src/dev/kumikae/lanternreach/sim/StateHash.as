@@ -32,5 +32,10 @@ package dev.kumikae.lanternreach.sim {
         public function finish():String {
             return hex(high) + hex(low);
         }
+        public function characters(value:String):void {
+            word(uint(value.length));
+            for (var i:int = 0; i < value.length; i++) word(uint(value.charCodeAt(i)));
+        }
+
     }
 }

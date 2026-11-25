@@ -15,6 +15,7 @@ public partial class Reach : Node2D
     private Desk desk;
     private Orders orders;
     private Watch watch;
+    private MenuReplay menus;
     private int limit;
     private readonly List<string> checks = new();
     private double total;
@@ -49,6 +50,7 @@ public partial class Reach : Node2D
         AddChild(desk);
         desk.setup(game);
         desk.field();
+        if (scenario.menu.Count > 0) menus = new MenuReplay(scenario.menu, game, Milliseconds);
         if (limit == 0) {
             orders = new Orders();
             AddChild(orders);
@@ -61,6 +63,7 @@ public partial class Reach : Node2D
 
     public override void _ExitTree()
     {
+        if (menus != null) menus.close();
         if (watch != null) watch.close();
         if (desk != null) desk.close();
         if (marsh != null) marsh.close(game.events);
@@ -86,19 +89,21 @@ public partial class Reach : Node2D
         effects.present(marsh);
         if (watch == null) desk.hud(game, 1, false);
         else watch.hud();
+        if (menus != null) menus.present(game, desk);
         double end = Milliseconds();
         presentation += end - drawn;
         total += end - start;
         allocated += GC.GetAllocatedBytesForCurrentThread() - before;
         if (limit == 0) return;
-        if (game.tick % 60 == 0 || game.tick == limit) checks.Add(game.checksum());
+        if (game.tick % 60 == 0 || game.tick == limit) checks.Add(menus == null ? game.checksum() : menus.checksum(game));
         if (game.tick < limit) return;
         string[] names = { "input", "spawn", "flow", "ai", "movement", "spatial", "collision", "combat", "status", "pickups", "light", "economy", "events" };
         var systems = new Dictionary<string, double>();
         for (int n = 0; n < names.Length; n++) systems[names[n]] = game.elapsed[n];
         GD.Print(JsonSerializer.Serialize(new { total_ms = total, systems_ms = systems,
             presentation_ms = presentation, peak = game.pool.peak, built = game.stats.built, destroyed = game.stats.destroyed,
-            deaths = game.stats.deaths, allocations = allocated, checksums = checks }));
+            deaths = game.stats.deaths, splits = game.combat.splits, floods = game.grid.floods,
+            writes = menus?.writes ?? 0, reads = menus?.reads ?? 0, hud_updates = menus?.updates ?? 0, allocations = allocated, checksums = checks }));
         GetTree().Quit();
     }
 }

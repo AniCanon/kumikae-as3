@@ -73,13 +73,21 @@ package dev.kumikae.lanternreach {
             }
         }
 
-        public function hud(game:Simulation, night:int, day:Boolean):void {
+        public function hud(game:Simulation, night:int, day:Boolean, left:int = 0):void {
             shownTick = game.tick;
             if (shownTick >= noticeUntil) notice.text = "";
             status.text = words.get(day ? "day" : "night") + " " + night + "     " + words.get("beacons") +
                 " " + game.grid.beacons.length + "     " + words.get("salvage") + " " + game.keeper.salvage +
                 "     " + words.get("level") + " " + game.keeper.level + "     " + words.get("xp") +
                 " " + game.keeper.xp + "     " + words.get("wave") + " " + wave;
+            var oil:String = "";
+            for each (var health:int in game.combat.beaconHealth) oil += "  " + health;
+            status.text += "     " + words.get("tending") + oil;
+            if (!day && left > 0) {
+                var seconds:int = int((left + 59) / 60);
+                status.text += "     " + words.get("untilDawn") + " " + int(seconds / 60) + ":" +
+                    (seconds % 60 < 10 ? "0" : "") + seconds % 60;
+            }
         }
 
         public function sheet(heading:String, body:String, imageKey:String, frameIndex:int):void {

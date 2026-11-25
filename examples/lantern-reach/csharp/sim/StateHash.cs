@@ -36,4 +36,9 @@ public sealed class StateHash {
     public string finish() {
         return hex(high) + hex(low);
     }
+
+    public void characters(string value) {
+        word((uint)(value.Length));
+        for (int i = 0; i < value.Length; i++) word(value[i]);
+    }
 }

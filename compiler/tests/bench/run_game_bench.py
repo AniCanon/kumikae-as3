@@ -71,6 +71,7 @@ def measure(godot, project, library, mode, scenario, ticks):
     check(mode, run.returncode == 0 and len(rows) == 1 and (USED in output) == (mode == "native")
           and not re.search(r"(ERROR|WARNING):", output), output[:6000])
     result = json.loads(rows[0])
+    check(mode + " allocation counter", (result["allocations"] is not None) == (mode == "C#"), result["allocations"])
     sequence = result["checksums"]
     check(mode, len(sequence) == math.ceil(ticks / 60)
           and all(re.fullmatch("[0-9a-f]{16}", value) for value in sequence), sequence)
@@ -95,12 +96,19 @@ def main():
             ticks = args.ticks or json.loads((project / "data/scenarios" / (scenario + ".json")).read_text())["ticks"]
             samples = {mode: {} for mode in MODES}
             expected = None
+            loads = None
+            allocated = []
             for turn in range(args.runs):
                 for mode in (MODES if turn % 2 == 0 else MODES[::-1]):
                     result = measure(godot, project, library, mode, scenario, ticks)
                     sequence = result["checksums"]
-                    detail = (f"peak {result['peak']}, built {result['built']}, "
-                              f"destroyed {result['destroyed']}, deaths {result['deaths']}")
+                    activity = {key: result[key] for key in
+                                ("peak", "built", "destroyed", "deaths", "splits", "floods", "writes", "reads", "hud_updates")}
+                    if loads is None:
+                        loads = activity
+                    check(f"{scenario} {mode} activity", activity == loads, activity)
+                    if mode == "C#":
+                        allocated.append(result["allocations"])
                     if expected is None:
                         expected = sequence
                     check(f"{scenario} {mode} checksums", sequence == expected,
@@ -114,7 +122,16 @@ def main():
                     times = samples[mode][key]
                     cells.append(f"{statistics.median(times):.3f} [{min(times):.3f}, {max(times):.3f}]")
                 print(f"| {scenario} | {key} | " + " | ".join(cells) + " |", flush=True)
+            if args.ticks is None:
+                minimums = {"calm": {"peak": 150, "built": 10}, "siege": {"peak": 2000, "built": 60, "destroyed": 1},
+                            "flood": {"peak": 10000, "splits": 10, "floods": 1},
+                            "menus": {"writes": 10, "reads": 10, "hud_updates": 300}}
+                for metric, minimum in minimums[scenario].items():
+                    check(f"{scenario} {metric}", loads[metric] >= minimum, loads)
+            detail = ", ".join(f"{key} {value}" for key, value in loads.items())
             print(f"{scenario}: {len(expected)} matching checkpoints, final {expected[-1]}; {detail}", flush=True)
+            print(f"{scenario} C# allocated bytes: {int(statistics.median(allocated))} "
+                  f"[{min(allocated)}, {max(allocated)}]", flush=True)
 
 
 if __name__ == "__main__":

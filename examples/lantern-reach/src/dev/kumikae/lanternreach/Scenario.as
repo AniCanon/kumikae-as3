@@ -5,6 +5,7 @@ package dev.kumikae.lanternreach {
     public final class Scenario {
         public var simulation:Simulation;
         public var ticks:int;
+        public var menu:Vector.<String> = new Vector.<String>();
 
         public function Scenario(name:String, timer:Function) {
             var data:Object = JSON.parse(FileAccess.getFileAsString("res://data/" + (name == "station" ? name : "scenarios/" + name) + ".json"));
@@ -30,6 +31,16 @@ package dev.kumikae.lanternreach {
             }
             for each (var row:Array in data.commands) {
                 simulation.commands.enqueue(new TickCommand(row[0], row[1], row[2], row[3]));
+            }
+            if (data.actors != null) {
+                for each (var actor:Array in data.actors) {
+                    var resident:Creature = simulation.spawn.place(actor[0], actor[1], actor[2], actor[3]);
+                    resident.hp = actor[4];
+                    resident.cooldown = actor[5];
+                }
+            }
+            if (data.menu != null) {
+                for each (var action:String in data.menu) menu.push(action);
             }
             ticks = data.ticks;
         }

@@ -1,0 +1,18 @@
+{
+  "seed": 8111,
+  "width": 64,
+  "height": 40,
+  "beacons": [1300,1572,1136],
+  "marsh": [[8,4,15,5],[36,12,13,4]],
+  "ticks": 121,
+  "salvage": 1200,
+  "waves": [],
+  "commands": [
+    [0,"lamp",19,18],
+    [0,"harpoon",21,18],
+    [0,"brazier",32,15],
+    [1,"upgrade",21,18],
+    [2,"wall",17,11]
+  ],
+  "menu": ["save","load","ledger","hud","upgrades","settings","hud","ledger"]
+}

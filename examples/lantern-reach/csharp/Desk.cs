@@ -63,13 +63,21 @@ public partial class Desk : CanvasLayer {
         }
     }
 
-    public void hud(Simulation game, int night, bool day) {
+    public void hud(Simulation game, int night, bool day, int left = 0) {
         shownTick = game.tick;
         if (shownTick >= noticeUntil) notice.Text = "";
         status.Text = words.get(day ? "day" : "night") + " " + night + "     " + words.get("beacons") +
             " " + game.grid.beacons.Count + "     " + words.get("salvage") + " " + game.keeper.salvage +
             "     " + words.get("level") + " " + game.keeper.level + "     " + words.get("xp") +
             " " + game.keeper.xp + "     " + words.get("wave") + " " + wave;
+        string oil = "";
+        foreach (int health in game.combat.beaconHealth) oil += "  " + health;
+        status.Text += "     " + words.get("tending") + oil;
+        if (!day && left > 0) {
+            int seconds = (int)((left + 59) / 60);
+            status.Text += "     " + words.get("untilDawn") + " " + (int)(seconds / 60) + ":" +
+                (seconds % 60 < 10 ? "0" : "") + seconds % 60;
+        }
     }
 
     public void sheet(string heading, string body, string imageKey, int frameIndex) {

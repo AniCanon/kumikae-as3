@@ -8,6 +8,7 @@ public sealed class Scenario
 {
     public Simulation simulation;
     public int ticks;
+    public System.Collections.Generic.List<string> menu = new();
 
     public Scenario(string name, Func<double> timer)
     {
@@ -30,6 +31,16 @@ public sealed class Scenario
             });
         foreach (var row in data.GetProperty("commands").EnumerateArray())
             simulation.commands.enqueue(new TickCommand(row[0].GetInt32(), row[1].GetString(), row[2].GetDouble(), row[3].GetDouble()));
+        if (data.TryGetProperty("actors", out var actors)) {
+            foreach (var actor in actors.EnumerateArray()) {
+                var resident = simulation.spawn.place(actor[0].GetInt32(), actor[1].GetDouble(), actor[2].GetDouble(), actor[3].GetInt32());
+                resident.hp = actor[4].GetInt32();
+                resident.cooldown = actor[5].GetInt32();
+            }
+        }
+        if (data.TryGetProperty("menu", out var actions)) {
+            foreach (var action in actions.EnumerateArray()) menu.Add(action.GetString());
+        }
         ticks = data.GetProperty("ticks").GetInt32();
     }
 }

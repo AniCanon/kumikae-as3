@@ -105,6 +105,11 @@ public sealed class Simulation {
 
     public string checksum() {
         StateHash hash = new StateHash();
+        hashInto(hash);
+        return hash.finish();
+    }
+
+    public void hashInto(StateHash hash) {
         hash.word((uint)(tick));
         hash.word(random.state);
         hash.word((uint)(spawn.cursor));
@@ -183,7 +188,6 @@ public sealed class Simulation {
             hash.coordinate(shard.y);
             hash.word((uint)(shard.value));
         }
-        return hash.finish();
     }
 
     public List<int> wrack = new List<int>();

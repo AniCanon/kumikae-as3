@@ -1,5 +1,6 @@
 package dev.kumikae.lanternreach.sim {
     public final class TownGrid {
+        public var floods:int;
         public var width:int;
         public var height:int;
         public var walls:Vector.<Boolean> = new Vector.<Boolean>();

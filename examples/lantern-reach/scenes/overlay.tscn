@@ -16,7 +16,7 @@ mouse_filter = 2
 [node name="Status" type="Label" parent="."]
 offset_left = 16.0
 offset_top = 0.0
-offset_right = 786.0
+offset_right = 952.0
 offset_bottom = 36.0
 theme_override_constants/outline_size = 4
 

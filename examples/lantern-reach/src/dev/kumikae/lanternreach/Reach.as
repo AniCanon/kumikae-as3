@@ -12,6 +12,7 @@ package dev.kumikae.lanternreach {
         private var desk:Desk;
         private var orders:Orders;
         private var watch:Watch;
+        private var menus:MenuReplay;
         private var limit:int;
         private var checks:Array = [];
         private var total:Number = 0;
@@ -39,6 +40,7 @@ package dev.kumikae.lanternreach {
             addChild(desk);
             desk.setup(game);
             desk.field();
+            if (scenario.menu.length > 0) menus = new MenuReplay(scenario.menu, game, milliseconds);
             if (limit == 0) {
                 orders = new Orders();
                 addChild(orders);
@@ -50,6 +52,7 @@ package dev.kumikae.lanternreach {
         }
 
         override public function _exitTree():void {
+            if (menus != null) menus.close();
             if (watch != null) watch.close();
             if (desk != null) desk.close();
             if (marsh != null) marsh.close(game.events);
@@ -73,18 +76,21 @@ package dev.kumikae.lanternreach {
             effects.present(marsh);
             if (watch == null) desk.hud(game, 1, false);
             else watch.hud();
+            if (menus != null) menus.present(game, desk);
             var end:Number = milliseconds();
             presentation += end - drawn;
             total += end - start;
             if (limit == 0) return;
-            if (game.tick % 60 == 0 || game.tick == limit) checks.push(game.checksum());
+            if (game.tick % 60 == 0 || game.tick == limit) checks.push(menus == null ? game.checksum() : menus.checksum(game));
             if (game.tick < limit) return;
             var names:Array = ["input", "spawn", "flow", "ai", "movement", "spatial", "collision", "combat", "status", "pickups", "light", "economy", "events"];
             var systems:Object = {};
             for (var n:int = 0; n < names.length; n++) systems[names[n]] = game.elapsed[n];
             trace(JSON.stringify({total_ms:total, systems_ms:systems, presentation_ms:presentation,
                                   peak:game.pool.peak, built:game.stats.built, destroyed:game.stats.destroyed,
-                                  deaths:game.stats.deaths, allocations:null, checksums:checks}));
+                                  deaths:game.stats.deaths, splits:game.combat.splits, floods:game.grid.floods,
+                                  writes:menus == null ? 0 : menus.writes, reads:menus == null ? 0 : menus.reads,
+                                  hud_updates:menus == null ? 0 : menus.updates, allocations:null, checksums:checks}));
             getTree().quit();
         }
     }

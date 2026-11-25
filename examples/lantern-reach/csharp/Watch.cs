@@ -217,5 +217,5 @@ public partial class Watch : Node {
         } else if (game.keeper.offers.Count > 0) show("levelup");
     }
 
-    public void hud() { desk.hud(game, tides.number, field == "day"); }
+    public void hud() { desk.hud(game, tides.number, field == "day", tides.ends - game.tick); }
 }

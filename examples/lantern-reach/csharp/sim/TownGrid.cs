@@ -4,6 +4,7 @@ using System.Collections.Generic;
 namespace Kumikae.LanternReach;
 
 public sealed class TownGrid {
+    public int floods;
     public int width;
     public int height;
     public List<bool> walls = new List<bool>();

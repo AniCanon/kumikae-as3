@@ -101,6 +101,11 @@ package dev.kumikae.lanternreach.sim {
 
         public function checksum():String {
             var hash:StateHash = new StateHash();
+            hashInto(hash);
+            return hash.finish();
+        }
+
+        public function hashInto(hash:StateHash):void {
             hash.word(uint(tick));
             hash.word(random.state);
             hash.word(uint(spawn.cursor));
@@ -179,7 +184,6 @@ package dev.kumikae.lanternreach.sim {
                 hash.coordinate(shard.y);
                 hash.word(uint(shard.value));
             }
-            return hash.finish();
         }
         public var wrack:Vector.<int> = new Vector.<int>();
 

@@ -5,6 +5,7 @@ namespace Kumikae.LanternReach;
 
 public sealed class CombatSystem {
     public List<int> beaconHealth = new List<int>();
+    public int splits;
     private TownGrid grid;
     private CreaturePool pool;
     private SpawnSystem spawn;
@@ -59,6 +60,7 @@ public sealed class CombatSystem {
         drops.drop(actor.x, actor.y, rules.enemies[actor.kind].xp);
         events.post(WorldEvent.DEATH, cell, actor.kind);
         if (actor.kind == Creature.SPLITTER && actor.generation < 3) {
+            splits++;
             for (int i = 0; i < 2; i++) {
                 double x = Math.Max(0, Math.Min(grid.width - 0.001, actor.x + (i == 0 ? -0.25 : 0.25)));
                 spawn.place(actor.kind, x, actor.y, actor.generation + 1);

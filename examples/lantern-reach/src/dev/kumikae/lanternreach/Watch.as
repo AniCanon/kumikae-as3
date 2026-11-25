@@ -217,6 +217,6 @@ package dev.kumikae.lanternreach {
             } else if (game.keeper.offers.length > 0) show("levelup");
         }
 
-        public function hud():void { desk.hud(game, tides.number, field == "day"); }
+        public function hud():void { desk.hud(game, tides.number, field == "day", tides.ends - game.tick); }
     }
 }
