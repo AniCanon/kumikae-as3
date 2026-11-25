@@ -42,7 +42,7 @@ nothing differently for the editor, so one library serves both.
 | `godot_named.cpp` | What a Godot value has under an AS3 name, from the name table, for a value held untyped |
 | `callable`, `bound_method.h` | A method as a Godot callable |
 | `restart.cpp` | What a reload reports, and restarting the running scene |
-| `ios_export` | Editor export plugin for iOS (native objects), Android (`libkas3_program.so`), and Web (`res://.kas3/program.kas3`) |
+| `ios_export` | Editor export plugin for iOS (native objects), Android (`libkas3_program.so`), macOS (`libkas3_program.dylib`), and Web (`res://.kas3/program.kas3`) |
 | `web_reload` | In-browser source overrides and `kas3_web_reload` C API for WebAssembly hot reload |
 | `native_program`, `shared_library` | [The program library](#the-program-library): found, loaded, checked, and given what it needs from Godot |
 | `play_build`, `play_cache.h`, `toolchain.h` | [Building the program library on Play](#building-on-play) |
@@ -100,19 +100,29 @@ The editor turns compiler candidates into Godot's insertions at the caret.
   that generated code reads directly, to learn when the object is freed. The bindings last as long as the
   library does.
 
-## Native iOS and Android exports
+## Native iOS, Android and macOS exports
 
-`ios_export` registers an editor export plugin for iOS and Android. On macOS, it collects the AS3 paths
-selected by an iOS preset and uses the same test-folder rules and source ordering as the game. Once Godot
-writes the Xcode project, the plugin compiles one object for the device and one for the Simulator, and Xcode
-links the object for its destination into the app. On Android exports, it compiles `libkas3_program.so` for
-`arm64-v8a` with the Android NDK (`aarch64-linux-android24-clang++`) and packages it into the APK/AAB, where
-`native_program` loads it alongside `libkas3_godot.so`.
+`ios_export` registers an editor export plugin for iOS, Android and macOS. It collects the AS3 paths a
+preset selects, with the same test-folder rules and source ordering as the game, and compiles them with the
+flags in `play_cache.h`.
 
-The default **Automatic** mode interprets debug exports and compiles release exports. Both presets accept
-`actionscript/native_code`: Automatic (2), Interpreter (0) and Native (1). Earlier iOS boolean settings keep
-their original meaning. Native debug exports record constructor arguments for hot reload. Release exports
-omit that bookkeeping.
+- **iOS.** Once Godot writes the Xcode project, the plugin compiles one object for the device and one for
+  the Simulator, and Xcode links the object for its destination into the app.
+- **Android.** The plugin compiles `libkas3_program.so` for `arm64-v8a` with the Android NDK
+  (`aarch64-linux-android24-clang++`) and packages it into the APK or AAB, beside `libkas3_godot.so`.
+- **macOS.** The plugin compiles `libkas3_program.dylib` with Xcode's `clang++` for the preset's
+  architectures, `arm64` and `x86_64` in one file for `universal`, and for the preset's oldest macOS
+  version. Godot puts the library in the app's `Contents/Frameworks`, beside `libkas3_godot.dylib`, and
+  signs it as it signs the extension. The macOS export runs on macOS only.
+
+At run time, `native_program` finds the library beside the extension library. On macOS, a library named by
+`KAS3_PROGRAM_LIBRARY` or in the project's `bin` folder comes first. See
+[The program library](#the-program-library).
+
+The default **Automatic** mode interprets debug exports and compiles release exports. Each of these presets
+has the `actionscript/native_code` option: Automatic (2), Interpreter (0) and Native (1). Earlier iOS
+boolean settings keep their original meaning. Native debug exports record constructor arguments for hot
+reload. Release exports omit that bookkeeping.
 
 ## Web export (WebAssembly)
 
@@ -139,7 +149,9 @@ project's program library. When the extension loads the scripts, it looks for on
 
 1. The file that `KAS3_PROGRAM_LIBRARY` names.
 2. `bin/libkas3_program.dylib` in the project (`.so` on Linux).
-3. A library the extension built itself, under `.godot/kas3`.
+3. On macOS, `libkas3_program.dylib` in the folder the extension library was loaded from. In an exported
+   app, that is `Contents/Frameworks`.
+4. A library the extension built itself, under `.godot/kas3`.
 
 The library must have been built from the scripts as they are now, which the extension checks with a
 fingerprint of the compiled module, and for this runtime's layout. If it was, the scripts run as native

@@ -63,9 +63,10 @@ state of the project changes.
 ### Native code
 
 - **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
-- **Native iOS and Android exports.** Release exports build the AS3 scripts into the app (static objects
-  linked into Xcode for iOS and the Simulator; `libkas3_program.so` compiled with the Android NDK for
-  `arm64-v8a`). Debug exports default to the interpreter. The Simulator runs the native integration suite,
+- **Native iOS, Android and macOS exports.** Release exports build the AS3 scripts into the app (static
+  objects linked into Xcode for iOS and the Simulator; `libkas3_program.so` compiled with the Android NDK for
+  `arm64-v8a`; a universal `libkas3_program.dylib` in a macOS app's `Contents/Frameworks`). Debug exports
+  default to the interpreter. Exported macOS apps are tested headless on Apple silicon. The Simulator runs the native integration suite,
   and Android APK export modes are verified on macOS. Runs on iOS and Android hardware are next.
 - **Every test program gives the same output** on the interpreter and as native code.
 - **Level with or ahead of Godot C#** on all ten macOS frame benchmarks. See [Performance](performance.md).

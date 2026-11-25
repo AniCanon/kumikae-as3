@@ -106,6 +106,10 @@ every run shares the test project.
   the test project.
 - **`godot_native/`** holds a script that Godot runs on the interpreter and as native code. The two must
   print the same.
+- **`test_macos_export.py`** exports a small project as a macOS app with a release preset and runs the app
+  headless. The scripts must run as native code and print what the interpreter prints. A library built
+  from other scripts must be refused with the reason, and the interpreter must run the scripts. It needs
+  Godot's macOS export templates, and skips itself without them.
 - **`play_godot.py`** tests the extension building a program library on Play: a project played twice,
   edited between runs, with the setting off, with no compiler, and with a compiler that fails.
 - **`timeout.gd`** runs on the interpreter and from a native start: a script stuck in a loop is stopped.
