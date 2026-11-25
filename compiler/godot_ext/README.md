@@ -115,6 +115,11 @@ flags in `play_cache.h`.
   version. Godot puts the library in the app's `Contents/Frameworks`, beside `libkas3_godot.dylib`, and
   signs it as it signs the extension. The macOS export runs on macOS only.
 
+  Without Xcode or its command line tools, an Automatic release export builds no library, warns that the
+  interpreter will run the scripts, and finishes. A preset set to Native fails the export instead. The
+  plugin looks for the tools before it runs `xcrun`, so it never opens the window that offers to install
+  them.
+
 At run time, `native_program` finds the library beside the extension library. On macOS, a library named by
 `KAS3_PROGRAM_LIBRARY` or in the project's `bin` folder comes first. See
 [The program library](#the-program-library).

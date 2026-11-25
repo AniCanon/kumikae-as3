@@ -108,7 +108,9 @@ every run shares the test project.
   print the same.
 - **`test_macos_export.py`** exports a small project as a macOS app with a release preset and runs the app
   headless. The scripts must run as native code and print what the interpreter prints. A library built
-  from other scripts must be refused with the reason, and the interpreter must run the scripts. It needs
+  from other scripts must be refused with the reason, and the interpreter must run the scripts. Without
+  the developer tools, an Automatic release export must warn and leave the scripts to the interpreter,
+  and a Native export must fail. It needs
   Godot's macOS export templates, and skips itself without them.
 - **`play_godot.py`** tests the extension building a program library on Play: a project played twice,
   edited between runs, with the setting off, with no compiler, and with a compiler that fails.

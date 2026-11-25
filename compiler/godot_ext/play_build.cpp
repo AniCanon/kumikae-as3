@@ -132,9 +132,7 @@ std::optional<toolchain::Compiler> compiler() {
 		search.path = environment("PATH");
 #if defined(__APPLE__)
 		search.shims = "/usr/bin";
-		std::error_code failed;
-		search.developer = { environment("DEVELOPER_DIR"), fs::read_symlink("/var/db/xcode_select_link", failed).string(),
-			"/Applications/Xcode.app/Contents/Developer", "/Library/Developer/CommandLineTools" };
+		search.developer = toolchain::apple_developer(environment("DEVELOPER_DIR"));
 #endif
 		return toolchain::find_compiler(search);
 	}();

@@ -5,6 +5,7 @@
 #include "play_build.h"
 #include "play_cache.h"
 #include "sources.h"
+#include "toolchain.h"
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -181,6 +182,17 @@ String build_android_library(std::vector<std::string> p_scripts, const fs::path 
 	return build_program_library(std::move(p_scripts), p_stage, p_debug, target, r_library);
 }
 
+// Why Xcode's compiler can't be run, if it can't. The tools are looked for before xcrun runs, because
+// without them /usr/bin/xcrun offers to install them in a window.
+std::optional<String> missing_macos_tools() {
+	const String developer = OS::get_singleton()->get_environment("DEVELOPER_DIR");
+	if (!kas3::toolchain::tools_compiler(kas3::toolchain::apple_developer(developer.utf8().get_data()))) {
+		return String("Xcode's command line tools were not found. Install them with xcode-select --install.");
+	}
+	const String why = run("/usr/bin/xcrun", PackedStringArray({ "--sdk", "macosx", "--find", "clang++" }));
+	return why.is_empty() ? std::nullopt : std::optional<String>(why);
+}
+
 // For the preset's architectures in one file, at the oldest macOS the preset runs on. Clang raises an
 // arm64 slice to that architecture's own first macOS.
 String build_macos_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, const String &p_architecture,
@@ -237,10 +249,12 @@ void AS3IOSExport::_export_begin(const PackedStringArray &p_features, bool p_deb
 	macos_ = p_features.has("macos");
 	web_ = p_features.has("web");
 	enabled_ = false;
+	automatic_ = false;
 	if (ios_ || android_ || macos_) {
 		// Values 0 and 1 also preserve the choices saved by the old boolean option.
 		const int mode = get_option(OPTION);
 		enabled_ = mode == 1 || (mode == 2 && !p_debug);
+		automatic_ = mode == 2;
 	}
 	debug_ = p_debug;
 	scripts_.clear();
@@ -316,7 +330,16 @@ void AS3IOSExport::build_library() {
 	const fs::path stage(library_temp_->get_current_dir().utf8().get_data());
 	String library;
 	String error;
-	if (android_) {
+	const std::optional<String> missing = macos_ ? missing_macos_tools() : std::nullopt;
+	if (missing && automatic_) {
+		// A release export in Automatic mode still makes a game, as a debug export would.
+		get_export_platform()->add_message(EditorExportPlatform::EXPORT_MESSAGE_WARNING, "Native AS3",
+				"No program library was built, so the scripts will run on the interpreter. " + *missing);
+		return;
+	}
+	if (missing) {
+		error = *missing;
+	} else if (android_) {
 		error = build_android_library(std::move(scripts_), stage, debug_, &library);
 	} else {
 		const String architecture = get_option("binary_format/architecture");
@@ -355,6 +378,7 @@ void AS3IOSExport::_export_end() {
 	scripts_.clear();
 	library_temp_.unref();
 	enabled_ = false;
+	automatic_ = false;
 	ios_ = false;
 	android_ = false;
 	macos_ = false;

@@ -20,6 +20,7 @@ class AS3IOSExport : public godot::EditorExportPlugin {
 	bool web_ = false;
 	bool android_ = false;
 	bool macos_ = false;
+	bool automatic_ = false; // Native because the mode is Automatic, not because the preset says Native.
 	godot::Ref<godot::DirAccess> library_temp_; // Where Android's or macOS's library is built, until the export ends.
 
 	void build_library();
