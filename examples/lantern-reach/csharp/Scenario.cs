@@ -11,7 +11,7 @@ public sealed class Scenario
 
     public Scenario(string name, Func<double> timer)
     {
-        using var json = JsonDocument.Parse(FileAccess.GetFileAsString($"res://data/scenarios/{name}.json"));
+        using var json = JsonDocument.Parse(FileAccess.GetFileAsString("res://data/" + (name == "station" ? name : "scenarios/" + name) + ".json"));
         var data = json.RootElement;
         var grid = new TownGrid(data.GetProperty("width").GetInt32(), data.GetProperty("height").GetInt32());
         foreach (var id in data.GetProperty("beacons").EnumerateArray()) grid.beacons.Add(id.GetInt32());

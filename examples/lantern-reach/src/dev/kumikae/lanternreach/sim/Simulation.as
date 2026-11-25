@@ -52,6 +52,15 @@ package dev.kumikae.lanternreach.sim {
             for (var i:int = 0; i < 13; i++) elapsed.push(0);
         }
 
+        public function daylight():void {
+            input.update(tick);
+            keeper.move(grid);
+            flow.update();
+            light.update();
+            events.dispatch();
+            tick++;
+        }
+
         public function step():void {
             previous = clock();
             input.update(tick);

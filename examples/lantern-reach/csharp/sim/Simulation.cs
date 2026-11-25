@@ -56,6 +56,15 @@ public sealed class Simulation {
         for (int i = 0; i < 13; i++) elapsed.Add(0);
     }
 
+    public void daylight() {
+        input.update(tick);
+        keeper.move(grid);
+        flow.update();
+        light.update();
+        events.dispatch();
+        tick++;
+    }
+
     public void step() {
         previous = clock();
         input.update(tick);

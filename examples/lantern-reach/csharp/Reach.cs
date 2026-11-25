@@ -9,7 +9,12 @@ public partial class Reach : Node2D
 {
     private Simulation game;
     private readonly FixedStep stepper = new();
-    private Crowd crowd;
+    private MarshView marsh;
+    private StationAudio station;
+    private Impressions effects;
+    private Desk desk;
+    private Orders orders;
+    private Watch watch;
     private int limit;
     private readonly List<string> checks = new();
     private double total;
@@ -28,15 +33,38 @@ public partial class Reach : Node2D
     public override void _Ready()
     {
         string bench = Option("--bench", "");
-        var scenario = new Scenario(bench == "" ? "calm" : bench, Milliseconds);
+        var scenario = new Scenario(bench == "" ? "station" : bench, Milliseconds);
         game = scenario.simulation;
         limit = bench == "" ? 0 : int.Parse(Option("--ticks", scenario.ticks.ToString()));
-        crowd = new Crowd();
-        AddChild(crowd);
+        marsh = new MarshView();
+        AddChild(marsh);
+        marsh.setup(game);
+        station = new StationAudio();
+        AddChild(station);
+        station.setup(game);
+        effects = new Impressions();
+        marsh.AddChild(effects);
+        effects.setup(game);
+        desk = new Desk();
+        AddChild(desk);
+        desk.setup(game);
+        desk.field();
+        if (limit == 0) {
+            orders = new Orders();
+            AddChild(orders);
+            orders.setup(game);
+            watch = new Watch();
+            AddChild(watch);
+            watch.setup(game, desk, orders, marsh, station);
+        }
     }
 
     public override void _ExitTree()
     {
+        if (desk != null) desk.close();
+        if (marsh != null) marsh.close(game.events);
+        if (effects != null) effects.close(game.events);
+        if (station != null) station.close(game.events);
         if (game != null) game.stats.close(game.events);
     }
 
@@ -45,9 +73,18 @@ public partial class Reach : Node2D
         long before = GC.GetAllocatedBytesForCurrentThread();
         double start = Milliseconds();
         int steps = stepper.advance(limit > 0 ? 1.0 / 60 : delta);
-        for (int i = 0; i < steps; i++) game.step();
+        if (watch != null) watch.poll();
+        for (int i = 0; i < steps; i++) {
+            if (watch == null) game.step();
+            else watch.advance();
+        }
         double drawn = Milliseconds();
-        crowd.Present(game.pool);
+        marsh.present(game);
+        station.present(game);
+        effects.shake = marsh.shake;
+        effects.present(marsh);
+        if (watch == null) desk.hud(game, 1, false);
+        else watch.hud();
         double end = Milliseconds();
         presentation += end - drawn;
         total += end - start;
@@ -61,7 +98,6 @@ public partial class Reach : Node2D
         GD.Print(JsonSerializer.Serialize(new { total_ms = total, systems_ms = systems,
             presentation_ms = presentation, peak = game.pool.peak, built = game.stats.built, destroyed = game.stats.destroyed,
             deaths = game.stats.deaths, allocations = allocated, checksums = checks }));
-        SetProcess(false);
         GetTree().Quit();
     }
 }

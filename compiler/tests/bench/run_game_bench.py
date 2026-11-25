@@ -43,6 +43,10 @@ def prepare(build, godot, folder):
     subprocess.run(["dotnet", "build", "-m:4", "-p:Optimize=true", "-p:NuGetAudit=false",
                     "--disable-build-servers", "-v:q"], cwd=project, check=True)
     (project / ".godot/extension_list.cfg").write_text("res://kas3.gdextension\n")
+    imported = subprocess.run([godot, "--headless", "--editor", "--path", project, "--import"],
+                              capture_output=True, text=True, timeout=180)
+    report = imported.stdout + imported.stderr
+    check("asset import", imported.returncode == 0 and not re.search(r"(ERROR|WARNING):", report), report[-6000:])
     runner = Runner(godot, extension, HERE.parent, build / "kas3c", check)
     scripts = sorted(path.relative_to(project) for path in (project / "src").rglob("*.as"))
     library = runner.library("Lantern Reach", project, scripts, folder)

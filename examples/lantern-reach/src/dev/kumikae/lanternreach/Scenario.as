@@ -7,7 +7,7 @@ package dev.kumikae.lanternreach {
         public var ticks:int;
 
         public function Scenario(name:String, timer:Function) {
-            var data:Object = JSON.parse(FileAccess.getFileAsString("res://data/scenarios/" + name + ".json"));
+            var data:Object = JSON.parse(FileAccess.getFileAsString("res://data/" + (name == "station" ? name : "scenarios/" + name) + ".json"));
             var grid:TownGrid = new TownGrid(data.width, data.height);
             for each (var id:int in data.beacons) grid.beacons.push(id);
             for each (var patch:Array in data.marsh) {
