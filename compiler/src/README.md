@@ -2,7 +2,7 @@
 
 Fixed array annotations (`[]T`) are interned by element type. Their length is read-only. The element type is checked for indexed writes and brace initializers.
 
-Callback annotations such as `(int, String)=>void` are interned by their complete signature. Binding checks the declared target, and calling checks the arguments against that signature.
+Callback annotations such as `(int, String)=>void` are interned by their complete signature. Parameters can use a script class or interface. Binding checks the declared target, and calling checks the arguments against that signature.
 
 The front end turns source text into a checked syntax tree. It holds the lexer, the parser, name resolution
 and the type checker, plus the queries an editor asks. `kas3c check`, the lowerer and the language server

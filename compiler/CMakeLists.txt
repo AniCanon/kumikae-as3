@@ -302,6 +302,9 @@ add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
 # AS3 inside Godot. Skips itself, with a message, without the extension library or Godot 4.7.
 add_test(NAME godot_extension COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_godot.py
     ${CMAKE_CURRENT_SOURCE_DIR}/tests $<TARGET_FILE:kas3c>)
+add_test(NAME lantern_reach COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_lantern_reach.py
+    $<TARGET_FILE:kas3c>)
+set_tests_properties(lantern_reach PROPERTIES SKIP_RETURN_CODE 77 RUN_SERIAL TRUE)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # The rules of docs/cpp-guidelines.md that a script can judge.

@@ -200,7 +200,9 @@ inline bool is_held(Kind p_kind) {
 	X(CallTypedFunction, "rRA") \
 	/* One of Godot's methods bound to the Godot object it is read from, as Godot's own Callable of that \
 	   object and method: out, the object, the method (E). */ \
-	X(HostBindMethod, "RRE")
+	X(HostBindMethod, "RRE") \
+	/* Argument pairs carry the value register and the declared script class, or NONE for a scalar. */ \
+	X(CallObjectCallback, "rRA")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

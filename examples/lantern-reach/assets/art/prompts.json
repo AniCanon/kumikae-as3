@@ -1,0 +1,412 @@
+[
+  {
+    "key": "beacons",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree STONE tower crowns in three columns one row, perfectly overhead, fieldstone masonry made of three broad flat slate/teal brush strokes, no individual rivets. One cold dark windglass opening, second with a small amber wick, third with a broad warm pool from the amber lamp like the towers in the reference. No exterior aura.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.",
+    "columns": 3,
+    "rows": 1,
+    "category": "structures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      2172,
+      724
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "brute",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "style_reference": "title.png",
+    "sources": [
+      {
+        "key": "brute-move",
+        "columns": 3,
+        "rows": 2,
+        "take": 5,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nSix animation drawings, three columns x two rows, read across. Facing NORTH throughout. First five poses form a restrained five-beat locomotion loop, with a distinct collapsed death drawing in final cell. Each living creature has TWO oversized pale BONE hollow eyes, each a simple thick pale ring with dark center that survives reduction to 16 pixels. No amber pigment or point of light. Broad silhouette must read at a glance.\nAn unmistakable broad SHIP'S ANCHOR lying FLAT ON ITS BACK on a chroma ground. Solid T stock at top, long straight shaft with one huge chunky coil of rope and a group of three overgrown barnacles wrapped around the central THIRD ONLY, two big sweeping prongs with pronounced triangular flukes spread to the sides. Large open triangular negative space separating each arm from the shank. No humanoid head or body, no pile obscuring the lower gap, no blob. The two rings of pale eye light are embedded in the barnacles. Strong stout silhouette with generous daylight around the flukes.",
+        "source_size": [
+          1536,
+          1024
+        ],
+        "seed": null
+      },
+      {
+        "key": "brute-death",
+        "columns": 1,
+        "rows": 1,
+        "character_reference": "brute-move.png",
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nUse the anchor in the second reference as the exact model, paint ONLY a single death pose for it. Top-down overhead, ENTIRE ANCHOR fallen apart on the ground diagonally, one iron fluke broken off lying next to the shaft, rope slack and emptied of barnacles, hollow eye rings extinguished. One flat broken heap of wreckage, no living face, no T standing upright. Preserve the weight and pigment of the reference, centered and surrounded by magenta space. Single cell.",
+        "source_size": [
+          1536,
+          1024
+        ],
+        "seed": null
+      }
+    ]
+  },
+  {
+    "key": "cards",
+    "prompt": "Eight separate equal full-bleed landscape illustration panels printed in a strict 2-column 4-row grid, with straight boundaries and no gutters. Each panel is a different top-down scene in the same keeper's maritime almanac. Row 1 left an iron lantern being trimmed on a worn work table; right a bell barely visible just under the bay water. Row 2 left wet boot prints walking along the boardwalk and out to sea; right two open log pages showing the same faint illegible pencil marks, with no readable text. Row 3 left wreckage and huge chain coils stirring under the tide; right sunrise light falling on all three burning stone lighthouse crowns through clearing fog. Row 4 left the cold empty desk with a new blank log page and a wet sleeve; right a supply boat moored to a lonely pier at night. Restrained cinematic gouache, sharp focal silhouettes in wide pools of negative space. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 2,
+    "rows": 4,
+    "category": "illustrations",
+    "cell": 480,
+    "seed": null,
+    "source_size": [
+      1086,
+      1448
+    ]
+  },
+  {
+    "key": "controls",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nSix separate printed UI pieces in exactly 3 columns 2 rows, perfectly FRONTAL. First row broad horizontal rectangle of cold bone paper used as blank button, its pressed indigo version, a matching EMPTY thin bone frame through which the magenta backdrop is visible. Bottom row small compass needle, circular crosshair, four open right-angle placement corners together. No golden trim. Restrained worn ink; geometric silhouettes, unadorned corners. Put each sprite centred in its own ample area on the same flat #ff00ff chroma background.",
+    "columns": 3,
+    "rows": 2,
+    "category": "ui",
+    "cell": 96,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png",
+    "cool_pigments": true,
+    "row_edges": [
+      0,
+      0.48047,
+      1
+    ]
+  },
+  {
+    "key": "effects",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nNine loose painted marks, exactly three rows/three columns. Row 1 amber sliver, steel harpoon, pitch fire. Row 2 thin unbroken bone circular bell pulse, pale foam splash, dried kelp glint. Row 3 teal dash streak, amber crescent swing, bone hit flash. Strong simple shapes, no shiny rainbow stars.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.",
+    "columns": 3,
+    "rows": 3,
+    "category": "effects",
+    "cell": 48,
+    "seed": null,
+    "source_size": [
+      1263,
+      1246
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "lurker",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nSix animation drawings, three columns x two rows, read across. Facing NORTH throughout. First five poses form a restrained five-beat locomotion loop, with a distinct collapsed death drawing in final cell. Each living creature has TWO oversized pale BONE hollow eyes, each a simple thick pale ring with dark center that survives reduction to 16 pixels. No amber pigment or point of light. Broad silhouette must read at a glance.\nAn ornithologist's bird in FLIGHT seen directly overhead. An overhead ray shape: long thin spear bill thrust forward to the NORTH. The back of its head masks its neck, so the neck cannot be seen. Broad shadow wings extend to the left and right and bend backwards into two long pointed angular wing tips, exposing the cool teal BACK feathers. Two long stilt legs stretch out behind the tail, slightly splayed towards south, with hooked three-toed ends. The silhouette must have distinct forward bill, swept wings, and trailing stilts when reduced to 22 pixels. Paired pale eye rings in the crown. It skims a dark marsh; five distinct stalking wingbeats; at death wings fold inward and legs collapse. No side profiles of a standing bird.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png",
+    "ink_spread": true,
+    "column_edges": [
+      0,
+      0.33105,
+      0.64323,
+      1
+    ]
+  },
+  {
+    "key": "paper",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nFull bleed straight overhead open logbook, horizontal 3:2 format, two blank large flat cool bone pages joined by central fold, desaturated indigo cloth cover hugs thin outer edge. Toned matte paper and one water tidemark, very fine faded cool horizontal pencil rules on each side. No sepia/yellow cast, no text. Fill the entire frame, this is an illustration.",
+    "columns": 1,
+    "rows": 1,
+    "category": "illustrations",
+    "cell": 720,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png",
+    "cool_pigments": true,
+    "cell_height": 480
+  },
+  {
+    "key": "splitter",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nSix animation drawings, three columns x two rows, read across. Facing NORTH throughout. First five poses form a restrained five-beat locomotion loop, with a distinct collapsed death drawing in final cell. Each living creature has TWO oversized pale BONE hollow eyes, each a simple thick pale ring with dark center that survives reduction to 16 pixels. No amber pigment or point of light. Broad silhouette must read at a glance.\nSix vertical aerial-map views of a floating JELLYFISH. Diameter of the bell nearly half the total LENGTH. Demonstrate the bell from above by concentric scalloped circles of smoky pale teal with two pale hollow ring eyes on its upper skin. FOUR THICK, LONG, WAVY KELP-LIKE TRAILING ORAL ARMS splay from under the circular disk and stream away in different directions mainly down the page to show the water current. Delicate ribbons with rounded ends, big open gaps. Like a fat comet with undulating strands. No rectangular fins, no face, no wings, no feet. First five change the flowing ribbons, final bell wrinkled nearly flat, ribbons curled.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "stamps",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\n25 small monochrome woodcut stamps as a sprite atlas, an EXACT even 5 by 5 square grid. Each is bone ink on flat #FF00FF, compact, large bold emblems without a rim, centered with clear magenta around it. Reading across: wick, boots, horseshoe magnet, convex lens, spark; orbiting moons, bellows, spanner, chart dividers, cork float; lamp mantle, hooked staff, rope knot, tide clock, rowlock; reed switch, sextant, copper wire, oil flask, candle snuffer; signal flag, cleat, bronze clapper, glass bead, kelp leaf. Never print letters, numerals or text. The feel of worn maritime almanac engravings. Use bone/indigo only in simple BOLD FLAT CUTOUTS, simplified rubber stamps, no bevels, outlines or shiny shading.",
+    "columns": 5,
+    "rows": 5,
+    "category": "ui",
+    "cell": 48,
+    "seed": null,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "style_reference": "title.png",
+    "cool_pigments": true
+  },
+  {
+    "key": "structures",
+    "columns": 3,
+    "rows": 6,
+    "category": "structures",
+    "cell": 72,
+    "style_reference": "title.png",
+    "sources": [
+      {
+        "key": "struct-lamp",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nIRON LANTERN MASTS viewed down their axis. Each base is a little round end-on iron post, offset to the left of a LARGE ROUND amber glass lantern top suspended along a short horizontal iron arm from that post. Lamp is the broadest part, circular golden dome with two iron ribs and amber light. First lamp shaped like a lollipop viewed flat on a map, second a dumbbell with two globes, third a triangular cluster of three globes. The radial arm and its end-on post cap are clearly visible. No pole standing up the page; the pole points straight at the camera.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null,
+        "column_edges": [
+          0,
+          0.27394,
+          0.67564,
+          1
+        ]
+      },
+      {
+        "key": "struct-wall",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nA driftwood palisade seen exactly from above. See ONLY the round irregular end-grain tops of the pilings, grouped tightly and interwoven with the dark connecting brace across their upper surfaces. The earthward sides of stakes are invisible. Three clearly separated silhouettes: short straight bolster (three broad posts), curved elbow of five, deep zigzag of seven with two protruding diagonal timbers. Use broad simple mass with pronounced voids, driftwood cool bone-grey.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null,
+        "column_edges": [
+          0,
+          0.2401,
+          0.50529,
+          1
+        ]
+      },
+      {
+        "key": "struct-harpoon",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nPlan views of deck-mounted harpoons. The top surface of small asymmetric stilt DECK viewed as a flat patch, one very LONG pale steel shaft projecting up-right well beyond it with broad triangular harpoon tip; tier 2 two shafts widely splayed in V; tier 3 three splayed shafts in trident. No feet, no vertical elevations, no side view. Use lighter cold bone tips and three flat planes only.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null
+      },
+      {
+        "key": "struct-brazier",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nView from straight above through the open grate of a burning pitch brazier. See coals flat inside a dark bowl, irregular ember red pitch and a glowing amber spot below the grating; NO tongues of flame rising up the image. Tier I round dark iron bowl with one tab; II angular triangular grate and three radial outriggers; III wide notched star of six heavy spurs around a broad ember pit. The metal stays indigo grey.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null,
+        "column_edges": [
+          0,
+          0.31008,
+          0.65147,
+          1
+        ]
+      },
+      {
+        "key": "struct-bell",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nLook directly down on circular bronze fog BELL CROWNS held up by a horizontal GANTRY which crosses over their centre in the same plane as our paper. Design a site plan: the roofs of bells are dark round teal disks with FACING-UP suspension eyes. ONLY the top surface of the narrow wood beams and post caps, no feet, no hanging flared bell skirts/clappers or arches. Tier I one disk with straight bar protruding on either side, tier II two overlapping disks with offset parallel rails forming broad H, tier III three disks in triangular plan with THREE projecting beams. BOLD irregular cutout shapes.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null
+      },
+      {
+        "key": "struct-rig",
+        "columns": 3,
+        "rows": 1,
+        "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nThree separate orthographic architectural roof plans on a horizontal sheet of EXACTLY THREE COLUMNS and ONE ROW. Zenith view from an aircraft: the vertical world axis points out of the page into the lens, we see only the topmost surfaces. No side elevations, no perspective or cast shadows. THREE different tiers left to right, generous pure #ff00ff isolation all around every object. Warped matte brush marks on horizontal surfaces. At actual size each piece will be 24 pixels wide. No words, signs or numbers.\nPlan view of salvage winch trestle, square hub with top of coiled rope on axle; three widely spaced leg beams radiate flat to post end-caps like a Y. ALL HOOKS AND LINES LIE ON THE GROUND. Tier 1 three-spoked outline, tier 2 wide fork with protruding crank and an angular hook off one arm, tier 3 asymmetric broad derrick with a long jib projecting northeast, big forked grab. Indigo and cool green muted paint only.",
+        "source_size": [
+          2172,
+          724
+        ],
+        "seed": null,
+        "column_edges": [
+          0,
+          0.29167,
+          0.63858,
+          1
+        ]
+      }
+    ]
+  },
+  {
+    "key": "swarmer",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict overhead orthographic game tokens. Six frames: exactly three columns by two rows. Solid pure magenta #ff00ff behind every pose, ample blank gutter. Centre each subject at consistent scale and facing north. Frames 1–5 show one cycle of movement with genuinely different small movements. Frame 6 is the collapsed death pose; same scale and footprint. No labels, effects or separate objects.\nA tiny top-down glass-ribbed eel viewed from above. Paint a pronounced, open letter S spine, one muscular tail bend to the left and the next to the right, far enough apart that magenta cuts quite deeply into both sides of its silhouette. WIDE blunt shovel head, its entire top half made of TWO enormous bone #efe6d2 round eye rings side-by-side. Each broad eye is about ONE QUARTER of the TOTAL WIDTH of the entire sprite, and its bone rim is VERY THICK: tiny near-black pupil, a very broad SOLID disk of bone around it. Design the pair first: these two light disks are a navigation landmark visible from the far side of the bay even at 16 pixels. Leave ONE distinct dark gap between them. Strongly contrast the lighter eyes against the dark head. The body is one stout single tapering S of dark muted teal #415762, solid opaque, with three QUIET glass ribs as short blue-grey lateral strokes. No ivory, highlights or light outlines anywhere else. No feathers, filigree, pearl necklace, stripes or sweeping streaks. First five same face/eyes and scale with differently flexed tail; last eel crumpled, eyes dim. All of each individual fits entirely inside its grid cell.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "tidecaller",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict overhead orthographic game tokens. Six frames: exactly three columns by two rows. Solid pure magenta #ff00ff behind every pose, ample blank gutter. Centre each subject at consistent scale and facing north. Frames 1–5 show one cycle of movement with genuinely different small movements. Frame 6 is the collapsed death pose; same scale and footprint. No labels, effects or separate objects.\nA drowned keeper under a colossal ship's bell HELMET. From straight overhead the keeper is swimming prone, with the long axis of the bell lying flat along their back. We see the COMPLETE bell-shaped outline in plan: crown forward at top, bold round-shouldered dome, widely flaring skirts stretching outward to the left and right, broad flat lip across bottom; a short narrow neck and one large round clapper visibly hanging out BELOW that lip. Completely tuck the arms and figure UNDER the helmet so the outline in black is unmistakably the shape of a ship's bell with a visible clapper. Deep negative space either side of the clapper. Body of bell 75–85 percent of the design, as broad as tall. Two hollow bone eye rings, matte cool slate belly, broad desaturated teal brushstroke over the crown. Loop a gentle rock and swing of the clapper. Broken bell tilted with loose clapper on death. Designed to fill a 22-pixel quad, with no thin whiskers, accessories or transparent haze.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "tiles",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nA full-bleed terrain swatch plate for the station in the reference. EXACT 3 columns x 8 rows. Top to bottom: 1 deep smooth deep indigo water, 2 shallow grey teal water, 3 cool slate tidal mud, 4 dark salt-marsh grass, 5 faded COOL blue-grey wet sand, 6 weathered grey-green horizontal boardwalk planks, 7 broad, quiet SLATE cobbles, 8 blue-grey dressed stone. A zoomed-out ORTHOGRAPHIC map, seen directly overhead. Keep ALL surfaces in middle-to-dark range like the marsh in the attached painting. CLOSE VALUES within each swatch, sparse wide flat gouache marks, unbusy, matte. Nothing warm, cream, brown, amber or yellow; no white glints, grainy speckles or pits. Big gentle painted patches should nearly dissolve into a single middle tone when the tiles are reduced to 15 pixels. Each row contains two subtle square variations and then a soft transition into the previous row. Square full-bleed seamless swatches with no margins, paper frames, props, symbols, dividers or words.",
+    "columns": 3,
+    "rows": 8,
+    "category": "tiles",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1086,
+      1448
+    ],
+    "style_reference": "title.png",
+    "cool_pigments": true,
+    "join_tiles": true
+  },
+  {
+    "key": "title",
+    "prompt": "Create a finished wide 16:9 wordless title illustration for Lantern Reach. It is a gouache plate printed on fine toned paper in an old maritime almanac. Strictly overhead orthographic aerial composition, no horizon. An empty indigo tidal marsh town. A narrow boardwalk weaves quietly from the lower right across the page; a lone keeper Wren in a bone oilskin and circular hood carries an amber lantern on a long pole. Behind her along the shore three stone beacon crowns cast three separate islands of amber light into the grey-teal fog. Leave the left third quiet deep indigo for a game menu. Interesting flat painted shapes, soft dry-brush edges, faint tooth and subtle print offset. Exact limited pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, paper bone #efe6d2, kelp #a3864b, lamplight #ffb347 with #ffe2a8 cores. No lettering, numbers, outlines around the page, signatures or watermarks.",
+    "columns": 1,
+    "rows": 1,
+    "category": "illustrations",
+    "cell": 960,
+    "seed": null,
+    "source_size": [
+      1672,
+      941
+    ]
+  },
+  {
+    "key": "undertow",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nA two-row four-column atlas of a wreck spirit and its separate chain parts. TOP LEFT CELL ONLY: broad, solid, angular raft of three interlocked broken hulls, a deckhouse, two fallen mast spars protruding out of one side, one drowned iron fog bell, a wrecked cold lantern and two very large glowing hollow bone ring eyes in the deck. High-contrast broad edges of weathered pale timber against deep indigo hull, irregular teal tangle of kelp and rope. Think a tiny wrecked harbour seen from a vertical aerial survey, absolutely no serpent, open crescent, horseshoe, spiral or ring body. Asymmetric and heavy, almost fills the first cell with a MASS. The other six parts are big separate vertical open CHAIN LINKS for movable arms. Slots 2 to 7 show one blunt link in each, slightly bent, not sequences of links. Leave slot eight EMPTY. Equal size square cells, exactly 4 columns x 2 rows, each subject isolated with broad chroma gutters.",
+    "columns": 4,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 112,
+    "seed": null,
+    "source_size": [
+      1774,
+      887
+    ],
+    "style_reference": "title.png",
+    "used_frames": 7,
+    "column_edges": [
+      0,
+      0.27396,
+      0.49972,
+      0.75366,
+      1
+    ]
+  },
+  {
+    "key": "wisp",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.\nSix animation drawings, three columns x two rows, read across. Facing NORTH throughout. First five poses form a restrained five-beat locomotion loop, with a distinct collapsed death drawing in final cell. Each living creature has TWO oversized pale BONE hollow eyes, each a simple thick pale ring with dark center that survives reduction to 16 pixels. No amber pigment or point of light. Broad silhouette must read at a glance.\nA fog moth. Two broad triangular pieces of clouded lamp glass form the wings with a deep V notch and a little head shape in the middle. Wings open and fold a little each beat.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ],
+    "style_reference": "title.png"
+  },
+  {
+    "key": "wren-dash",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nUse second attached walk sheet as precise model for the keeper's round matte bone oilskin hood, loose coat, short boots and one glowing lamp on a pole. Perfectly overhead; no face. Four separate centred poses in a two-column two-row grid on pure magenta. Same scale, central 65 percent of each cell, a common pivot through the hood, no cropping. Wren DASHES north, leaning low with shoulders tucked and coat tails sweeping down. Four different compressed, extended, sliding and recovering poses; carry EXACT same right-pointing pole and lantern as in the walk. Exaggerate coat motion with no separate streaks.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1448,
+      1086
+    ],
+    "reference": "wren-walk",
+    "style_reference": "title.png",
+    "character_reference": "wren-walk.png (source)",
+    "column_edges": [
+      0,
+      0.47963,
+      1
+    ]
+  },
+  {
+    "key": "wren-swing",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nUse second attached walk sheet as precise model for the keeper's round matte bone oilskin hood, loose coat, short boots and one glowing lamp on a pole. Perfectly overhead; no face. Four separate centred poses in a two-column two-row grid on pure magenta. Same scale, central 65 percent of each cell, a common pivot through the hood, no cropping. Wren SWINGS the lamp on its pole. Pose 1 the pole points east as her coat winds up; pose 2 northeast, pose 3 northwest, pose 4 west. Keep pole close enough to fit each cell. Make four genuinely different arm and pole directions without painting any arcs, sparks or detached trail.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1448,
+      1086
+    ],
+    "reference": "wren-walk",
+    "style_reference": "title.png",
+    "character_reference": "wren-walk.png (source)",
+    "row_edges": [
+      0,
+      0.47698,
+      1
+    ]
+  },
+  {
+    "key": "wren-walk",
+    "prompt": "Use the attached Lantern Reach title painting as the sole style reference. Match the dry opaque gouache, mottled toned-paper tooth, broken brush edges and broad interlocking planes of the boardwalk and fog. At map scale the silhouette does the work: two or three matte value shapes, one selective highlight. Use midnight indigo #1b1f3a, marsh slate #2e3a4a, fog teal #5f7f86 and muted bone #efe6d2. Reserve ochre amber #ffb347 and pale #ffe2a8 solely for emitted lamplight; ember #e4572e solely for fire. Suppress metallic shine, bevels, ruler-clean vector lines, gradients on material, decorative rivets and fine contour hatching. Original hand-painted maritime field guide. No lettering, numbers, labels, borders or ground shadows.\nFour poses, exactly 2 columns x 2 rows. Strictly from the zenith, character Wren from the painting. Silhouette: circle of off-white matte oilskin hood above two broad coat shoulders, two tiny black boots peep out below, a long horizontal pole extends to the right from her hand, amber hanging lamp on its far tip. Roof of plain hood in two painted planes, no radial lines, NO wide-brim hat, no stitching, no metallic reflections. Four alternating walk poses; lamp always visible. Face north; no face visible.\nStrict orthographic bird's-eye view looking vertically down. Unbroken solid pure magenta #ff00ff isolation background. Invisible equal rectangular grid; each full subject centered within the central 68% of its cell with ample empty gutter. No overlaps. Stable center and scale.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1448,
+      1086
+    ],
+    "style_reference": "title.png"
+  }
+]

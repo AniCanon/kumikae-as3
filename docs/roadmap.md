@@ -29,11 +29,12 @@ state of the project changes.
 
 - **Fixed-length typed arrays.** `[]T` supports allocation by length, list initialization, indexed reads and writes, and nominal runtime type checks.
 
-- **Typed callbacks** such as `(int)=>int` check scalar signatures and carry arguments and results in their declared register kinds.
+- **Typed callbacks** such as `(int)=>int` check scalar signatures and script-class parameters and carry arguments and results in their declared register kinds.
 
 - **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`
   and `continue`.
 - **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.
+  A typed loop variable can receive rows from a JSON array. Each row is checked as the loop reaches it.
 - **The standard library:** `String`, `Number`, `Math`, `JSON`, `Date`, `RegExp`, and the top-level
   functions.
 - **Opt-in `byte` and `Vector.<byte>`.** Byte vectors store one byte per element and copy directly to Godot's `PackedByteArray`.

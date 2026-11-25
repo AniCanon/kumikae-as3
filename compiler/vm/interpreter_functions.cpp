@@ -47,7 +47,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			}
 			break;
 		}
-		case Op::CallTypedFunction:
+		case Op::CallObjectCallback: case Op::CallTypedFunction:
 			typed_call(p_function, p_in);
 			break;
 		case Op::ApplyFunction:
@@ -182,7 +182,20 @@ void Interpreter::typed_call(const Function &p_function, const Instruction &p_in
 	const Function &callee = module_.functions[target];
 	const auto &list = p_function.argument_lists[p_in.c];
 	const Kind result = p_in.a == NONE ? Kind::Void : p_function.registers[p_in.a];
-	if (!matches_callback(callee, result, list.size(), [&](size_t i) { return p_function.registers[list[i]]; })) {
+	const size_t stride = p_in.op == Op::CallObjectCallback ? 2 : 1;
+	const size_t count = list.size() / stride;
+	const size_t first = callee.is_static ? 0 : 1;
+	bool matches = matches_callback(callee, result, count, [&](size_t i) { return p_function.registers[list[i * stride]]; });
+	for (size_t i = 0; stride == 2 && matches && i < count; ++i) {
+		const uint32_t reg = list[i * stride];
+		if (p_function.registers[reg] == Kind::Obj) {
+			const uint32_t expected = registers[list[i * stride + 1]].u;
+			const auto *object = static_cast<const Object *>(registers[reg].p);
+			matches = expected < module_.classes.size() && first + i < callee.parameter_classes.size() &&
+					callee.parameter_classes[first + i] == expected && (!object || is_class(object, expected));
+		}
+	}
+	if (!matches) {
 		raise(module_.type_error_class, "the Function does not match the callback signature");
 		return;
 	}
@@ -190,8 +203,8 @@ void Interpreter::typed_call(const Function &p_function, const Instruction &p_in
 	if (!callee.is_static) {
 		values->push_back(own_field(value, ir::FUNCTION_FIRST));
 	}
-	for (uint32_t arg : list) {
-		values->push_back(registers[arg]);
+	for (size_t i = 0; i < count; ++i) {
+		values->push_back(registers[list[i * stride]]);
 	}
 	push(target, values->data(), values->size(), p_in.a);
 }

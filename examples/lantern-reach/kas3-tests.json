@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "tests": [
+    { "name": "Gameplay", "discover": "tests", "suitePackage": "dev.kumikae.lanternreach.tests", "runtime": "godot", "timeout": 600 }
+  ]
+}

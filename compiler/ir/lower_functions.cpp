@@ -119,7 +119,23 @@ uint32_t Functions::value_call(Call *p_call, Kind p_want) {
 		Kind result = Kind::Void;
 		l_.kind_of(type->element, &result);
 		const uint32_t out = result == Kind::Void ? NONE : l_.reg(result);
-		l_.emit(Op::CallTypedFunction, position, out, value, l_.arguments(std::move(list)));
+		bool has_objects = false;
+		for (uint32_t reg : list) {
+			has_objects |= l_.kind_at(reg) == Kind::Obj;
+		}
+		if (has_objects) {
+			std::vector<uint32_t> pairs;
+			for (size_t i = 0; i < list.size(); ++i) {
+				pairs.push_back(list[i]);
+				const uint32_t nominal = l_.reg(Kind::U32);
+				const auto check = l_.check_for(type->parameters[i], l_.kind_at(list[i]));
+				l_.emit(Op::ConstU32, position, nominal, check.value_or(NONE));
+				pairs.push_back(nominal);
+			}
+			l_.emit(Op::CallObjectCallback, position, out, value, l_.arguments(std::move(pairs)));
+		} else {
+			l_.emit(Op::CallTypedFunction, position, out, value, l_.arguments(std::move(list)));
+		}
 		return out;
 	}
 	use_argument_error();

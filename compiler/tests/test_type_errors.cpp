@@ -68,12 +68,12 @@ static void test_fixed_arrays() {
 static void test_callback_signatures() {
 	expect(program("var f:(int)=>String = /*!*/fn; f = /*!*/any; f = /*!*/function(x:String):int { return 1; };"
 				   "f = /*!*/function(x:int = 1):String { return label; }; f = /*!*/function(...args):String { return label; };"
-				   "/*!*/f(); f(/*!*/label); f./*!*/apply(null, []); var nested:(/*!*/Sub)=>void;"),
+				   "/*!*/f(); f(/*!*/label); f./*!*/apply(null, []); var nested:(Sub)=>/*!*/Sub;"),
 			{ "callback requires the exact signature '(int)=>String'", "callback requires the exact signature '(int)=>String'",
 					"callback requires the exact signature '(int)=>String'", "callback requires the exact signature '(int)=>String'",
 					"callback requires the exact signature '(int)=>String'", "callback takes 1 argument but received 0",
 					UNRELATED("String", "int"), "store the callback in a Function to use its members",
-					"a callback signature requires a scalar or String type; only the result can be void" });
+					"callback parameters require a scalar, String or script type; results require a scalar, String or void" });
 }
 
 static void test_conversions_rejected() {

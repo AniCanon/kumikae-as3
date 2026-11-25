@@ -1,0 +1,8 @@
+[
+  {"key":"lamp","cost":8,"health":35,"radius":5,"power":2,"period":60,"branchA":"lens","branchB":"wick"},
+  {"key":"wall","cost":4,"health":60,"radius":0,"power":0,"period":0,"branchA":"stone","branchB":"thorns"},
+  {"key":"harpoon","cost":14,"health":45,"radius":9,"power":8,"period":55,"branchA":"barb","branchB":"winch"},
+  {"key":"brazier","cost":11,"health":40,"radius":3,"power":4,"period":45,"branchA":"coals","branchB":"oil"},
+  {"key":"bell","cost":12,"health":50,"radius":5,"power":1,"period":90,"branchA":"peal","branchB":"echo"},
+  {"key":"rig","cost":15,"health":35,"radius":1,"power":3,"period":240,"branchA":"crane","branchB":"hopper"}
+]

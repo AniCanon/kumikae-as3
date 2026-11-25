@@ -122,7 +122,9 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 	if (p_type && p_type->form == TypeRef::Callback) {
 		auto component = [&](TypeRef *p_part, bool p_result) {
 			Symbol *symbol = resolve_type(p_from, p_part);
-			if (p_result && p_part->form == TypeRef::Void) {
+			if ((p_result && p_part->form == TypeRef::Void) ||
+					(!p_result && p_part->form == TypeRef::Named && symbol && symbol->is_type() &&
+							symbol->unit && !symbol->unit->is_declaration)) {
 				return;
 			}
 			for (std::string_view name : { "int", "uint", "byte", "Int64", "float", "Number", "Boolean", "String" }) {
@@ -130,7 +132,7 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 					return;
 				}
 			}
-			p_from.unit->diagnostics.error(p_part->offset, "a callback signature requires a scalar or String type; only the result can be void");
+			p_from.unit->diagnostics.error(p_part->offset, "callback parameters require a scalar, String or script type; results require a scalar, String or void");
 		};
 		for (TypeRef *part : p_type->parameters) {
 			component(part, false);
