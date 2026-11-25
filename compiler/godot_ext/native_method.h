@@ -18,8 +18,15 @@ struct NativeMethod {
 	const void *default_at[rt::MOST_DEFAULTS] = {};
 };
 
+// Whether a signature's parameter types (the program's, "-" for none) number as many as the running
+// Godot's: generated code passes an array with a place for each one the program was built against.
+bool prepared_arity(std::string_view p_types, size_t p_running);
+// Whether a declared default of the type can be made once and passed to every call: not an object, not
+// text (passed converted) and not a value two calls would share and could change (an Array, a Dictionary).
+bool keeps_default(int p_type);
 // What Godot declares for the parameters a call leaves out, each of the parameter's own type: none if it
-// declares none there, or one of another type, an object or text.
+// declares none there, one of another type or one keeps_default() refuses, or if the running Godot's
+// method has another number of parameters.
 std::optional<std::vector<godot::Variant>> declared_defaults(const ir::EngineName &p_entry, const std::vector<int> &p_parameters, size_t p_given);
 std::unique_ptr<NativeMethod> prepare_native_method(const ir::EngineName &p_name, const ir::Function &p_function,
 		const ir::Instruction &p_in, const GodotHost::Worked &p_worked, std::vector<godot::Variant> p_defaults);

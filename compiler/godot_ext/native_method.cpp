@@ -86,6 +86,31 @@ void raise(rt::Context *c, const std::string &p_message) {
 
 } // namespace
 
+bool prepared_arity(std::string_view p_types, size_t p_running) {
+	size_t count = 0;
+	for (size_t at = 0; p_types != "-" && at <= p_types.size(); at = std::min(p_types.find(',', at), p_types.size()) + 1) {
+		count++;
+	}
+	return count == p_running;
+}
+
+bool keeps_default(int p_type) {
+	switch (p_type) {
+		case Variant::NIL:
+		case Variant::OBJECT:
+		case Variant::STRING:
+		case Variant::STRING_NAME:
+		case Variant::NODE_PATH:
+		case Variant::ARRAY:
+		case Variant::DICTIONARY:
+		case Variant::CALLABLE:
+		case Variant::SIGNAL:
+			return false;
+		default:
+			return true;
+	}
+}
+
 std::optional<std::vector<Variant>> declared_defaults(const ir::EngineName &p_entry, const std::vector<int> &p_parameters, size_t p_given) {
 	const StringName owner(String::utf8(p_entry.owner.c_str()));
 	const String method = String::utf8(p_entry.name.c_str());
@@ -96,6 +121,9 @@ std::optional<std::vector<Variant>> declared_defaults(const ir::EngineName &p_en
 			continue;
 		}
 		const Array declared = each["default_args"];
+		if (Array(each["args"]).size() != static_cast<int64_t>(p_parameters.size())) {
+			return std::nullopt;
+		}
 		std::vector<Variant> values;
 		for (size_t parameter = p_given; parameter < p_parameters.size(); parameter++) {
 			const int64_t at = static_cast<int64_t>(parameter) - (static_cast<int64_t>(p_parameters.size()) - declared.size());
@@ -104,8 +132,7 @@ std::optional<std::vector<Variant>> declared_defaults(const ir::EngineName &p_en
 			}
 			const Variant value = declared[at];
 			const int type = value.get_type();
-			if (type != p_parameters[parameter] || type == Variant::OBJECT || type == Variant::STRING || type == Variant::STRING_NAME ||
-					type == Variant::NODE_PATH) {
+			if (type != p_parameters[parameter] || !keeps_default(type)) {
 				return std::nullopt;
 			}
 			values.push_back(value);
@@ -122,7 +149,7 @@ std::unique_ptr<NativeMethod> prepare_native_method(const ir::EngineName &p_name
 	}
 	const auto &list = p_function.argument_lists[p_in.c];
 	const auto words = godot_words(p_name.value);
-	if (words.size() != 5 || list.empty() || list.size() > p_worked.parameters.size() + 1 || p_function.registers[list[0]] != ir::Kind::Ref ||
+	if (words.size() != 5 || !prepared_arity(words[4], p_worked.parameters.size()) || list.empty() || list.size() > p_worked.parameters.size() + 1 || p_function.registers[list[0]] != ir::Kind::Ref ||
 			p_worked.parameters.size() > MOST_OPERANDS || std::find(p_worked.parameters.begin(), p_worked.parameters.end(), ANY_VALUE) != p_worked.parameters.end()) {
 		return nullptr;
 	}
