@@ -7,10 +7,11 @@ package dev.kumikae.lanternreach.sim {
         public var spawn:SpawnSystem;
         public var rules:Rules;
         public var player:Keeper;
+        public var events:EventBus;
         public var near:Vector.<Creature> = new Vector.<Creature>();
 
         public function EnemySenses(map:TownGrid, buildings:Buildings, index:SpatialIndex, lights:LightField,
-                spawner:SpawnSystem, defs:Rules, keeper:Keeper) {
+                spawner:SpawnSystem, defs:Rules, keeper:Keeper, bus:EventBus) {
             grid = map;
             town = buildings;
             space = index;
@@ -18,6 +19,7 @@ package dev.kumikae.lanternreach.sim {
             spawn = spawner;
             rules = defs;
             player = keeper;
+            events = bus;
         }
 
         public function distance(actor:Creature, cell:int):Number {

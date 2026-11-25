@@ -23,13 +23,15 @@ def atlas(name):
     return Image.open(ART / (name + ".png")).convert("RGBA")
 
 
-def stamp(scene, name, index, x, y, width, height=None, silhouette=False):
+def stamp(scene, name, index, x, y, width, height=None, silhouette=False, opacity=1.0):
     sheet = atlas(name)
     columns = SHEETS[name]["columns"]
     w, h = sheet.width // columns, sheet.height // SHEETS[name]["rows"]
     u, v = index % columns * w, index // columns * h
     size = (width, height or width)
     frame = sheet.crop((u, v, u + w, v + h)).resize(size, Image.Resampling.BILINEAR)
+    if opacity != 1:
+        frame.putalpha(frame.getchannel("A").point(lambda a: round(a * opacity)))
     if silhouette:
         alpha = frame.getchannel("A").point(lambda a: 255 if a >= 128 else 0)
         frame = Image.new("RGBA", size, "black")
@@ -39,6 +41,9 @@ def stamp(scene, name, index, x, y, width, height=None, silhouette=False):
 
 def creature(scene, name, x, y, silhouette=False):
     size = SIZES[name]
+    if name == "tidecaller" and not silhouette:
+        # Midway through the 90-tick call, below the caller and the fog.
+        stamp(scene, "effects", 3, x, y, 39, opacity=0.4)
     stamp(scene, name, 0, x, y, size, silhouette=silhouette)
     if name == "undertow":
         for j in range(1, 7):

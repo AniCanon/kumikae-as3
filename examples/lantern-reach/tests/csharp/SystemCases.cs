@@ -22,7 +22,7 @@ public sealed class SystemCases {
             occlusionHidesLurkers,
             rigPaysAndSaleRefundsHalf,
             eventsAndRemoval,
-            listenerCanPostFollowup, bossTelegraphsBeforeFlood,
+            listenerCanPostFollowup, tidecallerSignalsItsBuff, bossTelegraphsBeforeFlood,
             splitAtMostThreeGenerations,
             shoreSalvageSurvivesRestore, lastBeaconEndsWatch };
         foreach (var test in cases) {
@@ -166,6 +166,23 @@ public sealed class SystemCases {
         game.events.dispatch();
         game.events.dispatch();
         Require(game.stats.destroyed == 1);
+        game.events.remove(listener);
+    }
+
+    private void tidecallerSignalsItsBuff() {
+        Creature ally = game.spawn.place(Creature.SWARMER, 12, 4, 0);
+        Creature caller = game.spawn.place(Creature.TIDECALLER, 12, 4, 0);
+        caller.cooldown = 2;
+        List<int> calls = new();
+        var listener = game.events.listen(item => {
+            if (item.kind == WorldEvent.TIDE_CALL) calls.Add(item.value);
+        });
+        game.step();
+        Require(calls.Count == 0 && ally.buff == 0);
+        game.step();
+        Require(calls.Count == 1 && calls[0] == caller.id && ally.buff > 0);
+        game.step();
+        Require(calls.Count == 1);
         game.events.remove(listener);
     }
 

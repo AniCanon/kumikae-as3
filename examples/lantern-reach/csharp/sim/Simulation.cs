@@ -41,7 +41,7 @@ public sealed class Simulation {
         town = new Buildings(grid, rules, keeper, flow, events);
         light = new LightField(grid, town, pool, rules);
         spawn = new SpawnSystem(grid, pool, random, rules, events);
-        EnemySenses senses = new EnemySenses(grid, town, index, light, spawn, rules, keeper);
+        EnemySenses senses = new EnemySenses(grid, town, index, light, spawn, rules, keeper, events);
         ai = new SwarmSteering(grid, pool, index, flow, senses);
         movement = new Movement(grid, pool);
         LevelUps levels = new LevelUps(keeper, rules, random, events);

@@ -11,10 +11,11 @@ public sealed class EnemySenses {
     public SpawnSystem spawn;
     public Rules rules;
     public Keeper player;
+    public EventBus events;
     public List<Creature> near = new List<Creature>();
 
     public EnemySenses(TownGrid map, Buildings buildings, SpatialIndex index, LightField lights,
-            SpawnSystem spawner, Rules defs, Keeper keeper) {
+            SpawnSystem spawner, Rules defs, Keeper keeper, EventBus bus) {
         grid = map;
         town = buildings;
         space = index;
@@ -22,6 +23,7 @@ public sealed class EnemySenses {
         spawn = spawner;
         rules = defs;
         player = keeper;
+        events = bus;
     }
 
     public double distance(Creature actor, int cell) {

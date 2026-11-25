@@ -143,6 +143,27 @@ package dev.kumikae.lanternreach.tests {
             game.events.remove(listener);
         }
 
+        private var calls:Vector.<int> = new Vector.<int>();
+
+        private function onCall(item:WorldEvent):void {
+            if (item.kind == WorldEvent.TIDE_CALL) calls.push(item.value);
+        }
+
+        [Test]
+        public function tidecallerSignalsItsBuff():void {
+            var ally:Creature = game.spawn.place(Creature.SWARMER, 12, 4, 0);
+            var caller:Creature = game.spawn.place(Creature.TIDECALLER, 12, 4, 0);
+            caller.cooldown = 2;
+            var listener:Subscription = game.events.listen(onCall);
+            game.step();
+            Assert.assertTrue(calls.length == 0 && ally.buff == 0);
+            game.step();
+            Assert.assertTrue(calls.length == 1 && calls[0] == caller.id && ally.buff > 0);
+            game.step();
+            Assert.assertTrue(calls.length == 1);
+            game.events.remove(listener);
+        }
+
         [Test]
         public function bossTelegraphsBeforeFlood():void {
             var boss:Creature = game.spawn.place(Creature.UNDERTOW, 25, 2, 0);

@@ -27,4 +27,5 @@ public sealed class WorldEvent {
 
     public const int DAWN = 11;
     public const int LOST_WATCH = 12;
+    public const int TIDE_CALL = 13;
 }

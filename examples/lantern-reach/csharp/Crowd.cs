@@ -9,17 +9,32 @@ public partial class Crowd : Node2D {
     private List<int> counts = new List<int>();
     private List<int> cursors = new List<int>();
 
+    private Texture2D ring;
+    private Rect2 ringFrame;
+    private readonly List<Vector2> origins = new();
+    private readonly List<int> started = new();
+    private Simulation world;
     private readonly List<int> struck = new();
     private int tick = -10;
     private Subscription listener;
 
     private void receive(WorldEvent item) {
+        if (item.kind == WorldEvent.TIDE_CALL) {
+            Creature caller = world.pool.slots[item.value];
+            if (!caller.active || caller.kind != Creature.TIDECALLER) return;
+            origins.Add(new Vector2((float)(caller.x * 15), (float)(caller.y * 13)));
+            started.Add(world.tick);
+        }
         if (item.kind == WorldEvent.DAMAGE) struck[item.cell] = tick + 5;
     }
 
     public void close(EventBus bus) { bus.remove(listener); }
 
     public void setup(Simulation game) {
+        world = game;
+        ring = ResourceLoader.Load("res://assets/art/effects.png") as Texture2D;
+        int cell = ring.GetWidth() / 3;
+        ringFrame = new Rect2(0, cell, cell, cell);
         for (int i = 0; i < game.grid.walls.Count; i++) struck.Add(-1);
         listener = game.events.listen(receive);
         Rules rules = game.rules;
@@ -45,8 +60,24 @@ public partial class Crowd : Node2D {
         }
     }
 
+    private void paintCalls() {
+        RenderingServer.CanvasItemClear(GetCanvasItem());
+        for (int i = started.Count - 1; i >= 0; i--) {
+            double phase = (tick - started[i]) / 90.0;
+            if (phase >= 1 || phase < 0) {
+                started.RemoveAt(i);
+                origins.RemoveAt(i);
+                continue;
+            }
+            float radius = (float)(8 + 23 * phase);
+            Rect2 dest = new Rect2(origins[i].X - radius, origins[i].Y - radius, 2 * radius, 2 * radius);
+            RenderingServer.CanvasItemAddTextureRectRegion(GetCanvasItem(), dest, ring.GetRid(), ringFrame, new Color(1, 1, 1, (float)(0.8 * (1 - phase))));
+        }
+    }
+
     public void present(Simulation game) {
         tick = game.tick;
+        if (started.Count > 0) paintCalls();
         for (int n = 0; n < batches.Count; n++) {
             counts[n] = 0;
             cursors[n] = 0;

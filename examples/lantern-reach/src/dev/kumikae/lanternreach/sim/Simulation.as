@@ -37,7 +37,7 @@ package dev.kumikae.lanternreach.sim {
             town = new Buildings(grid, rules, keeper, flow, events);
             light = new LightField(grid, town, pool, rules);
             spawn = new SpawnSystem(grid, pool, random, rules, events);
-            var senses:EnemySenses = new EnemySenses(grid, town, index, light, spawn, rules, keeper);
+            var senses:EnemySenses = new EnemySenses(grid, town, index, light, spawn, rules, keeper, events);
             ai = new SwarmSteering(grid, pool, index, flow, senses);
             movement = new Movement(grid, pool);
             var levels:LevelUps = new LevelUps(keeper, rules, random, events);

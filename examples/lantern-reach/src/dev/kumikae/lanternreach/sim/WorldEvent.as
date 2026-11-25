@@ -22,6 +22,7 @@ package dev.kumikae.lanternreach.sim {
         }
         public static const DAWN:int = 11;
         public static const LOST_WATCH:int = 12;
+        public static const TIDE_CALL:int = 13;
 
     }
 }

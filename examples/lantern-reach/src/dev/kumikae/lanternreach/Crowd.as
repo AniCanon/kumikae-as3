@@ -11,23 +11,40 @@ package dev.kumikae.lanternreach {
     import godot.Transform2D;
     import godot.Vector2;
     import godot.Color;
+    import godot.Rect2;
+    import godot.RenderingServer;
 
     public class Crowd extends Node2D {
         private var batches:Vector.<MultiMesh> = new Vector.<MultiMesh>();
         private var counts:Vector.<int> = new Vector.<int>();
         private var cursors:Vector.<int> = new Vector.<int>();
 
+        private var ring:Texture2D;
+        private var ringFrame:Rect2;
+        private var origins:Vector.<Vector2> = new Vector.<Vector2>();
+        private var started:Vector.<int> = new Vector.<int>();
+        private var world:Simulation;
         private var struck:Vector.<int> = new Vector.<int>();
         private var tick:int = -10;
         private var listener:Subscription;
 
         private function receive(item:WorldEvent):void {
+            if (item.kind == WorldEvent.TIDE_CALL) {
+                var caller:Creature = world.pool.slots[item.value];
+                if (!caller.active || caller.kind != Creature.TIDECALLER) return;
+                origins.push(new Vector2(caller.x * 15, caller.y * 13));
+                started.push(world.tick);
+            }
             if (item.kind == WorldEvent.DAMAGE) struck[item.cell] = tick + 5;
         }
 
         public function close(bus:EventBus):void { bus.remove(listener); }
 
         public function setup(game:Simulation):void {
+            world = game;
+            ring = ResourceLoader.load("res://assets/art/effects.png") as Texture2D;
+            var cell:int = int(ring.getWidth() / 3);
+            ringFrame = new Rect2(0, cell, cell, cell);
             for (var j:int = 0; j < game.grid.walls.length; j++) struck.push(-1);
             listener = game.events.listen(receive);
             var rules:Rules = game.rules;
@@ -53,8 +70,24 @@ package dev.kumikae.lanternreach {
             }
         }
 
+        private function paintCalls():void {
+            RenderingServer.canvasItemClear(getCanvasItem());
+            for (var i:int = started.length - 1; i >= 0; i--) {
+                var phase:Number = (tick - started[i]) / 90.0;
+                if (phase >= 1 || phase < 0) {
+                    started.splice(i, 1);
+                    origins.splice(i, 1);
+                    continue;
+                }
+                var radius:Number = 8 + 23 * phase;
+                var dest:Rect2 = new Rect2(origins[i].x - radius, origins[i].y - radius, 2 * radius, 2 * radius);
+                RenderingServer.canvasItemAddTextureRectRegion(getCanvasItem(), dest, ring.getRID(), ringFrame, new Color(1, 1, 1, 0.8 * (1 - phase)));
+            }
+        }
+
         public function present(game:Simulation):void {
             tick = game.tick;
+            if (started.length > 0) paintCalls();
             for (var n:int = 0; n < batches.length; n++) {
                 counts[n] = 0;
                 cursors[n] = 0;

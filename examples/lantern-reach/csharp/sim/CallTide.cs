@@ -10,5 +10,6 @@ public sealed class CallTide : IEnemyState {
         senses.space.nearby(actor.x, actor.y, 4, senses.near);
         foreach (Creature ally in senses.near) ally.buff = 90;
         senses.spawn.place(Creature.SWARMER, actor.x, actor.y, 0);
+        senses.events.post(WorldEvent.TIDE_CALL, senses.grid.cell(actor.x, actor.y), actor.id);
     }
 }
