@@ -43,7 +43,7 @@ output is the same to the byte.
 | `function_loops.cpp`, `function_whole.cpp` | Loops over vectors, and 32-bit integer arithmetic |
 | `function_rounds.cpp` | Where a loop goes round: the look at the host's alarm that stops a loop without end, and loops counted by a whole number |
 | `function_borrowed.cpp` | Reads that don't need a reference count |
-| `function_engine.cpp`, `function_values.cpp`, `function_signals.cpp` | Calls into Godot, Godot's value types, and `emit()` |
+| `function_engine.cpp`, `function_method.cpp`, `function_values.cpp`, `function_signals.cpp` | Calls into Godot, Godot's value types, and `emit()` |
 | `thunks` | Operations left to the interpreter's library |
 | `program_writer` | `program.h` and the program's table |
 
@@ -106,8 +106,9 @@ to give a wrong answer if the proof were wrong.
 | Results made in place | A `Dictionary`, `Array`, `Callable` or `RID` that Godot returns is written straight into a new handle. | `Probe.as`, `inHandles()` |
 | Direct `emit()` | `emit()` hands the host the values as they're held. Nothing is boxed and no name is looked up. | `tests/godot_project/Emits.as` |
 
-Everything else that asks Godot runs through a thunk: strings, arrays, callables, adding and removing
-listeners, and untyped values.
+A typed call can also pass an AS3 string as a Godot String, StringName or NodePath. The host converts
+it at the prepared method bind. A method that returns a string or an engine object gives the caller
+an owned result. Varargs methods and unresolved calls use the instruction's thunk.
 
 ## Rules
 

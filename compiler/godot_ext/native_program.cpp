@@ -170,7 +170,7 @@ bool in_handle(int p_type) {
 // over the value a new handle keeps, which starts as the zero of the type the host kept for the place.
 void *call_kept(const void *p_bind, void *p_object, const void *const *p_arguments, const void *p_zero) {
 	Variant *made = make_handle(*static_cast<const Variant *>(p_zero));
-	gdextension_interface::object_method_bind_ptrcall(p_bind, p_object, p_arguments, inside(*made, made->get_type()));
+	call_method_bind(p_bind, p_object, p_arguments, inside(*made, made->get_type()));
 	return made;
 }
 
@@ -281,7 +281,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed };
+		rt::EngineApi made = { &call_method_bind, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &call_native_method };
 		find_values(&made);
 		return made;
 	}();
@@ -298,7 +298,7 @@ bool crosses_bare(int p_type, bool p_parameter) {
 
 // What Godot declares for the parameters of a method that a call leaves out, bare, into r_defaults: false
 // if it declares none there, or one that is not a number or a Boolean.
-bool defaults_of(const ir::EngineName &p_entry, size_t p_parameters, size_t p_given, uint64_t *r_defaults) {
+bool defaults_of(const ir::EngineName &p_entry, const std::vector<int> &p_parameters, size_t p_given, uint64_t *r_defaults) {
 	const StringName owner(String::utf8(p_entry.owner.c_str()));
 	const String method = String::utf8(p_entry.name.c_str());
 	const TypedArray<Dictionary> methods = ClassDBSingleton::get_singleton()->class_get_method_list(owner, true);
@@ -308,12 +308,15 @@ bool defaults_of(const ir::EngineName &p_entry, size_t p_parameters, size_t p_gi
 			continue;
 		}
 		const Array declared = each["default_args"];
-		for (size_t parameter = p_given; parameter < p_parameters; parameter++) {
-			const int64_t at = static_cast<int64_t>(parameter) - (static_cast<int64_t>(p_parameters) - declared.size());
+		for (size_t parameter = p_given; parameter < p_parameters.size(); parameter++) {
+			const int64_t at = static_cast<int64_t>(parameter) - (static_cast<int64_t>(p_parameters.size()) - declared.size());
 			if (at < 0 || at >= declared.size()) {
 				return false;
 			}
 			const Variant value = declared[at];
+			if (value.get_type() != p_parameters[parameter]) {
+				return false;
+			}
 			uint64_t &bare = r_defaults[parameter - p_given];
 			bare = 0;
 			if (value.get_type() == Variant::BOOL) {
@@ -487,9 +490,18 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	// all it takes.
 	const size_t given = p_in.op == ir::Op::HostCall ? p_thunk.argument_lists[p_in.c].size() - 1 : worked->parameters.size();
 	const size_t missing = worked->parameters.size() - std::min(worked->parameters.size(), given);
-	if (!bare || missing > rt::MOST_DEFAULTS ||
-			(missing > 0 && !defaults_of(host.module.engine_names[p_in.b], worked->parameters.size(), given, r_resolved->defaults))) {
+	if (missing > rt::MOST_DEFAULTS ||
+			(missing > 0 && !defaults_of(host.module.engine_names[p_in.b], worked->parameters, given, r_resolved->defaults))) {
 		return false;
+	}
+	if (p_in.op == ir::Op::HostCall) {
+		if (auto method = prepare_native_method(host.module.engine_names[p_in.b], p_thunk, p_in, *worked)) {
+			r_resolved->method = method.get();
+			methods_.push_back(std::move(method));
+		}
+	}
+	if (!bare) {
+		return r_resolved->method != nullptr;
 	}
 	r_resolved->bind = const_cast<void *>(worked->bound);
 	if (kept) {

@@ -815,7 +815,7 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	private var n:int = 0; private var h:int = 0; public static var made:int = 0; private var bag:*;%s
 	public function bagText():String { return String(bag.length); }
 	private var seen:Vector.<int> = new Vector.<int>();
-	public function value():int { return %s; }
+	public function value():int { return getNodeOrNull(".") == this ? %s : -1; }
 	public function bump():int { n++; made++; seen.push(n); return n; }
 	public function seenText():String { return seen.join(","); }
 	public function count():int { return n; }

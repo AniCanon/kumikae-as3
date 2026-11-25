@@ -6,7 +6,7 @@
 #pragma once
 
 #include "godot_host.h"
-#include "native_host.h"
+#include "native_method.h"
 #include "shared_library.h"
 
 #include <godot_cpp/variant/string_name.hpp>
@@ -22,6 +22,7 @@ class NativeProgram {
 	std::unique_ptr<rt::Host> host_;
 	std::vector<godot::StringName> names_; // The program's names, each built once; never moved once made.
 	std::vector<void *> singletons_; // The handles kept for the singletons it uses, and for the constants.
+	std::vector<std::unique_ptr<NativeMethod>> methods_;
 	GodotHost &engine_;
 
 	explicit NativeProgram(GodotHost &p_engine) :

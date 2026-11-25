@@ -166,17 +166,6 @@ bool object_of(const vm::Argument &p_operand, GDExtensionObjectPtr *r_object) {
 	return true;
 }
 
-// A String given where a StringName is taken: the StringName made the last time this text was given, or
-// made now and kept.
-const Variant &name_for(NameKept &p_kept, const vm::Str *p_text) {
-	const std::string_view text = p_text->view();
-	if (p_kept.name.get_type() != Variant::STRING_NAME || p_kept.text != text) {
-		p_kept.text.assign(text.data(), text.size());
-		p_kept.name = StringName(String::utf8(text.data(), (int64_t)text.size()));
-	}
-	return p_kept.name;
-}
-
 // An argument as a Variant for a parameter of this type: a StringName from text once, else the value as is.
 void argument(const GodotHost::Worked &p_worked, size_t p_parameter, const vm::Argument &p_value, Variant *r_value) {
 	if (p_parameter < p_worked.parameters.size() && p_worked.parameters[p_parameter] == Variant::STRING_NAME && p_value.kind == ir::Kind::Str &&
@@ -271,6 +260,15 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 }
 
 } // namespace
+
+const Variant &name_for(NameKept &p_kept, const vm::Str *p_text) {
+	const std::string_view text = p_text->view();
+	if (p_kept.name.get_type() != Variant::STRING_NAME || p_kept.text != text) {
+		p_kept.text.assign(text.data(), text.size());
+		p_kept.name = StringName(String::utf8(text.data(), (int64_t)text.size()));
+	}
+	return p_kept.name;
+}
 
 void *inside(Variant &p_value, int p_type) {
 	static GDExtensionVariantGetInternalPtrFunc getters[Variant::VARIANT_MAX] = {};
@@ -427,15 +425,20 @@ std::optional<bool> GodotHost::run_bound(const Worked &p_worked, const vm::Objec
 		pointers[count] = &value;
 	}
 	Variant result;
-	GDExtensionCallError error;
-	error.error = GDEXTENSION_CALL_OK;
-	gdextension_interface::object_method_bind_call(p_worked.bound, object, reinterpret_cast<GDExtensionConstVariantPtr *>(pointers), (GDExtensionInt)count,
-			result._native_ptr(), &error);
+	return checked_bound(p_worked, object, pointers, count, &result, r_error) &&
+			(p_worked.what == What::Setter || take(p_result, result, p_worked.name, r_result, r_error));
+}
+
+bool checked_bound(const GodotHost::Worked &p_worked, GDExtensionObjectPtr p_object, const Variant **p_arguments,
+		size_t p_count, Variant *r_result, std::string *r_error) {
+	GDExtensionCallError error{};
+	gdextension_interface::object_method_bind_call(p_worked.bound, p_object, reinterpret_cast<GDExtensionConstVariantPtr *>(p_arguments),
+			static_cast<GDExtensionInt>(p_count), r_result->_native_ptr(), &error);
 	if (error.error != GDEXTENSION_CALL_OK) {
 		*r_error = describe(error, p_worked.name);
 		return false;
 	}
-	return p_worked.what == What::Setter || take(p_result, result, p_worked.name, r_result, r_error);
+	return true;
 }
 
 // One of Godot's value types made from its arguments, by Godot's constructor for their types; into the

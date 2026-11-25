@@ -47,6 +47,8 @@ inline HandleHead *head_of(void *p_handle) {
 	return static_cast<HandleHead *>(p_handle) - 1;
 }
 
+struct Resolved;
+
 // The engine's entry points, given by the host that has an engine; a host with none gives no table.
 struct EngineApi {
 	// Godot's call of a method bind on bare values (object_method_bind_ptrcall): each argument by its
@@ -77,6 +79,9 @@ struct EngineApi {
 	// host built for it, Context::names), where that is a value with parts of the type asked for: in a new
 	// handle, the caller's. Null for anything else (no Dictionary, no such key, a value of another type).
 	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
+	// Calls a prepared class method with borrowed arguments. Bits in p_handles identify engine
+	// value handles. Text arguments point to an AS3 string. Other arguments use the ptrcall ABI.
+	void (*method)(Context *, const Resolved &, Ref p_receiver, void *p_object, const void **p_arguments, uint32_t p_handles, Slot *r_result, void *r_parts);
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
@@ -94,6 +99,7 @@ inline constexpr size_t MOST_DEFAULTS = 4;
 // where it could not, or where the place is not one generated code calls directly: the library's way,
 // through its thunk, is then the only one.
 struct Resolved {
+	const void *method = nullptr; // A prepared typed class method, owned by the loaded program.
 	// The method bind of a method or of a property's accessor, callable on bare values; or, for one of
 	// Godot's value types, its own code for an operator, a method or a part (operate() and the rest, below).
 	void *bind = nullptr;

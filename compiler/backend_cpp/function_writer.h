@@ -282,6 +282,7 @@ class FunctionWriter {
 	bool engine(const ir::Instruction &p_in);
 	bool engine_alias(const ir::Instruction &p_in);
 	bool engine_inline(const ir::Instruction &p_in);
+	bool engine_method(const ir::Instruction &p_in);
 	bool engine_bound(const ir::Instruction &p_in);
 	bool emits_bare(const ir::Instruction &p_in) const; // Whether an instruction is an emit() engine_emit() writes.
 	bool engine_emit(const ir::Instruction &p_in); // A signal's emit() on values held bare.

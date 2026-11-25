@@ -143,6 +143,38 @@ class Runner:
             self.check("native: %s leaves to the library what %s says" % (label, os.path.basename(listed)), counted == wanted.get(name),
                        "\nlisted   %s\ncounted  %s\n%s" % (wanted.get(name), counted, detail))
 
+    def direct_methods(self):
+        sources = os.path.join(self.tests, "godot_direct")
+        expected = [
+            "DIRECT live Node2D",
+            "DIRECT path Node2D",
+            "DIRECT null TypeError 1009 Error #1009: Cannot access a property or method of a null object reference.",
+            "DIRECT freed TypeError 1009 Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.",
+            "DIRECT resource ShaderMaterial true",
+            "DIRECT argument Error 0 Godot rejected argument 2 of 'set_instance_custom_data'",
+        ]
+        with tempfile.TemporaryDirectory() as where:
+            files = ["DirectCalls.as", "direct.tscn", os.path.join(self.tests, "godot_native/project.godot")]
+            project = self.project(where, sources, files)
+            library = self.library("typed engine calls", project, ["DirectCalls.as"], where)
+            if not library:
+                return
+            for mode in ("interpreter", "native"):
+                env = dict(os.environ, KAS3_NATIVE_PLAY="0", KAS3_NATIVE_COUNTS="1")
+                env.pop("KAS3_PROGRAM_LIBRARY", None)
+                if mode == "native":
+                    env["KAS3_PROGRAM_LIBRARY"] = library
+                run = subprocess.run([self.godot, "--headless", "--path", project, "res://direct.tscn", "--quit-after", "2"],
+                                     capture_output=True, text=True, timeout=60, env=env)
+                text = run.stdout + run.stderr
+                self.check(mode + ": typed method results and errors", run.returncode == 0 and (USED in text) == (mode == "native")
+                           and [line for line in text.splitlines() if line.startswith("DIRECT ")] == expected
+                           and "ERROR:" not in text, text)
+                if mode == "native":
+                    self.check("native: typed methods use their prepared binding", "kas3: counts " in text
+                               and not any("HostCall " + name in text for name in ("GodotObject.getClass", "Node.getParent",
+                                           "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData")), text)
+
     def method_allocations(self):
         with tempfile.TemporaryDirectory() as where:
             files = ["project.godot", os.path.join(self.tests, "bench/by_name/Matrix.as"),
@@ -190,6 +222,7 @@ class Runner:
         """The probe by the interpreter and as native code: what each run prints of it."""
         if not self.able("the native probe"):
             return
+        self.direct_methods()
         self.method_allocations()
         sources = os.path.join(self.tests, "godot_native")
         with tempfile.TemporaryDirectory() as where:

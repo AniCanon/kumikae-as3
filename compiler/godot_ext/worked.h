@@ -107,6 +107,11 @@ struct GodotHost::Worked final : vm::Prepared {
 	const Utility *utility = nullptr;
 };
 
+const godot::Variant &name_for(NameKept &p_kept, const vm::Str *p_text);
+// A checked method bind preserves Godot's conversions and its argument errors.
+bool checked_bound(const GodotHost::Worked &p_worked, GDExtensionObjectPtr p_object, const godot::Variant **p_arguments,
+		size_t p_count, godot::Variant *r_result, std::string *r_error);
+
 // Shared by typed instructions and members discovered on an untyped receiver. An absent argument
 // count defers the built-in method's arity check until it runs.
 std::unique_ptr<GodotHost::Worked> method_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, int p_receiver,

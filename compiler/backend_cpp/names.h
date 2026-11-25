@@ -45,7 +45,9 @@ std::string_view parts_of(const ir::Function &p_function, uint32_t p_register);
 // same (godot_ext/native_program.cpp).
 bool in_handle(std::string_view p_godot_type);
 // The words of an engine name's value ("position property Vector2 get_position 334 set_position 743 -").
-std::vector<std::string_view> words_of(std::string_view p_text);
+std::vector<std::string_view> words_of(std::string_view p_text, char p_separator = ' ');
+// Parameter types in a method signature, which uses a dash for an empty list.
+std::vector<std::string_view> parameter_types(std::string_view p_list);
 
 // A Number as C++ reads back the very same one.
 std::string number_literal(double p_value);

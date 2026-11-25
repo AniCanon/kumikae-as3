@@ -154,7 +154,9 @@ context:
 | `c->resolved` | What the host found once for each place the program calls the engine: a method bind, a singleton's object, the defaults of parameters left out |
 | `c->names` | A `StringName` for each name the program writes |
 
-The extension fills them in `godot_ext/native_program.cpp`.
+The extension fills them in `godot_ext/native_program.cpp`. A prepared class method belongs to the
+loaded program. Its entry on `EngineApi` accepts borrowed arguments and writes an inline math
+result directly into caller storage.
 
 - **A handle on a Godot object has a head before it** (`HandleHead`), which generated code reads with no
   call. `object_of()` reads the object from the head while the host's count of freed objects
