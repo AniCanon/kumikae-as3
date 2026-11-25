@@ -6,6 +6,9 @@ package {
 		private var picture:ImageTexture;
 		private var canvas:RID;
 		private var ink:RID;
+		private var batches:Vector.<MultiMesh> = new Vector.<MultiMesh>();
+		private var shelf:Vector.<Resource> = new Vector.<Resource>();
+		private var heard:int = 0;
 
 		override public function _process(delta:Number):void {
 			var batch:MultiMesh = mesh;
@@ -19,6 +22,31 @@ package {
 				batch.setInstanceTransform2D(0, transform);
 				batch.setInstanceCustomData(0, color);
 			}
+			// Each read of an element hands its register a handle; one that holds the same object keeps its own.
+			for (var k:int = 0; k < 16; ++k) {
+				batches[k >> 3].setInstanceTransform2D(0, new Transform2D());
+				batches[k >> 3].setInstanceCustomData(0, new Color(0, 0, 0, 1));
+			}
+		}
+
+		private function onShelf():void {
+			heard++;
+			if (heard == 2) {
+				shelf.length = 0;
+			}
+		}
+
+		// A listener empties the vector while Godot runs a method of the element read from it: the register
+		// read last holds the object still.
+		private function shelved():void {
+			var made:Resource = new Resource();
+			made.changed.add(onShelf);
+			shelf.push(made);
+			made = null;
+			for (var i:int = 0; i < 2; ++i) {
+				shelf[0].emitChanged();
+			}
+			trace("DIRECT shelf " + heard + " " + shelf.length);
 		}
 
 		private function classOf(node:Node):String {
@@ -83,6 +111,13 @@ package {
 				trace("DIRECT argument " + wrong.name + " " + wrong.errorID + " " + wrong.message);
 			}
 			defaults();
+			batches.push(new MultiMesh());
+			batches.push(new MultiMesh());
+			for each (var each:MultiMesh in batches) {
+				each.useCustomData = true;
+				each.instanceCount = 1;
+			}
+			shelved();
 		}
 	}
 }

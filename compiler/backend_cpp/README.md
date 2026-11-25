@@ -103,7 +103,7 @@ to give a wrong answer if the proof were wrong.
 | Method binds on bare values | A property or method of a Godot object is called through Godot's method bind, with no boxed values and no lookup by name. Handle-held values with parts (such as a `Color` constant) are unboxed inline, and up to four omitted default arguments are filled from what Godot declares. | `Probe.as` |
 | Constant string names across classes | A `static const String` initialized to a single literal across the program reuses a cached Godot `StringName` on method binds and dictionary lookups, guarded by a pointer check. | `Probe.as` |
 | Fields read through their handle | A field that holds a value or a signal, read only to be used at once, is used through the field's own handle. | `Probe.as`, `fields()` |
-| Handles kept | A register given the same object again keeps the handle it has. | `Probe.as`, `fieldObjects()` |
+| Handles kept | A register given the same object again, from a field or an element of a vector, keeps the handle it has. | `Probe.as`, `fieldObjects()`; `DirectCalls.as` |
 | Results made in place | A `Dictionary`, `Array`, `Callable` or `RID` that Godot returns is written straight into a new handle. | `Probe.as`, `inHandles()` |
 | Direct `emit()` | `emit()` hands the host the values as they're held. Nothing is boxed and no name is looked up. | `tests/godot_project/Emits.as` |
 

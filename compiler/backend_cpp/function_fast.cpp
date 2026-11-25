@@ -93,6 +93,12 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				break;
 			}
 			line("if (Slot *const e = element(" + vector_for(p_in.b, p_in.a) + ", " + reg(p_in.c) + ")) {");
+			if (kind(p_in.a) == Kind::Ref && asked_[p_in.a] && owns(p_in.a)) {
+				// Read again in a loop, the element most often holds the object the register has a handle on
+				// already, which the register keeps (read_field() does the same for a field).
+				line("\tstore_again(c, " + reg(p_in.a) + ", Ref{ (*e).p });");
+				break;
+			}
 			// An Array's hole is read as undefined (vm/any.h).
 			share(p_in.a, from_slot(kind(p_in.a), kind(p_in.a) == Kind::Any ? "kas3::vm::any::filled(*e)" : "(*e)"));
 			break;

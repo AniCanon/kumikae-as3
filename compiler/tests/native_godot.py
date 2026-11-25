@@ -155,6 +155,7 @@ class Runner:
             "DIRECT default [X: (1.0, 0.0), Y: (0.0, 1.0), O: (0.0, 0.0)]",
             "DIRECT null value Error 0 Godot rejected argument 2 of 'canvas_item_add_texture_rect_region'",
             "DIRECT tile (1, 1)",
+            "DIRECT shelf 2 0",
         ]
         with tempfile.TemporaryDirectory() as where:
             files = ["DirectCalls.as", "direct.tscn", os.path.join(self.tests, "godot_native/project.godot")]
@@ -180,6 +181,10 @@ class Runner:
                     allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: typed call allocations ")]
                     self.check("native: typed construction and method arguments allocate no math values", len(allocations) >= 3
                                and max(allocations) == 0 and "kas3: typed call boxes " not in text, text)
+                    # Three handles for the fields read once, and one for each object each element read changes to:
+                    # two objects, read at two places.
+                    handles = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: typed call handles ")]
+                    self.check("native: an element read keeps a handle on the same object", len(handles) >= 3 and set(handles) == {7}, str(handles))
                     self.check("native: typed methods use their prepared binding", "kas3: counts " in text
                                and not any("HostCall " + name in text for name in ("GodotObject.getClass", "Node.getParent",
                                            "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData",

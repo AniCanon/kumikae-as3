@@ -346,8 +346,10 @@ bool NativeProgram::call(uint32_t p_function, const vm::Slot *p_arguments, size_
 	static const char *watched = std::getenv("KAS3_NATIVE_ALLOCATION_PROBE");
 	if (watched && host_->module.functions[p_function].name == watched) {
 		const auto before = boxes;
+		const uint64_t copies = host_->handle_copies;
 		ScriptReadAllocations allocations(true, "typed call");
 		const bool ok = host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
+		std::fprintf(stderr, "kas3: typed call handles %llu\n", static_cast<unsigned long long>(host_->handle_copies - copies));
 		for (size_t i = 0; i < PARTS; ++i) {
 			if (boxes[i] != before[i]) {
 				std::fprintf(stderr, "kas3: typed call boxes %s %zu\n", rt::PARTS_NAMES[i], boxes[i] - before[i]);
