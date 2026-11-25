@@ -109,7 +109,9 @@ to give a wrong answer if the proof were wrong.
 
 A typed call can also pass an AS3 string as a Godot String, StringName or NodePath. The host converts
 it at the prepared method bind. A method that returns a string or an engine object gives the caller
-an owned result. Varargs methods and unresolved calls use the instruction's thunk.
+an owned result. Up to four parameters the call leaves out, on a typed receiver or a singleton, take
+what Godot declares, made once when the call is prepared: a value such as a `Color` as well as a
+number. Varargs methods and unresolved calls use the instruction's thunk.
 
 ## Rules
 

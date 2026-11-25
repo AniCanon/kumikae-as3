@@ -152,6 +152,9 @@ class Runner:
             "DIRECT freed TypeError 1009 Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.",
             "DIRECT resource ShaderMaterial true",
             "DIRECT argument Error 0 Godot rejected argument 2 of 'set_instance_custom_data'",
+            "DIRECT default [X: (1.0, 0.0), Y: (0.0, 1.0), O: (0.0, 0.0)]",
+            "DIRECT null value Error 0 Godot rejected argument 2 of 'canvas_item_add_texture_rect_region'",
+            "DIRECT tile (1, 1)",
         ]
         with tempfile.TemporaryDirectory() as where:
             files = ["DirectCalls.as", "direct.tscn", os.path.join(self.tests, "godot_native/project.godot")]
@@ -179,7 +182,8 @@ class Runner:
                                and max(allocations) == 0 and "kas3: typed call boxes " not in text, text)
                     self.check("native: typed methods use their prepared binding", "kas3: counts " in text
                                and not any("HostCall " + name in text for name in ("GodotObject.getClass", "Node.getParent",
-                                           "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData")), text)
+                                           "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData",
+                                           "RenderingServer.canvasItemAddTextureRectRegion", "PhysicsServer2D.bodyAddShape", "TileSetAtlasSource.createTile")), text)
 
             self.check("native: a boxed transform keeps Godot's columns", len(transforms[0]) == 1 and transforms[0] == transforms[1], str(transforms))
 

@@ -156,7 +156,8 @@ context:
 
 The extension fills them in `godot_ext/native_program.cpp`. A prepared class method belongs to the
 loaded program. Its entry on `EngineApi` accepts borrowed arguments and writes an inline math
-result directly into caller storage.
+result directly into caller storage. Generated code leaves a place for every parameter, and the host
+fills those a call leaves out with Godot's declared defaults, made once when the place is prepared.
 
 - **A handle on a Godot object has a head before it** (`HandleHead`), which generated code reads with no
   call. `object_of()` reads the object from the head while the host's count of freed objects

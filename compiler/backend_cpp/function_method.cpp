@@ -59,15 +59,13 @@ bool FunctionWriter::engine_method(const ir::Instruction &p_in) {
 		}
 		addresses += (i == 1 ? "" : ", ") + *address;
 	}
-	for (size_t i = given; i < count; ++i) {
-		addresses += (i ? ", " : "") + ("&" + use + ".defaults[" + std::to_string(i - given) + "]");
-	}
 	const auto out = p_in.a;
 	const bool inline_result = out != NONE && !parts(out).empty();
 	line("if (KAS3_LIKELY(" + guard + ")) {");
 	body_ += inside;
-	if (!addresses.empty()) {
-		line("const void *p[] = { " + addresses + " };");
+	// The host writes the defaults of what the call leaves out into the places after the arguments.
+	if (count > 0) {
+		line("const void *p[" + std::to_string(count) + "] = { " + addresses + " };");
 	}
 	if (inline_result) {
 		line(std::string(parts(out)) + " v{};");
@@ -75,7 +73,7 @@ bool FunctionWriter::engine_method(const ir::Instruction &p_in) {
 	line("Slot result{};");
 	mark();
 	line("c->engine->method(c, " + use + ", " + reg(list[0]) + ", " + object_behind(list[0]) + ", " +
-			(addresses.empty() ? "nullptr" : "p") + ", " + std::to_string(handles) + "u, &result, " + (inline_result ? "&v" : "nullptr") + ");");
+			(count == 0 ? "nullptr" : "p") + ", " + std::to_string(handles) + "u, &result, " + (inline_result ? "&v" : "nullptr") + ");");
 	const std::string owned = out == NONE ? "" : from_slot(kind(out), "result");
 	const std::string drop = out != NONE && ir::is_held(kind(out)) && !inline_result ? "release(c, " + owned + "); " : "";
 	line("if (KAS3_UNLIKELY((c->listener_failed && call_failed(c)) || c->failing)) { " + drop + fail() + " }");

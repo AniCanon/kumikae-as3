@@ -5,10 +5,8 @@
 #include "sources.h"
 #include "worked.h"
 
-#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
-#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 
 #if defined(KAS3_TEST_COUNTS)
@@ -305,44 +303,26 @@ bool crosses_bare(int p_type, bool p_parameter) {
 }
 
 // What Godot declares for the parameters of a method that a call leaves out, bare, into r_defaults: false
-// if it declares none there, or one that is not a number or a Boolean.
-bool defaults_of(const ir::EngineName &p_entry, const std::vector<int> &p_parameters, size_t p_given, uint64_t *r_defaults) {
-	const StringName owner(String::utf8(p_entry.owner.c_str()));
-	const String method = String::utf8(p_entry.name.c_str());
-	const TypedArray<Dictionary> methods = ClassDBSingleton::get_singleton()->class_get_method_list(owner, true);
-	for (int64_t i = 0; i < methods.size(); i++) {
-		const Dictionary each = methods[i];
-		if (String(each["name"]) != method) {
-			continue;
+// if any of them is not a number or a Boolean.
+bool defaults_of(const std::vector<Variant> &p_declared, uint64_t *r_defaults) {
+	for (size_t i = 0; i < p_declared.size(); i++) {
+		const Variant &value = p_declared[i];
+		uint64_t &bare = r_defaults[i];
+		bare = 0;
+		if (value.get_type() == Variant::BOOL) {
+			const uint8_t flag = static_cast<bool>(value);
+			std::memcpy(&bare, &flag, sizeof(flag));
+		} else if (value.get_type() == Variant::INT) {
+			const int64_t whole = value;
+			std::memcpy(&bare, &whole, sizeof(whole));
+		} else if (value.get_type() == Variant::FLOAT) {
+			const double number = value;
+			std::memcpy(&bare, &number, sizeof(number));
+		} else {
+			return false;
 		}
-		const Array declared = each["default_args"];
-		for (size_t parameter = p_given; parameter < p_parameters.size(); parameter++) {
-			const int64_t at = static_cast<int64_t>(parameter) - (static_cast<int64_t>(p_parameters.size()) - declared.size());
-			if (at < 0 || at >= declared.size()) {
-				return false;
-			}
-			const Variant value = declared[at];
-			if (value.get_type() != p_parameters[parameter]) {
-				return false;
-			}
-			uint64_t &bare = r_defaults[parameter - p_given];
-			bare = 0;
-			if (value.get_type() == Variant::BOOL) {
-				const uint8_t flag = static_cast<bool>(value);
-				std::memcpy(&bare, &flag, sizeof(flag));
-			} else if (value.get_type() == Variant::INT) {
-				const int64_t whole = value;
-				std::memcpy(&bare, &whole, sizeof(whole));
-			} else if (value.get_type() == Variant::FLOAT) {
-				const double number = value;
-				std::memcpy(&bare, &number, sizeof(number));
-			} else {
-				return false;
-			}
-		}
-		return true;
 	}
-	return false;
+	return true;
 }
 
 } // namespace
@@ -516,12 +496,18 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	// all it takes.
 	const size_t given = p_in.op == ir::Op::HostCall ? p_thunk.argument_lists[p_in.c].size() - 1 : worked->parameters.size();
 	const size_t missing = worked->parameters.size() - std::min(worked->parameters.size(), given);
-	if (missing > rt::MOST_DEFAULTS ||
-			(missing > 0 && !defaults_of(host.module.engine_names[p_in.b], worked->parameters, given, r_resolved->defaults))) {
+	std::optional<std::vector<Variant>> declared = std::vector<Variant>();
+	if (missing > 0) {
+		declared = declared_defaults(host.module.engine_names[p_in.b], worked->parameters, given);
+	}
+	if (missing > rt::MOST_DEFAULTS || !declared) {
 		return false;
 	}
+	// A method bind on bare values is handed the defaults from the place's own slots, which hold a number
+	// or a Boolean; the prepared method keeps its own, of any value type.
+	bare = bare && defaults_of(*declared, r_resolved->defaults);
 	if (p_in.op == ir::Op::HostCall) {
-		if (auto method = prepare_native_method(host.module.engine_names[p_in.b], p_thunk, p_in, *worked)) {
+		if (auto method = prepare_native_method(host.module.engine_names[p_in.b], p_thunk, p_in, *worked, std::move(*declared))) {
 			r_resolved->method = method.get();
 			methods_.push_back(std::move(method));
 		}

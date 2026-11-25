@@ -81,6 +81,7 @@ struct EngineApi {
 	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
 	// Calls a prepared class method with borrowed arguments. Bits in p_handles identify engine
 	// value handles. Text arguments point to an AS3 string. Other arguments use the ptrcall ABI.
+	// p_arguments has a place for every parameter: the host fills those the call leaves out.
 	void (*method)(Context *, const Resolved &, Ref p_receiver, void *p_object, const void **p_arguments, uint32_t p_handles, Slot *r_result, void *r_parts);
 };
 

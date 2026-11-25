@@ -3,10 +3,16 @@ package {
 
 	public class DirectCalls extends Node2D {
 		private var mesh:MultiMesh;
+		private var picture:ImageTexture;
+		private var canvas:RID;
+		private var ink:RID;
 
 		override public function _process(delta:Number):void {
 			var batch:MultiMesh = mesh;
+			var item:RID = canvas;
+			var texture:RID = ink;
 			for (var i:int = 0; i < 16; ++i) {
+				RenderingServer.canvasItemAddTextureRectRegion(item, new Rect2(i, 0, 1, 1), texture, new Rect2(0, 0, 1, 1));
 				var point:Vector2 = new Vector2(i, -i);
 				var transform:Transform2D = new Transform2D(delta, new Vector2(2, 3), 0, point);
 				var color:Color = new Color(i / 16, 0.5, 0, 1);
@@ -21,6 +27,32 @@ package {
 			} catch (e:Error) {
 				return e.name + " " + e.errorID + " " + e.message;
 			}
+		}
+
+		// Defaults Godot declares as values are filled where the call is prepared, for a singleton's method
+		// and for a typed receiver's.
+		private function defaults():void {
+			picture = ImageTexture.createFromImage(Image.createEmpty(4, 4, false, Image.FORMAT_RGBA8));
+			canvas = getCanvasItem();
+			ink = picture.getRID();
+			var body:RID = PhysicsServer2D.bodyCreate();
+			var shape:RID = PhysicsServer2D.circleShapeCreate();
+			PhysicsServer2D.bodyAddShape(body, shape);
+			trace("DIRECT default " + PhysicsServer2D.bodyGetShapeTransform(body, 0));
+			var none:Rect2 = null;
+			try {
+				RenderingServer.canvasItemAddTextureRectRegion(canvas, none, ink, new Rect2(0, 0, 1, 1));
+				trace("DIRECT null value accepted");
+			} catch (wrong:Error) {
+				trace("DIRECT null value " + wrong.name + " " + wrong.errorID + " " + wrong.message);
+			}
+			PhysicsServer2D.freeRID(body);
+			PhysicsServer2D.freeRID(shape);
+			var atlas:TileSetAtlasSource = new TileSetAtlasSource();
+			atlas.texture = picture;
+			atlas.textureRegionSize = new Vector2i(1, 1);
+			atlas.createTile(new Vector2i(2, 1));
+			trace("DIRECT tile " + atlas.getTileSizeInAtlas(new Vector2i(2, 1)));
 		}
 
 		override public function _ready():void {
@@ -50,6 +82,7 @@ package {
 			} catch (wrong:Error) {
 				trace("DIRECT argument " + wrong.name + " " + wrong.errorID + " " + wrong.message);
 			}
+			defaults();
 		}
 	}
 }

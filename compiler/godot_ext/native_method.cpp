@@ -2,10 +2,18 @@
 #include "godot_calls.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 
 namespace kas3 {
 
+using godot::Array;
 using godot::ClassDBSingleton;
+using godot::Dictionary;
+using godot::String;
+using godot::StringName;
+using godot::TypedArray;
 using godot::Variant;
 
 namespace {
@@ -78,8 +86,37 @@ void raise(rt::Context *c, const std::string &p_message) {
 
 } // namespace
 
+std::optional<std::vector<Variant>> declared_defaults(const ir::EngineName &p_entry, const std::vector<int> &p_parameters, size_t p_given) {
+	const StringName owner(String::utf8(p_entry.owner.c_str()));
+	const String method = String::utf8(p_entry.name.c_str());
+	const TypedArray<Dictionary> methods = ClassDBSingleton::get_singleton()->class_get_method_list(owner, true);
+	for (int64_t i = 0; i < methods.size(); i++) {
+		const Dictionary each = methods[i];
+		if (String(each["name"]) != method) {
+			continue;
+		}
+		const Array declared = each["default_args"];
+		std::vector<Variant> values;
+		for (size_t parameter = p_given; parameter < p_parameters.size(); parameter++) {
+			const int64_t at = static_cast<int64_t>(parameter) - (static_cast<int64_t>(p_parameters.size()) - declared.size());
+			if (at < 0 || at >= declared.size()) {
+				return std::nullopt;
+			}
+			const Variant value = declared[at];
+			const int type = value.get_type();
+			if (type != p_parameters[parameter] || type == Variant::OBJECT || type == Variant::STRING || type == Variant::STRING_NAME ||
+					type == Variant::NODE_PATH) {
+				return std::nullopt;
+			}
+			values.push_back(value);
+		}
+		return values;
+	}
+	return std::nullopt;
+}
+
 std::unique_ptr<NativeMethod> prepare_native_method(const ir::EngineName &p_name, const ir::Function &p_function,
-		const ir::Instruction &p_in, const GodotHost::Worked &p_worked) {
+		const ir::Instruction &p_in, const GodotHost::Worked &p_worked, std::vector<Variant> p_defaults) {
 	if (p_in.op != ir::Op::HostCall || p_worked.what != GodotHost::Worked::What::Bound) {
 		return nullptr;
 	}
@@ -105,7 +142,16 @@ std::unique_ptr<NativeMethod> prepare_native_method(const ir::EngineName &p_name
 			wanted.type = p_function.engine_types[p_in.a];
 		}
 	}
-	return std::make_unique<NativeMethod>(NativeMethod{ p_worked, wanted, p_worked.result == Variant::OBJECT && subclass(words[3], "RefCounted") });
+	const size_t given = list.size() - 1;
+	if (given + p_defaults.size() != p_worked.parameters.size() || p_defaults.size() > rt::MOST_DEFAULTS) {
+		return nullptr;
+	}
+	auto method = std::make_unique<NativeMethod>(NativeMethod{ p_worked, wanted, p_worked.result == Variant::OBJECT && subclass(words[3], "RefCounted"), given,
+			std::move(p_defaults) });
+	for (size_t i = 0; i < method->defaults.size(); i++) {
+		method->default_at[i] = inside(method->defaults[i], method->defaults[i].get_type());
+	}
+	return method;
 }
 
 void call_method_bind(const void *p_bind, void *p_object, const void *const *p_arguments, void *r_result) {
@@ -123,6 +169,10 @@ void call_native_method(rt::Context *c, const rt::Resolved &p_use, rt::Ref p_rec
 			c->host->library().raise_null();
 		}
 		return;
+	}
+	// The parameters the call leaves out are Godot's declared defaults, made when the place was prepared.
+	for (size_t i = method.given; i < worked.parameters.size(); i++) {
+		p_arguments[i] = method.default_at[i - method.given];
 	}
 	Values text;
 	const uint32_t mismatched = convert_arguments(worked, p_arguments, p_handles, text);
