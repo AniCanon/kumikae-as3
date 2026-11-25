@@ -1,6 +1,7 @@
 package dev.kumikae.lanternreach.tests {
     import app.anicanon.kumikae.testing.Assert;
     import dev.kumikae.lanternreach.Scenario;
+    import dev.kumikae.lanternreach.Dawn;
     import dev.kumikae.lanternreach.sim.*;
 
     public class SystemsTest {
@@ -164,6 +165,19 @@ package dev.kumikae.lanternreach.tests {
             }
             game.step();
             Assert.assertTrue(game.pool.count == 0 && game.stats.deaths == 3);
+        }
+
+        [Test]
+        public function shoreSalvageSurvivesRestore():void {
+            var tides:Tides = new Tides(game);
+            tides.morning();
+            var before:String = game.checksum();
+            game.wrack[0] = -1;
+            Assert.assertNotEquals(before, game.checksum());
+            var saved:String = Dawn.write(game, 1);
+            game.wrack.length = 0;
+            Dawn.read(game, saved);
+            Assert.assertTrue(game.wrack.length == 3 && game.wrack[0] == -1);
         }
 
         [Test]

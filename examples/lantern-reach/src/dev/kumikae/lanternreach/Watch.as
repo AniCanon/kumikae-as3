@@ -129,7 +129,7 @@ package dev.kumikae.lanternreach {
                 book.saved = "";
                 book.save();
             }
-            tides.morning();
+            if (!resuming) tides.morning();
             for (var i:int = 0; i < 3; i++) marsh.marked[i] = book.knows("shore", i);
             show(resuming ? "card" : "open");
         }

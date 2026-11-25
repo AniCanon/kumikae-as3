@@ -182,6 +182,7 @@ public sealed class Simulation {
             hash.word((uint)(shot.remaining));
             foreach (int id in shot.hit) hash.word((uint)(id));
         }
+        foreach (int site in wrack) hash.word((uint)site);
         foreach (Shard shard in pickups.shards) {
             if (shard.value == 0) continue;
             hash.coordinate(shard.x);

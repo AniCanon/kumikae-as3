@@ -178,6 +178,7 @@ package dev.kumikae.lanternreach.sim {
                 hash.word(uint(shot.remaining));
                 for each (var id:int in shot.hit) hash.word(uint(id));
             }
+            for each (var site:int in wrack) hash.word(uint(site));
             for each (var shard:Shard in pickups.shards) {
                 if (shard.value == 0) continue;
                 hash.coordinate(shard.x);

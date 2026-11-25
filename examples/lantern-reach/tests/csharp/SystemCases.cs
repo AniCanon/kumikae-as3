@@ -24,7 +24,7 @@ public sealed class SystemCases {
             eventsAndRemoval,
             listenerCanPostFollowup, bossTelegraphsBeforeFlood,
             splitAtMostThreeGenerations,
-            lastBeaconEndsWatch };
+            shoreSalvageSurvivesRestore, lastBeaconEndsWatch };
         foreach (var test in cases) {
             game = new Scenario("station", () => 0).simulation;
             try { test(); GD.Print("PASS ", test.Method.Name); }
@@ -189,6 +189,18 @@ public sealed class SystemCases {
         }
         game.step();
         Require(game.pool.count == 0 && game.stats.deaths == 3);
+    }
+
+    private void shoreSalvageSurvivesRestore() {
+        var tides = new Tides(game);
+        tides.morning();
+        var before = game.checksum();
+        game.wrack[0] = -1;
+        Require(before != game.checksum());
+        var saved = Dawn.write(game, 1);
+        game.wrack.Clear();
+        Dawn.read(game, saved);
+        Require(game.wrack.Count == 3 && game.wrack[0] == -1);
     }
 
     private void lastBeaconEndsWatch() {

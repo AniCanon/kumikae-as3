@@ -18,7 +18,7 @@ public static class Dawn {
         return JsonSerializer.Serialize(new { night, game.tick, seed = game.random.state,
             hero = new { player.x, player.y, player.aimX, player.aimY, player.speed, player.pull, player.damage, player.range, player.haste, player.orbit, player.spark, player.xp, player.level, player.salvage },
             stats = new { game.stats.built, game.stats.destroyed, game.stats.lost, game.stats.waves, game.stats.deaths },
-            beacons, ground, towers, offers = player.offers });
+            beacons, ground, towers, shore = game.wrack, offers = player.offers });
     }
 
     public static int read(Simulation game, string saved) {
@@ -48,6 +48,12 @@ public static class Dawn {
                 spent = row[5].GetInt32(),
                 cooldown = row[6].GetInt32(),
             });
+        game.wrack.Clear();
+        if (state.TryGetProperty("shore", out var shore)) {
+            foreach (var tile in shore.EnumerateArray()) game.wrack.Add(tile.GetInt32());
+        } else {
+            game.wrack.AddRange(game.rules.nights[state.GetProperty("night").GetInt32() - 1].shore);
+        }
         game.keeper.offers.Clear();
         foreach (var choice in state.GetProperty("offers").EnumerateArray()) game.keeper.offers.Add(choice.GetInt32());
         var hero = state.GetProperty("hero");

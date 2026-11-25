@@ -7,7 +7,8 @@ package dev.kumikae.lanternreach {
             var state:Object = {night:night, tick:game.tick, seed:game.random.state,
                 hero:{x:player.x, y:player.y, aimX:player.aimX, aimY:player.aimY, speed:player.speed, pull:player.pull, damage:player.damage, range:player.range, haste:player.haste, orbit:player.orbit, spark:player.spark, xp:player.xp, level:player.level, salvage:player.salvage},
                 stats:{built:game.stats.built, destroyed:game.stats.destroyed, lost:game.stats.lost, waves:game.stats.waves, deaths:game.stats.deaths},
-                beacons:[], ground:[], towers:[], offers:[]};
+                beacons:[], ground:[], towers:[], offers:[], shore:[]};
+            for each (var wrack:int in game.wrack) state.shore.push(wrack);
             for each (var choice:int in player.offers) state.offers.push(choice);
             for (var i:int = 0; i < game.grid.beacons.length; i++)
                 state.beacons.push([game.grid.beacons[i], game.combat.beaconHealth[i]]);
@@ -45,6 +46,12 @@ package dev.kumikae.lanternreach {
                 s.spent = row[5];
                 s.cooldown = row[6];
                 game.town.restore(s);
+            }
+            game.wrack.length = 0;
+            if (state.shore != null) {
+                for each (var wrack:int in state.shore) game.wrack.push(wrack);
+            } else {
+                for each (var site:int in game.rules.nights[int(state.night) - 1].shore) game.wrack.push(site);
             }
             game.keeper.offers.length = 0;
             for each (var choice:int in state.offers) game.keeper.offers.push(choice);

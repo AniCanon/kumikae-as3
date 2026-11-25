@@ -129,7 +129,7 @@ public partial class Watch : Node {
             book.saved = "";
             book.save();
         }
-        tides.morning();
+        if (!resuming) tides.morning();
         for (int i = 0; i < 3; i++) marsh.marked[i] = book.knows("shore", i);
         show(resuming ? "card" : "open");
     }
