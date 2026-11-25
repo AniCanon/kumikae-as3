@@ -615,7 +615,52 @@ void checked_uint_conversion_keeps_its_error_path() {
 	CHECK(text && text->find("thunk(c,") != std::string::npos);
 }
 
+void loop_getter_keeps_its_bind() {
+	using ir::Kind;
+	using ir::Op;
+	auto module = module_of({ Kind::Ref, Kind::I32, Kind::I32, Kind::F64, Kind::F64, Kind::Bool, Kind::F64, Kind::F64, Kind::F64, Kind::F64, Kind::I32 },
+			{ { Op::ConstI32, 2, 0 }, { Op::I32ToF64, 3, 2 }, { Op::I32ToF64, 4, 1 }, { Op::LtF64, 5, 3, 4 }, { Op::JumpIfNot, 5, 12 },
+					{ Op::HostGet, 6, 0, 0 }, { Op::I32ToF64, 7, 2 }, { Op::ConstF64, 8, 0 }, { Op::AddF64, 9, 7, 8 },
+					{ Op::F64ToI32, 10, 9 }, { Op::Move, 2, 10 }, { Op::Jump, 1 } });
+	module.numbers.push_back(1);
+	module.engine_names.push_back({ 0, "Timer.waitTime", "wait_time property float get_wait_time 1740695150 set_wait_time 373806689 -", "wait_time", "Timer" });
+	module.functions[0].parameters = module.functions[0].required = 2;
+	const auto made = backend_cpp::generate(module);
+	const auto *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("L1:;") != std::string::npos);
+	CHECK(text && text->find("void *const bind0 = c->resolved ? c->resolved[0].bind : nullptr;") < text->find("L1:;"));
+	CHECK(text && text->find("void *const bind = bind0;") != std::string::npos);
+}
+
+void engine_handles_box_once() {
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module = module_of({ Kind::Val, Kind::Ref, Kind::Any },
+			{ ir::Instruction{ Op::ToAny, 2, 0 }, ir::Instruction{ Op::ToAny, 2, 1 } });
+	module.functions[0].parameters = 2;
+	module.functions[0].required = 2;
+	const auto made = backend_cpp::generate(module);
+	CHECK(made.unsupported.empty());
+	const auto *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("own_engine_any(c, shared(c, r0).handle, false)") != std::string::npos);
+	CHECK(text && text->find("own_engine_any(c, shared(c, r1).handle, true)") != std::string::npos);
+}
+
+void nullable_math_local_reuses_its_handle() {
+	using ir::Kind;
+	ir::Module module = module_of({ Kind::Val, Kind::Val }, { ir::Instruction{ ir::Op::Move, 1, 0 } });
+	module.functions[0].parameters = 1;
+	module.functions[0].required = 1;
+	module.functions[0].engine_types = { "Vector2", "Vector2" };
+	const auto made = backend_cpp::generate(module);
+	const auto *text = file_named(made, "program.cpp");
+	CHECK(text && text->find("copy_parts<Vector2>(c, r1, r0)") != std::string::npos);
+}
+
 int main() {
+	loop_getter_keeps_its_bind();
+	nullable_math_local_reuses_its_handle();
+	engine_handles_box_once();
 	checked_uint_conversion_keeps_its_error_path();
 	a_typed_callback_uses_the_typed_entry();
 	a_program_it_takes_is_written_whole();

@@ -8,7 +8,9 @@
 #pragma once
 
 #include "engine_types.h"
+#include "named_site.h"
 
+#include <optional>
 #include <string>
 
 namespace kas3 {
@@ -18,18 +20,52 @@ namespace vm {
 // method's entry, a constant's value): its own, kept by the host for as long as the host lives.
 struct Prepared {
 	virtual ~Prepared() {}
+	// A scalar field of an engine value. This reads the value alone and cannot run script code.
+	bool (*read_number)(const Prepared &, void *, double *) = nullptr;
 };
 
 // What an engine value has under an AS3 name, found as a program runs (`untyped.name`): whether the name is
 // a property (a signal and a part of a value too) or a method of the value's class or of one it extends,
 // and Godot's name for it, which the host keeps for as long as it lives. Unknown: a host that has no table
 // of Godot's names can't say.
+enum class ScriptRead { Value, Method, Missing, Failed, Declined };
+
+enum class NameSource { Computed, Literal };
+
+// Each resolved method owns one reference to both spellings. Bound functions take their own.
+struct MethodNames {
+	Str *as3 = nullptr;
+	Str *godot = nullptr;
+	MethodNames() = default;
+	MethodNames(const MethodNames &) = delete;
+	MethodNames &operator=(const MethodNames &) = delete;
+	~MethodNames() {
+		for (Str *name : { as3, godot }) {
+			if (release(name)) {
+				free_string(name);
+			}
+		}
+	}
+};
+
 struct NamedMember {
 	enum class What : uint8_t { Missing, Unknown, Property, Method };
 	What what = What::Missing;
 	std::string_view godot;
 	bool read = true; // A property with a getter.
 	bool written = true; // A property with a setter.
+	const Prepared *invoke = nullptr; // The method or getter, with the receiver as the first operand.
+	const Prepared *setter = nullptr;
+	bool script_only = false;
+	MethodNames *names = nullptr;
+};
+
+inline constexpr NamedMember MISSING_MEMBER{};
+
+struct NamedRead {
+	ScriptRead status;
+	// A computed key can name an engine member that needs the VM's ordinary read.
+	const NamedMember *resolved = nullptr;
 };
 
 struct EngineHandles {
@@ -38,15 +74,17 @@ struct EngineHandles {
 	// keeps of it, or null for one it carries out by the requests below each time.
 	[[nodiscard]] virtual const Prepared *prepare(const ir::Module &, const ir::Function &, const ir::Instruction &) { return nullptr; }
 	// Carries out an instruction prepare() worked out: its operands in order (a call's, get's or set's
-	// receiver first, never null), and the result wanted. False with r_error empty: the host can't here (an
+	// receiver first, never null), and the result wanted. No result means the host declined before running it (an
 	// operand of another type than prepared for), and the instruction is carried out by the requests below.
-	[[nodiscard]] virtual bool run(const Prepared &, const Argument *, size_t, const Wanted &, Slot *, std::string *) { return false; }
+	[[nodiscard]] virtual std::optional<bool> run(const Prepared &, const Argument *, size_t, const Wanted &, Slot *, std::string *, const Object * = nullptr) { return std::nullopt; }
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	[[nodiscard]] virtual void *copy(void *p_value) = 0;
 	virtual void drop(void *p_value) = 0;
 	// One of Godot's values (never an object) copied into a handle that holds one already, in place of a new
 	// handle: what assigning to a variable that has one costs. False if the engine can't: copy() then.
 	[[nodiscard]] virtual bool assign(void *, const void *) { return false; }
+	// Reuse a slot for a math value of the same type. A nonempty class also checks the coercion.
+	[[nodiscard]] virtual bool assign_math(void *, const void *, std::string_view) { return false; }
 	// One of Godot's values that a slot holds whole (ir::Bare), as a new handle, the caller's: what a place of
 	// a vector of them gives whoever reads it. Null, saying why, where the engine can make none.
 	[[nodiscard]] virtual void *boxed(ir::Bare p_type, Slot p_value, std::string *r_error) = 0;
@@ -79,7 +117,27 @@ struct EngineHandles {
 	[[nodiscard]] virtual bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) = 0;
 	// What an engine value has under an AS3 name: asked where the value is held untyped, so that the
 	// name is known only as the program runs. get(), set() and call() are then asked by Godot's name.
-	[[nodiscard]] virtual NamedMember named(void *, std::string_view) { return NamedMember(); }
+	[[nodiscard]] virtual const NamedMember &named(void *, std::string_view, NameSource = NameSource::Computed) { return MISSING_MEMBER; }
+	// A site holds the declaration miss for a literal. A foreign script can still supply the name.
+	virtual const NamedMember &script_member(void *, std::string_view) { return MISSING_MEMBER; }
+	// A literal read keeps its interned name even if the script changes what the name means.
+	virtual const NamedMember &script_getter(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name); }
+	virtual NamedRead read_script(void *, void *, std::string_view, const NamedMember *, const Wanted &, Slot *, std::string *) { return { ScriptRead::Declined }; }
+	virtual bool script_has(void *p_receiver, std::string_view p_name) { return script_member(p_receiver, p_name).what != NamedMember::What::Missing; }
+	// Validates a receiver for a site hit. A host without stable shape identities declines.
+	virtual std::optional<NamedShape> named_shape(void *, uintptr_t) { return {}; }
+	virtual bool delegates_script(void *, std::string_view) { return false; }
+	// The actual script handles the request even if it has changed since the site warmed.
+	virtual std::optional<bool> run_script(const NamedShape &, const Prepared &, const Argument *, size_t,
+			const Wanted &, Slot *, std::string *) { return std::nullopt; }
+	// A prepared operation on the receiver named_shape just validated.
+	virtual std::optional<bool> run_named(const NamedShape &p_shape, const Prepared &p_bind, const Argument *p_operands, size_t p_count,
+			const Wanted &p_result, Slot *r_value, std::string *r_error) {
+		if (p_shape.delegate || (p_shape.script && !p_shape.instance)) {
+			return std::nullopt;
+		}
+		return run(p_bind, p_operands, p_count, p_result, r_value, r_error, p_shape.instance);
+	}
 	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
 	[[nodiscard]] virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	// An element, by a number or another key: `vector[0]`.

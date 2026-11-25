@@ -37,7 +37,7 @@ struct HandleHead {
 	// none of them has been freed, so this one is still there. 0: not found yet.
 	uint64_t seen;
 	void *object;
-	uint64_t unused_too; // The handle after it is sixteen bytes on, as an untyped value's tag needs.
+	uint64_t godot_class; // Interned identity of the object's engine class, independent of its attached script.
 };
 inline constexpr uint8_t HANDLE_UNKNOWN = 0;
 inline constexpr uint8_t HANDLE_SHARED = 1;
@@ -62,7 +62,7 @@ struct EngineApi {
 	// for the place (Resolved::bind), `p_signal` the handle on the signal, and each value is given as its
 	// code in `p_held` says (GIVEN_WHOLE and the rest). False, with nothing done, where the handle holds no
 	// signal or the signal's object is gone: the instruction's thunk then says what that is.
-	bool (*emit)(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
+	bool (*emit)(Context *, void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
 	// For each value with parts: where a handle on one keeps it, in bytes from the handle's start (0 for a
 	// type a handle keeps elsewhere, and for every type where the host could not make sure), and the number
 	// a handle on one starts with. Found by the host as it starts, from what Godot itself says of a handle
@@ -260,6 +260,52 @@ constexpr uint8_t given_parts() {
 template <typename T>
 inline Val boxed(const Context *c, const T &p_value) {
 	return Val{ c->engine ? c->engine->box(PartsOf<T>::code, &p_value) : nullptr };
+}
+// Each math handle is owned by its slot. A copy of that slot gets a separate handle.
+template <typename T>
+inline char *parts_storage(const Context *c, void *p_handle) {
+	if (!c->engine || !p_handle) {
+		return nullptr;
+	}
+	const size_t type = static_cast<size_t>(PartsOf<T>::code);
+	const uint8_t at = c->engine->value_at[type];
+	int32_t held;
+	std::memcpy(&held, p_handle, sizeof(held));
+	return at && held == c->engine->value_type[type] ? static_cast<char *>(p_handle) + at : nullptr;
+}
+template <typename T>
+inline bool replace_parts(const Context *c, void *p_handle, const T &p_value) {
+	if (char *to = parts_storage<T>(c, p_handle)) {
+		std::memcpy(to, &p_value, sizeof(T));
+		return true;
+	}
+	return false;
+}
+template <typename T>
+inline void store_parts(Context *c, Val &r_place, const T &p_value) {
+	if (!replace_parts(c, r_place.handle, p_value)) {
+		put(c, r_place, boxed(c, p_value));
+	}
+}
+template <typename T>
+inline void copy_parts(Context *c, Val &r_place, Val p_from) {
+	if (r_place.handle == p_from.handle) {
+		return;
+	}
+	char *to = parts_storage<T>(c, r_place.handle);
+	const char *from = to ? parts_storage<T>(c, p_from.handle) : nullptr;
+	if (from) {
+		std::memcpy(to, from, sizeof(T));
+	} else {
+		store(c, r_place, p_from);
+	}
+}
+template <typename T>
+inline void store_parts_any(Context *c, Slot &r_place, const T &p_value) {
+	if (vm::any::tag(r_place) == vm::AnyTag::Value && replace_parts(c, any_pointer(c, r_place), p_value)) {
+		return;
+	}
+	put(c, r_place, own_engine_any(c, boxed(c, p_value).handle, false));
 }
 template <typename T>
 inline T unbox(const Context *c, const void *p_handle) {

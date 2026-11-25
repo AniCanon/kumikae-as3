@@ -225,6 +225,14 @@ bool FunctionWriter::engine_alias(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine_inline(const Instruction &p_in) {
+	if ((p_in.op == Op::HostPresent || p_in.op == Op::ToAny) && !parts(p_in.b).empty()) {
+		if (p_in.op == Op::HostPresent) {
+			line(reg(p_in.a) + " = c->engine != nullptr;");
+		} else {
+			line("store_parts_any(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ");");
+		}
+		return true;
+	}
 	// A value held inline moved to a register that holds the same: a plain copy, as of a number.
 	if (p_in.op == Op::Move && !parts(p_in.a).empty() && parts(p_in.a) == parts(p_in.b)) {
 		if (p_in.a != p_in.b) {
@@ -258,7 +266,7 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 		// An operand may be a register that stands for a field's handle (value_from_): the value is copied
 		// out of the handle first, and a field that holds none is the library's to say so.
 		const auto lent = [&](uint32_t p_register, std::string_view p_type) {
-			return value_from_[p_register] != NONE && has_parts(p_type) && value_type(p_register) == p_type;
+			return has_parts(p_type) && value_type(p_register) == p_type && (value_from_[p_register] != NONE || holds_handle(p_register, p_type));
 		};
 		const bool fit = std::equal(operands.begin(), operands.end(), each.operands, [&](uint32_t p_register, std::string_view p_type) {
 			return holds(p_register, p_type) || lent(p_register, p_type);
@@ -272,7 +280,8 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 			const std::string name = "$" + std::to_string(i);
 			std::string value = each.operands[i] == "number" ? "static_cast<double>(" + reg(operands[i]) + ")" : reg(operands[i]);
 			if (!holds(operands[i], each.operands[i])) {
-				const std::string handle = own_field(value_from_[operands[i]]) + ".handle";
+				const auto field = value_from_[operands[i]];
+				const std::string handle = (field == NONE ? reg(operands[i]) : own_field(field)) + ".handle";
 				value = "a" + std::to_string(i);
 				guard += (guard.empty() ? "" : " && ") + handle;
 				copies += "\tconst " + std::string(each.operands[i]) + " " + value + " = unbox<" + std::string(each.operands[i]) + ">(c, " + handle + ");\n";
@@ -384,8 +393,9 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const bool gives = result != "void";
 	// What comes back in a handle is made where a new handle keeps it, by the host (EngineApi::call_kept).
 	const bool kept = in_handle(result);
+	const bool math_handle = out != NONE && has_parts(result) && holds_handle(out, result);
 	if (kind(receiver) != Kind::Ref || given.size() > parameters.size() || missing > 4 ||
-			(out != NONE && (!gives || !(kept ? holds_handle(out, result) : holds(out, result)))) ||
+			(out != NONE && (!gives || !(kept || math_handle ? holds_handle(out, result) : holds(out, result)))) ||
 			(gives && !(result == "float" || result == "bool" || whole_type(result) || has_parts(result) || kept))) {
 		return false;
 	}
@@ -394,7 +404,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	const uint32_t use = thunks_.use_index(thunks_.use(function_, p_in).thunk);
 	const std::string resolved = "c->resolved[" + std::to_string(use) + "]";
 	line("{");
-	line("void *const bind = " + resolved + ".bind;");
+	const bool repeated = std::any_of(counted_.begin(), counted_.end(), [&](const Counted &p_loop) { return p_loop.from <= pc_ && pc_ <= p_loop.to; });
+	line("void *const bind = " + (repeated ? "bind" + std::to_string(use) : resolved + ".bind") + ";");
 	line("void *const on = " + object_behind(receiver) + ";");
 	std::string guard = "bind && on";
 	std::string inside;
@@ -407,6 +418,9 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 			return false;
 		}
 		addresses += (i ? ", " : "") + *address;
+	}
+	if (repeated) {
+		loop_binds_.insert(use);
 	}
 	line("if (KAS3_LIKELY(" + guard + (kept ? " && " + resolved + ".handle" : "") + ")) {");
 	body_ += inside;
@@ -427,6 +441,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + std::string(kept ? "release(c, v); " : "") + fail() + " }");
 	if (kept) {
 		line(out != NONE ? "put(c, " + reg(out) + ", v);" : "release(c, v);");
+	} else if (math_handle) {
+		line("store_parts(c, " + reg(out) + ", v);");
 	} else if (out != NONE) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}

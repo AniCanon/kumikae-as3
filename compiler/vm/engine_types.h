@@ -28,6 +28,7 @@ struct Wanted {
 	// write one of its values into it and give it back as the result, in place of a new one: a value the
 	// loop makes each time round then costs no handle.
 	void *reuse = nullptr;
+	uint8_t *bare_reads = nullptr; // Local to an effect-free read loop. Reset before any getter can run.
 };
 
 // A thing of the engine's that the cycle collector (vm/collector.h) looks through: one that holds counted

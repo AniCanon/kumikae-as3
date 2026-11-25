@@ -16,6 +16,8 @@ A byte register has kind `U8`. The VM slot uses its unsigned integer member. Con
 keeps the low eight bits of an unsigned integer, and arithmetic widens it before operating.
 The byte kind and its integer conversions also use appended wire values.
 
+A proven local uses the same registers, bound members and instructions as a local declared with its type. A local whose script or use is unknown keeps dynamic dispatch.
+
 ## The IR
 
 `CallTypedFunction` takes a Function object and an argument list of typed registers. Its destination has the declared result kind or is absent for a void callback. Packed modules preserve the operation and the register kinds.
@@ -32,6 +34,10 @@ The byte kind and its integer conversions also use appended wire values.
   `HostBindMethod`: Godot's own Callable of the object and the method. Anywhere else it's a `Function`
   whose function is a forwarder the lowerer writes: it takes what Godot's method declares and calls it.
   A method read from an object is bound to an Array of the object, the AS3 name and Godot's name.
+  The function table identifies these forwarders by index when you compare function values. Binary
+  format version 1 permits an empty local table. The reader accepts older version-1 modules and
+  recognizes an unflagged forwarder by its synthetic receiver or, with locals stripped, by its
+  receiver load and matching engine call. It rejects an unsupported format version.
 - **Godot by name table.** An instruction that asks something of Godot names it by an index into
   `Module::engine_names`, never by text. Each entry is a copy of one line of the generated name table, so a
   back end finds Godot's method, property or operator once.
@@ -50,6 +56,7 @@ The byte kind and its integer conversions also use appended wire values.
 | `ir_chain.cpp` | Whether a class's constructor chain depends only on its arguments and on constants, so that a reload can run it again for a live object |
 | `ir_reach.h` | What an instruction calls, and the code reached from a function |
 | `library_methods.h`, `library_names.h`, `library_entries.h` | The built-in library's methods by name: what each takes and gives, and the operation that carries it out. Read by the lowerer, the interpreter and the C++ backend |
+| `adjacent_uses.h` | Single-use temporaries and control-flow entries shared by the interpreter and native backend |
 | `lower.h`, `lower.cpp` | The entry point |
 | `lowerer.h` | The `Lowerer` class: its state, and the helpers every part of the lowering uses |
 | `lower_env.h`, `lower_flow.h` | Places a value is stored in, captured variables, and the loops and `try` statements around the code being lowered |

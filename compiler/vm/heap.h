@@ -56,6 +56,7 @@ public:
 
 	// Gives up the reference a slot holds, and empties it.
 	void drop(ir::Kind p_kind, Slot &p_slot);
+	void copy_any(Slot &r_target, Slot p_value);
 	void drop_any(Slot p_value); // Gives up what an untyped value holds.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.

@@ -184,6 +184,7 @@ void Typer::function(FunctionDecl *p_function) {
 	current_ = p_function;
 	leaves_ = false;
 	statement(p_function->body);
+	infer_storage(p_function->body);
 	// Paths are not followed: only a body with no `return <value>` and no `throw` anywhere is reported.
 	TypeRef *declared = p_function->return_type;
 	bool constructor = class_ && class_->klass->constructor && class_->klass->constructor->node == p_function;

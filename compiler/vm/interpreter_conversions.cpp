@@ -10,6 +10,17 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
+// An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
+void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
+	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
+	Slot number;
+	const bool done = from_any(value, Kind::F64, NONE, &number); // An object's text may run the program.
+	drop_any(value);
+	if (done) {
+		stack_[frames_.back().base + p_in.a].d = number.d;
+	}
+}
+
 // An Int64 where an int, a uint or a Number is expected, or a Number where an Int64 is, when the
 // program did not write the conversion: the value, or a RangeError that names it.
 void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {

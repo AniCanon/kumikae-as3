@@ -27,9 +27,9 @@ std::unique_ptr<GodotHost::Worked> emit_of(const ir::EngineName &p_entry, const 
 	return worked->bound ? std::move(worked) : nullptr;
 }
 
-bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, const Variant **p_pointers, size_t p_count) {
+std::optional<bool> emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, const Variant **p_pointers, size_t p_count, std::string *r_error) {
 	if (!p_signal || p_signal->get_type() != Variant::SIGNAL) {
-		return false;
+		return std::nullopt;
 	}
 	const Signal &signal = *static_cast<const Signal *>(inside(*const_cast<Variant *>(p_signal), Variant::SIGNAL));
 	const uint64_t object_id = static_cast<uint64_t>(signal.get_object_id());
@@ -44,7 +44,7 @@ bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, con
 	// By its id, each time: an object Godot has freed since is not there to emit anything.
 	const GDExtensionObjectPtr object = seen.object ? gdextension_interface::object_get_instance_from_id(seen.object) : nullptr;
 	if (!object) {
-		return false;
+		return std::nullopt;
 	}
 	// Godot copies the name before it runs a listener, which may emit another signal through this place.
 	p_pointers[0] = &seen.name;
@@ -56,7 +56,11 @@ bool emit_signal(const GodotHost::Worked &p_worked, const Variant *p_signal, con
 	// What emit_signal gives (whether anything listens, as a number) is nothing a signal's emit() gives,
 	// and nothing to give back to Godot. Nothing of the handle is read from here on: a listener may have
 	// let go of it (a field the signal was lent from, given another).
-	return error.error == GDEXTENSION_CALL_OK;
+	if (error.error != GDEXTENSION_CALL_OK) {
+		*r_error = describe(error, p_worked.name);
+		return false;
+	}
+	return true;
 }
 
 } // namespace kas3

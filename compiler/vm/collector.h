@@ -60,7 +60,7 @@ private:
 	enum class Phase : uint8_t { Idle, Count, Mark };
 	// The low two bits of gc_state: what this collection found of the object. The rest is which collection.
 	static constexpr uint32_t COUNTED = 0, IN_USE = 1, SUSPECT = 2;
-	static constexpr uint32_t EPOCHS = 1u << 30;
+	static constexpr uint32_t EPOCHS = 1u << 29;
 	// Asking the engine about a node costs about as much as looking at this many references.
 	static constexpr size_t NODE_WORK = 32;
 	// An engine node: its count, as an object's gc_count is kept.

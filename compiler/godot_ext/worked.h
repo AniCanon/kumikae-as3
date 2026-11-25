@@ -71,6 +71,7 @@ struct SignalSeen {
 struct GodotHost::Worked final : vm::Prepared {
 	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility, Construct, Emit } what = What::Constant;
 	std::string name; // Godot's name for it, for the errors it reports.
+	godot::StringName dynamic_name; // A property dispatched through an attached foreign script.
 	// Operator: Godot's evaluator for these types; the types of its operands, and of what it gives.
 	GDExtensionPtrOperatorEvaluator evaluator = nullptr;
 	int operands[2] = { NO_VALUE, NO_VALUE };
@@ -85,9 +86,11 @@ struct GodotHost::Worked final : vm::Prepared {
 	GDExtensionMethodBindPtr bound = nullptr;
 	mutable SignalSeen seen; // Emit.
 	bool is_static = false;
+	bool by_name = false; // Object.get/set/call let a script intercept the request.
 	// Every parameter and the result are numbers, Booleans or value types held inline (Vector2, Color): with
 	// every argument given, the method bind is called on the bare values, with no Variant at all.
 	bool bare = false;
+	GDExtensionVariantGetInternalPtrFunc setter_argument = nullptr;
 	int64_t index = -1;
 	// The type of each parameter: a Builtin's are exact; a Bound's say where a StringName is taken.
 	std::vector<int> parameters;
@@ -104,12 +107,18 @@ struct GodotHost::Worked final : vm::Prepared {
 	const Utility *utility = nullptr;
 };
 
+// Shared by typed instructions and members discovered on an untyped receiver. An absent argument
+// count defers the built-in method's arity check until it runs.
+std::unique_ptr<GodotHost::Worked> method_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, int p_receiver,
+		bool p_static, std::optional<size_t> p_arguments);
+std::unique_ptr<GodotHost::Worked> member_of(std::string_view p_owner, const std::vector<std::string_view> &p_words, bool p_set, ir::Kind p_receiver);
+
 // A signal's emit(), which Godot has as a method of the signal that takes any number of values: worked out
 // as Object's emit_signal, called by its method bind (godot_emit.cpp). Nothing for any other entry.
 std::unique_ptr<GodotHost::Worked> emit_of(const ir::EngineName &p_entry, const std::vector<std::string_view> &p_words);
 // Emits the signal a handle holds, with values that are Godot's already: `p_pointers` has room for the
 // signal's name first, then the `p_count` values. False, with nothing done, where the handle holds no
 // signal or the signal's object is gone: what that is, the request by name says.
-bool emit_signal(const GodotHost::Worked &p_worked, const godot::Variant *p_signal, const godot::Variant **p_pointers, size_t p_count);
+std::optional<bool> emit_signal(const GodotHost::Worked &p_worked, const godot::Variant *p_signal, const godot::Variant **p_pointers, size_t p_count, std::string *r_error);
 
 } // namespace kas3

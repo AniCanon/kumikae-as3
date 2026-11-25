@@ -73,7 +73,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			line("\t" + reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(static_cast<Vector *>(" + reg(p_in.b) + ")->length);");
 			break;
 		case Op::VecGet:
-			if (!whole(p_in.c)) {
+			if (!whole(p_in.c) && !(kind(p_in.c) == Kind::F64 && kind(p_in.a) == Kind::Str)) {
 				return false;
 			}
 			if (kind(p_in.a) == Kind::U8) {
@@ -154,10 +154,26 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 
 bool FunctionWriter::fast_text(const Instruction &p_in) {
 	switch (p_in.op) {
-		case Op::Concat:
-			line("if (Str *const s = join(c, " + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+		case Op::Concat: {
+			// When the next move replaces the prefix, the join can take its unique allocation.
+			const auto &code = function_.code;
+			bool append = false;
+			if (pc_ + 1 < code.size() && code[pc_ + 1].op == Op::Move && code[pc_ + 1].a == p_in.b &&
+					code[pc_ + 1].b == p_in.a && p_in.a != p_in.b && owns(p_in.b)) {
+				if (!adjacent_) {
+					adjacent_.emplace(function_);
+				}
+				append = adjacent_->only_consumer(p_in.a, pc_ + 1);
+			}
+			const std::string join = append ? "append_text_owned(c, &" : "join(c, ";
+			line("if (Str *const s = " + join + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
 			put(p_in.a, "s");
-			break;
+			line("} else {");
+			mark();
+			line("out_of_memory(c); " + fail());
+			line("}");
+			return true;
+		}
 		case Op::I32ToStr:
 		case Op::U32ToStr:
 		case Op::F64ToStr:
@@ -213,8 +229,12 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				share(p_in.a, reg(p_in.b));
 				return true;
 			}
-			if (kind(p_in.b) == Kind::I64 || ir::is_engine(kind(p_in.b))) {
-				return false; // An Int64 is held in a box, which the library makes; one of Godot's is the host's.
+			if (ir::is_engine(kind(p_in.b))) {
+				put(p_in.a, "own_engine_any(c, shared(c, " + reg(p_in.b) + ").handle, " + (kind(p_in.b) == Kind::Ref ? "true)" : "false)"));
+				return true;
+			}
+			if (kind(p_in.b) == Kind::I64) {
+				return false; // An Int64 is held in a box, which the library makes.
 			}
 			if (kind(p_in.b) != Kind::F64) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");

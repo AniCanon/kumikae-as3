@@ -49,7 +49,8 @@ def report(name, samples):
 
 
 # The programs `kas3c run` times, by the name each is reported under.
-PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as"), ("objects", "objects.as"))
+PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as"), ("objects", "objects.as"),
+            ("append", "string_append.as"), ("join", "string_join.as"))
 
 
 def against(build, other, runs):
@@ -75,6 +76,10 @@ def against(build, other, runs):
 
 def main():
     arguments = sys.argv[1:]
+    if "--untyped" in arguments:
+        from untyped import benchmark
+        benchmark(arguments, native=False)
+        return
     if not arguments:
         sys.exit(__doc__)
     build = os.path.abspath(arguments[0])

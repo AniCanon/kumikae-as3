@@ -238,6 +238,9 @@ const Vector *bound_pair(const ir::Module &p_module, const Object *p_function);
 // For a function value that is one of Godot's methods of one of Godot's objects: the handle on the object
 // and Godot's name for the method. False for any other.
 bool engine_method(const ir::Module &p_module, const Object *p_function, void **r_object, std::string_view *r_method);
+// A saved by-name engine method with arguments Godot can take directly. Declines before the call
+// for other functions and for script objects that need the VM's conversion.
+std::optional<bool> call_saved_method(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result);
 // What the engine's side said of a request it refused, raised: AS3's TypeError or RangeError where the
 // words start with its name (engine_handles.h), an Error otherwise.
 void raise_engine(Library &p_library, const std::string &p_error);

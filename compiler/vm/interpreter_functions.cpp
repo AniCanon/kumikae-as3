@@ -111,7 +111,7 @@ void Interpreter::arguments_array(const Instruction &p_in) {
 	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
 	Entries *properties = callee ? properties_of(made) : nullptr;
 	PropertyKey key;
-	key.text = "callee";
+	key.owned_text = "callee";
 	if (!properties || !set_entry(properties, key, any::object(callee))) {
 		release_object(callee);
 		release_object(made);
@@ -226,6 +226,16 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	SpareSlots given(spare_slots_);
 	for (const uint32_t each : list) {
 		given->push_back(r[each]);
+	}
+	const size_t base = frames_.back().base;
+	Slot result = any::undefined();
+	if (const auto done = call_saved_method(library_, value, given->data(), given->size(), &result)) {
+		if (*done && !failing_ && p_in.a != NONE) {
+			put(Kind::Any, stack_[base + p_in.a], result);
+		} else {
+			drop_any(result);
+		}
+		return;
 	}
 	SpareSlots values(spare_slots_);
 	if (!function_arguments(value, given->size(), given->data(), &*values)) {

@@ -8,7 +8,7 @@ Only the host differs. This folder also holds AS3's standard library, which nati
 
 ## The host
 
-A typed callback uses its Function object’s target and bound receiver or closure environment. The interpreter checks the target signature and passes raw slots into the new frame. A mismatching target from dynamic code raises `TypeError`.
+A typed callback uses its Function object's target and bound receiver or closure environment. The interpreter checks the target signature and passes raw slots into the new frame. A mismatching target from dynamic code raises `TypeError`.
 
 The interpreter knows where it runs only through four interfaces, gathered in `host.h`:
 
@@ -24,13 +24,17 @@ is no engine, and the tests use a recorder.
 
 Each instruction that asks something of the engine is prepared once, when the program loads:
 `EngineHandles::prepare()` is called for every such instruction, and `run()` carries out what it kept. A
-host that keeps nothing gets the request by name instead.
+host can decline before invoking the operation if the supplied operands do not match. Only a decline
+or an absent binding sends the request by name. A failure after invocation raises an AS3 error.
+
+A constant member name can keep four resolved receiver shapes at its instruction. Additional shapes share a table per literal name. At 64 entries, a new shape replaces one randomly chosen entry. Each access checks the receiver is alive. A reload replaces the interpreter table and invalidates the caches in native code.
 
 ## Files
 
 | Files | Job |
 |---|---|
 | `interpreter.h`, `interpreter.cpp`, `interpreter_records.h` | Frames, calls, and the public entry points |
+| `interpreter_library` | The standard library's callbacks into the interpreter |
 | `interpreter_run.cpp` | The loop: one case for each operation |
 | `interpreter_errors.cpp`, `interpreter_time_limit.cpp` | Raising and catching errors, stack traces, and the time limit (Error #1502) |
 | `interpreter_host.cpp`, `interpreter_godot_refuses.cpp` | Requests to the engine, and the checks made before one |
@@ -53,6 +57,7 @@ host that keeps nothing gets the request by name instead.
 | `json_*` | `JSON` |
 | `uri_text` | `escape`, `unescape` and the URI functions |
 | `class_values.cpp`, `class_statics.cpp` | Classes as values |
+| `named_sites`, `interpreter_named_site` | Literal member sites, their shared overflow table, and checked reuse of math results |
 | `engine_named` | What an untyped value does with Godot by name: a Godot class held as a class value made new, and a member of a Godot value read, written or called by its AS3 name |
 | `library_calls`, `library_members.cpp`, `interpreter_library.cpp`, `interpreter_functions.cpp` | Library methods called by name on an untyped value, and function values |
 | `reload`, `reload_update.cpp`, `constructions` | Hot reload: moving live objects onto a new build, and updating them in place |
@@ -74,6 +79,8 @@ host that keeps nothing gets the request by name instead.
 
 ### Errors
 
+- When you call a member by name on an attached script, its public methods, fields and accessors take
+  precedence over Godot members. A getter that returns a function runs once before the call.
 - **Every failure is an AS3 error** with a class, a message and a stack line. Handles and objects are
   released on the error path too. The tests count what is left alive.
 - **The interpreter never recurses in C++ for an AS3 call.** It keeps its own stack of frames, so runaway

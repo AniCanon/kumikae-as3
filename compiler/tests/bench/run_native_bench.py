@@ -22,7 +22,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILER = os.path.dirname(os.path.dirname(HERE))
-PROGRAMS = ("loop.as", "vectors.as", "values.as", "objects.as")
+PROGRAMS = ("loop.as", "vectors.as", "values.as", "objects.as", "string_append.as", "string_join.as")
 FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops"]
 
 
@@ -79,6 +79,10 @@ def compare(name, first, second, labels, runs):
 
 def main():
     arguments = sys.argv[1:]
+    if "--untyped" in arguments:
+        from untyped import benchmark
+        benchmark(arguments, native=True)
+        return
     if not arguments:
         sys.exit(__doc__)
     build = os.path.abspath(arguments[0])

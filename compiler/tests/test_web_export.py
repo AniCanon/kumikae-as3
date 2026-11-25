@@ -1,10 +1,32 @@
 """Check which scripts the Web preset puts in the precompiled program, using a real Godot export."""
 from pathlib import Path
+import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import zipfile
+
+
+# Godot issue 122158 describes deferred editor documentation work at shutdown.
+# A stock headless editor can print this after it has finished writing a valid pack.
+SHUTDOWN = re.compile(
+    r'ERROR: Parameter "singleton" is null\.\n   at: is_cmdline_mode \(editor/editor_node\.cpp:\d+\)\n'
+    r'(?:WARNING: A Thread object is being destroyed without its completion having been realized\.\n'
+    r'Please call wait_to_finish\(\) on it to ensure correct cleanup\.\n'
+    r'   at: ~Thread \((?:core/os/thread|drivers/apple/thread_apple)\.cpp:\d+\)\n)?'
+)
+
+
+def check_process(done):
+    if not done.stderr:
+        assert done.returncode == 0, (done.returncode, done.stdout)
+        return
+    assert SHUTDOWN.fullmatch(done.stderr), done.stderr
+    # Windows reports the process termination status directly. The caller also checks the archive.
+    aborted = (done.returncode & 0xffffffff) in (3, 0xC0000005, 0x40000015) if sys.platform == "win32" else False
+    assert done.returncode in (0, -signal.SIGABRT, -signal.SIGSEGV) or aborted, done.returncode
 
 
 def check_export(godot):
@@ -30,9 +52,10 @@ def check_export(godot):
             'variant/extensions_support=true\nvariant/thread_support=false\n')
         dest = Path(folder) / "game.zip"
         done = subprocess.run([godot, "--headless", "--path", str(project), "--export-pack", "Web", str(dest)],
-                              capture_output=True, text=True, check=True)
-        assert "ERROR:" not in done.stderr, done.stderr
+                              capture_output=True, text=True, timeout=120)
+        check_process(done)
         with zipfile.ZipFile(dest) as archive:
+            assert archive.testzip() is None
             module = archive.read(".kas3/program.kas3")
             assert "Excluded.as" not in archive.namelist()
             assert b"markerIncluded" in module

@@ -1,4 +1,5 @@
 #include "library_calls.h"
+#include "engine_named.h"
 
 #include <numeric>
 
@@ -58,7 +59,10 @@ void Interpreter::call_library(const ir::Instruction &p_in) {
 		given->push_back(share(Kind::Any, slots_of(rest)[i]));
 	}
 	PropertyKey key;
-	if (property_key(holder, name, &key)) {
+	if (bound->length >= 3 && any::is_engine(holder) && any::tag(slots_of(bound)[2]) == AnyTag::String) {
+		const auto *godot = static_cast<const Str *>(any::pointer(slots_of(bound)[2]));
+		EngineNamed(*this).call_bound(holder, godot->view(), method_binding(bound), *given, p_in.a);
+	} else if (property_key(holder, name, &key)) {
 		call_named(holder, key, *given, p_in.a);
 	}
 	drop_any(holder);

@@ -220,16 +220,15 @@ bool any_numbers(Library &p_library, Op p_op, const Slot *p_values, size_t p_cou
 // Two primitives joined as text, where either is text: a string is joined as it is held; only the other
 // side, a number or a word, is made into text. False, with Error #1000 raised, for no memory.
 bool join_primitives(Library &p_library, Slot p_first, Slot p_second, Slot *r_out) {
-	const auto view = [](Slot p_side, std::string *r_words) {
+	const auto part = [](Slot p_side, std::string *r_words) -> JoinOperand {
 		if (any::tag(p_side) == AnyTag::String) {
-			return static_cast<const Str *>(any::pointer(p_side))->view();
+			return static_cast<const Str *>(any::pointer(p_side));
 		}
 		*r_words = *any::text(p_side);
-		return std::string_view(*r_words);
+		return JoinOperand(*r_words);
 	};
 	std::string first_words, second_words;
-	const std::string_view first_text = view(p_first, &first_words);
-	Str *joined = join_strings(first_text, view(p_second, &second_words));
+	Str *joined = join_strings(part(p_first, &first_words), part(p_second, &second_words));
 	if (!joined) {
 		p_library.runner.out_of_memory();
 		return false;
@@ -292,9 +291,20 @@ bool any_arithmetic(Library &p_library, Op p_op, Slot p_b, Slot p_c, Slot *r_out
 } // namespace
 
 const Vector *bound_pair(const ir::Module &p_module, const Object *p_function) {
-	const Object *first = static_cast<const Object *>(own_field(const_cast<Object *>(p_function), ir::FUNCTION_FIRST).p);
-	const bool pair = first && first->klass == p_module.array_class && static_cast<const Vector *>(first)->length >= 2;
-	return pair ? static_cast<const Vector *>(first) : nullptr;
+	if (!p_function || p_function->klass != p_module.function_class) {
+		return nullptr;
+	}
+	Object *function = const_cast<Object *>(p_function);
+	const auto index = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
+	if (index >= p_module.functions.size() || (index != p_module.library_function && !p_module.functions[index].bound_engine_method)) {
+		return nullptr;
+	}
+	const Object *first = static_cast<const Object *>(own_field(function, ir::FUNCTION_FIRST).p);
+	if (!first || first->klass != p_module.array_class) {
+		return nullptr;
+	}
+	const auto *bound = static_cast<const Vector *>(first);
+	return bound->length >= 2 && any::tag(slots_of(bound)[1]) == AnyTag::String ? bound : nullptr;
 }
 
 bool engine_method(const ir::Module &p_module, const Object *p_function, void **r_object, std::string_view *r_method) {

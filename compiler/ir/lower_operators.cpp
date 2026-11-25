@@ -56,6 +56,12 @@ const Arithmetic *arithmetic_of(TokenKind p_op) {
 
 // Two values as strings, one after the other.
 uint32_t Operators::concatenate(uint32_t p_left, uint32_t p_right, uint32_t p_position) {
+	// Concat itself reads a null String as "null". Two String operands need no temporary copies.
+	if (l_.kind_at(p_left) == Kind::Str && l_.kind_at(p_right) == Kind::Str) {
+		const uint32_t out = l_.reg(Kind::Str);
+		l_.emit(Op::Concat, p_position, out, p_left, p_right);
+		return out;
+	}
 	uint32_t left = l_.reg(Kind::Str), right = l_.reg(Kind::Str), out = l_.reg(Kind::Str);
 	l_.emit(Op::StrToStr, p_position, left, l_.convert(p_left, Kind::Str, p_position));
 	l_.emit(Op::StrToStr, p_position, right, l_.convert(p_right, Kind::Str, p_position));

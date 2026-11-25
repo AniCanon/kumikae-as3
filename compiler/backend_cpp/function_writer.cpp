@@ -1,4 +1,5 @@
 #include "function_writer.h"
+#include "repeated_read.h"
 
 #include "library_entries.h"
 #include "names.h"
@@ -88,6 +89,7 @@ void FunctionWriter::analyse() {
 	shadow_.assign(function_.registers.size(), std::string());
 	borrowed_.assign(function_.registers.size(), NONE);
 	lent_.assign(function_.registers.size(), false);
+	repeated_read_ = ir::repeated_method_read(function_);
 	find_classes();
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
@@ -137,6 +139,10 @@ void FunctionWriter::put(uint32_t p_register, const std::string &p_owned) {
 }
 
 void FunctionWriter::share(uint32_t p_register, const std::string &p_borrowed) {
+	if (kind(p_register) == Kind::Val && parts(p_register).empty() && has_parts(value_type(p_register))) {
+		line("copy_parts<" + std::string(value_type(p_register)) + ">(c, " + reg(p_register) + ", " + p_borrowed + ");");
+		return;
+	}
 	if (ir::is_held(kind(p_register)) && !lent_[p_register]) {
 		line("store(c, " + reg(p_register) + ", " + p_borrowed + ");");
 	} else {
@@ -238,7 +244,7 @@ void FunctionWriter::raw_thunk(const Instruction &p_in) {
 
 void FunctionWriter::dispatch(const Instruction &p_in) {
 	const bool written = counted(p_in) || whole_conversion(p_in) || whole_comparison(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
-			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
+			fast_text(p_in) || fast_named(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
 	}
@@ -312,6 +318,11 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 		line(how->begin);
 		body_ += how->label + ":;\n";
 	}
+	// A direct method bind bypasses the host that normally observes changes to Script resources.
+	if ((p_in.op == Op::HostCall && module_.engine_names[p_in.b].key == "Script.reload") ||
+			(p_in.op == Op::HostSet && module_.engine_names[p_in.b].key == "Script.sourceCode")) {
+		line("if (c->script_declarations) ++*c->script_declarations;");
+	}
 	// Around what may see or change a field kept in a local, memory and the local are made to agree.
 	const std::string before = kept_written_back(pc_);
 	const std::string after = kept_read_again(pc_);
@@ -353,6 +364,13 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 std::string FunctionWriter::prologue() const {
 	std::string out;
 	const auto add = [&](const std::string &p_text) { out += "\t" + p_text + "\n"; };
+	for (const uint32_t use : loop_binds_) {
+		const std::string index = std::to_string(use);
+		add("void *const bind" + index + " = c->resolved ? c->resolved[" + index + "].bind : nullptr;");
+	}
+	if (repeated_read_) {
+		add("[[maybe_unused]] uint8_t bare_reads = 0;");
+	}
 	std::string unused = "(void)c;";
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
 		if (i >= function_.parameters) {

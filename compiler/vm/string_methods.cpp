@@ -73,13 +73,16 @@ void Interpreter::number_text(const Function &p_function, const Instruction &p_i
 	}
 }
 
-void Interpreter::any_null_check(Slot p_value) {
-	const AnyTag tag = any::tag(p_value);
+bool Interpreter::any_null_check(Slot p_value) {
+	const AnyTag tag = any::tag(present_or_null(p_value));
 	if (tag == AnyTag::Undefined) {
 		raise(module_.type_error_class, "Error #1010: A term is undefined and has no properties.");
 	} else if (tag == AnyTag::Null) {
 		raise_null();
+	} else {
+		return true;
 	}
+	return false;
 }
 
 } // namespace vm

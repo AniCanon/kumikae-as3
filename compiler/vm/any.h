@@ -38,6 +38,7 @@ inline constexpr uint64_t INT_FLAG = uint64_t(1) << 47;
 inline constexpr uint64_t TAG_MASK = 7;
 // 64-bit addresses reserve another low bit to remember a heap tag in their top byte.
 inline constexpr size_t POINTER_ALIGNMENT = sizeof(uintptr_t) == 4 ? 8 : 16;
+inline constexpr uint64_t HEAP_TAGGED = POINTER_ALIGNMENT == 16 ? uint64_t(1) << 3 : 0;
 inline constexpr uint64_t NULL_BITS = 1 << 3;
 inline constexpr uint64_t FALSE_BITS = 2 << 3;
 inline constexpr uint64_t TRUE_BITS = 3 << 3;
@@ -76,6 +77,11 @@ inline Slot integer(int32_t p_value) {
 // A pointer is held as it is, with no new reference: the caller decides who owns it.
 Slot string(Str *p_string);
 Slot object(Object *p_object);
+// A borrowed handle can come from a host stack with weaker alignment than the heap.
+inline bool can_borrow(const void *p_handle) {
+	const auto address = reinterpret_cast<uintptr_t>(p_handle);
+	return address && !(address & (POINTER_ALIGNMENT - 1)) && static_cast<uint64_t>(address) < INT_FLAG;
+}
 Slot godot_value(void *p_handle); // One of Godot's values (a Vector2).
 Slot godot_object(void *p_handle); // One of Godot's objects (a node).
 Slot wide(Wide *p_wide);
@@ -143,11 +149,24 @@ inline double to_number_payload(Slot p_value) { // For Number.
 inline int32_t to_int_payload(Slot p_value) { // For Int.
 	return static_cast<int32_t>(static_cast<uint32_t>(p_value.bits));
 }
-void *pointer(Slot p_value); // For String, Object, Value, Godot, Wide; null for the rest.
+// Only a pointer marked with a saved top byte needs the platform heap tag restored.
+void *tagged_pointer(Slot p_value);
+inline void *pointer(Slot p_value) {
+	if (!holds(p_value)) {
+		return nullptr;
+	}
+	if (p_value.bits & HEAP_TAGGED) {
+		return tagged_pointer(p_value);
+	}
+	return reinterpret_cast<void *>(static_cast<uintptr_t>(p_value.bits & ~TAG_MASK));
+}
 // The counted thing the value holds, if it holds one (a String, a script object or a Wide).
 Counted *counted(Slot p_value);
 // Whether it holds a handle on an engine value or object.
-bool is_engine(Slot p_value);
+inline bool is_engine(Slot p_value) {
+	const AnyTag kind = tag(p_value);
+	return kind == AnyTag::Value || kind == AnyTag::Godot;
+}
 
 // ECMAScript's conversions, where they need nothing outside the value. A script object or a Godot value
 // is not a number (NaN), and is true.

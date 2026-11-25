@@ -29,7 +29,7 @@ inline constexpr Pattern PATTERNS[] = {
 	{ ir::Op::I32ToBool, "bn-", "$a = $b != 0;" },
 	{ ir::Op::U32ToBool, "bn-", "$a = $b != 0;" },
 	{ ir::Op::F64ToBool, "bf-", "$a = to_bool($b);" },
-	{ ir::Op::StrToBool, "bs-", "$a = $b && $b->size > 0;" },
+	{ ir::Op::StrToBool, "bs-", "$a = $b && $b->size() > 0;" },
 	{ ir::Op::StrToF64, "fs-", "$a = text_to_number(c, $b);" },
 	{ ir::Op::StrLength, "ns-", "$a = static_cast<$A>(text_length(c, $b));" },
 	{ ir::Op::EqStr, "bss", "$a = same_text($b, $c);" },

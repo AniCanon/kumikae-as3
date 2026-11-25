@@ -17,7 +17,7 @@ using ir::NONE;
 using ir::Op;
 
 // Null, and the error raised, when there is no memory for it.
-Str *Interpreter::text(const std::string &p_text) {
+Str *Interpreter::text(std::string_view p_text) {
 	Str *made = new_string(p_text);
 	if (!made) {
 		out_of_memory();

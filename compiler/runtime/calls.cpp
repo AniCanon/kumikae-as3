@@ -95,6 +95,15 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 			r_value->p = object;
 			return nothing || (object && (p_class == NONE || is_class(c, object, p_class)));
 		}
+		case Kind::Val:
+			if (tag == AnyTag::Value && p_class < c->host->module.engine_names.size()) {
+				void *handle = vm::any::pointer(p_any);
+				if (c->host->handles.is_class(handle, c->host->module.engine_names[p_class].name)) {
+					r_value->p = handle;
+					return true;
+				}
+			}
+			return false;
 		case Kind::Any:
 			// Into an `Object` (a class given): undefined becomes null. Into a `*`: as it is.
 			*r_value = p_class != NONE && tag == AnyTag::Undefined ? vm::any::null() : p_any;
@@ -104,8 +113,8 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 	}
 }
 
-bool has_members(Context *, Slot p_any) {
-	const AnyTag tag = vm::any::tag(p_any);
+bool has_members(Context *c, Slot p_any) {
+	const AnyTag tag = vm::any::tag(vm::any::is_engine(p_any) ? vm::present_or_null(c->host->library(), p_any) : p_any);
 	return tag != AnyTag::Null && tag != AnyTag::Undefined;
 }
 
@@ -209,7 +218,13 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 	if (!p_function || p_function->klass != program.known.function) {
 		return false;
 	}
-	const FunctionInfo &callee = program.functions[static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX))];
+	const uint32_t target = static_cast<uint32_t>(field<int32_t>(p_function, ir::FUNCTION_INDEX));
+	Object *receiver = program.functions[target].is_static ? nullptr : field<Object *>(p_function, ir::FUNCTION_FIRST);
+	return call_resolved(c, target, receiver, p_arguments, p_count, r_result);
+}
+
+bool call_resolved(Context *c, uint32_t p_target, Object *p_receiver, const Slot *p_arguments, uint32_t p_count, Slot *r_result) {
+	const FunctionInfo &callee = c->program->functions[p_target];
 	const uint32_t first = callee.is_static ? 0 : 1;
 	if (callee.rest || callee.parameters > MOST_PARAMETERS || p_count + first > callee.parameters || p_count + first < callee.required) {
 		return false;
@@ -219,7 +234,7 @@ bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_
 		values[i] = empty();
 	}
 	if (first) {
-		values[0].p = field<Object *>(p_function, ir::FUNCTION_FIRST);
+		values[0].p = p_receiver;
 	}
 	for (uint32_t i = 0; i < p_count; i++) {
 		const uint32_t at = first + i;

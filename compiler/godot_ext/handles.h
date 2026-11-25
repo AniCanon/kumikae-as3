@@ -19,6 +19,7 @@ namespace kas3 {
 
 // Memory for one handle, its head before it and set for a handle one holds, that nothing is known of yet.
 void *handle_memory();
+void *live_handle_object(void *p_handle);
 void free_handle_memory(void *p_memory);
 
 template <class... T>

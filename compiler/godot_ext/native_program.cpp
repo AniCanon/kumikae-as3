@@ -55,12 +55,14 @@ bool has_parts(int p_type) {
 	return false;
 }
 
+#if defined(KAS3_TEST_COUNTS)
 // How many times generated code asked for the object behind a handle (rt::Host::object_lookups).
 uint64_t looked_up = 0;
 uint64_t lookups() {
 	return looked_up;
 }
 
+#endif
 // How many of the objects found behind handles (object_behind) Godot has freed. It starts at one: a handle
 // nothing was found behind yet has seen none.
 std::atomic<uint64_t> gone{ 1 };
@@ -98,7 +100,9 @@ const GDExtensionInstanceBindingCallbacks WATCH = { &watched, &watched_freed, nu
 // then tells of its end, with nothing of a script's run between (Object::~Object): a freed object is
 // never read from a head whose count still matches.
 void *object_behind(void *p_handle) {
+#if defined(KAS3_TEST_COUNTS)
 	looked_up++;
+#endif
 	const Variant *held = static_cast<const Variant *>(p_handle);
 	if (!held || held->get_type() != Variant::OBJECT) {
 		return nullptr;
@@ -107,6 +111,9 @@ void *object_behind(void *p_handle) {
 	void *const object = gdextension_interface::object_get_instance_from_id(gdextension_interface::variant_get_object_instance_id(held->_native_ptr()));
 	rt::HandleHead *const head = rt::head_of(p_handle);
 	if (!object) {
+		// The fallback after a failed site guard checks the same handle for null.
+		head->object = nullptr;
+		head->seen = before;
 		return nullptr;
 	}
 	if (!head->asked) {
@@ -197,7 +204,7 @@ uint32_t kept_at(int p_type) {
 
 // A signal emitted by generated code (rt::EngineApi::emit): each value made into Godot's own where Godot
 // reads it, on the stack, as the request by name makes it (to_variant), and the emit the host worked out.
-bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
+bool emit_bare(rt::Context *c, void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
 	if (p_count >= MOST_OPERANDS) {
 		return false;
 	}
@@ -237,7 +244,13 @@ bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const voi
 			}
 		}
 	}
-	return emit_signal(*static_cast<const GodotHost::Worked *>(p_emitter), static_cast<const Variant *>(p_signal), pointers, p_count);
+	std::string error;
+	const auto ran = emit_signal(*static_cast<const GodotHost::Worked *>(p_emitter), static_cast<const Variant *>(p_signal), pointers, p_count, &error);
+	if (ran && !*ran) {
+		auto library = c->host->library();
+		vm::raise_engine(library, error);
+	}
+	return ran.has_value();
 }
 
 // Godot's own entry for a call on bare values is handed over as it is: generated code calls it with nothing
@@ -323,6 +336,11 @@ bool defaults_of(const ir::EngineName &p_entry, size_t p_parameters, size_t p_gi
 
 } // namespace
 
+void *live_handle_object(void *p_handle) {
+	const rt::HandleHead *head = rt::head_of(p_handle);
+	return head->seen == gone.load(std::memory_order_relaxed) ? head->object : object_behind(p_handle);
+}
+
 static const rt::Program *linked_program = nullptr;
 
 #if defined(IOS_ENABLED)
@@ -406,8 +424,11 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 void NativeProgram::resolve(const rt::Program &p_program) {
 	rt::Host &host = *host_;
 	host.context.engine = api();
+	host.context.script_declarations = &engine_.declaration_epoch();
 	host.context.gone = &gone;
+#if defined(KAS3_TEST_COUNTS)
 	host.object_lookups = &lookups;
+#endif
 	names_.reserve(p_program.name_count);
 	for (uint32_t i = 0; i < p_program.name_count; i++) {
 		const rt::Text &text = p_program.strings[p_program.names[i]];
@@ -418,9 +439,14 @@ void NativeProgram::resolve(const rt::Program &p_program) {
 		const ir::Function &thunk = host.module.functions[host.thunk_function(p_program.uses[i])];
 		const ir::Instruction &in = thunk.code[0];
 		rt::Resolved &resolved = host.resolved[i];
-		if (!resolve_use(thunk, in, &resolved)) {
+		const bool ready = resolve_use(thunk, in, &resolved);
+#if defined(KAS3_TEST_COUNTS)
+		if (!ready) {
 			host.unresolved.push_back(i);
 		}
+#else
+		(void)ready;
+#endif
 	}
 }
 

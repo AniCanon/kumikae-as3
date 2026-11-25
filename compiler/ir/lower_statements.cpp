@@ -90,7 +90,13 @@ void Statements::declare_locals(Node *p_body) {
 				continue;
 			}
 			Kind kind = l_.written_kind(declarator.type, declarator.offset, Kind::F64);
-			uint32_t local = l_.engine_reg(kind, declarator.type ? l_.compilation_.type_of(declarator.type) : nullptr);
+			const Type *type = l_.compilation_.type_of(declarator.type);
+			Kind proven;
+			if (declarator.symbol->storage && l_.kind_of(declarator.symbol->storage, &proven) && proven != Kind::Any) {
+				kind = proven;
+				type = declarator.symbol->storage;
+			}
+			uint32_t local = l_.engine_reg(kind, type);
 			l_.locals_[declarator.symbol] = local;
 			l_.fn().locals.push_back({ std::string(declarator.name), local });
 			// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.

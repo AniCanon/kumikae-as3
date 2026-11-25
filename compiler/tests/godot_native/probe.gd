@@ -132,6 +132,9 @@ func _by_name() -> void:
 	var gone := Node2D.new()
 	var held = gone
 	gone.free()
+	var warmed := Node2D.new()
+	warmed.name = "warmed"
+	print("PROBE freed after warmup=", main.call("freeAfterRead", warmed))
 	print("PROBE by name freed=", main.call("freed", held))
 	other.free()
 	main.free()

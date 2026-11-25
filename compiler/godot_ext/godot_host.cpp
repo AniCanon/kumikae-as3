@@ -185,11 +185,21 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 	}
 }
 
+Variant *reusable_math(const vm::Wanted &p_wanted, const Variant &p_value) {
+	if (p_wanted.kind != ir::Kind::Any || !p_wanted.reuse) {
+		return nullptr;
+	}
+	const auto type = p_value.get_type();
+	auto *held = static_cast<Variant *>(p_wanted.reuse);
+	return type >= Variant::VECTOR2 && type <= Variant::COLOR && held->get_type() == type &&
+					(p_wanted.type.empty() || value_name(type) == p_wanted.type) ? held : nullptr;
+}
+
 bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
 	if (!r_result || p_wanted.kind == ir::Kind::Void) {
 		return true;
 	}
-	if (!arrives(p_wanted.kind, p_wanted.type, p_value)) {
+	if (p_wanted.kind != ir::Kind::Any && !arrives(p_wanted.kind, p_wanted.type, p_value)) {
 		CharString got = Variant::get_type_name(p_value.get_type()).utf8();
 		if ((p_wanted.kind == ir::Kind::I32 || p_wanted.kind == ir::Kind::U32 || p_wanted.kind == ir::Kind::U8) &&
 				(p_value.get_type() == Variant::INT || p_value.get_type() == Variant::FLOAT)) {
@@ -206,6 +216,11 @@ bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p
 		*r_error = "Godot's '" + std::string(p_from) + "' gave a " + std::string(got.get_data()) + " where " +
 				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
 		return false;
+	}
+	if (auto *held = reusable_math(p_wanted, p_value)) {
+		*held = p_value;
+		*r_result = vm::any::godot_value(held);
+		return true;
 	}
 	const std::optional<vm::Slot> taken = from_variant(p_wanted.kind, p_value);
 	if (!taken) {
@@ -309,6 +324,9 @@ void GodotHost::error_at(std::string_view p_text, std::string_view p_function, s
 bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
+	if (p_method == "reload" || p_method == "set_source_code") {
+		script_entry();
+	}
 	if (!p_method.empty() && p_method[0] == '@') {
 		return signal_verb(*receiver, p_method, p_arguments, p_count, p_result, r_result, r_error);
 	}
@@ -379,6 +397,10 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 }
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) {
+	if (p_property == "source_code") {
+		script_entry();
+	}
+
 	if (is_freed(*static_cast<Variant *>(p_receiver))) {
 		*r_error = FREED;
 		return false;

@@ -3,6 +3,7 @@
 // (vm/table.h), and one element added at a vector's end. Each is the library's rule for that one case
 // (vm/interpreter_properties.cpp, vm/interpreter_vectors.cpp); every other case is left to it.
 #include "fast.h"
+#include "direct.h"
 
 #include "native_host.h"
 #include "table.h"
@@ -18,6 +19,39 @@ Object *holder_of_any(Context *, Slot p_any) {
 
 Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
+}
+
+vm::NamedResult named_access(Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, uint8_t *p_bare_reads, Slot *r_result) {
+	Host &host = *c->host;
+	const uint32_t carries = host.interpreter->carries();
+	std::optional<vm::NamedCall> call;
+	const vm::Wanted wanted{ static_cast<ir::Op>(p_op) == ir::Op::DynSet ? ir::Kind::Void : ir::Kind::Any, p_type ? p_type : "", p_reuse };
+	bool done = p_key != nullptr;
+	if (!p_key && p_bare_reads) {
+		*p_bare_reads = 0;
+	}
+	if (!p_site && p_key) {
+		host.interpreter->read_computed(p_holder, p_key->view(), r_result, p_key, nullptr, p_bare_reads);
+	} else if (p_site) {
+		done = host.interpreter->access_named(*p_site, static_cast<ir::Op>(p_op), p_holder, p_key->view(), p_args, p_count, r_result, &call, wanted);
+	}
+	if (call) {
+		retain(c, call->receiver);
+		done = call_resolved(c, call->function, call->receiver, p_args, p_count, r_result);
+		release(c, call->receiver);
+	}
+	settle_direct(c, carries);
+	if (c->listener_failed) {
+		call_failed(c);
+	}
+	const bool reused = p_reuse && vm::any::tag(*r_result) == AnyTag::Value && vm::any::pointer(*r_result) == p_reuse;
+	if (c->failing) {
+		if (!reused) {
+			release(c, *r_result);
+		}
+		*r_result = empty();
+	}
+	return reused ? vm::NamedResult::Reused : done ? vm::NamedResult::Done : vm::NamedResult::Declined;
 }
 
 Slot *property(const Context *c, Object *p_holder, const Str *p_key) {

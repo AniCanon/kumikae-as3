@@ -1,0 +1,216 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class Proven on Godot's Node
+  .0 $owner:GodotObject
+  #0 Proven/inferred
+  #1 Proven/declared
+  #2 Proven/timerInferred
+  #3 Proven/timerDeclared
+  #4 Proven/beforeEscape
+  #5 Proven/acrossCallback
+  new Proven
+class ReferenceError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new ReferenceError
+class Function
+  .0 function:int
+  .1 first:Object
+class Array of *
+class ArgumentError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new ArgumentError
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function Proven/inferred(r0:Object):Number
+  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r11:Vector2
+  @1 HostNew r3 [Node2D] ()
+  @2 Move r1 r3
+  @4 ConstI64 r4 3
+  @5 ConstF64 r5 4
+  @6 HostNew r6 [Vector2] (r4, r5)
+  @7 HostSet r1 [Node2D.position] r6
+  @9 ConstF64 r7 0.25
+  @10 HostCall _ [Node2D.rotate] (r1, r7)
+  @12 ToAny r8 r1
+  @13 ConstStr r9 "position"
+  @14 DynGet r10 r8 r9
+  @15 FromAny r11 r10 13
+  @16 Move r2 r11
+  @18 ToAny r12 r1
+  @19 ConstStr r13 "free"
+  @20 DynCall r14 r12 (r13)
+  @22 HostGet r15 r2 [Vector2.x]
+  @23 Return r15
+  @24 ConstF64 r16 nan
+  @25 Return r16
+function Proven/declared(r0:Object):Number
+  godot r1:Node2D r2:Vector2 r3:Node2D r6:Vector2 r8:Vector2
+  @1 HostNew r3 [Node2D] ()
+  @2 Move r1 r3
+  @4 ConstI64 r4 3
+  @5 ConstF64 r5 4
+  @6 HostNew r6 [Vector2] (r4, r5)
+  @7 HostSet r1 [Node2D.position] r6
+  @9 ConstF64 r7 0.25
+  @10 HostCall _ [Node2D.rotate] (r1, r7)
+  @12 HostGet r8 r1 [Node2D.position]
+  @13 Move r2 r8
+  @15 HostCall _ [GodotObject.free] (r1)
+  @17 HostGet r9 r2 [Vector2.x]
+  @18 Return r9
+  @19 ConstF64 r10 nan
+  @20 Return r10
+function Proven/timerInferred(r0:Object, r1:int, r2:Object):Number
+  godot r3:Timer r6:Timer
+  @0 ConstF64 r4 nan
+  @2 HostNew r6 [Timer] ()
+  @3 Move r3 r6
+  @5 ConstF64 r7 0
+  @6 Move r4 r7
+  @8 ConstI32 r8 0
+  @9 Move r5 r8
+  @11 I32ToF64 r9 r5
+  @12 I32ToF64 r10 r1
+  @13 LtF64 r11 r9 r10
+  @14 JumpIfNot r11 @25
+  @16 HostGet r12 r3 [Timer.waitTime]
+  @17 AddF64 r13 r4 r12
+  @18 Move r4 r13
+  @19 I32ToF64 r14 r5
+  @20 ConstF64 r15 1
+  @21 AddF64 r16 r14 r15
+  @22 F64ToI32 r17 r16
+  @23 Move r5 r17
+  @24 Jump @10
+  @26 HostCall _ [GodotObject.free] (r3)
+  @28 CallFunction r18 r2 ()
+  @30 Return r4
+  @31 ConstF64 r19 nan
+  @32 Return r19
+function Proven/timerDeclared(r0:Object, r1:int, r2:Object):Number
+  godot r3:Timer r6:Timer
+  @0 ConstF64 r4 nan
+  @2 HostNew r6 [Timer] ()
+  @3 Move r3 r6
+  @5 ConstF64 r7 0
+  @6 Move r4 r7
+  @8 ConstI32 r8 0
+  @9 Move r5 r8
+  @11 I32ToF64 r9 r5
+  @12 I32ToF64 r10 r1
+  @13 LtF64 r11 r9 r10
+  @14 JumpIfNot r11 @25
+  @16 HostGet r12 r3 [Timer.waitTime]
+  @17 AddF64 r13 r4 r12
+  @18 Move r4 r13
+  @19 I32ToF64 r14 r5
+  @20 ConstF64 r15 1
+  @21 AddF64 r16 r14 r15
+  @22 F64ToI32 r17 r16
+  @23 Move r5 r17
+  @24 Jump @10
+  @26 HostCall _ [GodotObject.free] (r3)
+  @28 CallFunction r18 r2 ()
+  @30 Return r4
+  @31 ConstF64 r19 nan
+  @32 Return r19
+function Proven/beforeEscape(r0:Object, r1:Object):Number
+  godot r2:Timer r5:Timer
+  @0 ConstF64 r3 nan
+  @1 ConstF64 r4 nan
+  @3 HostNew r5 [Timer] ()
+  @4 Move r2 r5
+  @6 HostGet r6 r2 [Timer.waitTime]
+  @7 Move r3 r6
+  @9 ToAny r7 r2
+  @10 CallFunction r8 r1 (r7)
+  @12 ToAny r9 r2
+  @13 ConstStr r10 "waitTime"
+  @14 DynGet r11 r9 r10
+  @15 FromAny r12 r11 -1
+  @16 Move r4 r12
+  @18 AddF64 r13 r3 r4
+  @19 Return r13
+  @20 ConstF64 r14 nan
+  @21 Return r14
+function Proven/acrossCallback(r0:Object, r1:Object):Number
+  godot r3:Vector2 r4:Node2D r9:Vector2
+  @1 HostNew r4 [Node2D] ()
+  @2 ToAny r5 r4
+  @3 Move r2 r5
+  @5 CallFunction r6 r1 ()
+  @7 ConstStr r7 "position"
+  @8 DynGet r8 r2 r7
+  @9 FromAny r9 r8 13
+  @10 Move r3 r9
+  @12 ConstStr r10 "free"
+  @13 DynCall r11 r2 (r10)
+  @15 HostGet r12 r3 [Vector2.x]
+  @16 Return r12
+  @17 ConstF64 r13 nan
+  @18 Return r13
+function Proven(r0:Object):void
+  @0 ReturnVoid
+function ReferenceError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "ReferenceError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function ArgumentError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "ArgumentError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function Function/call(r0:Object, r1:Object):*
+  @0 CallLibrary r2 r0 r1
+  @1 Return r2

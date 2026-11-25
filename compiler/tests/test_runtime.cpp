@@ -3,6 +3,7 @@
 #include "check.h"
 
 #include "any.h"
+#include "engine_handles.h"
 #include "fields.h"
 #include "json_text.h"
 #include "number_text.h"
@@ -34,6 +35,12 @@ static void test_integers() {
 	CHECK_EQ(to_int32(-1e10), -1410065408);
 	CHECK_EQ(to_int32(1e300), 0);
 	CHECK_EQ(to_int32(-1.5), -1);
+	CHECK_EQ(to_int32(std::nextafter(2147483648.0, 0.0)), INT32_MAX);
+	CHECK_EQ(to_int32(std::nextafter(-2147483648.0, -INFINITY)), INT32_MIN);
+	CHECK_EQ(to_int32(2147483648.75), INT32_MIN);
+	CHECK_EQ(to_uint32(std::nextafter(4294967296.0, 0.0)), UINT32_MAX);
+	CHECK_EQ(to_uint32(4294967296.75), 0u);
+	CHECK_EQ(to_uint32(-0.75), 0u);
 	CHECK_EQ(to_uint32(-1.0), 4294967295u);
 	CHECK_EQ(to_uint32(-1.5), 4294967295u);
 	CHECK_EQ(to_uint32(4294967296.0 + 5), 5u);
@@ -159,6 +166,40 @@ static void test_counts() {
 	CHECK_EQ(live_objects(), objects);
 	retain(nullptr);
 	CHECK(!release(nullptr));
+}
+
+// A bound method and its captures share storage, but either can be released first during collection.
+static void test_method_storage() {
+	const size_t before = live_objects();
+	Object list{};
+	list_init(&list);
+	Prepared binding;
+	Vector ordinary{};
+	CHECK(!method_binding(&ordinary));
+	for (bool function_first : { false, true }) {
+		auto [function, captures] = new_method_storage(3, 2, &list, 4, &list, &binding);
+		CHECK(function && captures);
+		CHECK_EQ(method_binding(captures), &binding);
+		CHECK_EQ(any::pointer(any::object(function)), function);
+		CHECK_EQ(live_objects(), before + 2);
+		slots_of(captures)[2].i = 17;
+		slot_at(function, 1).p = captures;
+		if (function_first) {
+			free_object(function);
+			CHECK_EQ(slots_of(captures)[2].i, 17);
+			CHECK_EQ(method_binding(captures), &binding);
+			free_vector(captures);
+		} else {
+			free_vector(captures);
+			CHECK_EQ(function->klass, 3u);
+			free_object(function);
+		}
+		CHECK(list_empty(&list));
+		CHECK_EQ(live_objects(), before);
+	}
+	fail_allocations(1);
+	CHECK(!new_method_storage(3, 2, &list, 4, &list).first);
+	CHECK(list_empty(&list));
 }
 
 // Math, where C's library and AS3 differ. Checked against Node: Math.round(-0.5), Math.min(0, -0), ...
@@ -372,6 +413,30 @@ static void test_any() {
 	}
 }
 
+static void test_join_across_short_limit() {
+	const std::string left(32768, 'a');
+	for (size_t size : { 65534, 65535, 65536 }) {
+		std::string right(size - left.size() - 4, 'b');
+		right += "\xf0\x9f\x98\x80";
+		for (bool measured : { false, true }) {
+			Str *a = new_string(left), *b = new_string(right);
+			CHECK(!a->is_long() && !b->is_long());
+			if (measured) {
+				CHECK_EQ(b->length(), static_cast<int32_t>(right.size() - 2));
+			}
+			Str *joined = join_strings(a, b);
+			CHECK_EQ(joined->is_long(), size >= UINT16_MAX);
+			CHECK(joined->view() == left + right);
+			CHECK_EQ(joined->data()[size], '\0');
+			CHECK_EQ(joined->measured(), measured);
+			CHECK_EQ(joined->length(), static_cast<int32_t>(size - 2));
+			free_string(joined);
+			free_string(b);
+			free_string(a);
+		}
+	}
+}
+
 // Text by UTF-16 unit. A character past U+FFFF is two units; a half held alone is three bytes.
 static void test_text_units() {
 	const std::string face = "a\xF0\x9F\x98\x80" "b"; // a, U+1F600, b
@@ -395,9 +460,38 @@ static void test_text_units() {
 	append_unit(&built, 0xD83D);
 	append_unit(&built, 0xDE00);
 	CHECK_EQ(built, std::string("\xF0\x9F\x98\x80"));
+	for (size_t bytes : { 4, 5, 6, 7, 65534, 65535, 65536 }) {
+		std::string text(bytes - 4, 'a');
+		text += "\xF0\x9F\x98\x80";
+		Str *value = new_string(text);
+		CHECK(value && value->view() == text);
+		CHECK_EQ(value->length(), static_cast<int32_t>(bytes - 2));
+		CHECK_EQ(value->data()[bytes], '\0');
+		if (bytes <= 7) {
+			CHECK(value->data() + bytes + 1 - reinterpret_cast<char *>(value) <= 16);
+		}
+		free_string(value);
+	}
 	Str *whole = join_strings("a" + high, low + "b");
 	CHECK(whole && whole->view() == face);
+	CHECK(whole && !whole->measured());
+	CHECK(whole && whole->length() == 4);
+	CHECK(whole && whole->measured());
 	free_string(whole);
+	for (size_t prefix : { 4, 65532, 65536 }) {
+		Str *built = new_string(std::string(prefix, 'a') + high);
+		Str *piece = new_string(low);
+		CHECK_EQ(built->length(), static_cast<int32_t>(prefix + 1));
+		for (int append = 0; append < 3; ++append) {
+			Str *next = join_strings(built, piece);
+			free_string(built);
+			built = next;
+			CHECK(next->measured());
+			CHECK_EQ(next->length(), static_cast<int32_t>(prefix + 2 + append));
+		}
+		free_string(built);
+		free_string(piece);
+	}
 	CHECK_EQ(find_units(face, high, 0), 1);
 	CHECK_EQ(find_units(face, low, 0), 2);
 	CHECK_EQ(find_units(face, low + "b", 0), 2);
@@ -811,6 +905,7 @@ int main() {
 	test_regex_matches();
 	test_regex_limits();
 	test_text_units();
+	test_join_across_short_limit();
 	test_number_methods();
 	test_tagged_addresses();
 	test_long_text();
@@ -822,5 +917,6 @@ int main() {
 	test_number_text();
 	test_text_number();
 	test_counts();
+	test_method_storage();
 	return check::finish();
 }

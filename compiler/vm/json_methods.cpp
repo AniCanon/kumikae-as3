@@ -110,7 +110,7 @@ bool Json::add(Slot p_owned) {
 		return true;
 	}
 	Interpreter::PropertyKey key;
-	key.text = open.key;
+	key.owned_text = open.key;
 	const bool set = vm_.set_entry(entries_of(open.container), key, p_owned);
 	vm_.drop_any(p_owned);
 	return set;
@@ -189,13 +189,13 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			for (uint32_t i = 0; i < static_cast<Vector *>(object)->length; i++) {
 				keys.emplace_back();
 				keys.back().index = i;
-				keys.back().text = std::to_string(i);
+				keys.back().owned_text = std::to_string(i);
 			}
 		} else {
 			for (const Entry &entry : entries_of(object)->all()) {
 				if (any::tag(entry.key) == AnyTag::String && !entry.hidden) {
 					keys.emplace_back();
-					keys.back().text = static_cast<const Str *>(any::pointer(entry.key))->view();
+					keys.back().owned_text = static_cast<const Str *>(any::pointer(entry.key))->view();
 				}
 			}
 		}
@@ -207,7 +207,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			} else if (const std::optional<uint32_t> at = vm_.entry_of(entries_of(object), key)) {
 				member = vm_.share(Kind::Any, entries_of(object)->value_at(*at));
 			}
-			const std::optional<Slot> revived = walk(member, key.text, p_depth + 1);
+			const std::optional<Slot> revived = walk(member, key.name(), p_depth + 1);
 			bool done = revived.has_value();
 			bool deleted = false;
 			if (done && any::tag(*revived) == AnyTag::Undefined) {
@@ -262,7 +262,7 @@ bool Json::to_json(Slot *r_owned, std::string_view p_key) {
 		return made != nullptr;
 	}
 	Interpreter::PropertyKey name;
-	name.text = "toJSON";
+	name.owned_text = "toJSON";
 	Slot found = any::undefined();
 	Entries *entries = klass->table ? entries_of(object) : klass->array ? static_cast<Vector *>(object)->properties : nullptr;
 	if (const std::optional<uint32_t> at = vm_.entry_of(entries, name)) {
@@ -274,13 +274,13 @@ bool Json::to_json(Slot *r_owned, std::string_view p_key) {
 		}
 		return made != nullptr;
 	} else if (klass->element == Kind::Void && !klass->table) {
-		if (const std::optional<uint32_t> slot = vm_.named_method(*klass, name.text)) {
+		if (const std::optional<uint32_t> slot = vm_.named_method(*klass, name.name())) {
 			Object *made = vm_.make_function(klass->methods[*slot], object);
 			if (!made) {
 				return false;
 			}
 			found = any::object(made);
-		} else if (const std::optional<uint32_t> field = klass->field(name.text, true)) {
+		} else if (const std::optional<uint32_t> field = klass->field(name.name(), true)) {
 			found = vm_.to_any(klass->fields[*field].kind, vm::field(*klass, object, *field));
 		}
 	}

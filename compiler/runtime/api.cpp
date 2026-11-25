@@ -11,8 +11,12 @@ void free_string(Context *, Str *p_string) {
 	vm::free_string(p_string);
 }
 
+Str *append_text_owned(Context *, Str **r_prefix, const Str *p_piece) {
+	return vm::append_string(r_prefix, p_piece);
+}
+
 Str *join_text(Context *, const Str *p_first, const Str *p_second) {
-	return vm::join_strings(p_first ? p_first->view() : std::string_view("null"), p_second ? p_second->view() : std::string_view("null"));
+	return vm::join_strings(p_first, p_second);
 }
 
 int compare_text(Context *, const Str *p_a, const Str *p_b) {
@@ -20,7 +24,7 @@ int compare_text(Context *, const Str *p_a, const Str *p_b) {
 }
 
 int32_t text_length(Context *, const Str *p_text) {
-	return p_text ? vm::utf16_length(p_text->view()) : 0;
+	return p_text ? p_text->length() : 0;
 }
 
 double text_to_number(Context *, const Str *p_text) {
@@ -49,6 +53,10 @@ Slot any_object(Context *, Object *p_object) {
 
 Slot any_null(Context *) {
 	return vm::any::null();
+}
+
+Slot own_engine_any(Context *, void *p_handle, bool p_ref) {
+	return p_ref ? vm::any::godot_object(p_handle) : vm::any::godot_value(p_handle);
 }
 
 void *any_pointer(Context *, Slot p_any) {

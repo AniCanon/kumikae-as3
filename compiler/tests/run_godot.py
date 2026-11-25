@@ -332,7 +332,7 @@ check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not
 output = compare("threads.gd", [
     "toString on the main thread", "toString from a worker is refused: Godot's own text",
     "attached on a worker is refused: no script, no constructor run", "lists asked for on workers and on the main thread at once",
-    "scripts loaded on workers at once",
+    "main thread warms a by-name site", "worker cannot enter a warm by-name site", "scripts loaded on workers at once",
     "freed on a worker: nothing of AS3's freed there",
     "freed on a worker: freed on the main thread",
 ])
@@ -417,7 +417,9 @@ check("kinds.gd: a cast that fails is AS3's coercion error", "Error #1034: Type 
 output = compare("by_name.gd", [
     "properties read by name", "properties written by name", "methods called by name", "a name that is not there", "in and hasOwnProperty",
     "a value's parts and methods", "a node that carries a script", "the script's own object", "a method read by name", "a signal reached by name",
-    "a freed object",
+    "exact untyped arguments", "fresh timer after attaching a script", "foreign declarations", "foreign declaration after replacement", "foreign declaration after in-place reload", "typed reload after staging source", "foreign script accessors", "same site on alternating classes and scripts", "replacement on the same receiver",
+    "rotating computed names", "Callable field", "method value", "reload classification callback", "reload classification entry", "reload classification reload", "reload classification source",
+    "foreign engine reads", "computed engine methods", "computed misses", "null math receivers", "parameter alias keeps foreign accessors", "parameter alias respects position overrides", "computed getter values keep their types and copies", "freed after warming the site", "a freed object",
 ])
 check("by_name.gd: nothing is reported", "SCRIPT ERROR" not in output, output[-1500:])
 
@@ -865,6 +867,8 @@ def reload_test(label, elsewhere, native=False):
         environment = dict(os.environ)
         environment.pop("KAS3_SOURCE_DIR", None)
         environment["KAS3_REPORT_PREPARED"] = "1"
+        for library in glob.glob(os.path.join(copy, "bin", "test_counts", "libkas3_godot.*")):
+            shutil.copy2(library, os.path.join(copy, "bin"))
         if elsewhere:
             sources = os.path.join(edited, "sources")
             shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
@@ -998,7 +1002,7 @@ with tempfile.TemporaryDirectory() as edited:
 
 test_web_export.check_export(godot)
 
-native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
+native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check, counted=True)
 native.probe()
 native.workloads()
 native.frames()

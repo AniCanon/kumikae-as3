@@ -106,10 +106,10 @@ std::optional<Outcome> prepared(Request &p_request, const Argument *p_operands, 
 	if (p_request.target != NONE && p_request.kind == Kind::Val) {
 		wanted.reuse = p_request.registers[p_request.target].p;
 	}
-	if (p_request.host.handles.run(*p_request.prepared, p_operands, p_count, wanted, p_request.result_or_none(), &p_request.error)) {
-		return Outcome::Done;
+	if (const auto ran = p_request.host.handles.run(*p_request.prepared, p_operands, p_count, wanted, p_request.result_or_none(), &p_request.error)) {
+		return *ran ? Outcome::Done : Outcome::Refused;
 	}
-	return p_request.error.empty() ? std::nullopt : std::optional<Outcome>(Outcome::Refused);
+	return std::nullopt;
 }
 
 Outcome construct(Request &p_request) {

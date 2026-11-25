@@ -4,18 +4,18 @@
 // is therefore an AS3 error, a debugger can walk the frames, and a function could later be paused and
 // resumed.
 #pragma once
-
 #include "constructions.h"
+#include "counted_loops.h"
 #include "heap.h"
 #include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
-#include "library.h"
+#include "interpreter_library.h"
 #include "native_code.h"
+#include "named_sites.h"
 #include "runtime.h"
 #include "stack.h"
 #include "text_methods.h"
-
 #include <array>
 #include <memory>
 #include <optional>
@@ -23,17 +23,15 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-
 namespace kas3 {
 namespace vm {
-
 namespace regex {
 struct Program;
 }
-
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
+	friend class InterpreterLibrary;
 	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
 	friend class EngineNamed; // Godot's classes and members an untyped value reaches by name (vm/engine_named.h).
 
@@ -61,29 +59,12 @@ private:
 
 	const ir::Module &module_;
 	Host host_;
+	NamedSites named_sites_;
+	CountedLoops loops_{ module_ };
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	// What each object was constructed with, while a host asks for it to be remembered: none otherwise.
 	std::unique_ptr<Constructions> constructions_;
-	// What the library's functions of plain values ask of whoever runs the program (vm/library.h), answered
-	// by this interpreter.
-	struct Asked final : Runner, Unmoved {
-		Interpreter &vm;
-		explicit Asked(Interpreter &p_vm) :
-				vm(p_vm) {}
-		void raise(uint32_t p_class, const std::string &p_message) override { vm.raise(p_class, p_message); }
-		void out_of_memory() override { vm.out_of_memory(); }
-		bool failing() const override { return vm.failing_ || vm.stopped_; }
-		bool run(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
-			return vm.call_within(p_function, p_arguments, p_count, r_result);
-		}
-		uint32_t carries() const override { return vm.carries_; }
-		// What is still the interpreter's own (vm/interpreter_library.cpp).
-		bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) override;
-		bool engine_is(Slot p_value, uint32_t p_class) override;
-		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
-		bool array_number_set(Vector *p_array, double p_number, Slot p_value) override;
-		bool sort_field(Slot p_element, Str *p_name, Slot *r_value) override;
-	} asked_{ *this };
+	InterpreterLibrary asked_{ *this };
 	Library library_{ heap_, asked_, asked_ };
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
@@ -168,6 +149,8 @@ private:
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
+	bool indexed_read(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	bool cached_property(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_borrow = nullptr);
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	// The request itself, on those registers: what the engine gave and the register it goes to (NONE for
 	// none), or false with an error raised if the engine refuses.
@@ -251,7 +234,7 @@ private:
 	std::string date_text(const Object *p_date, ir::DateText p_which) const { return vm::date_text(library_, p_date, p_which); }
 	void json_call(const ir::Function &p_function, const ir::Instruction &p_in); // vm/json_methods.cpp
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
-	void any_null_check(Slot p_value);
+	bool any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length) { vm::raise_range(library_, p_index, p_length); }
 	bool resize_vector(Vector *p_vector, uint32_t p_length) { return vm::resize_vector(library_, p_vector, p_length); }
@@ -278,6 +261,7 @@ private:
 	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
 	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix = {}) const;
+	bool ordinary_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
 	bool sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
@@ -362,7 +346,7 @@ private:
 	// The function the object's class runs for an interface method; NONE, with the error raised, if the
 	// object is missing or its class has none.
 	uint32_t interface_function(const Object *p_object, uint32_t p_method);
-	Str *text(const std::string &p_text);
+	Str *text(std::string_view p_text);
 
 public:
 	Interpreter(const ir::Module &p_module, Host p_host);
@@ -451,17 +435,12 @@ public:
 	// the engine runs meanwhile is carried back to that call, as to an instruction.
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
-	// For a host whose native code is the program (native_code.h says what each is for).
+	bool read_computed(Slot p_holder, std::string_view p_name, Slot *r_value, Str *p_key = nullptr, void *p_reuse = nullptr, uint8_t *p_bare_reads = nullptr);
+	bool access_named(NamedSite &p_site, ir::Op p_op, Slot p_holder, std::string_view p_name, const Slot *p_args, size_t p_count, Slot *r_value, std::optional<NamedCall> *r_call, const Wanted &p_wanted = { ir::Kind::Any, {} });
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
 	// p_timed: the host keeps the call's time itself, and knows it began (native code's, for the engine).
-	void entered(bool p_timed = false) {
-		// The clock is started by the first call from outside alone: one made inside another asks nothing.
-		if (entries_ == 0 && !p_timed) {
-			entering();
-		}
-		entries_++;
-	}
+	void entered(bool p_timed = false);
 	void left() { entries_--; }
 	bool in_call() const { return entries_ > 0; } // A call from outside is in progress, the interpreter's or native code's.
 	void report_native(NativeError p_error);

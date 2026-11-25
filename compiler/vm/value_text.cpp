@@ -322,7 +322,7 @@ std::string error_heading(const ir::Module &p_module, const Object *p_error) {
 	const Str *name = static_cast<const Str *>(own_field(error, ir::ERROR_NAME).p);
 	const Str *message = static_cast<const Str *>(own_field(error, ir::ERROR_MESSAGE).p);
 	std::string text = name ? std::string(name->view()) : p_module.classes[p_error->klass].name;
-	if (message && message->size > 0) {
+	if (message && message->size() > 0) {
 		text += ": " + std::string(message->view());
 	}
 	return text;

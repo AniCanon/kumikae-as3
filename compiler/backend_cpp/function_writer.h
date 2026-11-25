@@ -9,11 +9,13 @@
 //     through its handlers, or by `failed`, which puts its line into the trace.
 #pragma once
 
+#include "adjacent_uses.h"
 #include "facts.h"
 #include "ir.h"
 #include "thunks.h"
 
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -46,6 +48,7 @@ class FunctionWriter {
 	std::string told() const; // What tells the host of a construction, in a constructor that does.
 	const Facts *const facts_; // Null while the facts themselves are being found: nothing is known of any callee.
 	std::string body_;
+	std::optional<size_t> repeated_read_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
 	std::vector<bool> written_; // Per register: an instruction writes it.
 	// The handlers an instruction's error is offered to, innermost first, as numbers of
@@ -205,6 +208,7 @@ class FunctionWriter {
 		uint32_t moved = 0; // The instruction that writes the counter.
 	};
 	std::vector<Counted> counted_;
+	std::set<uint32_t> loop_binds_; // Immutable method binds read by a counted loop in this function.
 	// How such a loop is written in the copy being written.
 	struct Counts {
 		const Counted *loop = nullptr;
@@ -309,6 +313,8 @@ class FunctionWriter {
 	bool fast_place(const ir::Instruction &p_in);
 	std::string vector_for(uint32_t p_vector, uint32_t p_element) const;
 	bool fast_text(const ir::Instruction &p_in);
+	std::optional<ir::AdjacentUses> adjacent_;
+	bool fast_named(const ir::Instruction &p_in);
 	bool fast_untyped(const ir::Instruction &p_in);
 	bool fast_call(const ir::Instruction &p_in);
 	std::string arguments(const ir::Function &p_callee, const std::vector<uint32_t> &p_list);

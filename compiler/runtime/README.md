@@ -170,7 +170,7 @@ The extension fills them in `godot_ext/native_program.cpp`.
 - **A place of a `Vector.<Vector2>` or `Vector.<Vector2i>` holds the value itself.** Generated code copies
   eight bytes between the place and an inline register (`vector_of()`, `place_value()`, `value_place()`).
 
-Set `KAS3_NATIVE_COUNTS` to make the host print how many times generated code left an operation to the
+In the test build, set `KAS3_NATIVE_COUNTS` to print how many times generated code left an operation to the
 library, and which. The tests hold the benchmarks to those counts (`native_counts.txt`), so a change that
 loses a fast path fails a test and not only a timing.
 

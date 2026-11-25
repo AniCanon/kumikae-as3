@@ -54,6 +54,24 @@ bool FunctionWriter::whole_conversion(const Instruction &p_in) {
 		by_thunk(p_in);
 		return true;
 	}
+	if (p_in.op == Op::ModF64) {
+		const Whole &left = whole_[p_in.b], &right = whole_[p_in.c];
+		const auto widened = [&](const Whole &p_value) {
+			if (p_value.sources.size() != 1 || p_value.terms != 1) {
+				return false;
+			}
+			const Kind source = kind(p_value.sources.front());
+			return source == Kind::I32 || source == Kind::U32;
+		};
+		if (widened(left) && widened(right)) {
+			// Each operand was widened from a 32-bit integer. Divide in 64 bits, including INT_MIN % -1.
+			line("if (" + right.exact + " != 0) {");
+			line("const int64_t rem = " + left.exact + " % " + right.exact + ";");
+			line(reg(p_in.a) + " = rem == 0 && " + left.exact + " < 0 ? -0.0 : static_cast<double>(rem);");
+			line("} else { " + reg(p_in.a) + " = NAN; }");
+			return true;
+		}
+	}
 	// F64ToI32 or F64ToU32 of a known whole-number sum uses the integer's own type.
 	if ((p_in.op != Op::F64ToI32 && p_in.op != Op::F64ToU32) || whole_[p_in.b].expression.empty()) {
 		return false;

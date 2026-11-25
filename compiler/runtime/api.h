@@ -75,6 +75,8 @@ enum class Kind : uint8_t;
 	X(element_added, void *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
 	X(holder_of_any, Object *, (Context *c, Slot p_any), (c, p_any)) \
 	X(key_of_any, Str *, (Context *c, Slot p_any), (c, p_any)) \
+	X(named_access, vm::NamedResult, (Context *c, vm::NamedSite *p_site, uint8_t p_op, Slot p_holder, Str *p_key, const Slot *p_args, uint32_t p_count, const char *p_type, void *p_reuse, uint8_t *p_bare_reads, Slot *r_result), \
+			(c, p_site, p_op, p_holder, p_key, p_args, p_count, p_type, p_reuse, p_bare_reads, r_result)) \
 	X(property, Slot *, (const Context *c, Object *p_holder, const Str *p_key), (c, p_holder, p_key)) \
 	X(set_property, bool, (Context *c, Object *p_holder, Str *p_key, Slot p_value), (c, p_holder, p_key, p_value)) \
 	X(text_of_int, Str *, (Context *c, int32_t p_value), (c, p_value)) \
@@ -93,6 +95,7 @@ enum class Kind : uint8_t;
 	/* The interpreter's own values and numbers (vm/any.h, vm/runtime.h, vm/numeric.h), which a program \
 	   library reaches here too. join_text reads a missing String as "null"; compare_text orders two \
 	   Strings by their UTF-16 units; text_length counts them (0 for none); text_to_number is 0 for none. */ \
+	X(append_text_owned, Str *, (Context *c, Str **r_prefix, const Str *p_piece), (c, r_prefix, p_piece)) \
 	X(join_text, Str *, (Context *c, const Str *p_first, const Str *p_second), (c, p_first, p_second)) \
 	X(compare_text, int, (Context *c, const Str *p_a, const Str *p_b), (c, p_a, p_b)) \
 	X(text_length, int32_t, (Context *c, const Str *p_text), (c, p_text)) \
@@ -103,6 +106,7 @@ enum class Kind : uint8_t;
 	X(any_string, Slot, (Context *c, Str *p_string), (c, p_string)) \
 	X(any_object, Slot, (Context *c, Object *p_object), (c, p_object)) \
 	X(any_null, Slot, (Context *c), (c)) \
+	X(own_engine_any, Slot, (Context *c, void *p_handle, bool p_ref), (c, p_handle, p_ref)) \
 	X(any_pointer, void *, (Context *c, Slot p_any), (c, p_any)) \
 	X(to_int32, int32_t, (Context *c, double p_value), (c, p_value)) \
 	X(to_uint32, uint32_t, (Context *c, double p_value), (c, p_value)) \

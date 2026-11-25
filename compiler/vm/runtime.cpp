@@ -10,6 +10,10 @@
 #include <limits>
 #include <new>
 
+#if defined(KAS3_TEST_COUNTS)
+#include "../tests/script_read_allocations.h"
+#endif
+
 namespace kas3 {
 namespace vm {
 
@@ -26,6 +30,9 @@ void fail_allocations(uint32_t p_count) {
 }
 
 bool allocation_fails() {
+#if defined(KAS3_TEST_COUNTS)
+	count_vm_allocation();
+#endif
 	if (failing_allocations == 0) {
 		return false;
 	}
@@ -40,32 +47,124 @@ size_t live_objects() {
 	return objects_alive;
 }
 
-Str *join_strings(std::string_view p_first, std::string_view p_second) {
-	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
-	// Two halves of a character that meet are joined into its four bytes (vm/text_units.h).
-	const size_t saved = joined_halves(p_first, p_second);
-	const uint64_t size = (uint64_t)p_first.size() + p_second.size() - saved;
-	void *memory = size > UINT32_MAX || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + (size_t)size + 1);
+static Str *allocate_string(uint64_t p_size, size_t p_header) {
+	if (p_size > UINT32_MAX || p_size >= SIZE_MAX - p_header || allocation_fails()) {
+		return nullptr;
+	}
+	void *memory = std::malloc(p_header + p_size + 1);
 	if (!memory) {
 		return nullptr;
 	}
-	Str *string = new (memory) Str();
-	string->references = 1;
-	string->size = (uint32_t)size;
+	++strings_alive;
+	const uint32_t size = static_cast<uint32_t>(p_size);
+	return size < UINT16_MAX ? new (memory) Str{ { 1 }, size } : new (memory) LongStr{ { { 1 }, UINT16_MAX }, size, -1 };
+}
+
+Str *join_strings(std::string_view p_first, std::string_view p_second) {
+	const size_t saved = joined_halves(p_first, p_second);
+	const uint64_t size = static_cast<uint64_t>(p_first.size()) + p_second.size() - saved;
+	const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
+	Str *string = allocate_string(size, header);
+	if (!string) {
+		return nullptr;
+	}
+	char *bytes = reinterpret_cast<char *>(string) + header;
 	if (saved) {
-		write_joined(p_first, p_second, string->data() + p_first.size() - 3);
+		write_joined(p_first, p_second, bytes + p_first.size() - 3);
 		p_first.remove_suffix(3);
 		p_second.remove_prefix(3);
 	}
 	if (!p_first.empty()) {
-		std::memcpy(string->data(), p_first.data(), p_first.size());
+		std::memcpy(bytes, p_first.data(), p_first.size());
 	}
 	if (!p_second.empty()) {
-		std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
+		std::memcpy(bytes + size - p_second.size(), p_second.data(), p_second.size());
 	}
-	string->data()[size] = 0;
-	strings_alive++;
+	bytes[size] = 0;
 	return string;
+}
+
+Str *join_strings(const Str *p_first, const Str *p_second) {
+	if (p_first && p_second) {
+		const uint32_t left = p_first->sizes;
+		const uint32_t right = p_second->sizes;
+		if ((left | right) < UINT16_MAX) {
+			const auto *first = reinterpret_cast<const char *>(p_first + 1);
+			const auto *second = reinterpret_cast<const char *>(p_second + 1);
+			// Only a trailing high half and a leading low half can change the byte size.
+			if (left < 3 || right < 3 || static_cast<unsigned char>(second[0]) != 0xED ||
+					!joined_halves({ first, left }, { second, right })) {
+				const uint32_t size = left + right;
+				const size_t header = size < UINT16_MAX ? sizeof(Str) : sizeof(LongStr);
+				Str *joined = allocate_string(size, header);
+				if (!joined) {
+					return nullptr;
+				}
+				char *bytes = reinterpret_cast<char *>(joined) + header;
+				std::memcpy(bytes, first, left);
+				std::memcpy(bytes + left, second, right + 1);
+				return joined;
+			}
+		}
+	}
+	return join_strings(JoinOperand(p_first), JoinOperand(p_second));
+}
+
+Str *append_string(Str **r_prefix, const Str *p_piece) {
+	Str *prefix = *r_prefix;
+	if (!prefix || !p_piece || prefix == p_piece || prefix->references != 1 || prefix->is_long() || p_piece->is_long()) {
+		return join_strings(prefix, p_piece);
+	}
+	const auto left = prefix->view(), right = p_piece->view();
+	const size_t size = left.size() + right.size();
+	if (size >= UINT16_MAX || joined_halves(left, right)) {
+		return join_strings(prefix, p_piece);
+	}
+	uint32_t sizes = static_cast<uint32_t>(size);
+	if (prefix->measured() || p_piece->measured()) {
+		sizes |= static_cast<uint32_t>(prefix->length() + p_piece->length() + 1) << 16;
+	}
+	void *memory = allocation_fails() ? nullptr : std::realloc(prefix, sizeof(Str) + size + 1);
+	if (!memory) {
+		return nullptr;
+	}
+	Str *joined = new (memory) Str{ { 1 }, sizes };
+	std::memcpy(reinterpret_cast<char *>(joined + 1) + left.size(), right.data(), right.size() + 1);
+	*r_prefix = nullptr;
+	return joined;
+}
+
+Str *join_strings(JoinOperand p_first, JoinOperand p_second) {
+	Str *joined = join_strings(p_first.bytes, p_second.bytes);
+	if (joined && (!p_first.string || !p_second.string || p_first.string->measured() || p_second.string->measured())) {
+		// A newly encountered piece is measured once. Joining two surrogate halves changes the
+		// byte count but preserves both UTF-16 units.
+		const auto units = [](JoinOperand p_part) -> uint32_t {
+			return p_part.string ? static_cast<uint32_t>(p_part.string->length()) : static_cast<uint32_t>(p_part.bytes.size());
+		};
+		const uint32_t length = units(p_first) + units(p_second);
+		if (joined->is_long()) {
+			joined->sizes |= 1u << 16;
+			static_cast<LongStr *>(joined)->full_units = static_cast<int32_t>(length);
+		} else {
+			joined->sizes |= (length + 1) << 16;
+		}
+	}
+	return joined;
+}
+
+int32_t Str::measure_length() const {
+	if (!is_long()) {
+		const uint32_t count = utf16_length(view());
+		sizes |= (count + 1) << 16;
+		return static_cast<int32_t>(count);
+	}
+	const auto *large = static_cast<const LongStr *>(this);
+	if (!measured()) {
+		sizes |= 1u << 16;
+		large->full_units = utf16_length(view());
+	}
+	return large->full_units;
 }
 
 Str *new_string(std::string_view p_text) {
@@ -126,10 +225,64 @@ Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list) {
 	return object;
 }
 
+// The capture array precedes the function. The collector may release them in either order.
+struct alignas(16) MethodCaptures : Vector {
+	Slot values[3];
+	const Prepared *binding;
+};
+static constexpr size_t METHOD_OFFSET = sizeof(MethodCaptures);
+static_assert(METHOD_OFFSET % alignof(Object) == 0);
+
+const Prepared *method_binding(const Vector *p_bound) {
+	return p_bound->paired ? static_cast<const MethodCaptures *>(p_bound)->binding : nullptr;
+}
+
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions,
+		uint32_t p_array, Object *p_arrays, const Prepared *p_binding) {
+	if (p_fields > (SIZE_MAX - METHOD_OFFSET - sizeof(Object)) / sizeof(Slot) || allocation_fails()) {
+		return {};
+	}
+	auto *block = static_cast<char *>(std::calloc(1, METHOD_OFFSET + sizeof(Object) + p_fields * sizeof(Slot)));
+	if (!block) {
+		return {};
+	}
+	auto *array = new (block) MethodCaptures();
+	array->places = array->values;
+	array->binding = p_binding;
+	array->inline_places = true;
+	array->fixed = true;
+	array->length = array->capacity = 3;
+	auto *function = new (block + METHOD_OFFSET) Object();
+	auto initialize = [](Object *p_object, uint32_t p_class, Object *p_list) {
+		p_object->references = 1;
+		p_object->paired = true;
+		p_object->klass = p_class;
+		if (p_list) {
+			list_insert(p_list, p_object);
+		}
+	};
+	initialize(array, p_array, p_arrays);
+	initialize(function, p_function, p_functions);
+	objects_alive += 2;
+	return { function, array };
+}
+
+static void free_method_part(Object *p_object, char *p_block, Object *p_other) {
+	p_object->paired = false;
+	if (!p_other->paired) {
+		std::free(p_block);
+	}
+}
+
 void free_object(Object *p_object) {
 	list_remove(p_object);
 	objects_alive--;
-	std::free(p_object);
+	if (p_object->paired) {
+		char *block = reinterpret_cast<char *>(p_object) - METHOD_OFFSET;
+		free_method_part(p_object, block, reinterpret_cast<Vector *>(block));
+	} else {
+		std::free(p_object);
+	}
 }
 
 Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list,
@@ -204,10 +357,18 @@ void free_vector(Vector *p_vector) {
 		std::free(p_vector->places);
 	}
 	objects_alive--;
-	std::free(p_vector);
+	if (p_vector->paired) {
+		char *block = reinterpret_cast<char *>(p_vector);
+		free_method_part(p_vector, block, reinterpret_cast<Object *>(block + METHOD_OFFSET));
+	} else {
+		std::free(p_vector);
+	}
 }
 
 uint32_t to_uint32(double p_value) {
+	if (p_value >= 0.0 && p_value < 4294967296.0) {
+		return static_cast<uint32_t>(p_value);
+	}
 	if (!std::isfinite(p_value)) {
 		return 0;
 	}
@@ -220,6 +381,9 @@ uint32_t to_uint32(double p_value) {
 }
 
 int32_t to_int32(double p_value) {
+	if (p_value >= -2147483648.0 && p_value < 2147483648.0) {
+		return static_cast<int32_t>(p_value);
+	}
 	return (int32_t)to_uint32(p_value);
 }
 
@@ -323,7 +487,7 @@ double string_to_number(std::string_view p_text) {
 }
 
 int32_t utf16_length(std::string_view p_text) {
-	int32_t count = 0;
+	uint32_t count = 0;
 	for (unsigned char c : p_text) {
 		count += (c & 0xC0) != 0x80; // A character starts here,
 		count += c >= 0xF0; // and one of four bytes is two units.

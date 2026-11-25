@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <cstdio>
 #include <cstdlib>
 #include <optional>
 #include <vector>
@@ -101,7 +102,17 @@ struct GodotHost::Utility {
 };
 
 GodotHost::GodotHost() = default;
-GodotHost::~GodotHost() = default;
+GodotHost::~GodotHost() {
+#if defined(KAS3_TEST_COUNTS) && !defined(KAS3_RUNTIME_ONLY)
+	if (std::getenv("KAS3_NATIVE_COUNTS")) {
+		for (const auto &[klass, members] : class_members_) {
+			for (const std::string &miss : members.misses.names()) {
+				std::fprintf(stderr, "kas3: cached miss %s\n", miss.c_str());
+			}
+		}
+	}
+#endif
+}
 
 const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::string *r_error) {
 	auto found = utilities_.find(p_signature);

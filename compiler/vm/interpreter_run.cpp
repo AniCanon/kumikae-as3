@@ -1,4 +1,5 @@
 #include "interpreter_internal.h"
+#include "numeric_dispatch.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,105 +29,10 @@ static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
 	return p_op == Op::LtStr ? left < right : left <= right;
 }
 
-// A statement is about to run: once in a while the clock is looked at, and the debugger's hook, if there is
-// one, sees it and may stop the program.
-void Interpreter::at_statement() {
-	if (--countdown_ == 0) {
-		look_at_clock();
-	}
-	if (!hook_) {
-		return;
-	}
-	frames_.back().pc--; // The hook sees the statement about to run.
-	const bool carry_on = hook_(*this, hook_data_);
-	frames_.back().pc++;
-	if (time_limit_) {
-		entered_ = host_.clock.elapsed(); // A debugger's stop is not the program's time.
-	}
-	if (!carry_on) {
-		stopped_ = true;
-		halted_ = true;
-	}
-}
-
 // New, by the library's function.
 void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	if (Object *object = object_new(library_, p_class)) {
 		assign(Kind::Obj, r_out, object);
-	}
-}
-
-// A call: the function named, or for a virtual call the one the object's own class has in that slot.
-// The arguments are copied out of their registers first, since the new frame may move the stack.
-void Interpreter::enter(const Function &p_function, const Instruction &p_in, const Slot *p_registers) {
-	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	uint32_t target = p_in.b;
-	if (p_in.op == Op::CallVirtual) {
-		const Object *object = list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p);
-		if (!object) {
-			raise_null();
-			return;
-		}
-		target = module_.classes[object->klass].methods[p_in.b];
-	} else if (p_in.op == Op::CallInterface) {
-		target = interface_function(list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p), p_in.b);
-		if (target == NONE) {
-			return;
-		}
-	}
-	Slot few[16];
-	std::vector<Slot> many;
-	Slot *values = few;
-	if (list.size() > 16) {
-		many.resize(list.size());
-		values = many.data();
-	}
-	for (size_t i = 0; i < list.size(); i++) {
-		values[i] = p_registers[list[i]];
-	}
-	push(target, values, list.size(), p_in.a);
-}
-
-// A function is done. Its value, if it gives one, goes to the caller's register, or to whoever called in
-// from outside, or nowhere.
-void Interpreter::leave(const Function &p_function, const Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result) {
-	Slot value;
-	value.bits = 0;
-	const Kind kind = p_function.result;
-	const bool gives = p_in.op == Op::Return;
-	if (gives) {
-		value = share(kind, p_registers[p_in.a]);
-	}
-	const uint32_t result = frames_.back().result;
-	if (frames_.back().constructs) {
-		constructions_->constructed(static_cast<Object *>(stack_[frames_.back().base].p));
-	}
-	pop();
-	if (gives && result != NONE && frames_.size() > p_depth) {
-		const Frame &caller = frames_.back();
-		const Kind wanted = module_.functions[caller.function].registers[result];
-		if (wanted == Kind::Any && kind != Kind::Any) {
-			// Called through a function value: what it gives is untyped.
-			Slot typed = value;
-			value = to_any(kind, typed);
-			drop(kind, typed);
-		}
-		put(wanted, stack_[caller.base + result], value);
-	} else if (gives && frames_.size() == p_depth && r_result) {
-		*r_result = value; // The caller from outside takes it, with its reference.
-	} else if (gives && held(kind)) {
-		drop(kind, value); // Nobody wants it.
-	}
-}
-
-// An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
-void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
-	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
-	Slot number;
-	const bool done = from_any(value, Kind::F64, NONE, &number); // An object's text may run the program.
-	drop_any(value);
-	if (done) {
-		stack_[frames_.back().base + p_in.a].d = number.d;
 	}
 }
 
@@ -152,6 +58,8 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 		Frame &frame = frames_.back();
 		const Function &function = module_.functions[frame.function];
 		Slot *r = stack_.data() + frame.base;
+		// Scalar instructions cannot call back into the VM. Keep the frame and registers across them.
+	dispatch:
 		const Instruction &in = function.code[frame.pc++];
 		// A Boolean result: the whole register is cleared, then the flag set. (Written here, not as a
 		// function in a header: measured, that form makes the loop about 3% slower.)
@@ -161,29 +69,38 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 		};
 		switch (in.op) {
 			case Op::Stmt:
+				if (--countdown_ && !hook_) {
+					goto dispatch;
+				}
 				at_statement();
 				break;
 			case Op::ConstI32:
 				r[in.a].i = (int32_t)in.b;
-				break;
+				goto dispatch;
 			case Op::ConstU32:
 				r[in.a].u = in.b;
-				break;
+				goto dispatch;
 			case Op::ConstF64:
 				r[in.a].d = module_.numbers[in.b];
-				break;
+				goto dispatch;
 			case Op::ConstBool:
 				flag(in.b != 0);
-				break;
+				goto dispatch;
 			case Op::ConstStr:
-				retain(strings_[in.b]);
-				assign(Kind::Str, r[in.a], strings_[in.b]);
-				break;
+				if (r[in.a].p != strings_[in.b]) {
+					retain(strings_[in.b]);
+					assign(Kind::Str, r[in.a], strings_[in.b]);
+				}
+				goto dispatch;
 			case Op::ConstNull:
 				drop(function.registers[in.a], r[in.a]);
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
+				if (!held(kind)) {
+					r[in.a] = r[in.b];
+					goto dispatch;
+				}
 				if (kind == Kind::Val && r[in.a].p && r[in.b].p && host_.handles.assign(r[in.a].p, r[in.b].p)) {
 					break;
 				}
@@ -191,14 +108,22 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			}
 			case Op::I32ToF64:
+				if (!hook_ && countdown_ > 1 && frame.pc < function.code.size() && function.code[frame.pc].op == Op::ConstF64) {
+					if (const auto *loop = loops_.at(frame.function, frame.pc - 1)) {
+						--countdown_;
+						frame.pc = loop->advance(r);
+						goto dispatch;
+					}
+				}
 				r[in.a].d = r[in.b].i;
-				break;
+				numeric_tail(module_, function, frame.pc, r);
+				goto dispatch;
 			case Op::U32ToF64:
 				r[in.a].d = r[in.b].u;
-				break;
+				goto dispatch;
 			case Op::BoolToF64:
 				r[in.a].d = r[in.b].b ? 1 : 0;
-				break;
+				goto dispatch;
 			case Op::StrToF64: {
 				Str *string = static_cast<Str *>(r[in.b].p);
 				r[in.a].d = string ? string_to_number(string->view()) : 0;
@@ -206,7 +131,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			}
 			case Op::F64ToI32:
 				r[in.a].i = to_int32(r[in.b].d);
-				break;
+				goto dispatch;
 			case Op::ConstI64:
 				r[in.a].l = module_.wides[in.b];
 				break;
@@ -334,7 +259,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::StrToBool: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				flag(string && string->size > 0);
+				flag(string && string->size() > 0);
 				break;
 			}
 			case Op::ObjToBool:
@@ -402,16 +327,16 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::AddF64:
 				r[in.a].d = r[in.b].d + r[in.c].d;
-				break;
+				goto dispatch;
 			case Op::SubF64:
 				r[in.a].d = r[in.b].d - r[in.c].d;
-				break;
+				goto dispatch;
 			case Op::MulF64:
 				r[in.a].d = r[in.b].d * r[in.c].d;
-				break;
+				goto dispatch;
 			case Op::DivF64:
 				r[in.a].d = r[in.b].d / r[in.c].d;
-				break;
+				goto dispatch;
 			case Op::ModF64:
 				r[in.a].d = std::fmod(r[in.b].d, r[in.c].d);
 				break;
@@ -438,13 +363,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::BitAnd:
 				r[in.a].i = r[in.b].i & r[in.c].i;
-				break;
+				goto dispatch;
 			case Op::BitOr:
 				r[in.a].i = r[in.b].i | r[in.c].i;
-				break;
+				goto dispatch;
 			case Op::BitXor:
 				r[in.a].i = r[in.b].i ^ r[in.c].i;
-				break;
+				goto dispatch;
 			case Op::Shl:
 				r[in.a].i = (int32_t)(r[in.b].u << (r[in.c].u & 31));
 				break;
@@ -459,13 +384,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::LtF64:
 				flag(r[in.b].d < r[in.c].d);
-				break;
+				goto dispatch;
 			case Op::LeF64:
 				flag(r[in.b].d <= r[in.c].d);
-				break;
+				goto dispatch;
 			case Op::EqF64:
 				flag(r[in.b].d == r[in.c].d);
-				break;
+				goto dispatch;
 			case Op::LtStr:
 			case Op::LeStr:
 			case Op::EqStr:
@@ -482,8 +407,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Concat:
 				// One string after the other; a missing one reads "null".
-				if (Str *joined = join_strings(r[in.b].p ? static_cast<Str *>(r[in.b].p)->view() : std::string_view("null"),
-							r[in.c].p ? static_cast<Str *>(r[in.c].p)->view() : std::string_view("null"))) {
+				if (Str *joined = join_strings(static_cast<const Str *>(r[in.b].p), static_cast<const Str *>(r[in.c].p))) {
 					assign(Kind::Str, r[in.a], joined);
 				} else {
 					out_of_memory();
@@ -491,7 +415,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				r[in.a].i = string ? utf16_length(string->view()) : 0;
+				r[in.a].i = string ? string->length() : 0;
 				break;
 			}
 			case Op::StrCall:
@@ -511,17 +435,17 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Jump:
 				frame.pc = in.a;
-				break;
+				goto dispatch;
 			case Op::JumpIf:
 				if (r[in.a].b) {
 					frame.pc = in.b;
 				}
-				break;
+				goto dispatch;
 			case Op::JumpIfNot:
 				if (!r[in.a].b) {
 					frame.pc = in.b;
 				}
-				break;
+				goto dispatch;
 			case Op::GetField: {
 				Object *object = static_cast<Object *>(r[in.b].p);
 				if (!object) {
@@ -529,7 +453,11 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					break;
 				}
 				Kind kind = function.registers[in.a];
-				put(kind, r[in.a], share(kind, field(module_.classes[object->klass], object, in.c)));
+				Slot value = field(module_.classes[object->klass], object, in.c);
+				if (kind == Kind::Obj && value.p == r[in.a].p) {
+					goto dispatch;
+				}
+				put(kind, r[in.a], share(kind, value));
 				break;
 			}
 			case Op::SetField: {
@@ -572,9 +500,25 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::New:
 				make(in.b, r[in.a]);
 				break;
+			case Op::VecGet: {
+				if (function.registers[in.a] == Kind::Str && indexed_read(function, in, r)) {
+					break;
+				}
+				const uint32_t target = named_sites_.move_target(frame.function, frame.pc - 1);
+				if (target == NONE) {
+					vector_op(function, in, r);
+				} else {
+					Instruction read = in;
+					read.a = target;
+					vector_op(function, read, r);
+					if (!failing_ && !stopped_) {
+						frames_.back().pc++;
+					}
+				}
+				break;
+			}
 			case Op::VecNew:
 			case Op::ArrayNew:
-			case Op::VecGet:
 			case Op::VecSet:
 			case Op::VecLength:
 			case Op::VecSetLength:
@@ -601,9 +545,25 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::CallLibrary:
 				call_library(in); // `frame` and `r` may be stale after this.
 				break;
-			case Op::AnyConst:
 			case Op::ToAny:
+				if (named_sites_.borrows_set(frame.function, frame.pc - 1) && any::can_borrow(r[in.b].p)) {
+					const Slot borrowed = any::godot_value(r[in.b].p);
+					const Instruction &set = function.code[frame.pc++];
+					if (cached_property(function, set, &borrowed)) {
+						break;
+					}
+					frame.pc--;
+				}
+				any_op(function, in, r);
+				break;
 			case Op::FromAny:
+				if (function.registers[in.a] == Kind::I32 && any::tag(r[in.b]) == AnyTag::Int) {
+					set_int32(r[in.a], any::to_int_payload(r[in.b]));
+					goto dispatch;
+				}
+				any_op(function, in, r);
+				break;
+			case Op::AnyConst:
 			case Op::AnyText:
 			case Op::AnyTypeof:
 			case Op::AnyEq:
@@ -625,12 +585,20 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.
 				break;
-			case Op::TableNew:
+			case Op::DynCall:
+				if (!cached_property(function, in)) {
+					property_call(function, in);
+				}
+				break;
 			case Op::DynGet:
 			case Op::DynSet:
+				if (!cached_property(function, in)) {
+					property_op(function, in);
+				}
+				break;
+			case Op::TableNew:
 			case Op::DynDelete:
 			case Op::DynIn:
-			case Op::DynCall:
 			case Op::DynKeys:
 			case Op::DynNext:
 			case Op::DynKey:
@@ -716,9 +684,18 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				failing_ = true;
 				take_trace(in.a);
 				break;
+			case Op::HostGet: {
+				const auto &steps = prepared_[frame.function];
+				const auto *bind = steps.empty() ? nullptr : steps[frame.pc - 1].prepared;
+				if (bind && bind->read_number && function.registers[in.a] == Kind::F64 &&
+						r[in.b].p && bind->read_number(*bind, r[in.b].p, &r[in.a].d)) {
+					goto dispatch;
+				}
+				host_op(function, in);
+				break;
+			}
 			case Op::HostNew:
 			case Op::HostCall:
-			case Op::HostGet:
 			case Op::HostOperate:
 			case Op::HostToStr:
 			case Op::HostPresent:

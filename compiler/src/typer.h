@@ -242,6 +242,8 @@ class Typer {
 
 	void returned(Return *p_return);
 
+	void infer_storage(Block *p_body);
+	void prove_local_uses(Block *p_body, const std::unordered_map<Symbol *, Expr *> &p_initial);
 	void function(FunctionDecl *p_function);
 
 	void definition(Node *p_node);

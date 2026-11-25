@@ -1,0 +1,103 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class Configure on Godot's Node
+  .0 $owner:GodotObject
+  #0 Configure/attach
+  new Configure
+class ReferenceError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new ReferenceError
+class Function
+  .0 function:int
+  .1 first:Object
+class Array of *
+class ArgumentError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new ArgumentError
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function Configure/attach(r0:Object):void
+  godot r1:Timer r3:Timer
+  @0 ConstF64 r2 nan
+  @2 HostNew r3 [Timer] ()
+  @3 Move r1 r3
+  @5 ConstF64 r4 2.5
+  @6 HostSet r1 [Timer.waitTime] r4
+  @8 ConstBool r5 1
+  @9 HostSet r1 [Timer.oneShot] r5
+  @11 ConstBool r6 1
+  @12 HostSet r1 [Timer.autostart] r6
+  @14 HostGet r7 r1 [Timer.waitTime]
+  @15 Move r2 r7
+  @17 GetField r8 r0 .0
+  @18 HostCall _ [Node.addChild] (r8, r1)
+  @20 ToAny r9 r1
+  @21 ConstStr r10 "waitTime"
+  @22 ToAny r11 r2
+  @23 DynSet r9 r10 r11
+  @24 ReturnVoid
+function Configure(r0:Object):void
+  @0 ReturnVoid
+function ReferenceError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "ReferenceError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function ArgumentError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "ArgumentError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function Function/call(r0:Object, r1:Object):*
+  @0 CallLibrary r2 r0 r1
+  @1 Return r2

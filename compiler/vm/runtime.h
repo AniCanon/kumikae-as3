@@ -6,8 +6,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace kas3 {
 namespace vm {
@@ -29,12 +31,35 @@ struct Counted {
 	uint32_t references;
 };
 
+// Most strings fit both their byte size and UTF-16 length in one word.
 struct Str : Counted {
-	uint32_t size; // In bytes.
-	char *data() { return reinterpret_cast<char *>(this + 1); }
-	const char *data() const { return reinterpret_cast<const char *>(this + 1); }
-	std::string_view view() const { return std::string_view(data(), size); }
+	// Low half: byte size or UINT16_MAX for LongStr. High half: cached units plus one
+	// (one for a measured LongStr). An unmeasured short header is just its byte size.
+	mutable uint32_t sizes;
+	bool is_long() const { return static_cast<uint16_t>(sizes) == UINT16_MAX; }
+	bool measured() const { return (sizes >> 16) != 0; }
+	uint32_t size() const;
+	int32_t length() const { return measured() && !is_long() ? static_cast<int32_t>((sizes >> 16) - 1) : measure_length(); }
+	char *data() { return const_cast<char *>(static_cast<const Str *>(this)->data()); }
+	const char *data() const;
+	std::string_view view() const { return std::string_view(data(), size()); }
+
+private:
+	int32_t measure_length() const;
 };
+
+struct LongStr : Str {
+	uint32_t byte_size;
+	mutable int32_t full_units = -1;
+};
+
+inline uint32_t Str::size() const {
+	return is_long() ? static_cast<const LongStr *>(this)->byte_size : static_cast<uint16_t>(sizes);
+}
+
+inline const char *Str::data() const {
+	return reinterpret_cast<const char *>(this) + (is_long() ? sizeof(LongStr) : sizeof(Str));
+}
 
 struct Object : Counted {
 	uint32_t klass; // An index into the module's classes.
@@ -43,7 +68,8 @@ struct Object : Counted {
 	Object *gc_previous;
 	Object *gc_next;
 	int32_t gc_count;
-	uint32_t gc_state;
+	uint32_t gc_state : 31;
+	uint32_t paired : 1; // This function and its capture array share one allocation.
 };
 
 // A slot of an object, by its number: they follow the header. Which slot a field is in is not said here:
@@ -177,6 +203,17 @@ size_t live_objects();
 Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
 // The two, one after the other, made at once: nothing else is allocated. Two halves of a character that
 // meet there become the character (vm/text_units.h). Null if out of memory.
+// Primitive words (numbers, null and Booleans) are ASCII. Strings retain their cached UTF-16 count.
+struct JoinOperand {
+	std::string_view bytes;
+	const Str *string = nullptr;
+	explicit JoinOperand(std::string_view p_ascii) : bytes(p_ascii) {}
+	JoinOperand(const Str *p_string) : bytes(p_string ? p_string->view() : std::string_view("null")), string(p_string) {}
+};
+// A unique prefix may give its allocation to the result. Failure leaves it in place.
+Str *append_string(Str **r_prefix, const Str *p_piece);
+Str *join_strings(const Str *p_first, const Str *p_second);
+Str *join_strings(JoinOperand p_first, JoinOperand p_second);
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
 // One reference; fields zeroed. Null if out of memory. It is put on the list (the collector's list_for() its
@@ -190,6 +227,11 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 		bool p_bytes = false, VectorPlaces p_places = VectorPlaces::Separate);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
+// The function and its three captures have independent counts and collector list entries.
+struct Prepared;
+std::pair<Object *, Vector *> new_method_storage(uint32_t p_function, size_t p_fields, Object *p_functions,
+		uint32_t p_array, Object *p_arrays, const Prepared *p_binding = nullptr);
+const Prepared *method_binding(const Vector *p_bound);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
 
 // The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as

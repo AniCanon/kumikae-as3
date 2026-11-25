@@ -1,0 +1,256 @@
+# Untyped member access
+
+When you write `target.position` on a value held as `*`, the receiver determines what the name
+means. A script can supply a field or a getter. A foreign script can intercept a Godot property.
+A freed node raises an error. A Vector2 held untyped is a copy, and writing its parts raises an
+error even when its initializer tells the compiler that it holds a Vector2.
+
+## Cost of dynamic dispatch
+
+The following measurements use headless Godot 4.7.2 on arm64 and the benchmark in
+`compiler/tests/bench/by_name`. Each cell gives percentages of main-thread samples inside the
+outer AS3 call, in the order **dispatch / name lookup / script check / conversion / Godot / other**.
+Each mode and operation has its own one-second sample at a requested one-millisecond interval.
+The reference implementation resolves names through its shared class table and runs native
+dynamic operations through interpreter thunks.
+
+A sample counts once. The innermost recognizable lookup, script check or conversion takes its
+descendants, including work inside Godot. Conversion includes copying and releasing handles.
+The Godot column counts other samples that enter the engine. The dispatch column includes the
+interpreter loop, thunk and property machinery. Inlining and stripped engine symbols limit the
+separation of these costs. In particular, time inside Godot includes validation and bridging
+as well as the member itself.
+
+| Receiver | Operation | Interpreter | Native |
+|---|---|---|---|
+| node | read | 34 / 17 / 7 / 32 / 10 / 0 | 24 / 13 / 7 / 40 / 12 / 3 |
+| node | write | 35 / 17 / 10 / 19 / 19 / 0 | 29 / 17 / 7 / 25 / 15 / 6 |
+| node | call | 38 / 19 / 11 / 10 / 22 / 0 | 37 / 19 / 9 / 13 / 21 / 0 |
+| inherited | read | 29 / 28 / 8 / 29 / 6 / 0 | 24 / 26 / 6 / 31 / 7 / 6 |
+| inherited | write | 29 / 28 / 11 / 18 / 15 / 0 | 25 / 26 / 9 / 22 / 13 / 5 |
+| inherited | call | 30 / 36 / 9 / 7 / 18 / 0 | 33 / 31 / 10 / 10 / 16 / 0 |
+| gdscript | read | 29 / 14 / 5 / 26 / 25 / 0 | 22 / 16 / 6 / 30 / 23 / 3 |
+| gdscript | write | 26 / 19 / 6 / 17 / 32 / 0 | 27 / 12 / 5 / 20 / 31 / 4 |
+| gdscript | call | 31 / 15 / 6 / 7 / 40 / 0 | 32 / 14 / 6 / 10 / 38 / 0 |
+| script | read | 62 / 3 / 20 / 15 / 0 / 0 | 49 / 2 / 21 / 27 / 0 / 2 |
+| script | write | 55 / 3 / 21 / 21 / 0 / 0 | 49 / 3 / 21 / 25 / 0 / 2 |
+| script | call | 59 / 8 / 15 / 18 / 0 / 0 | 60 / 5 / 14 / 20 / 0 / 1 |
+| value | read | 52 / 10 / 0 / 34 / 3 / 0 | 51 / 10 / 0 / 33 / 4 / 2 |
+| value | call | 57 / 9 / 0 / 31 / 3 / 0 | 53 / 9 / 0 / 35 / 3 / 1 |
+| parameter alias | read | 30 / 19 / 7 / 35 / 9 / 0 | 26 / 16 / 6 / 36 / 10 / 5 |
+| parameter alias | write | 30 / 16 / 11 / 19 / 25 / 0 | 32 / 15 / 6 / 26 / 16 / 5 |
+| parameter alias | call | 36 / 22 / 9 / 9 / 24 / 0 | 37 / 18 / 8 / 11 / 25 / 0 |
+| typed parameter alias | read | 77 / 0 / 0 / 10 / 12 / 0 | 0 / 0 / 0 / 0 / 88 / 12 |
+| typed parameter alias | write | 63 / 0 / 0 / 2 / 35 / 0 | 0 / 0 / 0 / 0 / 93 / 6 |
+| typed parameter alias | call | 63 / 0 / 0 / 3 / 34 / 0 | 0 / 0 / 0 / 0 / 96 / 4 |
+| mixed | read | 33 / 17 / 7 / 32 / 10 / 0 | 24 / 16 / 9 / 35 / 12 / 4 |
+| mixed | write | 34 / 17 / 11 / 21 / 18 / 0 | 28 / 14 / 10 / 25 / 17 / 5 |
+| mixed | call | 36 / 17 / 10 / 14 / 23 / 0 | 33 / 19 / 10 / 13 / 24 / 1 |
+
+On the plain node, the native read takes 4.21 ms per 20,000 operations and the interpreter
+takes 3.71 ms. Generated code enters a thunk, builds an interpreter frame, runs the dynamic
+instruction, and converts its result back to Vector2. In the native read sample, 562 of the
+796 samples cross the thunk from one instruction in the generated function. On Vector2 the
+thunk and conversion dominate even though reading x requires only one component. Script
+members still enter a frame to search the script class and move a field or call a function.
+On Vector2, the reference read takes 1.57 ms interpreted and 1.81 ms native. Calling its
+method takes 1.66 ms and 1.93 ms. On the scripted node, writing the script field takes 1.24 ms
+and 1.53 ms. Each pair uses the same 20,000-operation workload.
+
+## Representation and guards
+
+The front end checks your source with its declared types, then follows each local by symbol.
+It considers an initializer or a standalone first assignment in a statement block. Reads must
+follow that write in the same straight-line region, which can include nested blocks. A write
+inside an `if`, loop or `try` block proves only the part of that block after the write.
+Every later simple assignment must have the same checked type. Closure capture and indirect writes
+such as `for each` keep the local dynamic.
+
+The proof recognizes literals, construction, typed parameters and locals, fields, getters and
+typed call results. A local can flow to a matching declaration, assignment, return or fixed
+call parameter. A Boolean or ordinary number can control a branch. Numbers, signed and unsigned
+32-bit integers support numeric arithmetic and comparisons with another known ordinary number.
+A Boolean can feed a Boolean conjunction or disjunction. An int can also go directly to the
+built-in `trace`. The checker tests candidate operands together and removes unsupported
+types until every remaining use agrees. When a proof loses an operand, the checker revisits the
+locals whose proofs read it. Both operands can come from untyped locals or their
+fields. A numeric compound assignment uses Number storage so an integer initializer can grow
+past the 32-bit limit.
+
+A public field, getter or method can bind when its result feeds one of these uses. A discarded
+method call can also bind. Writes and method arguments require an exact value. A script class
+must be non-dynamic and either final or constructed at the first write. Writing a component of
+an untyped Godot math value still raises the copy error.
+
+A zero-argument construction of a built-in engine class establishes a fresh receiver. The proof
+tracks its uses up to a call that can run user code, an escape, or an engine operation that may
+publish the receiver. The operation itself can bind before its effects take place. Plain engine
+property reads and writes can continue within this region. Native value constructors and reads of
+their component fields are recognized from the generated API declarations. A loop includes effects
+on its back edge. Later calls outside the loop cannot alter an earlier read. For example, a fresh
+Timer can read `waitTime` in a loop, free itself, and then call a callback. When you pass the Timer
+to the callback first, subsequent by-name accesses check its current script. An unreassigned local
+keeps its engine reference in a typed register. A later untyped member access boxes that reference
+and dispatches through the current script.
+
+A parameter declared as `Node2D` can already carry a foreign script. Its untyped alias must
+dispatch through that script even for a built-in property. The parameter-alias fixture overrides
+`position`, counts reads and writes, and changes the type on the fifth read. Both execution modes
+observe the override once per access and raise the conversion error.
+
+Operations that observe the dynamic tag, including `typeof`, `is`, `as` and `delete`, keep their
+dynamic semantics. Parameters and the `arguments` array keep their declared calling convention.
+
+An untyped read on a receiver with a foreign script uses Godot's named getter. Literal and
+computed reads translate an engine name to its Godot spelling and follow the same order as
+GDScript's `Object.get`. Godot checks the script's declared members, including methods, then
+its `_get`, then the engine class. A getter can therefore return a number for an engine method
+name. A script method that shadows an engine method binds to the current receiver. A receiver
+with an AS3 script resolves its AS3 members first.
+
+A receiver's storage type alone does not prove which script is attached. At a dynamic site the
+runtime validates the live receiver and checks its script before selecting a field or engine
+binding. Scalar fields with matching tags can move directly. A setter, a callable returned by
+a getter, a conversion with side effects, or an argument that the entry cannot accept takes
+the ordinary path. A refusal happens before any observable operation so a setter or call runs once.
+
+## Site lifetime
+
+Each site has room for four receiver shapes. A shape identifies the Godot class or value type and
+the script class. An entry holds resolution metadata. It takes its receiver and arguments from the
+current operation. Additional shapes share a table with at most 64 entries per literal. A new shape
+replaces one randomly chosen entry in a full table. An interpreter owns its side table separately
+from the immutable module, so warming a site cannot change the module fingerprint. The host retains
+resolved engine declarations. It remembers a declaration miss for a literal on the receiver class or
+value type. A computed key can reuse that answer. Starting a program clears the literal misses. A
+foreign script can declare a property or method absent from the engine table. A foreign field
+read asks Godot for the named value.
+
+The host keeps up to 32 computed names keyed by native class and AS3 spelling. Each entry holds
+the translated Godot name and, for a method, the resolved declaration used to bind the receiver.
+Each read validates the receiver. A method entry delegates to Godot when the current receiver
+carries a foreign script. A bare receiver binds the engine method directly. A full cache replaces the least recently used name.
+Nested getters can use cached names and hold new names on the stack.
+
+Both execution modes can reuse the bare-receiver check in a loop with one computed read from
+the same untyped receiver. The proof covers the code spanned by all back edges in the function.
+It permits branches, scalar moves and arithmetic, String moves, numeric indexing into a String
+vector and an immediate move of the read result. A second read, a change of receiver, a call,
+a construction, a property write or any other operation outside that set ends the proof. A
+function with an exception handler is ineligible.
+
+The first two consecutive bare method reads on a shared object each check its script. Replacing
+the previous result can release an object whose destructor attaches a script, so reuse starts
+on the third read. A delegated read clears the guard. The interpreter also clears it when a
+debugger hook runs. Each function call starts with a fresh guard. A saved engine method keeps
+its prepared binding with the captured receiver and names. It checks the receiver at call time
+so a newly attached script can supply the implementation.
+
+After a script reload removes a field, its current `_get` can supply the value. A method read
+produces a bound AS3 function. A Callable field keeps its Godot value. When Godot declines a read,
+the host refreshes that script's declarations before choosing the error. Other declaration
+lookups reuse the reflected table until Godot enters AS3 again or AS3 reloads or changes a
+script resource. Explicit membership tests check current declarations without invoking a getter.
+
+Generated C++ checks the program generation before using a literal site's cache. AS3 execution
+and instance registration run on Godot's main thread. A worker call is refused before it enters
+AS3, and a worker free is queued for the main thread. The instance lookup, host bindings and
+interpreter overflow table follow the same thread contract. A native site uses
+static storage in the program image so dyld can unload it when Play closes it. Reload gets a fresh
+generation. A cache hit still checks for a freed object.
+
+For an engine receiver, generated code passes its operands to `named_access`, which calls the host
+interpreter's `access_named` for a literal or `read_computed` for a computed read. A computed
+read that the host declines continues through ordinary AS3 property lookup. A declined literal
+continues through the generated dynamic operation and its thunk where needed. A handled
+operation avoids the extra frame, argument copies and result handoff visible in the reference
+samples. The timing gate compares both execution modes for every operation so a change in either
+path is visible.
+
+## Cost after a site warms
+
+With the same fixtures and the unfused interpreter, GDScript read has 816 samples, mixed read
+has 824, and mixed write has 809. The six-category breakdowns are 51 / 0 / 4 / 18 / 27 / 0,
+60 / 0 / 12 / 19 / 8 / 0 and 52 / 0 / 16 / 10 / 22 / 0 respectively. The additional conversion
+work on reads includes copying the getter result into a typed local.
+
+The mixed fixture passes eight receivers from six engine classes through one instruction. Four
+shapes fit inline. When a foreign binding first appears in the shared table, the site can move
+it into an inline slot. The host can then dispatch the current script on that engine class after
+checking that the receiver is live and has no AS3 instance. Other shapes still use the shared
+table. Warm hits create no entries or name strings.
+
+The interpreter keeps the current frame and register base across scalar instructions. A named
+math read followed by a single-use conversion can write directly into the typed destination
+when its existing handle and the actual result have the expected type. Native code uses the
+same instruction analysis. A different result goes through ordinary AS3 conversion using the
+value the getter already returned. Foreign property reads still call Godot's named getter once.
+A math value passed directly to a setter can borrow its handle for that call.
+
+The table uses the six sampling categories above. The last two columns include Godot frames
+nested inside receiver checks and conversions. Each AS3 cell comes from a separate sample of
+the operation, with 709 to 757 samples inside the outer AS3 call. Percentages are rounded.
+C# uses its by-name API on the same receivers.
+
+| Receiver | Operation | Interpreter | Native | In Godot, interpreter / native (%) | C# in Godot |
+|---|---|---|---|---:|---:|
+| node | read | 66 / 0 / 24 / 0 / 11 / 0 | 39 / 0 / 32 / 0 / 14 / 15 | 22 / 30 | 32% |
+| node | write | 49 / 0 / 20 / 1 / 30 / 0 | 28 / 0 / 24 / 0 / 36 / 12 | 39 / 48 | 41% |
+| node | call | 41 / 0 / 18 / 4 / 37 / 0 | 23 / 0 / 25 / 0 / 43 / 10 | 45 / 56 | 33% |
+| inherited | read | 79 / 0 / 7 / 0 / 15 / 0 | 50 / 0 / 11 / 0 / 17 / 22 | 16 / 19 | 44% |
+| inherited | write | 54 / 0 / 6 / 1 / 39 / 0 | 34 / 0 / 8 / 0 / 44 / 13 | 39 / 46 | 53% |
+| inherited | call | 48 / 0 / 5 / 6 / 40 / 0 | 26 / 0 / 6 / 0 / 55 / 13 | 41 / 56 | 34% |
+| gdscript | read | 45 / 0 / 5 / 18 / 33 / 0 | 17 / 0 / 7 / 22 / 42 / 12 | 38 / 52 | 40% |
+| gdscript | write | 37 / 0 / 6 / 1 / 56 / 0 | 18 / 0 / 6 / 0 / 64 / 13 | 58 / 64 | 50% |
+| gdscript | call | 40 / 3 / 3 / 7 / 47 / 0 | 26 / 5 / 3 / 5 / 57 / 4 | 48 / 58 | 35% |
+| script | read | 81 / 0 / 8 / 11 / 0 / 0 | 32 / 0 / 22 / 10 / 0 / 36 | 2 / 4 | 40% |
+| script | write | 79 / 0 / 12 / 9 / 0 / 0 | 35 / 0 / 25 / 0 / 0 / 40 | 2 / 6 | 39% |
+| script | call | 79 / 0 / 5 / 16 / 0 / 0 | 23 / 0 / 17 / 10 / 0 / 49 | 1 / 2 | 49% |
+| value | read | 67 / 0 / 3 / 23 / 7 / 0 | 41 / 0 / 5 / 28 / 10 / 17 | 9 / 15 | n/a |
+| value | call | 68 / 0 / 4 / 22 / 6 / 0 | 40 / 0 / 4 / 28 / 11 / 18 | 8 / 16 | n/a |
+| alias | read | 65 / 0 / 24 / 0 / 11 / 0 | 39 / 0 / 29 / 0 / 15 / 16 | 24 / 29 | 26% |
+| alias | write | 46 / 0 / 19 / 1 / 33 / 0 | 28 / 0 / 24 / 0 / 34 / 14 | 40 / 46 | 43% |
+| alias | call | 42 / 0 / 18 / 6 / 34 / 0 | 22 / 0 / 24 / 0 / 41 / 12 | 42 / 52 | 36% |
+| aliasTyped | read | 61 / 0 / 0 / 13 / 26 / 0 | 0 / 0 / 0 / 0 / 86 / 14 | 34 / 86 | 32% |
+| aliasTyped | write | 46 / 0 / 0 / 0 / 54 / 0 | 0 / 0 / 0 / 0 / 94 / 6 | 54 / 94 | 41% |
+| aliasTyped | call | 46 / 0 / 0 / 0 / 54 / 0 | 0 / 0 / 0 / 0 / 97 / 3 | 54 / 97 | 33% |
+| proven | read | 70 / 0 / 0 / 10 / 20 / 0 | 0 / 0 / 0 / 0 / 84 / 16 | 26 / 84 | 32% |
+| proven | write | 60 / 0 / 0 / 0 / 40 / 0 | 0 / 0 / 0 / 0 / 95 / 5 | 40 / 95 | 40% |
+| proven | call | 52 / 0 / 0 / 0 / 48 / 0 | 0 / 0 / 0 / 0 / 97 / 3 | 48 / 97 | 31% |
+| typed | read | 66 / 0 / 0 / 10 / 24 / 0 | 0 / 0 / 0 / 0 / 82 / 18 | 30 / 82 | 32% |
+| typed | write | 61 / 0 / 0 / 0 / 39 / 0 | 0 / 0 / 0 / 0 / 92 / 8 | 39 / 92 | 40% |
+| typed | call | 53 / 0 / 0 / 0 / 47 / 0 | 0 / 0 / 0 / 0 / 94 / 5 | 47 / 94 | 32% |
+| mixed | read | 59 / 0 / 18 / 11 / 12 / 0 | 38 / 0 / 21 / 12 / 16 / 13 | 26 / 29 | 47% |
+| mixed | write | 51 / 0 / 17 / 7 / 25 / 0 | 29 / 0 / 23 / 7 / 28 / 13 | 35 / 41 | 50% |
+| mixed | call | 47 / 1 / 14 / 9 / 29 / 0 | 25 / 0 / 17 / 9 / 40 / 9 | 38 / 52 | 35% |
+
+On a foreign getter, the interpreter can move Godot's returned Variant into an existing handle
+of the expected math type. A bare setter with one exact math argument passes that value directly
+to the validated method bind. A foreign setter still calls Godot's named setter. The gate measures
+GDScript reads and mixed writes separately so both paths stay visible.
+
+The host resolves method binds when it loads the program. Native code reads a counted loop's
+bind once on function entry. Each iteration still checks the receiver's lifetime, calls the
+getter, and checks for a listener error. An unresolved bind still takes the ordinary thunk.
+
+The fresh Timer loop reads `waitTime` through the same host getter as an explicitly typed Timer.
+In a one-second interpreted sample, 155 samples end in the VM loop, 112 in its engine request and
+113 in bound dispatch. In native mode, 233 end in the generated function. For a GDScript-only
+property, the interpreter sample includes 129 of 728 main-thread samples at one receiver-shape
+check. The site retains the interned name and calls Godot's named getter for the live receiver.
+
+A mixed write loads each receiver from an Array. In an interpreter sample, 47 samples end in
+binding selection, 19 in pointer decoding and eight in counted-value lookup. A shared engine
+handle keeps its tag when copied. Ordinary pointers decode inline, while a platform-tagged pointer
+restores its saved high byte. Overflow sites look up a binding before allocating a new entry.
+
+An AS3 String holds immutable UTF-8 bytes. The first length read counts UTF-16 units and saves
+the result on that string. Below 65,535 bytes, the byte and unit counts share a four-byte word.
+Larger strings use full-width counts. Typed, dynamic and generated length reads share the count.
+For two unmeasured short strings, the join reads the byte sizes directly from the header words.
+Once either operand has a count, the join measures the other operand once and keeps the sum.
+When an append replaces its uniquely owned short prefix, native code can grow that allocation.
+Other references keep their original string. Joining surrogate halves preserves both UTF-16 units.
+
+Rebuild generated native libraries for runtime layout `0x4b4153330000001c`.
+The loader checks the layout before using a site's runtime entry points.

@@ -114,7 +114,8 @@ std::string function_tables(const ir::Module &p_module, uint32_t p_index, std::s
 	const uint32_t starts = line_of(p_module, function.file, function.code.empty() ? function.position : function.code[0].position);
 	std::string info = "{ " + string_literal(function.name) + ", " + std::to_string(function.file) + ", " + std::to_string(starts) + ", " +
 			number(function.owner) + ", " +
-			number(function.written_in) + ", " + boolean(function.is_static) + ", " + boolean(function.is_public) + ", " + boolean(function.rest) + ", " + boolean(function.takes_extra) + ", " +
+			number(function.written_in) + ", " + boolean(function.is_static) + ", " + boolean(function.is_public) + ", " + boolean(function.rest) + ", " +
+			boolean(function.bound_engine_method) + ", " + boolean(function.takes_extra) + ", " +
 			kind_number(function.result) + ", " + std::to_string(function.parameters) + ", " + std::to_string(function.required) + ", ";
 	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", ";
 	info += array(r_out, "const uint32_t", prefix + "_classes", classes) + ", ";

@@ -30,6 +30,14 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 inline Slot *element(Object *p_vector, int32_t p_index) {
 	return element(p_vector, static_cast<uint32_t>(p_index));
 }
+inline Slot *element(Object *p_vector, double p_index) {
+	const auto *vector = static_cast<const Vector *>(p_vector);
+	if (!vector || !(p_index >= 0 && p_index < vector->length)) {
+		return nullptr;
+	}
+	const auto at = static_cast<uint32_t>(p_index);
+	return p_index == at ? vm::slots_of(static_cast<Vector *>(p_vector)) + at : nullptr;
+}
 inline int32_t *number(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
 	return vector && vector->narrow && !vector->floating && !vector->bytes && p_index < vector->length ? vm::numbers_of(vector) + p_index : nullptr;

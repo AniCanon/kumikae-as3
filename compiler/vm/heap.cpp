@@ -127,13 +127,16 @@ Slot Heap::share(Kind p_kind, Slot p_value) {
 		if (!any::holds(p_value)) {
 			return p_value;
 		}
+		const auto kind = any::tag(p_value);
+		if (kind == AnyTag::Godot || kind == AnyTag::Value) {
+			void *handle = any::pointer(p_value);
+			void *copy = handles.copy(handle);
+			if (copy == handle) {
+				return p_value;
+			}
+			return kind == AnyTag::Godot ? any::godot_object(copy) : any::godot_value(copy);
+		}
 		retain(any::counted(p_value));
-		if (any::tag(p_value) == AnyTag::Value) {
-			return any::godot_value(handles.copy(any::pointer(p_value)));
-		}
-		if (any::tag(p_value) == AnyTag::Godot) {
-			return any::godot_object(handles.copy(any::pointer(p_value)));
-		}
 		return p_value;
 	}
 	if (ir::is_reference(p_kind)) {
@@ -142,6 +145,13 @@ Slot Heap::share(Kind p_kind, Slot p_value) {
 		p_value.p = handles.copy(p_value.p);
 	}
 	return p_value;
+}
+
+void Heap::copy_any(Slot &r_target, Slot p_value) {
+	const Slot owned = share(Kind::Any, p_value);
+	const Slot old = r_target;
+	r_target = owned;
+	drop_any(old);
 }
 
 void Heap::put(Kind p_kind, Slot &p_target, Slot p_owned) {

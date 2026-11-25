@@ -70,6 +70,10 @@ To update the golden files:
 python3 compiler/tests/run_golden.py compiler/build/kas3c compiler/tests --update
 ```
 
+Run `python3 compiler/tests/inference_controls.py` to build the local inference controls in a
+temporary directory. Each run changes one compiler rule. Disabling a proof must change the
+typed IR. Choosing the wrong storage must change the standalone program's output.
+
 A golden file that records a bug is worse than no test. Read what `--update` wrote.
 
 ## Rules
@@ -138,7 +142,7 @@ one the test project loads:
 ```sh
 cmake -S compiler -B compiler/build-san-godot -DKAS3_SANITIZE=ON -DKAS3_GODOT_CPP=<path to godot-cpp> \
     -DKAS3_GODOT_OUTPUT=$PWD/compiler/build-san-godot/out
-cmake --build compiler/build-san-godot --target kas3_godot
+cmake --build compiler/build-san-godot --target kas3_godot kas3_godot_counts
 ```
 
 Godot must load the sanitizer's runtime before the extension, and the Godot that is distributed refuses
@@ -160,8 +164,10 @@ to. On macOS, this works:
    | `ASAN_OPTIONS` | `detect_leaks=0:halt_on_error=1:detect_container_overflow=0`, because Godot itself isn't instrumented |
    | `UBSAN_OPTIONS` | `print_stacktrace=1` |
 
-3. Copy `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot`, put the sanitized
-   library in the copy's `godot_project/bin`, and run:
+3. Copy `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot`. Copy the
+   sanitized extension from `out` to the scratch project's `godot_project/bin`. Copy the extension
+   from `out/test_counts` to `godot_project/bin/test_counts` for the counter checks. Run the suite
+   with the scratch Godot executable.
 
    ```sh
    KAS3_GODOT=<the script> python3 <copy>/tests/run_godot.py <copy>/tests compiler/build/kas3c
@@ -210,21 +216,87 @@ fails. Errors don't, because these projects use Flash's library, namespaces and 
 
 ## Benchmarks
 
-Benchmarks print timings and don't pass or fail. A change made for speed comes with numbers measured
-before and after, in alternating runs: `--against` runs two builds in turn so that load on the machine
-hits both.
+Compare two builds on the same machine. For the standard compiler and VM measurements, run seven
+alternating rounds from the repository root.
+
+```sh
+nice -n 19 python3 compiler/tests/bench/run_bench.py compiler/build --against "$MAIN_BUILD" --runs 7
+```
+
+Set `MAIN_BUILD` to main's compiler build directory. Each row reports the median and the
+difference between its fastest and slowest run. The headless by-name gate below also checks
+each workload's result and enforces timing comparisons.
 
 | Script | Measures |
 |---|---|
-| `bench/run_bench.py <build> [--against <other build>]` | The interpreter on the programs in `bench/` |
+| `bench/run_bench.py <build> [--against <other build>]` | Compiler checking and VM workloads, including strings, vectors and objects |
 | `bench/web_bundle.py <export> [--against <other export>] [--brotli]` | Raw and compressed bytes for each file and the complete Web export |
-| `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter |
+| `bench/run_native_bench.py <build> [--against <other build>]` | Native code against the interpreter, or two native builds with `--against` |
 | `bench/languages/run.py` | The same workloads in Godot, in C#, GDScript and AS3. See [Performance](../../docs/performance.md#measure-it-yourself) |
 | `bench/recheck.py <build> --against <other build>` | A re-check after an edit, in generated projects of 100,000 and 1,000,000 lines |
 | `bench/completion.py <build> --against <other build>` | Completion in the language server: start-up, warm requests, and requests that follow an edit |
 
 `bench/generate_project.py` writes the generated projects. `build/bench_recheck <folder>` times a re-check
 in one build.
+
+For by-name access in headless Godot, run either AS3 timing script with
+`<build-godot> --untyped [--against <other build-godot>] [--runs N]`. Each build uses its own
+`kas3c`, runtime headers and extension in the adjacent test project. The driver checks the result
+after warm-up and after 20,000 rounds. Node2D and the attached script read, write and call by name.
+Vector2 measures a read and a call together, and times the rejected write separately.
+Use `--script-only` with a build that supports only the script case. The existing .NET export
+runs the same two nodes through C#'s Get, Set and Call with `bench/languages/run.py --untyped-cs`.
+
+To check each by-name operation separately, set `KAS3_GODOT_DOTNET` to the Godot 4.7 .NET
+executable and run this command from the repository root:
+
+```sh
+python3 compiler/tests/bench/by_name_gate.py compiler/build-godot --against <main-build-godot> --gate
+```
+
+The gate alternates interpreted AS3, native AS3 and optimized C# on the same receiver fixtures.
+A pilot measures each build and mode and sizes short batches for two milliseconds. Both sides
+of an inferred/typed pair use the same iteration count, as do all builds and modes. A timed
+window below half a millisecond is rejected. If a native control pair takes less than 0.05 ms
+per 20,000 operations in the pilot, the gate builds a second image with the two functions in
+opposite positions. Each round averages their times across both layouts. Longer rows keep the
+original single-layout comparison. The gate checks the result of every batch. Each process
+times four windows per row, twice in each direction. Short native control pairs alternate
+individual batches in ABBA order within each window.
+Each window warms for at least 20 ms and collects at least 40 ms of timed batches.
+The process takes the median batch time in each window, then the median of the four windows,
+normalized to 20,000 operations. The report gives the median and range across seven rounds.
+Alternate rounds reverse build, mode and row order. The gate fails if a candidate median exceeds its
+reference median by more than 3%. Each AS3 mode compares with the same row and mode on main.
+Native compares with the interpreter, each untyped row compares with C# by name where
+the API exists, and each inferred row compares with its explicitly typed control. The controls cover
+a fresh Node2D and Timer, Number, Boolean, String, an AS3 class, Vector2 and Color.
+The parameter-alias and typed-alias rows show the cost when a caller can supply a scripted node.
+Timing stays outside CTest. The report prints main timings only when you pass its build
+with `--against <main-build-godot>`. Add `--before-script <build-godot>` to interleave another
+build for the script members. Its script enters through an AS3 wrapper that passes `this`.
+Current builds receive the scripted node from Godot. C# uses `Get`, `Set` and `Call`.
+Its Vector2 struct has no corresponding by-name operations.
+
+The Timer control reads a freshly constructed object's wait time. The foreign-only rows read a
+GDScript field and call its method. The computed reads cycle through two or eight GDScript fields,
+or through `position`, `modulate` and `rotation` on a plain Node2D and one carrying GDScript.
+AS3 indexes a String vector and C# indexes the corresponding interned StringNames. One row alternates
+two engine method names and calls the last bound method. Another reads one name on alternating bare
+and scripted nodes at the same site. The saved-call row reads a node's rotation method once, calls it
+in a loop and checks the final rotation.
+
+The counted extension checks these paths in headless Godot in both modes. Sixteen reads alternating
+a scripted and a bare Node2D must issue a named get on each scripted receiver and skip it on each
+bare receiver. A warmed computed read of a script-declared method allocates only its bound value.
+
+Four rows compare string operations with main. They join three strings, append a piece with and
+without reading the growing length, and join two short strings into a 65,536-byte result. The custom
+getter fixture reads String, Vector2 and Object fields and calls a script helper in the same loop.
+Its call row alternates the helper and a node method. The main build probes each operation and reports
+an unsupported row if AS3 raises the missing-property or missing-method error. On macOS the comparison
+counts how many of eight distinct program images each build keeps loaded after close. Run
+`ctest -R by_name_gate_rules` to exercise the timing rules without timing a run.
 
 The tests also hold the benchmarks to the number of times native code falls back to the library
 (`native_counts.txt`), so a change that loses a fast path fails a test.

@@ -149,7 +149,8 @@ def build(files, sources_in, out, more=()):
         return "failed", "the C++ took more than 600 seconds to build"
     if built.returncode != 0:
         return "failed", "the C++ did not build\n" + built.stderr[-4000:]
-    linked = step("%s: the link" % name, [given["--cxx"][0], *given["--flag"], library, *given["--lib"], "-Wl,-rpath," + out, "-o", executable], 600)
+    driver = [*FLAGS, *includes, os.path.join(tests, "append_failure_main.cpp")] if name == "append_string" else []
+    linked = step("%s: the link" % name, [given["--cxx"][0], *given["--flag"], *driver, library, *given["--lib"], "-Wl,-rpath," + out, "-o", executable], 600)
     if linked is None:
         return "failed", "the program took more than 600 seconds to link"
     if linked.returncode != 0:
@@ -261,6 +262,13 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
 failures = ["%s\n%s" % (name, why) for name, (what, why) in outcomes.items() if what == "failed"]
 skipped = {name: why for name, (what, why) in outcomes.items() if what == "skipped"}
 passed = sum(1 for what, _ in outcomes.values() if what == "passed")
+
+if outcomes.get("append_string", ("", ""))[0] == "passed":
+    failed_append = step("append_string with an allocation failure", [os.path.join(work, "append_string", "program"), "--fail-append"],
+                         120, cwd=folder, env=environment)
+    wanted = expected(os.path.join(folder, "append_string.out")).removesuffix("old/retry\n") + "1000 old\n"
+    if failed_append is None or failed_append.returncode or failed_append.stdout != wanted or failed_append.stderr:
+        failures.append("append_string lost the prefix on allocation failure: " + str(failed_append))
 
 if outcomes.get("deep_frames", ("", ""))[0] == "passed":
     small = step("deep_frames with a small stack", [os.path.join(work, "deep_frames", "program")], 120, cwd=folder,

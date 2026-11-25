@@ -11,6 +11,13 @@ all read its result.
 **Depends on:** nothing else in this repository. It includes no header from `ir/`, `vm/`, `godot_ext/` or
 `lsp/`, and no Godot header. Godot's API arrives as AS3 declarations, like any source file.
 
+After checking your source, the checker can give an untyped local the storage of its first write.
+The proof follows that declaration or assignment through its block, checks all later assignments,
+and checks each use. It covers typed parameters, fields, getters, construction and typed return values.
+A fresh engine object can bind a member while it stays detached. A node passed in by a caller can
+already carry a script. Captures, early reads and operations that observe a dynamic tag keep the
+declared representation. See [Untyped member access](../../docs/design/untyped-performance.md).
+
 ## Files
 
 | Files | Job |

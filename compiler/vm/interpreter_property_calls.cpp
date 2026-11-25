@@ -30,9 +30,6 @@ void Interpreter::dynamic_op(const Function &p_function, const Instruction &p_in
 		case Op::TableNew:
 			table_new(p_function, p_in);
 			break;
-		case Op::DynCall:
-			property_call(p_function, p_in);
-			break;
 		case Op::DynKeys:
 		case Op::DynNext:
 		case Op::DynKey:
@@ -147,7 +144,7 @@ bool Interpreter::set_enumerable(Slot p_holder, const std::vector<Slot> &p_given
 		return true; // A Date, a RegExp, a Vector: dynamic in AS3, with no property here to hide.
 	}
 	if (!klass || !(klass->table || klass->array)) {
-		return refuse_write("1056", "Cannot create property ", asked.text, p_holder);
+		return refuse_write("1056", "Cannot create property ", asked.name(), p_holder);
 	}
 	Entries *entries = loop_entries(p_holder);
 	if (const std::optional<uint32_t> at = entry_of(entries, asked)) {
@@ -185,7 +182,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 		}
 		drop(p_kind, p_value);
 	};
-	const std::string &name = p_key.text;
+	const std::string_view name = p_key.name();
 	if (name == "hasOwnProperty" || name == "propertyIsEnumerable") {
 		PropertyKey asked;
 		bool has = false;
@@ -251,41 +248,50 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 // holder.name(arguments): the property's value called, as a function. A sealed object's method is called
 // on it; a name it lacks is #1069; a property that is not a function, AS3's TypeError #1006.
 void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
-	Object *object = held_object(p_holder);
+	Object *object = property_object(host_.handles, p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	if (any::is_engine(p_holder) || (klass && !klass->native_base.empty())) {
-		if (EngineNamed(*this).call(p_holder, p_key, p_given, p_out)) {
-			return; // One of Godot's methods by its AS3 name, called or raised.
-		}
-	}
-	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.text, p_given, p_out))) {
+	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.name(), p_given, p_out))) {
 		return; // A class's static method, or RegExp's or Date's, done or raised.
-	}
-	if (klass && klass->element == Kind::Void && !klass->table) {
-		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.text)) {
-			call_with(klass->methods[*slot], object, p_given, p_out);
-			return;
-		}
 	}
 	Slot value = any::undefined();
 	bool own = false;
-	if (klass && (klass->table || klass->array || (klass->element == Kind::Void && klass->field(p_key.text, true)))) {
-		if (!has_property(p_holder, p_key, false, &own)) {
+	if (klass && klass->element == Kind::Void && !klass->table) {
+		if (const auto slot = named_method(*klass, p_key.name())) {
+			call_with(klass->methods[*slot], object, p_given, p_out);
 			return;
 		}
-		if (own && !get_property(p_holder, p_key, &value)) {
+		if (const auto index = klass->field(p_key.name(), true)) {
+			own = true;
+			value = to_any(klass->fields[*index].kind, field(*klass, object, *index));
+		} else if (const auto getter = named_method(*klass, p_key.name(), "get ")) {
+			own = true;
+			if (!call_getter(object, klass->methods[*getter], &value)) {
+				return;
+			}
+		} else if (named_method(*klass, p_key.name(), "set ")) {
+			raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
+					"Error #1077: Illegal read of write-only property " + std::string(p_key.name()) + " on " + holder_name(any::object(object)) + ".");
 			return;
 		}
+	} else if (klass && (klass->table || klass->array)) {
+		if (!has_property(p_holder, p_key, false, &own) || (own && !get_property(p_holder, p_key, &value))) {
+			return;
+		}
+	}
+	if (!own && (any::is_engine(p_holder) || (klass && !klass->native_base.empty())) && EngineNamed(*this, object).call(p_holder, p_key, p_given, p_out)) {
+		return;
 	}
 	Object *function = held_object(value);
 	if (function && function->klass == module_.function_class) {
 		const uint32_t target = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
 		call_with(target, static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p), p_given, p_out);
-	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
+	} else if (!own && (library_call(p_holder, p_key.name(), p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
 		// The library's method, or Object's own, on a value with no property of that name.
 	} else if (own || (klass && klass->table) || any::is_engine(p_holder)) {
 		// One of Godot's values has no such method: what calling a name that is not there is in AVM2.
-		raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
+		raise(module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
+	} else if (klass && !klass->native_base.empty()) {
+		raise_not_found(p_key, p_holder);
 	} else {
 		// A method of its prototype (an Array's push) can't be called by name yet; reading anything else
 		// raises for what is not there (#1069), and what is read is no function.
@@ -294,10 +300,10 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 		if (!has_property(p_holder, p_key, true, &inherited)) {
 			// Raised.
 		} else if (inherited) {
-			raise_unsupported("calling '" + p_key.text + "' on a value of type '" + holder_name(p_holder) + "' by its name");
+			raise_unsupported("calling '" + std::string(p_key.name()) + "' on a value of type '" + holder_name(p_holder) + "' by its name");
 		} else if (get_property(p_holder, p_key, &read)) {
 			drop_any(read);
-			raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
+			raise(module_.type_error_class, "Error #1006: " + std::string(p_key.name()) + " is not a function.");
 		}
 	}
 	drop_any(value);
@@ -317,9 +323,7 @@ void Interpreter::property_call(const Function &p_function, const Instruction &p
 		given->push_back(share(Kind::Any, stack_[base + list[i]]));
 	}
 	PropertyKey found;
-	if (!held_object(holder) && (any::tag(holder) == AnyTag::Null || any::tag(holder) == AnyTag::Undefined)) {
-		any_null_check(holder);
-	} else if (property_key(holder, key, &found)) {
+	if (any_null_check(holder) && property_key(holder, key, &found)) {
 		call_named(holder, found, *given, p_in.a);
 	}
 	drop_any(holder);

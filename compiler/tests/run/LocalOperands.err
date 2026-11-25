@@ -1,0 +1,5 @@
+LocalOperands.as:8:8: warning: 'n' has no type: it is taken as '*'. Write ':*' to say so
+LocalOperands.as:13:8: warning: 'x' has no type: it is taken as '*'. Write ':*' to say so
+LocalOperands.as:14:8: warning: 'y' has no type: it is taken as '*'. Write ':*' to say so
+LocalOperands.as:19:8: warning: 'p' has no type: it is taken as '*'. Write ':*' to say so
+LocalOperands.as:24:8: warning: 'sum' has no type: it is taken as '*'. Write ':*' to say so

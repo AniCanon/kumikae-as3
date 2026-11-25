@@ -21,21 +21,23 @@ using namespace godot;
 
 namespace kas3 {
 
-// The names are listed once and searched without heap allocation.
-std::optional<int> value_type(std::string_view p_name) {
-	static const std::vector<std::pair<std::string, int>> types = [] {
-		std::vector<std::pair<std::string, int>> found;
-		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
-			if (i != Variant::OBJECT) {
-				const CharString text = Variant::get_type_name(static_cast<Variant::Type>(i)).utf8();
-				found.emplace_back(std::string(text.get_data(), static_cast<size_t>(text.length())), i);
-			}
+// The canonical UTF-8 name of each Variant type, shared by class checks and lookups by name.
+std::string_view value_name(int p_type) {
+	static const auto names = [] {
+		std::array<std::string, Variant::VARIANT_MAX> found;
+		for (int i = 0; i < Variant::VARIANT_MAX; i++) {
+			const CharString text = Variant::get_type_name(static_cast<Variant::Type>(i)).utf8();
+			found[i].assign(text.get_data(), static_cast<size_t>(text.length()));
 		}
 		return found;
 	}();
-	for (const auto &[name, type] : types) {
-		if (name == p_name) {
-			return type;
+	return names[p_type];
+}
+
+std::optional<int> value_type(std::string_view p_name) {
+	for (int i = 1; i < Variant::VARIANT_MAX; i++) {
+		if (i != Variant::OBJECT && value_name(i) == p_name) {
+			return i;
 		}
 	}
 	return std::nullopt;

@@ -76,6 +76,11 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	switch (p_in.op) {
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
+			// Arrays store tagged slots. The usual integer read can transfer one straight to its destination.
+			if (kind == Kind::Any && index == Kind::I32 && r[p_in.c].i >= 0 && static_cast<uint32_t>(r[p_in.c].i) < vector->length) {
+				heap_.copy_any(r[p_in.a], any::filled(slots_of(vector)[r[p_in.c].i]));
+				break;
+			}
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
 			if (at && vector->narrow) {
 				r[p_in.a] = place(vector, *at); // An int or a uint: nothing is counted.

@@ -137,7 +137,7 @@ public:
 		u32(p_fn.owner);
 		u32(p_fn.written_in);
 		const uint8_t bits = (p_fn.is_static ? 1u : 0u) | (p_fn.is_public ? 2u : 0u) |
-				(p_fn.rest ? 4u : 0u) | (p_fn.takes_extra ? 8u : 0u);
+				(p_fn.rest ? 4u : 0u) | (p_fn.takes_extra ? 8u : 0u) | (p_fn.bound_engine_method ? 16u : 0u);
 		byte(bits);
 		u32(p_fn.parameters);
 		u32(p_fn.required);
@@ -424,6 +424,7 @@ public:
 		r_out->is_public = (bits & 2u) != 0;
 		r_out->rest = (bits & 4u) != 0;
 		r_out->takes_extra = (bits & 8u) != 0;
+		r_out->bound_engine_method = (bits & 16u) != 0;
 		if (!u32(&count) || !check_count(count, 2)) {
 			return false;
 		}
@@ -471,6 +472,11 @@ public:
 			if (!text(&r_out->locals[i].name) || !u32(&r_out->locals[i].reg)) {
 				return false;
 			}
+		}
+		// Earlier modules identify a generated instance forwarder by its synthetic receiver.
+		if (!r_out->is_static && r_out->owner == NONE && !r_out->locals.empty() && r_out->locals.front().reg == 0 &&
+				r_out->locals.front().name == BOUND_RECEIVER) {
+			r_out->bound_engine_method = true;
 		}
 		if (!u32(&count) || !check_count(count, 6)) {
 			return false;
@@ -549,6 +555,32 @@ std::vector<uint8_t> write_binary(const Module &p_module) {
 		w.u32(p_module.*field);
 	}
 	return w.take();
+}
+
+// A stripped version-one forwarder still loads its captured receiver from element zero
+// and calls the engine method named by its synthetic function name.
+static bool stripped_forwarder(const Function &p_fn, const Module &p_module) {
+	if (p_fn.is_static || p_fn.owner != NONE || !p_fn.locals.empty() || p_fn.name.compare(0, 6, "godot.") != 0 || p_fn.code.size() < 4) {
+		return false;
+	}
+	const auto &zero = p_fn.code[0], &get = p_fn.code[1], &convert = p_fn.code[2];
+	if (zero.op != Op::ConstI32 || zero.b != 0 || get.op != Op::VecGet || get.b != 0 || get.c != zero.a ||
+			convert.op != Op::FromAny || convert.b != get.a) {
+		return false;
+	}
+	std::string key = p_fn.name.substr(6);
+	const size_t slash = key.find('/');
+	if (slash == std::string::npos) {
+		return false;
+	}
+	key[slash] = '.';
+	for (const auto &in : p_fn.code) {
+		if (in.op == Op::HostCall && in.b < p_module.engine_names.size() && p_module.engine_names[in.b].key == key &&
+				in.c < p_fn.argument_lists.size() && !p_fn.argument_lists[in.c].empty() && p_fn.argument_lists[in.c].front() == convert.a) {
+			return true;
+		}
+	}
+	return false;
 }
 
 std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Module *r_module) {
@@ -647,6 +679,9 @@ std::optional<std::string> read_binary(const uint8_t *p_data, size_t p_size, Mod
 	}
 	if (!binary_references_valid(module)) {
 		return std::string("invalid reference in binary IR module");
+	}
+	for (auto &fn : module.functions) {
+		fn.bound_engine_method = fn.bound_engine_method || stripped_forwarder(fn, module);
 	}
 	*r_module = std::move(module);
 	return std::nullopt;

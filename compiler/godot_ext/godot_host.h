@@ -3,12 +3,18 @@
 #pragma once
 
 #include "host.h"
+#include "literal_misses.h"
+#include "script_declarations.h"
 
 #include <godot_cpp/variant/variant.hpp>
 
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <array>
+#include <atomic>
+#include <cstring>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -45,6 +51,53 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+	struct ReadKey {
+		uintptr_t type = 0;
+		std::string text;
+		godot::StringName key;
+		const vm::NamedMember *member = nullptr;
+		uint64_t used = 0;
+		uint8_t next = 0;
+	};
+	std::array<ReadKey, 32> read_keys_;
+	uint8_t last_read_key_ = 0;
+	uint64_t read_clock_ = 0;
+	ReadKey *find_read_key(uintptr_t p_type, std::string_view p_name);
+	ReadKey &keep_read_key(ReadKey p_key);
+	const godot::StringName *getter_for(const ReadKey &p_entry, void *p_owner, void *p_receiver, uint8_t *p_guard, uint8_t p_previous);
+	unsigned active_reads_ = 0;
+	const godot::StringName *computed_getter(void *p_receiver, std::string_view p_name, void **r_owner, std::optional<godot::StringName> &r_nested, const vm::NamedMember **r_member, uint8_t *p_guard);
+	Name computed_name_;
+	godot::StringName computed_class_;
+	bool can_delegate_ = false;
+#if !defined(KAS3_RUNTIME_ONLY)
+	// Godot 4 stores the interned name pointer in its opaque StringName. Keep the name alive as the key.
+	static uintptr_t handle_class(void *p_receiver, void *p_raw);
+	static uintptr_t class_identity(const godot::StringName &p_class) {
+		uintptr_t identity;
+		static_assert(sizeof(p_class) == sizeof(identity));
+		std::memcpy(&identity, p_class._native_ptr(), sizeof(identity));
+		return identity;
+	}
+	struct ClassHash {
+		size_t operator()(const godot::StringName &p_class) const { return std::hash<uintptr_t>{}(class_identity(p_class)); }
+	};
+	struct SameClass {
+		bool operator()(const godot::StringName &a, const godot::StringName &b) const { return class_identity(a) == class_identity(b); }
+	};
+	struct Declaration {
+		vm::NamedMember member;
+		vm::MethodNames names;
+	};
+	struct Members {
+		std::unordered_map<std::string_view, Declaration> known;
+		LiteralMisses misses;
+	};
+	const vm::NamedMember &named_on_class(godot::Variant::Type p_type, const godot::StringName &p_class, std::string_view p_name, vm::NameSource p_source);
+	const vm::NamedMember *resolve_member(Members &p_members, godot::StringName p_class, godot::Variant::Type p_type, std::string_view p_name);
+	std::unordered_map<godot::StringName, Members, ClassHash, SameClass> class_members_;
+	std::array<Members, godot::Variant::VARIANT_MAX> value_members_;
+#endif
 	// Only a successful ClassDB lookup is cached. Script fields depend on the instance.
 	struct {
 		std::string_view as3; // Points into the generated static table.
@@ -80,7 +133,9 @@ public:
 	// An engine instruction worked out once (worked.h): public for the helpers of godot_prepared.cpp.
 	struct Worked;
 	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
-	void new_program() { program_++; }
+	void new_program();
+	void script_entry() { ++declaration_epoch_; }
+	uint64_t &declaration_epoch() { return declaration_epoch_; }
 	// The programs made before the last are gone: what was worked out for a call at its own place and
 	// is not the last program's is let go of.
 	void release_unused();
@@ -90,16 +145,23 @@ public:
 private:
 	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
+	std::vector<std::unique_ptr<Worked>> named_bindings_;
+	ScriptDeclarations declarations_;
+	uint64_t declaration_epoch_ = 1;
+	uint64_t reflected_epoch_ = 0;
+	std::map<std::string, std::array<vm::NamedMember, 2>, std::less<>> script_members_;
+	const vm::NamedMember &reflected_member(void *p_receiver, std::string_view p_name, bool p_refresh);
+	const vm::NamedMember &script_binding(std::string_view p_name, bool p_method);
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
 	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.
 	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
-	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
-	bool run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+	std::optional<bool> run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
+	std::optional<bool> run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
-	bool run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-			std::string *r_error);
-	bool run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
-	bool run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+	std::optional<bool> run_bound(const Worked &p_worked, const vm::Object *p_checked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error, void *p_validated = nullptr);
+	std::optional<bool> run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
+	std::optional<bool> run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
 
 public:
@@ -114,8 +176,8 @@ public:
 
 	// The engine instructions, worked out once and run (godot_prepared.cpp).
 	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in) override;
-	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
-			std::string *r_error) override;
+	[[nodiscard]] std::optional<bool> run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error, const vm::Object *p_checked) override;
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
@@ -136,7 +198,19 @@ public:
 	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	[[nodiscard]] void *bind_method(void *p_receiver, std::string_view p_method, std::string *r_error) override;
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] vm::NamedMember named(void *p_receiver, std::string_view p_name) override; // godot_named.cpp
+	bool delegates_script(void *p_receiver, std::string_view p_name) override;
+	const vm::NamedMember &script_getter(void *p_receiver, std::string_view p_name) override;
+	bool script_has(void *p_receiver, std::string_view p_name) override;
+	vm::NamedRead read_script(void *p_receiver, void *p_owner, std::string_view p_name, const vm::NamedMember *p_binding,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
+	const vm::NamedMember &script_member(void *p_receiver, std::string_view p_name) override;
+	static std::optional<vm::NamedShape> shape_of(void *p_receiver, uintptr_t p_delegated = 0);
+	std::optional<vm::NamedShape> named_shape(void *p_receiver, uintptr_t p_delegated) override { return shape_of(p_receiver, p_delegated); }
+	std::optional<bool> run_script(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
+	std::optional<bool> run_named(const vm::NamedShape &p_shape, const vm::Prepared &p_bind, const vm::Argument *p_operands, size_t p_count,
+			const vm::Wanted &p_result, vm::Slot *r_value, std::string *r_error) override;
+	[[nodiscard]] const vm::NamedMember &named(void *p_receiver, std::string_view p_name, vm::NameSource p_source) override; // godot_named.cpp
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
 	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future
@@ -154,6 +228,7 @@ public:
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
 	[[nodiscard]] bool assign(void *p_to, const void *p_from) override;
+	[[nodiscard]] bool assign_math(void *p_to, const void *p_from, std::string_view p_class) override;
 	// For the cycle collector: a reference-counted object that a script listens to or that has a script
 	// is a node (by its id), and so is a listener (callable.h).
 	[[nodiscard]] uint64_t node(void *p_value) override;
@@ -167,14 +242,17 @@ godot::Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot);
 std::optional<vm::Slot> from_variant(ir::Kind p_kind, const godot::Variant &p_value);
 godot::Variant untyped_to_variant(const vm::Slot &p_slot);
 std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
+std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value, godot::Variant::Type p_type);
 // Whether a value arriving from Godot may be taken as this kind, and for an engine value as the type of
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Variant &p_value);
+godot::Variant *reusable_math(const vm::Wanted &p_wanted, const godot::Variant &p_value);
 // What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
 // something else.
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
 // One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
+std::string_view value_name(int p_type);
 std::optional<int> value_type(std::string_view p_name);
 
 } // namespace kas3
