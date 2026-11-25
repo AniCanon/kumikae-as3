@@ -1,4 +1,4 @@
-// Godot and the IDE both use this plugin when exporting iOS, Android or Web projects.
+// Godot and the IDE both use this plugin when exporting iOS, Android, macOS or Web projects.
 #pragma once
 
 #if !defined(IOS_ENABLED) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(KAS3_RUNTIME_ONLY)
@@ -19,7 +19,11 @@ class AS3IOSExport : public godot::EditorExportPlugin {
 	bool ios_ = false;
 	bool web_ = false;
 	bool android_ = false;
-	godot::Ref<godot::DirAccess> android_temp_;
+	bool macos_ = false;
+	bool automatic_ = false; // Native because the mode is Automatic, not because the preset says Native.
+	godot::Ref<godot::DirAccess> library_temp_; // Where Android's or macOS's library is built, until the export ends.
+
+	void build_library();
 
 protected:
 	static void _bind_methods() {}

@@ -76,6 +76,14 @@ inline std::optional<std::filesystem::path> tools_compiler(const std::vector<std
 	return std::nullopt;
 }
 
+// The folders the developer tools may be in on macOS, the first that is there being the one in use:
+// DEVELOPER_DIR, what `xcode-select` chose, Xcode, and the command line tools.
+inline std::vector<std::string> apple_developer(const std::string &p_developer_dir) {
+	std::error_code failed;
+	return { p_developer_dir, std::filesystem::read_symlink("/var/db/xcode_select_link", failed).string(),
+		"/Applications/Xcode.app/Contents/Developer", "/Library/Developer/CommandLineTools" };
+}
+
 // The compiler: the one named, or `c++`, `clang++` or `g++`, in that order, each wherever the PATH has it.
 // None if it is not there, or if it only stands for developer tools that are not installed.
 inline std::optional<Compiler> find_compiler(const Search &p_search) {

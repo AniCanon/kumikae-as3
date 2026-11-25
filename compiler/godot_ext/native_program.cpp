@@ -19,7 +19,7 @@
 #include <mutex>
 #include <new>
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || (defined(__APPLE__) && !defined(IOS_ENABLED))
 #include <dlfcn.h>
 #include <unistd.h>
 #endif
@@ -365,14 +365,10 @@ bool NativeProgram::linked() {
 	return linked_program != nullptr;
 }
 
-std::string NativeProgram::path() {
-	if (const char *named = std::getenv("KAS3_PROGRAM_LIBRARY")) {
-		return named;
-	}
-#if defined(IOS_ENABLED) || defined(__EMSCRIPTEN__)
-	// The watched project can be on the desktop; its host library cannot run on iOS or the Web.
-	return {};
-#elif defined(__ANDROID__)
+#if defined(__ANDROID__) || (defined(__APPLE__) && !defined(IOS_ENABLED))
+// The program library in the folder this extension was loaded from: where an export puts both (an APK's
+// libraries, a macOS app's Frameworks).
+static std::string beside_extension() {
 	Dl_info info{};
 	if (dladdr(reinterpret_cast<const void *>(&NativeProgram::path), &info) && info.dli_fname) {
 		const std::string self(info.dli_fname);
@@ -385,10 +381,29 @@ std::string NativeProgram::path() {
 		}
 	}
 	return {};
+}
+#endif
+
+std::string NativeProgram::path() {
+	if (const char *named = std::getenv("KAS3_PROGRAM_LIBRARY")) {
+		return named;
+	}
+#if defined(IOS_ENABLED) || defined(__EMSCRIPTEN__)
+	// The watched project can be on the desktop; its host library cannot run on iOS or the Web.
+	return {};
+#elif defined(__ANDROID__)
+	return beside_extension();
 #else
 	const String beside = scripts_root().path_join(String::utf8(("bin/" + SharedLibrary::file_name("kas3_program")).c_str()));
 	const String file = ProjectSettings::get_singleton()->globalize_path(beside);
-	return FileAccess::file_exists(file) ? std::string(file.utf8().get_data()) : std::string();
+	if (FileAccess::file_exists(file)) {
+		return file.utf8().get_data();
+	}
+#if defined(__APPLE__)
+	return beside_extension();
+#else
+	return {};
+#endif
 #endif
 }
 
