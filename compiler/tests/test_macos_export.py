@@ -3,7 +3,9 @@
 A release export with the default (Automatic) mode builds the scripts into `libkas3_program.dylib`, for
 both of the universal preset's architectures, in the app's `Contents/Frameworks` beside the extension.
 The app then says its scripts run as native code, and prints what the interpreter prints. A library built
-from other scripts than the app's is refused with a warning, and the interpreter runs them.
+from other scripts than the app's is refused with a warning, and the interpreter runs them. Without
+developer tools for xcrun, an Automatic release export warns and leaves the scripts to the interpreter,
+and a Native export fails.
 """
 import glob
 import os
@@ -14,6 +16,7 @@ import tempfile
 
 USED = "ActionScript: the scripts run as native code."
 STALE = "it was built from other sources than the project's scripts are now"
+NO_TOOLS = "the scripts will run on the interpreter"
 LIBRARY = "libkas3_program.dylib"
 EXTENSION = "libkas3_godot.dylib"
 TEMPLATES = os.path.expanduser("~/Library/Application Support/Godot/export_templates")
@@ -162,6 +165,26 @@ def check_export(godot, extension, check):
         output = ran.stdout + ran.stderr if ran else "no binary in the app"
         check("macos export: a stale library is refused with the reason", ran is not None and STALE in output and USED not in output, output[-1500:])
         check("macos export: the interpreter then runs the scripts", ran is not None and lines(ran.stdout) == want and len(want) == 1, output[-1500:])
+
+        # No developer tools for xcrun: Automatic release falls back to the interpreter, Native is an error.
+        no_tools = dict(env, DEVELOPER_DIR=os.path.join(folder, "no-developer-tools"))
+        plain = os.path.join(folder, "no-tools", "Export Test.app")
+        os.makedirs(os.path.dirname(plain))
+        done = export(godot, project, PRESET, plain, no_tools)
+        said = done.stdout + done.stderr
+        check("macos export: without the tools, an Automatic release export succeeds", done.returncode == 0 and "ERROR" not in said, said[-1500:])
+        check("macos export: and warns that the interpreter will run the scripts", "WARNING" in said and NO_TOOLS in said, said[-1500:])
+        check("macos export: and builds no program library",
+              os.path.isdir(os.path.join(plain, "Contents")) and not os.path.exists(os.path.join(plain, "Contents", "Frameworks", LIBRARY)), said[-1500:])
+        ran = run_app(plain, env)
+        output = ran.stdout + ran.stderr if ran else "no binary in the app"
+        check("macos export: that app runs on the interpreter",
+              ran is not None and USED not in output and "WARNING" not in output and lines(ran.stdout) == want, output[-1500:])
+        forced = os.path.join(folder, "no-tools-native", "Export Test.app")
+        os.makedirs(os.path.dirname(forced))
+        done = export(godot, project, PRESET + "actionscript/native_code=1\n", forced, no_tools)
+        said = done.stdout + done.stderr
+        check("macos export: without the tools, a Native export is an error", "ERROR" in said and NO_TOOLS not in said, said[-1500:])
     print("macos export: done")
 
 
