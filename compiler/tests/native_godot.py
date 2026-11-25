@@ -143,6 +143,57 @@ class Runner:
             self.check("native: %s leaves to the library what %s says" % (label, os.path.basename(listed)), counted == wanted.get(name),
                        "\nlisted   %s\ncounted  %s\n%s" % (wanted.get(name), counted, detail))
 
+    def direct_methods(self):
+        sources = os.path.join(self.tests, "godot_direct")
+        expected = [
+            "DIRECT live Node2D",
+            "DIRECT path Node2D",
+            "DIRECT null TypeError 1009 Error #1009: Cannot access a property or method of a null object reference.",
+            "DIRECT freed TypeError 1009 Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.",
+            "DIRECT resource ShaderMaterial true",
+            "DIRECT argument Error 0 Godot rejected argument 2 of 'set_instance_custom_data'",
+            "DIRECT default [X: (1.0, 0.0), Y: (0.0, 1.0), O: (0.0, 0.0)]",
+            "DIRECT null value Error 0 Godot rejected argument 2 of 'canvas_item_add_texture_rect_region'",
+            "DIRECT tile (1, 1)",
+            "DIRECT alternating 1 2",
+            "DIRECT runs 3 4",
+            "DIRECT shelf 2 0",
+        ]
+        with tempfile.TemporaryDirectory() as where:
+            files = ["DirectCalls.as", "direct.tscn", os.path.join(self.tests, "godot_native/project.godot")]
+            project = self.project(where, sources, files)
+            library = self.library("typed engine calls", project, ["DirectCalls.as"], where)
+            if not library:
+                return
+            transforms = []
+            for mode in ("interpreter", "native"):
+                env = dict(os.environ, KAS3_NATIVE_PLAY="0", KAS3_NATIVE_COUNTS="1")
+                env.pop("KAS3_PROGRAM_LIBRARY", None)
+                if mode == "native":
+                    env["KAS3_PROGRAM_LIBRARY"] = library
+                    env["KAS3_NATIVE_ALLOCATION_PROBE"] = "DirectCalls/_process"
+                run = subprocess.run([self.godot, "--headless", "--path", project, "res://direct.tscn", "--fixed-fps", "60", "--quit-after", "5"],
+                                     capture_output=True, text=True, timeout=60, env=env)
+                text = run.stdout + run.stderr
+                transforms.append([line for line in text.splitlines() if line.startswith("TRANSFORM ")])
+                self.check(mode + ": typed method results and errors", run.returncode == 0 and (USED in text) == (mode == "native")
+                           and [line for line in text.splitlines() if line.startswith("DIRECT ")] == expected
+                           and "ERROR:" not in text, text)
+                if mode == "native":
+                    allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: typed call allocations ")]
+                    self.check("native: typed construction and method arguments allocate no math values", len(allocations) >= 3
+                               and max(allocations) == 0 and "kas3: typed call boxes " not in text, text)
+                    # Three handles for the fields read once, and one for each object each element read changes to:
+                    # two objects, read at two places.
+                    handles = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: typed call handles ")]
+                    self.check("native: an element read keeps a handle on the same object", len(handles) >= 3 and set(handles) == {7}, str(handles))
+                    self.check("native: typed methods use their prepared binding", "kas3: counts " in text
+                               and not any("HostCall " + name in text for name in ("GodotObject.getClass", "Node.getParent",
+                                           "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData",
+                                           "RenderingServer.canvasItemAddTextureRectRegion", "PhysicsServer2D.bodyAddShape", "TileSetAtlasSource.createTile")), text)
+
+            self.check("native: a boxed transform keeps Godot's columns", len(transforms[0]) == 1 and transforms[0] == transforms[1], str(transforms))
+
     def method_allocations(self):
         with tempfile.TemporaryDirectory() as where:
             files = ["project.godot", os.path.join(self.tests, "bench/by_name/Matrix.as"),
@@ -190,6 +241,7 @@ class Runner:
         """The probe by the interpreter and as native code: what each run prints of it."""
         if not self.able("the native probe"):
             return
+        self.direct_methods()
         self.method_allocations()
         sources = os.path.join(self.tests, "godot_native")
         with tempfile.TemporaryDirectory() as where:

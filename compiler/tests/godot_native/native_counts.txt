@@ -1,3 +1,3 @@
 # What Probe.as, Entry.as and the test project's Places.as, Emits.as, EmitsChild.as, Loops.as, Callables.as, Kinds.as and ByName.as, as native code, leave to the library
 # in one run of probe.gd (native_godot.py).
-probe: thunks=1107 unresolved=13 handles=376 lookups=127
+probe: thunks=1078 unresolved=13 handles=376 lookups=131

@@ -43,7 +43,7 @@ output is the same to the byte.
 | `function_loops.cpp`, `function_whole.cpp` | Loops over vectors, and 32-bit integer arithmetic |
 | `function_rounds.cpp` | Where a loop goes round: the look at the host's alarm that stops a loop without end, and loops counted by a whole number |
 | `function_borrowed.cpp` | Reads that don't need a reference count |
-| `function_engine.cpp`, `function_values.cpp`, `function_signals.cpp` | Calls into Godot, Godot's value types, and `emit()` |
+| `function_engine.cpp`, `function_method.cpp`, `function_values.cpp`, `function_signals.cpp` | Calls into Godot, Godot's value types, and `emit()` |
 | `thunks` | Operations left to the interpreter's library |
 | `program_writer` | `program.h` and the program's table |
 
@@ -99,15 +99,19 @@ to give a wrong answer if the proof were wrong.
 |---|---|---|
 | Values held inline | A Godot value with parts, such as `Vector2`, that can't be `null` is a plain struct in a local, laid out as Godot lays it out. | `tests/godot_native/Probe.as` |
 | Inline math | For `Vector2` and `Vector3`, the arithmetic operators, `normalized()`, `length()`, `dot()` and `cross()` are the runtime's own code, identical to Godot's to the last bit. | `Probe.as` |
+| Transform2D construction | Rotation, scale, skew and position are combined in a native struct. A typed engine call borrows its columns directly. | `DirectCalls.as` |
 | Method binds on bare values | A property or method of a Godot object is called through Godot's method bind, with no boxed values and no lookup by name. Handle-held values with parts (such as a `Color` constant) are unboxed inline, and up to four omitted default arguments are filled from what Godot declares. | `Probe.as` |
 | Constant string names across classes | A `static const String` initialized to a single literal across the program reuses a cached Godot `StringName` on method binds and dictionary lookups, guarded by a pointer check. | `Probe.as` |
 | Fields read through their handle | A field that holds a value or a signal, read only to be used at once, is used through the field's own handle. | `Probe.as`, `fields()` |
-| Handles kept | A register given the same object again keeps the handle it has. | `Probe.as`, `fieldObjects()` |
+| Handles kept | A register given the same object again, from a field or an element of a vector, keeps the handle it has. | `Probe.as`, `fieldObjects()`; `DirectCalls.as` |
 | Results made in place | A `Dictionary`, `Array`, `Callable` or `RID` that Godot returns is written straight into a new handle. | `Probe.as`, `inHandles()` |
 | Direct `emit()` | `emit()` hands the host the values as they're held. Nothing is boxed and no name is looked up. | `tests/godot_project/Emits.as` |
 
-Everything else that asks Godot runs through a thunk: strings, arrays, callables, adding and removing
-listeners, and untyped values.
+A typed call can also pass an AS3 string as a Godot String, StringName or NodePath. The host converts
+it at the prepared method bind. A method that returns a string or an engine object gives the caller
+an owned result. Up to four parameters the call leaves out, on a typed receiver or a singleton, take
+what Godot declares, made once when the call is prepared: a value such as a `Color` as well as a
+number. Varargs methods and unresolved calls use the instruction's thunk.
 
 ## Rules
 

@@ -145,16 +145,20 @@ std::string_view parts_of(const ir::Function &p_function, uint32_t p_register) {
 	return has_parts(type) ? type : std::string_view();
 }
 
-std::vector<std::string_view> words_of(std::string_view p_text) {
+std::vector<std::string_view> words_of(std::string_view p_text, char p_separator) {
 	std::vector<std::string_view> words;
 	for (size_t at = 0; at < p_text.size();) {
-		const size_t space = std::min(p_text.find(' ', at), p_text.size());
+		const size_t space = std::min(p_text.find(p_separator, at), p_text.size());
 		if (space > at) {
 			words.push_back(p_text.substr(at, space - at));
 		}
 		at = space + 1;
 	}
 	return words;
+}
+
+std::vector<std::string_view> parameter_types(std::string_view p_list) {
+	return words_of(p_list == "-" ? std::string_view() : p_list, ',');
 }
 
 std::string number_literal(double p_value) {

@@ -32,12 +32,15 @@ namespace {
 struct InlineOperation {
 	Op op;
 	std::string_view key;
-	std::string_view operands[2];
+	std::string_view operands[4];
 	std::string_view result;
 	std::string_view text;
 };
 
 constexpr InlineOperation INLINE[] = {
+	{ Op::HostNew, "Transform2D", { "number", "Vector2" }, "Transform2D", "transform2d($0, $1)" },
+	{ Op::HostNew, "Transform2D", { "number", "Vector2", "number", "Vector2" }, "Transform2D", "transform2d($0, $1, $2, $3)" },
+	{ Op::HostNew, "Transform2D", { "Vector2", "Vector2", "Vector2" }, "Transform2D", "Transform2D{ { $0, $1, $2 } }" },
 	{ Op::HostNew, "Vector2", { "number", "number" }, "Vector2", "vector2($0, $1)" },
 	{ Op::HostOperate, "@operator.OP_ADD", { "Vector2", "Vector2" }, "Vector2", "add($0, $1)" },
 	{ Op::HostOperate, "@operator.OP_SUBTRACT", { "Vector2", "Vector2" }, "Vector2", "subtract($0, $1)" },
@@ -87,7 +90,7 @@ bool FunctionWriter::holds(uint32_t p_register, std::string_view p_type) const {
 		return held == Kind::F64;
 	}
 	if (p_type == "number") {
-		return held == Kind::F64 || whole(held);
+		return held == Kind::F64 || held == Kind::F32 || whole(held) || held == Kind::U8;
 	}
 	if (p_type == "bool") {
 		return held == Kind::Bool;
@@ -259,7 +262,7 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 	const std::string_view key = module_.engine_names[listed ? p_in.b : p_in.c].key;
 	const std::vector<uint32_t> operands = listed ? function_.argument_lists[p_in.c] : std::vector<uint32_t>{ p_in.b };
 	for (const InlineOperation &each : INLINE) {
-		const size_t wanted = each.operands[1].empty() ? 1 : 2;
+		const size_t wanted = std::find(std::begin(each.operands), std::end(each.operands), std::string_view()) - std::begin(each.operands);
 		if (each.op != p_in.op || each.key != key || operands.size() != wanted || !holds(p_in.a, each.result)) {
 			continue;
 		}
@@ -312,7 +315,7 @@ std::optional<std::string> FunctionWriter::bare_argument(uint32_t p_register, st
 		std::string *r_inside) {
 	const Kind held = kind(p_register);
 	const std::string temporary = "a" + std::to_string(p_at);
-	if (p_type == "float" && (held == Kind::F64 || held == Kind::I32 || held == Kind::U32)) {
+	if (p_type == "float" && (held == Kind::F64 || held == Kind::F32 || whole(held) || held == Kind::U8)) {
 		line("const double " + temporary + " = static_cast<double>(" + reg(p_register) + ");");
 		return "&" + temporary;
 	}
@@ -379,11 +382,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		}
 		receiver = list[0];
 		given.assign(list.begin() + 1, list.end());
-		for (size_t at = 0; words[4] != "-" && at <= words[4].size();) {
-			const size_t comma = std::min(words[4].find(',', at), words[4].size());
-			parameters.push_back(words[4].substr(at, comma - at));
-			at = comma + 1;
-		}
+		parameters = parameter_types(words[4]);
 		out = p_in.a;
 		result = words[3];
 	} else {
@@ -447,13 +446,15 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}
 	line("} else");
-	generic(p_in);
+	if (!engine_method(p_in)) {
+		generic(p_in);
+	}
 	line("}");
 	return true;
 }
 
 bool FunctionWriter::engine(const Instruction &p_in) {
-	return engine_alias(p_in) || engine_inline(p_in) || engine_emit(p_in) || engine_value(p_in) || engine_bound(p_in);
+	return engine_alias(p_in) || engine_inline(p_in) || engine_emit(p_in) || engine_value(p_in) || engine_bound(p_in) || engine_method(p_in);
 }
 
 } // namespace backend_cpp

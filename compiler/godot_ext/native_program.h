@@ -6,7 +6,7 @@
 #pragma once
 
 #include "godot_host.h"
-#include "native_host.h"
+#include "native_method.h"
 #include "shared_library.h"
 
 #include <godot_cpp/variant/string_name.hpp>
@@ -22,6 +22,7 @@ class NativeProgram {
 	std::unique_ptr<rt::Host> host_;
 	std::vector<godot::StringName> names_; // The program's names, each built once; never moved once made.
 	std::vector<void *> singletons_; // The handles kept for the singletons it uses, and for the constants.
+	std::vector<std::unique_ptr<NativeMethod>> methods_;
 	GodotHost &engine_;
 
 	explicit NativeProgram(GodotHost &p_engine) :
@@ -51,9 +52,7 @@ public:
 	vm::Interpreter &interpreter() { return *host_->interpreter; }
 	// Godot calling a function of the scripts: the generated function itself where nothing of the
 	// interpreter's is in progress (rt::Host::enter).
-	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
-		return host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
-	}
+	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result);
 	// Whether a function of the scripts is in progress, generated or the interpreter's: the scripts are not
 	// reloaded meanwhile.
 	bool running() const { return host_->interpreter->in_call() || host_->interpreter->depth() > 0 || host_->context.depth > 0; }
