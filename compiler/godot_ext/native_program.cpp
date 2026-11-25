@@ -11,6 +11,10 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 
+#if defined(KAS3_TEST_COUNTS)
+#include "../tests/script_read_allocations.h"
+#endif
+
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -57,6 +61,7 @@ bool has_parts(int p_type) {
 
 #if defined(KAS3_TEST_COUNTS)
 // How many times generated code asked for the object behind a handle (rt::Host::object_lookups).
+thread_local std::array<size_t, PARTS> boxes{};
 uint64_t looked_up = 0;
 uint64_t lookups() {
 	return looked_up;
@@ -127,6 +132,9 @@ void *object_behind(void *p_handle) {
 }
 
 void *box(rt::Parts p_type, const void *p_value) {
+#if defined(KAS3_TEST_COUNTS)
+	++boxes[static_cast<size_t>(p_type)];
+#endif
 	const int type = godot_type(p_type);
 	Variant zero;
 	GDExtensionCallError error;
@@ -352,6 +360,24 @@ extern "C" GDE_EXPORT void kas3_ios_set_program(const rt::Program *p_program) {
 	linked_program = p_program;
 }
 #endif
+
+bool NativeProgram::call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
+#if defined(KAS3_TEST_COUNTS)
+	static const char *watched = std::getenv("KAS3_NATIVE_ALLOCATION_PROBE");
+	if (watched && host_->module.functions[p_function].name == watched) {
+		const auto before = boxes;
+		ScriptReadAllocations allocations(true, "typed call");
+		const bool ok = host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
+		for (size_t i = 0; i < PARTS; ++i) {
+			if (boxes[i] != before[i]) {
+				std::fprintf(stderr, "kas3: typed call boxes %s %zu\n", rt::PARTS_NAMES[i], boxes[i] - before[i]);
+			}
+		}
+		return ok;
+	}
+#endif
+	return host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
+}
 
 bool NativeProgram::linked() {
 	return linked_program != nullptr;

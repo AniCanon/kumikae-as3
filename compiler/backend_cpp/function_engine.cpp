@@ -32,12 +32,15 @@ namespace {
 struct InlineOperation {
 	Op op;
 	std::string_view key;
-	std::string_view operands[2];
+	std::string_view operands[4];
 	std::string_view result;
 	std::string_view text;
 };
 
 constexpr InlineOperation INLINE[] = {
+	{ Op::HostNew, "Transform2D", { "number", "Vector2" }, "Transform2D", "transform2d($0, $1)" },
+	{ Op::HostNew, "Transform2D", { "number", "Vector2", "number", "Vector2" }, "Transform2D", "transform2d($0, $1, $2, $3)" },
+	{ Op::HostNew, "Transform2D", { "Vector2", "Vector2", "Vector2" }, "Transform2D", "Transform2D{ { $0, $1, $2 } }" },
 	{ Op::HostNew, "Vector2", { "number", "number" }, "Vector2", "vector2($0, $1)" },
 	{ Op::HostOperate, "@operator.OP_ADD", { "Vector2", "Vector2" }, "Vector2", "add($0, $1)" },
 	{ Op::HostOperate, "@operator.OP_SUBTRACT", { "Vector2", "Vector2" }, "Vector2", "subtract($0, $1)" },
@@ -87,7 +90,7 @@ bool FunctionWriter::holds(uint32_t p_register, std::string_view p_type) const {
 		return held == Kind::F64;
 	}
 	if (p_type == "number") {
-		return held == Kind::F64 || whole(held);
+		return held == Kind::F64 || held == Kind::F32 || whole(held) || held == Kind::U8;
 	}
 	if (p_type == "bool") {
 		return held == Kind::Bool;
@@ -259,7 +262,7 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 	const std::string_view key = module_.engine_names[listed ? p_in.b : p_in.c].key;
 	const std::vector<uint32_t> operands = listed ? function_.argument_lists[p_in.c] : std::vector<uint32_t>{ p_in.b };
 	for (const InlineOperation &each : INLINE) {
-		const size_t wanted = each.operands[1].empty() ? 1 : 2;
+		const size_t wanted = std::find(std::begin(each.operands), std::end(each.operands), std::string_view()) - std::begin(each.operands);
 		if (each.op != p_in.op || each.key != key || operands.size() != wanted || !holds(p_in.a, each.result)) {
 			continue;
 		}

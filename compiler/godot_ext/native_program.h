@@ -52,9 +52,7 @@ public:
 	vm::Interpreter &interpreter() { return *host_->interpreter; }
 	// Godot calling a function of the scripts: the generated function itself where nothing of the
 	// interpreter's is in progress (rt::Host::enter).
-	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
-		return host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
-	}
+	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result);
 	// Whether a function of the scripts is in progress, generated or the interpreter's: the scripts are not
 	// reloaded meanwhile.
 	bool running() const { return host_->interpreter->in_call() || host_->interpreter->depth() > 0 || host_->context.depth > 0; }

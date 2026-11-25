@@ -99,6 +99,7 @@ to give a wrong answer if the proof were wrong.
 |---|---|---|
 | Values held inline | A Godot value with parts, such as `Vector2`, that can't be `null` is a plain struct in a local, laid out as Godot lays it out. | `tests/godot_native/Probe.as` |
 | Inline math | For `Vector2` and `Vector3`, the arithmetic operators, `normalized()`, `length()`, `dot()` and `cross()` are the runtime's own code, identical to Godot's to the last bit. | `Probe.as` |
+| Transform2D construction | Rotation, scale, skew and position are combined in a native struct. A typed engine call borrows its columns directly. | `DirectCalls.as` |
 | Method binds on bare values | A property or method of a Godot object is called through Godot's method bind, with no boxed values and no lookup by name. Handle-held values with parts (such as a `Color` constant) are unboxed inline, and up to four omitted default arguments are filled from what Godot declares. | `Probe.as` |
 | Constant string names across classes | A `static const String` initialized to a single literal across the program reuses a cached Godot `StringName` on method binds and dictionary lookups, guarded by a pointer check. | `Probe.as` |
 | Fields read through their handle | A field that holds a value or a signal, read only to be used at once, is used through the field's own handle. | `Probe.as`, `fields()` |

@@ -159,21 +159,29 @@ class Runner:
             library = self.library("typed engine calls", project, ["DirectCalls.as"], where)
             if not library:
                 return
+            transforms = []
             for mode in ("interpreter", "native"):
                 env = dict(os.environ, KAS3_NATIVE_PLAY="0", KAS3_NATIVE_COUNTS="1")
                 env.pop("KAS3_PROGRAM_LIBRARY", None)
                 if mode == "native":
                     env["KAS3_PROGRAM_LIBRARY"] = library
-                run = subprocess.run([self.godot, "--headless", "--path", project, "res://direct.tscn", "--quit-after", "2"],
+                    env["KAS3_NATIVE_ALLOCATION_PROBE"] = "DirectCalls/_process"
+                run = subprocess.run([self.godot, "--headless", "--path", project, "res://direct.tscn", "--fixed-fps", "60", "--quit-after", "5"],
                                      capture_output=True, text=True, timeout=60, env=env)
                 text = run.stdout + run.stderr
+                transforms.append([line for line in text.splitlines() if line.startswith("TRANSFORM ")])
                 self.check(mode + ": typed method results and errors", run.returncode == 0 and (USED in text) == (mode == "native")
                            and [line for line in text.splitlines() if line.startswith("DIRECT ")] == expected
                            and "ERROR:" not in text, text)
                 if mode == "native":
+                    allocations = [int(line.split()[-1]) for line in text.splitlines() if line.startswith("kas3: typed call allocations ")]
+                    self.check("native: typed construction and method arguments allocate no math values", len(allocations) >= 3
+                               and max(allocations) == 0 and "kas3: typed call boxes " not in text, text)
                     self.check("native: typed methods use their prepared binding", "kas3: counts " in text
                                and not any("HostCall " + name in text for name in ("GodotObject.getClass", "Node.getParent",
                                            "Node.getNodeOrNull", "Resource.duplicate", "MultiMesh.setInstanceTransform2D", "MultiMesh.setInstanceCustomData")), text)
+
+            self.check("native: a boxed transform keeps Godot's columns", len(transforms[0]) == 1 and transforms[0] == transforms[1], str(transforms))
 
     def method_allocations(self):
         with tempfile.TemporaryDirectory() as where:

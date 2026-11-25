@@ -113,6 +113,20 @@ inline double dot(Vector2 p_a, Vector2 p_b) {
 	return p_a.x * p_b.x + p_a.y * p_b.y;
 }
 
+// Transform2D (core/math/transform_2d.cpp). Godot rounds rotation and skew before adding them.
+inline Transform2D transform2d(double p_rotation, Vector2 p_position) {
+	const float angle = static_cast<float>(p_rotation);
+	const float cosine = std::cos(angle), sine = std::sin(angle);
+	return Transform2D{ { { cosine, sine }, { -sine, cosine }, p_position } };
+}
+
+inline Transform2D transform2d(double p_rotation, Vector2 p_scale, double p_skew, Vector2 p_position) {
+	const float angle = static_cast<float>(p_rotation);
+	const float skewed = angle + static_cast<float>(p_skew);
+	return Transform2D{ { { std::cos(angle) * p_scale.x, std::sin(angle) * p_scale.x },
+			{ -std::sin(skewed) * p_scale.y, std::cos(skewed) * p_scale.y }, p_position } };
+}
+
 // Vector3 (core/math/vector3.h).
 inline Vector3 add(Vector3 p_a, Vector3 p_b) {
 	return Vector3{ p_a.x + p_b.x, p_a.y + p_b.y, p_a.z + p_b.z };
