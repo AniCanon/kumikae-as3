@@ -133,11 +133,16 @@ std::optional<fs::path> find_ndk_clang() {
 	return std::nullopt;
 }
 
-String build_android_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, String *r_library) {
-	const std::optional<fs::path> clang = find_ndk_clang();
-	if (!clang) {
-		return "Android NDK was not found (set ANDROID_NDK_HOME or install an NDK in ANDROID_HOME/ndk).";
-	}
+// A compiler for one platform's program library, and what it is told besides the shared flags.
+struct LibraryTarget {
+	String compiler;
+	PackedStringArray before; // Ahead of the shared flags, such as the tool and the architectures.
+	PackedStringArray after; // After them, such as how the library is linked.
+	const char *file = "";
+};
+
+String build_program_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, const LibraryTarget &p_target,
+		String *r_library) {
 	if (p_scripts.empty()) {
 		return {};
 	}
@@ -150,17 +155,30 @@ String build_android_library(std::vector<std::string> p_scripts, const fs::path 
 	if (!write_err.empty()) {
 		return String::utf8(write_err.c_str());
 	}
-	const fs::path out = p_stage / "libkas3_program.so";
-	PackedStringArray args = String(kas3::play::COMPILE_FLAGS).split(" ", false);
-	args.append_array(PackedStringArray({ "-shared", "-fPIC", "-fno-math-errno", "-I",
-			String::utf8((p_stage / kas3::play::HEADERS).string().c_str()),
+	const fs::path out = p_stage / p_target.file;
+	PackedStringArray args = p_target.before;
+	args.append_array(String(kas3::play::COMPILE_FLAGS).split(" ", false));
+	args.append_array(p_target.after);
+	args.append_array(PackedStringArray({ "-I", String::utf8((p_stage / kas3::play::HEADERS).string().c_str()),
 			String::utf8((p_stage / "program.cpp").string().c_str()), "-o", String::utf8(out.string().c_str()) }));
-	const String why = run(String::utf8(clang->string().c_str()), args);
+	const String why = run(p_target.compiler, args);
 	if (!why.is_empty()) {
 		return why;
 	}
 	*r_library = String::utf8(out.string().c_str());
 	return {};
+}
+
+String build_android_library(std::vector<std::string> p_scripts, const fs::path &p_stage, bool p_debug, String *r_library) {
+	const std::optional<fs::path> clang = find_ndk_clang();
+	if (!clang) {
+		return "Android NDK was not found (set ANDROID_NDK_HOME or install an NDK in ANDROID_HOME/ndk).";
+	}
+	LibraryTarget target;
+	target.compiler = String::utf8(clang->string().c_str());
+	target.after = PackedStringArray({ "-shared", "-fPIC", "-fno-math-errno" });
+	target.file = "libkas3_program.so";
+	return build_program_library(std::move(p_scripts), p_stage, p_debug, target, r_library);
 }
 
 } // namespace
