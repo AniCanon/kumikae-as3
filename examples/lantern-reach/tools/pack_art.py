@@ -15,8 +15,9 @@ def palette_image(cool):
     if cool:
         bases = [bases[i] for i in (0, 1, 2, 6)]
     # Intermediate pigments preserve the paper grain in the reduced image.
-    colours = [tuple(round(a + (b - a) * part / 7) for a, b in zip(left, right))
-               for i, left in enumerate(bases) for right in bases[i:] for part in range(8)]
+    steps = 24 if cool else 7
+    colours = [tuple(round(a + (b - a) * part / steps) for a, b in zip(left, right))
+               for i, left in enumerate(bases) for right in bases[i:] for part in range(steps + 1)]
     colours = list(dict.fromkeys(colours))
     palette = Image.new("P", (1, 1))
     palette.putpalette([v for colour in colours[:256] for v in colour])
@@ -33,42 +34,85 @@ def key(image):
     return frame
 
 
-def frames(sheet, columns, rows, row_edges):
+def frames(sheet, column_edges, row_edges):
     width, height = sheet.size
-    return [sheet.crop((round(x * width / columns), round(row_edges[y] * height),
-                        round((x + 1) * width / columns), round(row_edges[y + 1] * height)))
-            for y in range(rows) for x in range(columns)]
+    return [sheet.crop((round(left * width), round(top * height),
+                        round(right * width), round(bottom * height)))
+            for top, bottom in zip(row_edges, row_edges[1:])
+            for left, right in zip(column_edges, column_edges[1:])]
 
 
-def pack(raw, entry):
+def source_cells(raw, entry, sprite):
     sheet = Image.open(raw).convert("RGB")
     if list(sheet.size) != entry["source_size"]:
         raise ValueError(f"{raw.name} has the wrong source dimensions")
+    cols, rows = entry["columns"], entry["rows"]
+    cells = frames(key(sheet) if sprite else sheet.convert("RGBA"),
+                   entry.get("column_edges", [i / cols for i in range(cols + 1)]),
+                   entry.get("row_edges", [i / rows for i in range(rows + 1)]))
+    return cells[:entry.get("take", len(cells))]
+
+
+def join_tiles(cells, columns, size):
+    # Repeated variants meet on every side. Give each material a common edge pigment.
+    result = []
+    y, x = np.indices((size, size))
+    edge = np.minimum.reduce((x, y, size - 1 - x, size - 1 - y))
+    gain = (0.65 * np.minimum(edge / (size * 0.12), 1))[:, :, None]
+    for start in range(0, len(cells), columns):
+        row = [np.asarray(ImageOps.fit(c.convert("RGB"), (size, size), Image.Resampling.LANCZOS))
+               for c in cells[start:start + columns]]
+        pigment = np.mean(row[:2], axis=(0, 1, 2))
+        for tile in row:
+            colour = pigment + gain * (tile - tile.mean(axis=(0, 1)))
+            result.append(Image.fromarray(np.uint8(np.clip(colour, 0, 255))).convert("RGBA"))
+    return result
+
+
+def pack(directory, entry):
     cols, rows, size = entry["columns"], entry["rows"], entry["cell"]
     category = entry["category"]
     sprite = category not in ("tiles", "illustrations")
-    cells = frames(key(sheet) if sprite else sheet.convert("RGBA"), cols, rows,
-                   entry.get("row_edges", [i / rows for i in range(rows + 1)]))
-    boxes = [cell.getbbox() for cell in cells]
-    shared = max(max(box[2] - box[0], box[3] - box[1]) for box in boxes if box)
-    height = round(size * cells[0].height / cells[0].width) if category == "illustrations" else size
+    cells = []
+    extents = []
+    for source in entry.get("sources", [entry]):
+        group = source_cells(directory / (source["key"] + ".png"), source, sprite)
+        boxes = [cell.getbbox() for cell in group]
+        longest = max(max(b[2] - b[0], b[3] - b[1]) for b in boxes if b)
+        extents.extend([longest] * len(group))
+        cells.extend(group)
+    if len(cells) != cols * rows:
+        raise ValueError(f"{entry['key']} grid does not fit its sources")
+    if entry.get("join_tiles"):
+        cells = join_tiles(cells, cols, size)
+    cells = cells[:entry.get("used_frames", len(cells))]
+    height = entry.get("cell_height", round(size * cells[0].height / cells[0].width)
+                       if category == "illustrations" else size)
     atlas = Image.new("RGBA", (cols * size, rows * height))
     cool = category == "creatures" and not entry["key"].startswith("wren")
-    palette = palette_image(cool)
-    for index, (cell, box) in enumerate(zip(cells, boxes)):
+    palette = palette_image(cool or entry.get("cool_pigments", False))
+    for index, cell in enumerate(cells):
+        box = cell.getbbox()
         if box is None:
             continue
         if sprite:
             cell = cell.crop(box)
-            longest = shared if category == "creatures" else max(cell.size)
+            longest = extents[index] if category == "creatures" else max(cell.size)
             scale = size * 0.92 / longest
             cell = cell.resize((max(1, round(cell.width * scale)), max(1, round(cell.height * scale))), Image.Resampling.LANCZOS)
         else:
             cell = ImageOps.fit(cell, (size, height), Image.Resampling.LANCZOS)
         rgb = cell.convert("RGB")
         ink = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
-        frame = Image.blend(rgb, ink, 0.85 if cool else 0.65).convert("RGBA")
+        frame = (ink if entry.get("style_reference") else
+                 Image.blend(rgb, ink, 0.85 if cool else 0.65)).convert("RGBA")
         frame.putalpha(cell.getchannel("A"))
+        if entry.get("ink_spread"):
+            # A single atlas pixel of bleed keeps the heron's toes visible in the small quad.
+            spread = Image.new("RGBA", (frame.width + 2, frame.height + 2))
+            for offset in ((0, 1), (2, 1), (1, 0), (1, 2), (1, 1)):
+                spread.alpha_composite(frame, offset)
+            frame = spread
         x = index % cols * size + (size - frame.width) // 2
         y = index // cols * height + (height - frame.height) // 2
         atlas.alpha_composite(frame, (x, y))
@@ -82,7 +126,7 @@ def main():
     args = parser.parse_args()
     categories = {}
     for entry in json.loads((ART / "prompts.json").read_text()):
-        atlas = pack(args.raw / (entry["key"] + ".png"), entry)
+        atlas = pack(args.raw, entry)
         atlas.save(ART / (entry["key"] + ".png"), optimize=True)
         group = entry["category"]
         categories.setdefault(group, []).append(atlas)

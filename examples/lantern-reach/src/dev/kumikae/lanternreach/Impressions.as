@@ -12,6 +12,7 @@ package dev.kumikae.lanternreach {
         private var numbers:Vector.<Label> = new Vector.<Label>();
         private var remaining:Vector.<int> = new Vector.<int>();
         private var deaths:Vector.<Plate> = new Vector.<Plate>();
+        private var rules:Rules;
         private var signs:Plate;
         private var cursor:int;
         private var width:int;
@@ -20,6 +21,7 @@ package dev.kumikae.lanternreach {
         public var shake:Boolean = true;
 
         public function setup(game:Simulation):void {
+            rules = game.rules;
             width = game.grid.width;
             signs = new Plate("effects", 3, 3);
             for each (var def:EnemyDef in game.rules.enemies) {
@@ -56,7 +58,8 @@ package dev.kumikae.lanternreach {
             var h:int = int(plate.ink.getHeight() / plate.rows);
             body.texture = plate.ink;
             body.regionRect = new Rect2(frameIndex % plate.columns * w, int(frameIndex / plate.columns) * h, w, h);
-            body.scale = new Vector2(0.5, 0.5);
+            var scale:Number = item.kind == WorldEvent.DEATH ? rules.enemies[item.value].drawSize / Number(w) : 0.5;
+            body.scale = new Vector2(scale, scale);
             body.position = new Vector2((item.cell % width + 0.5) * 15, (int(item.cell / width) + 0.5) * 13);
             body.visible = true;
             var number:Label = numbers[cursor];

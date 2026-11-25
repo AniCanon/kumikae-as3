@@ -9,6 +9,7 @@ public partial class Impressions : Node2D {
     private List<Label> numbers = new List<Label>();
     private List<int> remaining = new List<int>();
     private List<Plate> deaths = new List<Plate>();
+    private Rules rules;
     private Plate signs;
     private int cursor;
     private int width;
@@ -17,6 +18,7 @@ public partial class Impressions : Node2D {
     public bool shake = true;
 
     public void setup(Simulation game) {
+        rules = game.rules;
         width = game.grid.width;
         signs = new Plate("effects", 3, 3);
         foreach (EnemyDef def in game.rules.enemies) {
@@ -53,7 +55,8 @@ public partial class Impressions : Node2D {
         int h = (int)(plate.ink.GetHeight() / plate.rows);
         body.Texture = plate.ink;
         body.RegionRect = new Rect2(frameIndex % plate.columns * w, (int)(frameIndex / plate.columns) * h, w, h);
-        body.Scale = new Vector2(0.5f, 0.5f);
+        float scale = item.kind == WorldEvent.DEATH ? rules.enemies[item.value].drawSize / (float)w : 0.5f;
+        body.Scale = new Vector2(scale, scale);
         body.Position = new Vector2((item.cell % width + 0.5f) * 15, ((int)(item.cell / width) + 0.5f) * 13);
         body.Visible = true;
         Label number = numbers[cursor];

@@ -35,7 +35,7 @@ package dev.kumikae.lanternreach {
             for (var i:int = 0; i < rules.enemies.length; i++) {
                 var node:MultiMeshInstance2D = new MultiMeshInstance2D();
                 var shape:QuadMesh = new QuadMesh();
-                var extent:int = i == Creature.UNDERTOW ? 85 : i == Creature.BRUTE ? 23 : 16;
+                var extent:int = rules.enemies[i].drawSize;
                 shape.size = new Vector2(extent, extent);
                 var batch:MultiMesh = new MultiMesh();
                 batch.useCustomData = true;

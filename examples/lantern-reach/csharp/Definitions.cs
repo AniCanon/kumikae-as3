@@ -16,6 +16,7 @@ public static class Definitions
             rules.enemies.Add(new EnemyDef
             {
                 key = row.GetProperty("key").GetString(),
+                drawSize = row.GetProperty("drawSize").GetInt32(),
                 health = row.GetProperty("health").GetInt32(),
                 speed = row.GetProperty("speed").GetDouble(),
                 damage = row.GetProperty("damage").GetInt32(),

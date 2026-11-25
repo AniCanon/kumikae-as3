@@ -27,7 +27,7 @@ public partial class Crowd : Node2D {
         for (int i = 0; i < rules.enemies.Count; i++) {
             MultiMeshInstance2D node = new MultiMeshInstance2D();
             QuadMesh shape = new QuadMesh();
-            int extent = i == Creature.UNDERTOW ? 85 : i == Creature.BRUTE ? 23 : 16;
+            int extent = rules.enemies[i].drawSize;
             shape.Size = new Vector2(extent, extent);
             MultiMesh batch = new MultiMesh();
             batch.UseCustomData = true;

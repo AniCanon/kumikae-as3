@@ -12,6 +12,7 @@ package dev.kumikae.lanternreach {
             for each (var enemiesRow:Object in read("enemies")) {
                 var enemiesDef:EnemyDef = new EnemyDef();
                 enemiesDef.key = enemiesRow.key;
+                enemiesDef.drawSize = enemiesRow.drawSize;
                 enemiesDef.health = enemiesRow.health;
                 enemiesDef.speed = enemiesRow.speed;
                 enemiesDef.damage = enemiesRow.damage;

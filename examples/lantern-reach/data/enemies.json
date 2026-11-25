@@ -1,9 +1,9 @@
 [
-  {"key":"swarmer","health":12,"speed":0.048,"damage":2,"xp":2,"period":75},
-  {"key":"brute","health":90,"speed":0.026,"damage":12,"xp":8,"period":60},
-  {"key":"wisp","health":16,"speed":0.067,"damage":3,"xp":3,"period":72},
-  {"key":"splitter","health":28,"speed":0.036,"damage":4,"xp":4,"period":80},
-  {"key":"lurker","health":25,"speed":0.043,"damage":6,"xp":5,"period":65},
-  {"key":"tidecaller","health":145,"speed":0.023,"damage":6,"xp":18,"period":240},
-  {"key":"undertow","health":2400,"speed":0.012,"damage":18,"xp":200,"period":280}
+  {"key":"swarmer","drawSize":22,"health":12,"speed":0.048,"damage":2,"xp":2,"period":75},
+  {"key":"brute","drawSize":36,"health":90,"speed":0.026,"damage":12,"xp":8,"period":60},
+  {"key":"wisp","drawSize":22,"health":16,"speed":0.067,"damage":3,"xp":3,"period":72},
+  {"key":"splitter","drawSize":22,"health":28,"speed":0.036,"damage":4,"xp":4,"period":80},
+  {"key":"lurker","drawSize":30,"health":25,"speed":0.043,"damage":6,"xp":5,"period":65},
+  {"key":"tidecaller","drawSize":22,"health":145,"speed":0.023,"damage":6,"xp":18,"period":240},
+  {"key":"undertow","drawSize":85,"health":2400,"speed":0.012,"damage":18,"xp":200,"period":280}
 ]
