@@ -176,7 +176,7 @@ bool in_handle(int p_type) {
 // over the value a new handle keeps, which starts as the zero of the type the host kept for the place.
 void *call_kept(const void *p_bind, void *p_object, const void *const *p_arguments, const void *p_zero) {
 	Variant *made = make_handle(*static_cast<const Variant *>(p_zero));
-	call_method_bind(p_bind, p_object, p_arguments, inside(*made, made->get_type()));
+	gdextension_interface::object_method_bind_ptrcall(p_bind, p_object, p_arguments, inside(*made, made->get_type()));
 	return made;
 }
 
@@ -287,7 +287,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { &call_method_bind, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &call_native_method };
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed, &call_native_method };
 		find_values(&made);
 		return made;
 	}();

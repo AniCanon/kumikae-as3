@@ -181,10 +181,6 @@ std::unique_ptr<NativeMethod> prepare_native_method(const ir::EngineName &p_name
 	return method;
 }
 
-void call_method_bind(const void *p_bind, void *p_object, const void *const *p_arguments, void *r_result) {
-	godot::gdextension_interface::object_method_bind_ptrcall(p_bind, p_object, p_arguments, r_result);
-}
-
 void call_native_method(rt::Context *c, const rt::Resolved &p_use, rt::Ref p_receiver, void *p_object,
 		const void **p_arguments, uint32_t p_handles, vm::Slot *r_result, void *r_parts) {
 	const auto &method = *static_cast<const NativeMethod *>(p_use.method);
@@ -203,7 +199,7 @@ void call_native_method(rt::Context *c, const rt::Resolved &p_use, rt::Ref p_rec
 	}
 	Values text;
 	const uint32_t mismatched = convert_arguments(worked, p_arguments, p_handles, text);
-	auto ptrcall = [&](void *out) { call_method_bind(worked.bound, p_object, p_arguments, out); };
+	auto ptrcall = [&](void *out) { godot::gdextension_interface::object_method_bind_ptrcall(worked.bound, p_object, p_arguments, out); };
 	Variant result;
 	std::string error;
 	if (mismatched) {
