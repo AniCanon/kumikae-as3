@@ -1,0 +1,260 @@
+[
+  {
+    "key": "beacons",
+    "prompt": "Three stone tower beacons in a row by one row. Each is a circular stone crown, strict architectural plan from overhead. First beacon completely dark, second has an amber wick, third has brilliant amber light with a bone core. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.  Entire image has a pure flat #FF00FF background. Center each full sprite in its invisible cell with at least 17% untouched margin on every side. Read from left to right then top to bottom. No cell borders.",
+    "columns": 3,
+    "rows": 1,
+    "category": "structures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      2172,
+      724
+    ]
+  },
+  {
+    "key": "brute",
+    "prompt": "Six brute tokens for a game sprite sheet. EXACT layout 3 columns by 2 rows. A precise orthographic MAP TOKEN, seen by a camera exactly 90 degrees above the crown. Each head faces north, away from us; we see horizontal upper surfaces only. No faces looking toward the viewer, no side elevations, no visible torsos, no shadow. Centered and fully within 65% of each cell; empty unbroken flat magenta #FF00FF fills the backdrop. Gouache flecks, three cool inks only: indigo #1b1f3a, teal #5f7f86, bone #efe6d2. Eye spots are small hollow bone rings, never amber. No lettering. A heavy horizontal ship anchor lying flat, with two skeletal flukes and one long straight shank pointed NORTH. Barnacle ridges, two hollow bone eye spots and tangled teal ropes, no humanoid limbs. First five poses are a locomotion loop with tiny changes in flex and limbs and position of coils. Final sixth frame is a collapsed dead form.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "cards",
+    "prompt": "Eight separate equal full-bleed landscape illustration panels printed in a strict 2-column 4-row grid, with straight boundaries and no gutters. Each panel is a different top-down scene in the same keeper's maritime almanac. Row 1 left an iron lantern being trimmed on a worn work table; right a bell barely visible just under the bay water. Row 2 left wet boot prints walking along the boardwalk and out to sea; right two open log pages showing the same faint illegible pencil marks, with no readable text. Row 3 left wreckage and huge chain coils stirring under the tide; right sunrise light falling on all three burning stone lighthouse crowns through clearing fog. Row 4 left the cold empty desk with a new blank log page and a wet sleeve; right a supply boat moored to a lonely pier at night. Restrained cinematic gouache, sharp focal silhouettes in wide pools of negative space. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 2,
+    "rows": 4,
+    "category": "illustrations",
+    "cell": 480,
+    "seed": null,
+    "source_size": [
+      1086,
+      1448
+    ]
+  },
+  {
+    "key": "controls",
+    "prompt": "Game interface sprites from an antique maritime almanac, 3 columns by 2 rows invisible cells on flat #ff00ff. Top row: simple blank wide ruled bone paper label button, pressed indigo ink-washed button, wide open thin ornamental bone frame with transparent magenta center. Bottom row: distinct small compass needle cursor, circular crosshair of bone with a tiny amber middle, square four-corner build placement cursor. All sprites centered, isolated with ample magenta margin, perfectly frontal on flat page. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 3,
+    "rows": 2,
+    "category": "ui",
+    "cell": 96,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "effects",
+    "prompt": "Nine discrete maritime game sprite effects in equal squares, exactly 3 by 3. Row 1 amber sliver of light, a slender pointed harpoon, ember-red pitch flame. Row 2 thin circular bone bell-pulse ring, pale foam splash, a kelp-colored salvage glint. Row 3 tapered indigo dash streak, amber crescent swing of a lantern, fractured bone-white hit flash. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.  Entire image has a pure flat #FF00FF background. Center each full sprite in its invisible cell with at least 17% untouched margin on every side. Read from left to right then top to bottom. No cell borders.",
+    "columns": 3,
+    "rows": 3,
+    "category": "effects",
+    "cell": 48,
+    "seed": null,
+    "source_size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "key": "lurker",
+    "prompt": "Original animated creature spritesheet in exactly three columns and two rows, six equal square invisible cells, bright solid flat #FF00FF background. Marsh heron made of a thin ink shadow. From straight overhead its long beak points north, its thin bent legs trail, two small pale hollow eyes shine. Deliberate stalking gait. First five frames in reading order form an animated movement loop, the sixth is a collapsed death pose. Each body stays centered on the same pivot in the central 60\u201365% of its cell, constant size and direction; every limb stays inside with generous empty margin on every side. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "paper",
+    "prompt": "Flat overhead scan of an old open lighthouse station logbook, spine straight down center; two broad flat softly ruled blank bone paper pages, gentle tea stain and a thumb smudge. No writing or marks resembling letters. Cover is indigo cloth, thin dark edge against an indigo surface, no other items. 3:2 horizontal, symmetrical book almost fills image, restrained flat gouache dry ink. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 1,
+    "rows": 1,
+    "category": "illustrations",
+    "cell": 720,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "splitter",
+    "prompt": "Six splitter tokens for a game sprite sheet. EXACT layout 3 columns by 2 rows. A precise orthographic MAP TOKEN, seen by a camera exactly 90 degrees above the crown. Each head faces north, away from us; we see horizontal upper surfaces only. No faces looking toward the viewer, no side elevations, no visible torsos, no shadow. Centered and fully within 65% of each cell; empty unbroken flat magenta #FF00FF fills the backdrop. Gouache flecks, three cool inks only: indigo #1b1f3a, teal #5f7f86, bone #efe6d2. Eye spots are small hollow bone rings, never amber. No lettering. A jellyfish seen ONLY through the TOP of its circular translucent glassy umbrella, radial segments and hollow bone eye marks on its upper dome; four ribbon tentacles spread radially flat beneath it. No face. First five poses are a locomotion loop with tiny changes in flex and limbs and position of coils. Final sixth frame is a collapsed dead form.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "stamps",
+    "prompt": "25 small monochrome woodcut stamps as a sprite atlas, an EXACT even 5 by 5 square grid. Each is bone ink on flat #FF00FF, compact, large bold emblems without a rim, centered with clear magenta around it. Reading across: wick, boots, horseshoe magnet, convex lens, spark; orbiting moons, bellows, spanner, chart dividers, cork float; lamp mantle, hooked staff, rope knot, tide clock, rowlock; reed switch, sextant, copper wire, oil flask, candle snuffer; signal flag, cleat, bronze clapper, glass bead, kelp leaf. Never print letters, numerals or text. The feel of worn maritime almanac engravings. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 5,
+    "rows": 5,
+    "category": "ui",
+    "cell": 48,
+    "seed": null,
+    "source_size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "key": "structures",
+    "prompt": "Orthographic architectural ROOF PLANS for a coastal town defense game. Camera points straight down 90 degrees. WE SEE ONLY ROOFS, horizontal machines and post end-grain. Eighteen isolated top surfaces in exactly THREE columns and SIX rows on flat #FF00FF, padding 15% inside every grid cell; no words or visible grid lines. Row 1: a single square amber skylight, paired square skylights, round amber skylight with iron ribs. No vertical posts visible. Row 2: a horizontal line of circular wooden post cut-ends lashed together, a double row, a spiked double row. No side views of logs or fence faces. Row 3: square wooden floor with steel harpoon pointing right, double winch, twin bolts. Row 4: round iron cage seen through its open grate, a red ember across it, three increasingly substantial types. Row 5: circular blue fog-bell crowns with central round hanging eye viewed from directly above, under two thin parallel frame rails, single to double to big. No bell skirt side elevation or hanging clappers. Row 6: a triangle of three winch beams radiating horizontally from a central coil, three increasingly complex tiers. Restrained flat maritime almanac gouache, indigo teal and bone, only lamplight is amber. Large shapes tiny details, strict zenith camera.",
+    "columns": 3,
+    "rows": 6,
+    "category": "structures",
+    "cell": 72,
+    "seed": null,
+    "source_size": [
+      1199,
+      1312
+    ],
+    "row_edges": [
+      0,
+      0.179,
+      0.319,
+      0.486,
+      0.653,
+      0.809,
+      1
+    ]
+  },
+  {
+    "key": "swarmer",
+    "prompt": "Original animated creature spritesheet in exactly three columns and two rows, six equal square invisible cells, bright solid flat #FF00FF background. Small swimming eel with translucent glass ribs picked out in bone, two hollow glowing bone eyes. A coherent eel swimming cycle; its head faces north, spine curves left to right. First five frames in reading order form an animated movement loop, the sixth is a collapsed death pose. Each body stays centered on the same pivot in the central 60\u201365% of its cell, constant size and direction; every limb stays inside with generous empty margin on every side. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "tidecaller",
+    "prompt": "Six tidecaller tokens for a game sprite sheet. EXACT layout 3 columns by 2 rows. A precise orthographic MAP TOKEN, seen by a camera exactly 90 degrees above the crown. Each head faces north, away from us; we see horizontal upper surfaces only. No faces looking toward the viewer, no side elevations, no visible torsos, no shadow. Centered and fully within 65% of each cell; empty unbroken flat magenta #FF00FF fills the backdrop. Gouache flecks, three cool inks only: indigo #1b1f3a, teal #5f7f86, bone #efe6d2. Eye spots are small hollow bone rings, never amber. No lettering. Circular green-patinated iron bell crown viewed as a disk with a suspension ring. Beneath it are only foam-tattered shoulders and two trailing bell ropes from the drowned keeper. Paint two pale eye-like holes on the TOP of the bell. No face, no feet, no clapper visible. First five poses are a locomotion loop with tiny changes in flex and limbs and position of coils. Final sixth frame is a collapsed dead form.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "tiles",
+    "prompt": "A seamless terrain atlas, eight horizontal rows, three square terrain swatches across in each row. Full bleed in every swatch. From the top: deep indigo sea; shallow blue tidal water; mudflat; marsh grass; cool sand; wood boardwalk planks; town cobble; worn dressed stone. Each row has two subtle repeating texture variants and the third a blended edge where that material feathers onto the adjacent one. Straight overhead, fine brushwork, no props, no people, no outlines or borders between tiles. Tonal variation is quiet; keep the whole atlas readable behind sprites. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 3,
+    "rows": 8,
+    "category": "tiles",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1086,
+      1448
+    ]
+  },
+  {
+    "key": "title",
+    "prompt": "Create a finished wide 16:9 wordless title illustration for Lantern Reach. It is a gouache plate printed on fine toned paper in an old maritime almanac. Strictly overhead orthographic aerial composition, no horizon. An empty indigo tidal marsh town. A narrow boardwalk weaves quietly from the lower right across the page; a lone keeper Wren in a bone oilskin and circular hood carries an amber lantern on a long pole. Behind her along the shore three stone beacon crowns cast three separate islands of amber light into the grey-teal fog. Leave the left third quiet deep indigo for a game menu. Interesting flat painted shapes, soft dry-brush edges, faint tooth and subtle print offset. Exact limited pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, paper bone #efe6d2, kelp #a3864b, lamplight #ffb347 with #ffe2a8 cores. No lettering, numbers, outlines around the page, signatures or watermarks.",
+    "columns": 1,
+    "rows": 1,
+    "category": "illustrations",
+    "cell": 960,
+    "seed": null,
+    "source_size": [
+      1672,
+      941
+    ]
+  },
+  {
+    "key": "undertow",
+    "prompt": "An overhead kit of seven isolated sprite parts in 4 columns by 2 rows, each cell square. Upper left: the huge body of a bay spirit made of wreck fragments, a broken ship hull, old lamps, cold bells and kelp with hollow bone eye lights. No attached arms. Next six cells: six individual segments of a heavy tentacle made of chain, progressing from thick base link through thinner double links to a pointed broken bell clapper tip. All segments oriented vertically. The eighth cell is completely empty magenta.  Entire image has a pure flat #FF00FF background. Center each full sprite in its invisible cell with at least 17% untouched margin on every side. Read from left to right then top to bottom. No cell borders. Strict orthographic view looking vertically down, flat hand-painted gouache silhouettes on fine toned paper, soft dry edges and a faint misregistered almanac print texture. Restricted pigments: indigo #1b1f3a, marsh #2e3a4a, fog #5f7f86, bone #efe6d2, kelp #a3864b. Only lit lanterns use amber #ffb347 and a pale #ffe2a8 core. No text, labels, numbers, grids, frames, signatures or shadows on the background.",
+    "columns": 4,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 112,
+    "seed": null,
+    "source_size": [
+      1774,
+      887
+    ]
+  },
+  {
+    "key": "wisp",
+    "prompt": "Six wisp tokens for a game sprite sheet. EXACT layout 3 columns by 2 rows. A precise orthographic MAP TOKEN, seen by a camera exactly 90 degrees above the crown. Each head faces north, away from us; we see horizontal upper surfaces only. No faces looking toward the viewer, no side elevations, no visible torsos, no shadow. Centered and fully within 65% of each cell; empty unbroken flat magenta #FF00FF fills the backdrop. Gouache flecks, three cool inks only: indigo #1b1f3a, teal #5f7f86, bone #efe6d2. Eye spots are small hollow bone rings, never amber. No lettering. An actual moth insect seen on its dorsal side, like a natural-history entomology plate straight down on the spread wings and thin horizontal insect body. Pale translucent blue wing membranes. No skull, lantern, feather or face. First five poses are a locomotion loop with tiny changes in flex and limbs and position of coils. Final sixth frame is a collapsed dead form.",
+    "columns": 3,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 64,
+    "seed": null,
+    "source_size": [
+      1536,
+      1024
+    ]
+  },
+  {
+    "key": "wren-dash",
+    "prompt": "Use the supplied overhead keeper walk sheet as exact visual reference. Create four different poses in a 2 by 2 square grid showing a quick dash north. Wren crouches under her circular hood, takes a long stride, her coat spreads back then settles. Preserve bone circular oilskin hood, foreshortened shoulders, tiny dark boots, small amber light and ink-grain brushwork. Zenith view. Same body scale in all four cells, center at the middle of every square and occupy only the central 65%. Full containment, solid #FF00FF backdrop, no detached streaks, no lettering, no grid.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1292,
+      1218
+    ],
+    "reference": "wren-walk"
+  },
+  {
+    "key": "wren-swing",
+    "prompt": "Use the supplied overhead keeper walk sheet as exact visual reference. Create four different poses in a 2 by 2 square grid showing a lantern swing across the body. The pole angles in, crosses north toward left, finishes and resets; keep the pole close and centered. Preserve bone circular oilskin hood, foreshortened shoulders, tiny dark boots, small amber light and ink-grain brushwork. Zenith view. Same body scale in all four cells, center at the middle of every square and occupy only the central 65%. Full containment, solid #FF00FF backdrop, no detached streaks, no lettering, no grid.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1292,
+      1218
+    ],
+    "reference": "wren-walk"
+  },
+  {
+    "key": "wren-walk",
+    "prompt": "Four token frames in a 2x2 grid. Vertical overhead view exactly from the zenith: a circular bone-coloured oilskin hood and the rounded shoulders form TWO concentric circles, filling 75 percent of the CHARACTER, a stub of two boots barely protrudes. Body foreshortened beneath hood, no view of the keeper's back. Pole is held HORIZONTALLY parallel to the ground and extends to the RIGHT of the circular hood, small amber #ffb347 light at its tip. Walk cycle with alternating boots and gently swaying coat. A precise orthographic MAP TOKEN, seen by a camera exactly 90 degrees above the crown. Each head faces north, away from us; we see horizontal upper surfaces only. No faces looking toward the viewer, no side elevations, no visible torsos, no shadow. Centered and fully within 65% of each cell; empty unbroken flat magenta #FF00FF fills the backdrop. Gouache flecks, three cool inks only: indigo #1b1f3a, teal #5f7f86, bone #efe6d2. Eye spots are small hollow bone rings, never amber. No lettering.",
+    "columns": 2,
+    "rows": 2,
+    "category": "creatures",
+    "cell": 80,
+    "seed": null,
+    "source_size": [
+      1292,
+      1218
+    ]
+  }
+]
