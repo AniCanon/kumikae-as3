@@ -25,5 +25,11 @@ package dev.kumikae.lanternreach.sim {
             free.push(creature.id);
             count--;
         }
+        public function clear():void {
+            slots.length = 0;
+            free.length = 0;
+            count = 0;
+        }
+
     }
 }

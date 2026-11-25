@@ -61,6 +61,7 @@ public partial class Reach : Node2D
 
     public override void _ExitTree()
     {
+        if (watch != null) watch.close();
         if (desk != null) desk.close();
         if (marsh != null) marsh.close(game.events);
         if (effects != null) effects.close(game.events);

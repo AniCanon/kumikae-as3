@@ -28,5 +28,10 @@ package dev.kumikae.lanternreach.sim {
             shot.active = false;
             free.push(shot);
         }
+        public function clear():void {
+            shots.length = 0;
+            free.length = 0;
+        }
+
     }
 }

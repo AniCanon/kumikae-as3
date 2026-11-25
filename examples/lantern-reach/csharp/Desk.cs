@@ -75,6 +75,7 @@ public partial class Desk : CanvasLayer {
     public void sheet(string heading, string body, string imageKey, int frameIndex) {
         page.Visible = true;
         status.Visible = false;
+        entry.RemoveThemeFontOverride("font");
         titleLabel.Text = heading;
         entry.Text = body;
         if (imageKey == "cards") {
@@ -99,8 +100,27 @@ public partial class Desk : CanvasLayer {
 
     public void option(int slot, string caption) {
         Button button = page.Visible ? buttons[slot] : tools[slot];
+        button.Icon = null;
         button.Text = caption;
         button.Visible = true;
         if (page.Visible && slot == 0) button.GrabFocus();
+    }
+
+    public void handwriting(int keeper) {
+        FontVariation face = new FontVariation();
+        face.BaseFont = entry.GetThemeDefaultFont();
+        face.VariationEmbolden = keeper % 2 == 0 ? 0 : 0.25f;
+        face.VariationTransform = new Transform2D(new Vector2(1, 0), new Vector2(keeper % 2 == 0 ? -0.15f : 0.08f, 1), new Vector2());
+        entry.AddThemeFontOverride("font", face);
+    }
+
+    public void stamp(int slot, int id) {
+        Texture2D ink = ResourceLoader.Load("res://assets/art/stamps.png") as Texture2D;
+        AtlasTexture image = new AtlasTexture();
+        image.Atlas = ink;
+        int side = (int)(ink.GetWidth() / 5);
+        image.Region = new Rect2(id % 5 * side, (int)(id / 5) * side, side, side);
+        buttons[slot].Icon = image;
+        buttons[slot].AddThemeConstantOverride("icon_max_width", 28);
     }
 }

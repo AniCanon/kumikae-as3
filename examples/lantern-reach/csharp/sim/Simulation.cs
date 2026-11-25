@@ -185,4 +185,25 @@ public sealed class Simulation {
         }
         return hash.finish();
     }
+
+    public List<int> wrack = new List<int>();
+
+    public void clearWatch() {
+        spawn.waves.Clear();
+        spawn.cursor = 0;
+        pool.clear();
+        shots.clear();
+        pickups.clear();
+        index.rebuild();
+        keeper.dx = 0;
+        keeper.dy = 0;
+        keeper.dash = 0;
+        keeper.recharge = 0;
+        keeper.lastShot = 0;
+        keeper.firing = false;
+        light.daylight = 160;
+        grid.revision++;
+        flow.update();
+        light.update();
+    }
 }

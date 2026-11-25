@@ -79,7 +79,7 @@ package dev.kumikae.lanternreach {
                 body.modulate = new Color(1, 1, 1, remaining[i] / 14.0);
                 if (numbers[i].visible) body.position = body.position + new Vector2(0, -0.5);
             }
-            view.position = new Vector2(shake && impact > 0 ? impact % 2 * 2 - 1 : 0, 0);
+            if (view.scale.x == 1) view.position = new Vector2(shake && impact > 0 ? impact % 2 * 2 - 1 : 0, 0);
             if (impact > 0) impact--;
         }
     }

@@ -8,4 +8,7 @@ public sealed class Rules {
     public List<StructureDef> structures = new List<StructureDef>();
     public List<WeaponDef> weapons = new List<WeaponDef>();
     public List<UpgradeDef> upgrades = new List<UpgradeDef>();
+
+    public List<NightPlan> nights = new List<NightPlan>();
+    public List<Advice> knowledge = new List<Advice>();
 }

@@ -75,4 +75,10 @@ public sealed class PickupSystem {
         foreach (int changed in moved) insert(changed);
         upgrades.offer();
     }
+
+    public void clear() {
+        shards.Clear();
+        free.Clear();
+        for (int i = 0; i < head.Count; i++) head[i] = -1;
+    }
 }

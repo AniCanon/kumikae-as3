@@ -48,6 +48,28 @@ package dev.kumikae.lanternreach {
                 upgradesDef.weight = upgradesRow.weight;
                 rules.upgrades.push(upgradesDef);
             }
+            for each (var page:Object in read("knowledge")) {
+                var advice:Advice = new Advice();
+                advice.key = page.key;
+                advice.subject = page.subject;
+                advice.value = page.value;
+                rules.knowledge.push(advice);
+            }
+            for each (var tide:Object in read("nights")) {
+                var plan:NightPlan = new NightPlan();
+                plan.duration = tide.duration;
+                for each (var tile:int in tide.shore) plan.shore.push(tile);
+                for each (var group:Array in tide.waves) {
+                    var wave:Wave = new Wave();
+                    wave.tick = group[0];
+                    wave.kind = group[1];
+                    wave.count = group[2];
+                    wave.depth = group[3];
+                    wave.name = group[4];
+                    plan.waves.push(wave);
+                }
+                rules.nights.push(plan);
+            }
             return rules;
         }
     }

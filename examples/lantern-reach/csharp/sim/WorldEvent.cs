@@ -24,4 +24,7 @@ public sealed class WorldEvent {
         cell = tile;
         value = amount;
     }
+
+    public const int DAWN = 11;
+    public const int LOST_WATCH = 12;
 }

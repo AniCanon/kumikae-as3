@@ -50,6 +50,7 @@ package dev.kumikae.lanternreach {
         }
 
         override public function _exitTree():void {
+            if (watch != null) watch.close();
             if (desk != null) desk.close();
             if (marsh != null) marsh.close(game.events);
             if (effects != null) effects.close(game.events);

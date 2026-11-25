@@ -70,5 +70,11 @@ package dev.kumikae.lanternreach.sim {
             for each (var changed:int in moved) insert(changed);
             upgrades.offer();
         }
+        public function clear():void {
+            shards.length = 0;
+            free.length = 0;
+            for (var i:int = 0; i < head.length; i++) head[i] = -1;
+        }
+
     }
 }

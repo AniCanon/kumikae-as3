@@ -76,5 +76,12 @@ package dev.kumikae.lanternreach.sim {
             placed.splice(placed.indexOf(tower), 1);
             events.post(WorldEvent.DESTROYED, cell, tower.kind);
         }
+        public function restore(tower:Structure):void {
+            tower.policy = tower.branch == 1 ? new Strongest() : tower.branch == 2 ? new FirstAlongPath() : new Nearest();
+            placed.push(tower);
+            at[tower.cell] = tower;
+            if (tower.kind == Structure.WALL) grid.walls[tower.cell] = true;
+        }
+
     }
 }

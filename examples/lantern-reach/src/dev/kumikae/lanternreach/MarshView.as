@@ -34,6 +34,7 @@ package dev.kumikae.lanternreach {
         public var accessible:Boolean;
 
         public function setup(game:Simulation):void {
+            for each (var cell:int in game.grid.beacons) original.push(cell);
             tiles = new Plate("tiles", 3, 8);
             towers = new Plate("structures", 3, 6);
             beacons = new Plate("beacons", 3, 1);
@@ -87,8 +88,16 @@ package dev.kumikae.lanternreach {
                 towers.paint(canvas, tower.kind * 3 + tower.tier - 1, (tower.cell % game.grid.width + 0.5) * 15,
                     (int(tower.cell / game.grid.width) + 0.5) * 13, 24, 24);
             }
-            for each (var beacon:int in game.grid.beacons) {
-                beacons.paint(canvas, 2, (beacon % game.grid.width + 0.5) * 15, (int(beacon / game.grid.width) + 0.5) * 13, 40, 40);
+            for each (var beacon:int in original) {
+                beacons.paint(canvas, game.grid.beacons.indexOf(beacon) >= 0 || sunrise > 0 ? 2 : 0, (beacon % game.grid.width + 0.5) * 15, (int(beacon / game.grid.width) + 0.5) * 13, 40, 40);
+            }
+            for (var k:int = 0; k < game.wrack.length; k++) {
+                var cell:int = game.wrack[k];
+                if (cell < 0) continue;
+                var x:Number = cell % game.grid.width + 0.5;
+                var y:Number = int(cell / game.grid.width) + 0.5;
+                if (marked[k] || Math.abs(game.keeper.x - x) + Math.abs(game.keeper.y - y) < 12)
+                    debris.paint(canvas, 5, x * 15, y * 13, marked[k] ? 22 : 14, marked[k] ? 22 : 14);
             }
             for each (var shot:Shot in game.shots.shots) {
                 if (shot.active) debris.paint(canvas, 1, shot.x * 15, shot.y * 13, 12, 12);
@@ -111,7 +120,19 @@ package dev.kumikae.lanternreach {
             for (var i:int = 0; i < game.light.level.length; i++) pixels.set(i, game.light.level[i]);
             chart.update(Image.createFromData(game.grid.width, game.grid.height, false, Image.FORMAT_L8, pixels));
             fog.setShaderParameter("tide", game.tick / 60.0);
+            fog.setShaderParameter("sunrise", sunrise);
             fog.setShaderParameter("accessible", accessible);
         }
+        public var marked:Vector.<Boolean> = new <Boolean>[false, false, false];
+        private var original:Vector.<int> = new Vector.<int>();
+        private var sunrise:Number;
+
+        public function pullBack(frame:int):void {
+            sunrise = Math.min(1, frame / 150.0);
+            var zoom:Number = 1.12 - sunrise * 0.12;
+            scale = new Vector2(zoom, zoom);
+            position = new Vector2(480 * (1 - zoom), 260 * (1 - zoom));
+        }
+
     }
 }

@@ -1,6 +1,9 @@
 package dev.kumikae.lanternreach {
     import dev.kumikae.lanternreach.sim.*;
     import godot.CanvasLayer;
+    import godot.FontVariation;
+    import godot.Vector2;
+    import godot.Transform2D;
     import godot.Control;
     import godot.PackedScene;
     import godot.ResourceLoader;
@@ -82,6 +85,7 @@ package dev.kumikae.lanternreach {
         public function sheet(heading:String, body:String, imageKey:String, frameIndex:int):void {
             page.visible = true;
             status.visible = false;
+            entry.removeThemeFontOverride("font");
             titleLabel.text = heading;
             entry.text = body;
             if (imageKey == "cards") {
@@ -106,9 +110,28 @@ package dev.kumikae.lanternreach {
 
         public function option(slot:int, caption:String):void {
             var button:Button = page.visible ? buttons[slot] : tools[slot];
+            button.icon = null;
             button.text = caption;
             button.visible = true;
             if (page.visible && slot == 0) button.grabFocus();
         }
+        public function handwriting(keeper:int):void {
+            var face:FontVariation = new FontVariation();
+            face.baseFont = entry.getThemeDefaultFont();
+            face.variationEmbolden = keeper % 2 == 0 ? 0 : 0.25;
+            face.variationTransform = new Transform2D(new Vector2(1, 0), new Vector2(keeper % 2 == 0 ? -0.15 : 0.08, 1), new Vector2());
+            entry.addThemeFontOverride("font", face);
+        }
+
+        public function stamp(slot:int, id:int):void {
+            var ink:Texture2D = ResourceLoader.load("res://assets/art/stamps.png") as Texture2D;
+            var image:AtlasTexture = new AtlasTexture();
+            image.atlas = ink;
+            var side:int = int(ink.getWidth() / 5);
+            image.region = new Rect2(id % 5 * side, int(id / 5) * side, side, side);
+            buttons[slot].icon = image;
+            buttons[slot].addThemeConstantOverride("icon_max_width", 28);
+        }
+
     }
 }

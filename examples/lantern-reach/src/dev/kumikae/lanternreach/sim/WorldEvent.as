@@ -20,5 +20,8 @@ package dev.kumikae.lanternreach.sim {
             cell = tile;
             value = amount;
         }
+        public static const DAWN:int = 11;
+        public static const LOST_WATCH:int = 12;
+
     }
 }

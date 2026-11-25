@@ -80,4 +80,11 @@ public sealed class Buildings {
         placed.Remove(tower);
         events.post(WorldEvent.DESTROYED, cell, tower.kind);
     }
+
+    public void restore(Structure tower) {
+        tower.policy = tower.branch == 1 ? new Strongest() : tower.branch == 2 ? new FirstAlongPath() : new Nearest();
+        placed.Add(tower);
+        at[tower.cell] = tower;
+        if (tower.kind == Structure.WALL) grid.walls[tower.cell] = true;
+    }
 }

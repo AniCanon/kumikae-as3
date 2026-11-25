@@ -181,5 +181,26 @@ package dev.kumikae.lanternreach.sim {
             }
             return hash.finish();
         }
+        public var wrack:Vector.<int> = new Vector.<int>();
+
+        public function clearWatch():void {
+            spawn.waves.length = 0;
+            spawn.cursor = 0;
+            pool.clear();
+            shots.clear();
+            pickups.clear();
+            index.rebuild();
+            keeper.dx = 0;
+            keeper.dy = 0;
+            keeper.dash = 0;
+            keeper.recharge = 0;
+            keeper.lastShot = 0;
+            keeper.firing = false;
+            light.daylight = 160;
+            grid.revision++;
+            flow.update();
+            light.update();
+        }
+
     }
 }

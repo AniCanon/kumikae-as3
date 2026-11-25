@@ -33,4 +33,9 @@ public sealed class ShotPool {
         shot.active = false;
         free.Add(shot);
     }
+
+    public void clear() {
+        shots.Clear();
+        free.Clear();
+    }
 }

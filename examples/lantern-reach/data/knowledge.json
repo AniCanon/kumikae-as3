@@ -1,0 +1,22 @@
+[
+  {"key":"braziers","subject":"structure","value":3},
+  {"key":"firstSoundings","subject":"waves","value":1},
+  {"key":"eastWreck","subject":"shore","value":0},
+  {"key":"bells","subject":"structure","value":4},
+  {"key":"secondSoundings","subject":"waves","value":2},
+  {"key":"rigs","subject":"structure","value":5},
+  {"key":"nightFeet","subject":"waves","value":3},
+  {"key":"westWreck","subject":"shore","value":1},
+  {"key":"bellTime","subject":"timing","value":45},
+  {"key":"fourthSoundings","subject":"waves","value":4},
+  {"key":"jelly","subject":"field","value":3},
+  {"key":"northWreck","subject":"shore","value":2},
+  {"key":"wings","subject":"field","value":2},
+  {"key":"anchors","subject":"field","value":1},
+  {"key":"burning","subject":"field","value":0},
+  {"key":"fifthSoundings","subject":"waves","value":5},
+  {"key":"floodmark","subject":"timing","value":2},
+  {"key":"lastchain","subject":"timing","value":1},
+  {"key":"paths","subject":"field","value":4},
+  {"key":"lastlight","subject":"field","value":5}
+]

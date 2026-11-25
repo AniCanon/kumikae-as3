@@ -25,6 +25,7 @@ public partial class MarshView : Node2D {
     public bool accessible;
 
     public void setup(Simulation game) {
+        original.AddRange(game.grid.beacons);
         tiles = new Plate("tiles", 3, 8);
         towers = new Plate("structures", 3, 6);
         beacons = new Plate("beacons", 3, 1);
@@ -77,8 +78,16 @@ public partial class MarshView : Node2D {
             towers.paint(canvas, tower.kind * 3 + tower.tier - 1, (tower.cell % game.grid.width + 0.5) * 15,
                 ((int)(tower.cell / game.grid.width) + 0.5) * 13, 24, 24);
         }
-        foreach (int beacon in game.grid.beacons) {
-            beacons.paint(canvas, 2, (beacon % game.grid.width + 0.5) * 15, ((int)(beacon / game.grid.width) + 0.5) * 13, 40, 40);
+        foreach (int beacon in original) {
+            beacons.paint(canvas, game.grid.beacons.IndexOf(beacon) >= 0 || sunrise > 0 ? 2 : 0, (beacon % game.grid.width + 0.5) * 15, ((int)(beacon / game.grid.width) + 0.5) * 13, 40, 40);
+        }
+        for (int k = 0; k < game.wrack.Count; k++) {
+            int cell = game.wrack[k];
+            if (cell < 0) continue;
+            double x = cell % game.grid.width + 0.5;
+            double y = (int)(cell / game.grid.width) + 0.5;
+            if (marked[k] || Math.Abs(game.keeper.x - x) + Math.Abs(game.keeper.y - y) < 12)
+                debris.paint(canvas, 5, x * 15, y * 13, marked[k] ? 22 : 14, marked[k] ? 22 : 14);
         }
         foreach (Shot shot in game.shots.shots) {
             if (shot.active) debris.paint(canvas, 1, shot.x * 15, shot.y * 13, 12, 12);
@@ -101,6 +110,18 @@ public partial class MarshView : Node2D {
         for (int i = 0; i < game.light.level.Count; i++) pixels[i] = (byte)game.light.level[i];
         chart.Update(Image.CreateFromData(game.grid.width, game.grid.height, false, Image.Format.L8, pixels));
         fog.SetShaderParameter("tide", game.tick / 60.0);
+        fog.SetShaderParameter("sunrise", sunrise);
         fog.SetShaderParameter("accessible", accessible);
+    }
+
+    public List<bool> marked = new List<bool> { false, false, false };
+    private List<int> original = new List<int>();
+    private double sunrise;
+
+    public void pullBack(int frame) {
+        sunrise = Math.Min(1, frame / 150.0);
+        double zoom = 1.12 - sunrise * 0.12;
+        Scale = new Vector2((float)zoom, (float)zoom);
+        Position = new Vector2((float)(480 * (1 - zoom)), (float)(260 * (1 - zoom)));
     }
 }

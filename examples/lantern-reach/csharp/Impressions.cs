@@ -76,7 +76,7 @@ public partial class Impressions : Node2D {
             body.Modulate = new Color(1, 1, 1, remaining[i] / 14f);
             if (numbers[i].Visible) body.Position = body.Position + new Vector2(0, -0.5f);
         }
-        view.Position = new Vector2(shake && impact > 0 ? impact % 2 * 2 - 1 : 0, 0);
+        if (view.Scale.X == 1) view.Position = new Vector2(shake && impact > 0 ? impact % 2 * 2 - 1 : 0, 0);
         if (impact > 0) impact--;
     }
 }

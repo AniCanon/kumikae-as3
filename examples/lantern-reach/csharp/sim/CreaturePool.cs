@@ -30,4 +30,10 @@ public sealed class CreaturePool {
         free.Add(creature.id);
         count--;
     }
+
+    public void clear() {
+        slots.Clear();
+        free.Clear();
+        count = 0;
+    }
 }
