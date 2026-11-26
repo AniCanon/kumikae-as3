@@ -3,7 +3,6 @@
 #pragma once
 
 #include "godot_host.h"
-#include "godot_names.h"
 
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
@@ -65,6 +64,16 @@ inline bool is_freed(const godot::Variant &p_value) {
 std::string describe(const GDExtensionCallError &p_error, std::string_view p_what);
 // Text as Godot holds it.
 godot::String to_godot(std::string_view p_text);
+// The words of a name-table value, split at its spaces: "position property Vector2 get_position 3341600327 ...".
+inline std::vector<std::string_view> godot_words(std::string_view p_value) {
+	std::vector<std::string_view> words;
+	for (size_t at = 0; at <= p_value.size();) {
+		const size_t space = std::min(p_value.find(' ', at), p_value.size());
+		words.push_back(p_value.substr(at, space - at));
+		at = space + 1;
+	}
+	return words;
+}
 
 // The AS3 way of listening to a signal (`@add`, `@remove` and the rest), for GodotHost::call and get.
 bool signal_verb(const godot::Variant &p_receiver, std::string_view p_verb, const vm::Argument *p_arguments, size_t p_count,
