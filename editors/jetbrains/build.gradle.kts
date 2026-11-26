@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "app.anicanon.kumikae.as3"
-version = "0.2.10"
+version = "0.2.11"
 
 repositories {
     mavenCentral()
@@ -59,6 +59,33 @@ intellijPlatform {
     buildSearchableOptions = false
     pluginConfiguration {
         name = "Kumikae AS3"
+        changeNotes = """
+            <h3>New</h3>
+            <ul>
+              <li><b>Web.</b> Build, run and test games in a browser. New games get a Web export preset, and
+                gameplay tests run in headless Chrome or Chromium. Scripts reload in the browser as you save.</li>
+              <li><b>Native code in macOS exports.</b> Release exports build the scripts into the app. Without
+                Xcode's command line tools, an export falls back to the interpreter and says so.</li>
+              <li><b>Language.</b> Fixed-length typed arrays, <code>float</code> and <code>byte</code> vectors,
+                typed callback signatures, and Godot's methods and classes as values.</li>
+              <li><b>Completion</b> shows Godot and AS3 documentation, with compile-checked examples.</li>
+              <li><b>Run targets.</b> Adding a target sets up its Godot preset. Companion devices appear in the
+                Devices panel, and target settings are in Build &amp; Release.</li>
+              <li><b>Godot's Script editor</b> highlights and completes ActionScript.</li>
+            </ul>
+            <h3>Faster</h3>
+            <ul>
+              <li>Untyped and by-name code, and native calls into Godot, are much faster.</li>
+            </ul>
+            <h3>Fixed</h3>
+            <ul>
+              <li>Run presets load off the UI thread, and preset file errors show in the target editor.</li>
+              <li>Settings, concurrency and platform API fixes in the plugin.</li>
+              <li>AS3 names in the wizard are checked against the compiler's reserved words.</li>
+              <li>A freed Godot object read by a computed name raises the null error instead of misbehaving.</li>
+              <li>Hardened the interpreter, the binary IR loader, the language server and the Godot extension.</li>
+            </ul>
+        """.trimIndent()
         ideaVersion {
             // Runtime probes and verification cover the installed IDEA and Rider endpoints.
             sinceBuild = "261.22158.277"
